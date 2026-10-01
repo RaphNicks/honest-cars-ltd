@@ -67,6 +67,26 @@ const config = {
     similarLimit: 3,
   },
 
+  // Phone-first accounts (§7.1). OTP delivery is a seam: `console` writes the
+  // code to the server log for development, `whatsapp` and `sms` are the real
+  // providers (§11 — WhatsApp first, SMS as fallback). No provider is wired yet,
+  // so the code is only ever returned to the browser outside production.
+  auth: {
+    provider: process.env.AUTH_OTP_PROVIDER || 'console',
+    otpTtlMinutes: int(process.env.AUTH_OTP_TTL_MINUTES, 10),
+    otpLength: int(process.env.AUTH_OTP_LENGTH, 6),
+    maxVerifyAttempts: int(process.env.AUTH_MAX_VERIFY_ATTEMPTS, 5),
+    maxRequestsPerHour: int(process.env.AUTH_MAX_REQUESTS_PER_HOUR, 5),
+    sessionDays: int(process.env.AUTH_SESSION_DAYS, 30),
+    // Peppers the OTP hash and the session token. Must be set in production.
+    pepper: process.env.AUTH_PEPPER || '',
+    // Development only: echo the code in the API response so the flow can be
+    // driven without a phone. Forced off when NODE_ENV=production.
+    get showCodeInResponse() {
+      return !config.isProduction && bool(process.env.AUTH_SHOW_CODE, true);
+    },
+  },
+
   analytics: {
     ga4Id: process.env.GA4_ID || '',
     metaPixelId: process.env.META_PIXEL_ID || '',

@@ -28,6 +28,9 @@ const EVENT_NAMES = new Set([
   'dealer_application_submitted', 'dealer_login_active', 'services_enquiry_submitted',
   // Brand
   'article_read_75', 'blog_post_shared', 'deal_alert_signup', 'review_link_clicked',
+  // Auth & account — server-side extension beyond §15.1 (see services/events.js)
+  'otp_requested', 'otp_request_failed', 'otp_verify_succeeded', 'otp_verify_failed',
+  'sign_out', 'account_deleted', 'saved_car_added', 'saved_car_removed',
 ]);
 
 async function record(eventName, { payload = null, sourcePath = null, sessionId = null } = {}) {

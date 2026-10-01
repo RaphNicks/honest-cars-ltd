@@ -73,7 +73,7 @@ function bottomNav() {
       external: true,
       event: 'whatsapp_click',
     },
-    { label: 'Account', href: '/account', icon: 'account' },
+    { label: 'Account', href: '/login', icon: 'account' }, // signed-in state swaps this to /account in the partial
   ];
 }
 

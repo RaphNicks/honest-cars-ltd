@@ -23,6 +23,7 @@ import { initServiceForms } from './service-forms.js';
 import { initFlows } from './flow.js';
 import { initAddToCart, initCartPage, initCheckoutPage, initComparePage } from './cart.js';
 import { initLoadMore, initVideoFacades, initTableOfContents, initHelpful } from './blog.js';
+import { initLogin, initSaveButtons, initAccount, initSaveSearch } from './account.js';
 
 function boot() {
   bindDeclarativeEvents();
@@ -47,6 +48,10 @@ function boot() {
   initHelpful();
   initGallery();
   initCompare();
+  initLogin();
+  initSaveButtons();
+  initAccount();
+  initSaveSearch();
   observeImpressions();
 
   // --- page-specific wiring ------------------------------------------------
@@ -81,6 +86,7 @@ function boot() {
     observeImpressions();
     initCompare();
     initInfoTips();
+    initSaveButtons();
   });
 
   // A lead was created: nudge ops in the background, then be honest about it.

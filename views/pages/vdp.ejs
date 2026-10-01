@@ -290,6 +290,8 @@
                     data-source="vdp_share_copy" aria-label="Copy link">
               <%- helpers.icon('link', { size: 20 }) %>
             </button>
+            <%- include('../partials/save-button', { listing: listing, helpers: helpers, variant: 'wide' }) %>
+
             <label class="compare-toggle">
               <input type="checkbox" name="compare" value="<%= listing.id %>"
                      data-compare-toggle data-listing-id="<%= listing.id %>"

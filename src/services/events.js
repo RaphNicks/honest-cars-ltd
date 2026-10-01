@@ -34,6 +34,22 @@ const EVENTS = {
   commerce: ['view_item', 'add_to_cart', 'begin_checkout', 'purchase', 'subscription_renewed'],
   dealerB2b: ['dealer_application_submitted', 'dealer_login_active', 'services_enquiry_submitted'],
   brand: ['article_read_75', 'blog_post_shared', 'deal_alert_signup', 'review_link_clicked'],
+  /**
+   * Auth & account telemetry — an extension BEYOND §15.1, which has no auth
+   * category. Recorded server-side only (never accepted from the browser) so
+   * ops can see login health without widening the client contract. No PII:
+   * the payload carries a channel and an attempts count, never a phone number.
+   */
+  account: [
+    'otp_requested',
+    'otp_request_failed',
+    'otp_verify_succeeded',
+    'otp_verify_failed',
+    'sign_out',
+    'account_deleted',
+    'saved_car_added',
+    'saved_car_removed',
+  ],
 };
 
 /** Flat list, exposed to the browser as window.HonestCars.events.names. */
@@ -44,7 +60,13 @@ const EVENT_NAMES = Object.values(EVENTS).flat();
  * money moved, or a record created by the server itself (§11 "all amounts
  * confirmed via webhook, never client-side").
  */
-const SERVER_ONLY = new Set(['purchase', 'concierge_retainer_paid', 'subscription_renewed', 'booking_completed']);
+const SERVER_ONLY = new Set([
+  'purchase',
+  'concierge_retainer_paid',
+  'subscription_renewed',
+  'booking_completed',
+  ...['otp_requested', 'otp_request_failed', 'otp_verify_succeeded', 'otp_verify_failed', 'sign_out', 'account_deleted'],
+]);
 
 /** Client-side payload allowlist — keeps PII out of analytics (§12.2). */
 const ALLOWED_PAYLOAD_KEYS = new Set([

@@ -13,6 +13,7 @@
 
 const { query, queryOne, transaction } = require('./pool');
 const { parseJson } = require('./shape');
+const phones = require('../lib/phone');
 
 const REQUEST_TYPES = ['concierge', 'sell', 'swap', 'documents', 'research', 'parts', 'consultation', 'tracking', 'hire'];
 const REQUEST_STATUSES = ['new', 'searching', 'options_ready', 'viewings', 'closed', 'lost'];
@@ -90,7 +91,7 @@ async function createRequest({
         safeType,
         safeStatus,
         String(name || '').slice(0, 120),
-        String(phone || '').slice(0, 40),
+        phones.canonical(phone, { fallback: '' }),
         brief ? JSON.stringify(brief).slice(0, 20_000) : null,
         listingId,
         due,
@@ -124,9 +125,12 @@ async function updateStatus(trackingId, status, notes = null) {
 
 /** /account “Requests” card — phone-number-first, no password yet (§7.1). */
 async function listRequestsForPhone(phone) {
+  const shapes = phones.variants(phone);
+  if (!shapes.length) return [];
   const rows = await query(
-    'SELECT * FROM service_requests WHERE phone = ? ORDER BY created_at DESC LIMIT 20',
-    [String(phone || '').slice(0, 40)],
+    `SELECT * FROM service_requests WHERE phone IN (${shapes.map(() => '?').join(',')})
+     ORDER BY created_at DESC LIMIT 20`,
+    shapes,
   );
   return rows.map(shapeRequest);
 }
@@ -206,9 +210,13 @@ async function findByReference(reference) {
 }
 
 async function listBookingsForPhone(phone) {
-  const rows = await query('SELECT * FROM bookings WHERE phone = ? ORDER BY created_at DESC LIMIT 20', [
-    String(phone || '').slice(0, 40),
-  ]);
+  const shapes = phones.variants(phone);
+  if (!shapes.length) return [];
+  const rows = await query(
+    `SELECT * FROM bookings WHERE phone IN (${shapes.map(() => '?').join(',')})
+     ORDER BY created_at DESC LIMIT 20`,
+    shapes,
+  );
   return rows.map(shapeBooking);
 }
 

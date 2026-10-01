@@ -38,9 +38,16 @@
               aria-controls="header-search">
         <%- helpers.icon('search', { size: 22 }) %>
       </button>
-      <a class="header__search-toggle" href="/account" aria-label="Your account">
+      <% var signedIn = typeof user !== 'undefined' && Boolean(user); %>
+      <a class="header__search-toggle<%= signedIn ? ' header__search-toggle--on' : '' %>"
+         href="<%= signedIn ? '/account' : '/login' %>"
+         aria-label="<%= signedIn ? 'Your account' : 'Sign in' %>">
         <%- helpers.icon('account', { size: 22 }) %>
+        <% if (signedIn) { %><span class="visually-hidden">Signed in as <%= helpers.esc(user.shortName) %></span><% } %>
       </a>
+      <% if (!signedIn) { %>
+        <a class="header__signin" href="/login">Sign in</a>
+      <% } %>
       <a class="btn btn--primary header__cta" href="/find-my-car">Find My Car</a>
       <button class="header__menu-toggle" type="button" aria-label="Open menu"
               aria-expanded="false" aria-controls="mobile-drawer" data-drawer-open>

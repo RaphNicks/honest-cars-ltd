@@ -68,6 +68,8 @@
     <div class="car-card__actions">
       <a class="btn btn--secondary btn--sm" href="<%= listing.url %>">View</a>
 
+      <%- include('save-button', { listing: listing, helpers: helpers }) %>
+
       <label class="compare-toggle">
         <input type="checkbox" name="compare" value="<%= listing.id %>"
                data-compare-toggle data-listing-id="<%= listing.id %>"

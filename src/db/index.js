@@ -20,6 +20,7 @@ const facets = require('./facets');
 const content = require('./content');
 const requests = require('./requests');
 const commerce = require('./commerce');
+const users = require('./users');
 const leads = require('./leads');
 const analytics = require('./analytics');
 const redirects = require('./redirects');
@@ -38,6 +39,7 @@ module.exports = {
   content,
   requests,
   commerce,
+  users,
   leads,
   analytics,
   redirects,

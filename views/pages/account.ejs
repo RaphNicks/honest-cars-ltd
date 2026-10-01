@@ -1,63 +1,312 @@
 <%#
-  /account — §7.1. Phone-number-first auth (OTP via WhatsApp/SMS) is the real
-  build; this page is the phase-1 entry point and says so plainly rather than
-  faking a dashboard. Noindex (see the route).
+  /account — §7.1 dashboard. Cards, in the order the PRD lists them:
+    Requests · Bookings · Orders + tracker subscriptions · Saved cars ·
+    Saved searches · (Hire requests are requests of type hire) ·
+    Documents · Referrals (phase 2 — stated plainly, not faked)
+  Every card reads a record the public site already wrote, matched by phone.
+  Locals: user, requests, bookings, orders, subscriptions, savedCars,
+          savedSearches, hireRequests, counts, trail
 %>
-<section class="page-hero">
+<section class="page-hero page-hero--account">
   <div class="container">
     <%- include('../partials/breadcrumbs', { crumbs: trail }) %>
-    <p class="eyebrow">Account</p>
-    <h1>Your cars, requests and receipts — in one place</h1>
-    <p class="lead">
-      The account opens with your phone number and an OTP on WhatsApp. Nothing to remember, no password
-      to leak.
-    </p>
+    <div class="row row--between">
+      <div>
+        <p class="eyebrow">Your account</p>
+        <h1><%= user.name ? user.shortName + '’s cars and requests' : 'Your cars and requests' %></h1>
+        <p class="lead mb-0">
+          Signed in as <strong class="tabular"><%= user.maskedPhone %></strong>. Everything below is keyed to that
+          number, and to nothing else.
+        </p>
+      </div>
+      <div class="btn-row btn-row--tight">
+        <a class="btn btn--secondary btn--sm" href="/cars">Browse cars</a>
+        <button class="btn btn--ghost btn--sm" type="button" data-sign-out>Sign out</button>
+      </div>
+    </div>
+
+    <div class="dash-counts">
+      <% [['Requests', counts.requests], ['Bookings', counts.bookings], ['Orders', counts.orders],
+          ['Trackers', counts.subscriptions], ['Saved cars', counts.savedCars], ['Saved searches', counts.savedSearches]]
+         .forEach(function (pair) { %>
+        <span class="trust-chip"><strong class="tabular"><%= pair[1] %></strong> <%= pair[0] %></span>
+      <% }); %>
+    </div>
   </div>
 </section>
 
 <section class="section">
-  <div class="container container--narrow">
-    <div class="portal-stub">
-      <span class="portal-stub__icon"><%- helpers.icon('account', { size: 28 }) %></span>
-      <span class="phase-note">Phase 2</span>
-      <h2 class="mb-1">Sign-in opens with the portal release</h2>
-      <p class="mb-0">
-        Phase 1 ships the storefront, the concierge pipeline and the records behind it. When the account
-        opens you will see requests (concierge, sell, swap, parts), bookings, orders and receipts, saved
-        cars and searches, hire bookings, tracker subscriptions and referral status — all keyed to the phone
-        number you already use with us.
-      </p>
-      <div class="btn-row">
-        <a class="btn btn--primary" href="/find-my-car">Start a request instead</a>
-        <a class="btn btn--secondary" href="/contact">Talk to the ops desk</a>
-      </div>
-    </div>
-  </div>
-</section>
-
-<section class="section section--surface">
   <div class="container">
-    <div class="section-head">
-      <h2>What is already tracked for you</h2>
-      <p class="section-head__note mb-0">Every submission on this site already writes a record — the account is the window, not the plumbing.</p>
+    <div class="dash-grid">
+
+      <%# ---------------------------------------------------- Requests %>
+      <div class="dash-card" id="requests">
+        <div class="dash-card__head">
+          <h2 class="mb-0">Requests</h2>
+          <a class="section-head__link" href="/find-my-car">Start a search →</a>
+        </div>
+
+        <% if (!requests.length) { %>
+          <div class="empty-state">
+            <p class="mb-1">No requests yet. When you hand us a brief — a concierge search, a sell or swap, documents, parts — it shows up here with its tracking id and stage.</p>
+            <a class="btn btn--primary btn--sm" href="/find-my-car">Start a concierge search</a>
+          </div>
+        <% } else { %>
+          <ul class="account-list">
+            <% requests.forEach(function (request) { %>
+              <li class="account-item">
+                <div class="account-item__main">
+                  <span class="badge badge--ghost"><%= request.type %></span>
+                  <a class="account-item__title" href="<%= request.url %>"><%= request.trackingId %></a>
+                  <span class="account-item__meta">
+                    <span class="status-pill status-pill--<%= request.status %>"><%= request.statusLabel %></span>
+                    · opened <%= helpers.relativeDays(request.createdAt) %>
+                  </span>
+                </div>
+                <div class="account-item__side">
+                  <% if (request.slaDueAt) { %>
+                    <span class="note-inline">SLA <%= helpers.relativeDays(request.slaDueAt) %></span>
+                  <% } %>
+                  <a class="btn btn--secondary btn--sm" href="<%= request.url %>">Track</a>
+                </div>
+              </li>
+            <% }); %>
+          </ul>
+        <% } %>
+      </div>
+
+      <%# ---------------------------------------------------- Bookings %>
+      <div class="dash-card" id="bookings">
+        <div class="dash-card__head">
+          <h2 class="mb-0">Bookings</h2>
+          <a class="section-head__link" href="/services/inspection">Book an inspection →</a>
+        </div>
+
+        <% if (!bookings.length) { %>
+          <div class="empty-state">
+            <p class="mb-1">No inspections, installs or consultations booked yet. Pick a date and we come to the car.</p>
+            <a class="btn btn--primary btn--sm" href="/services/inspection">Book an inspection</a>
+          </div>
+        <% } else { %>
+          <ul class="account-list">
+            <% bookings.forEach(function (booking) { %>
+              <li class="account-item">
+                <div class="account-item__main">
+                  <span class="badge badge--ghost"><%= booking.type %></span>
+                  <span class="account-item__title tabular"><%= booking.reference %></span>
+                  <span class="account-item__meta">
+                    <%= booking.slotAt ? new Date(booking.slotAt).toDateString() : 'Date to confirm' %>
+                    <% if (booking.location) { %> · <%= booking.location %><% } %>
+                  </span>
+                </div>
+                <div class="account-item__side">
+                  <span class="status-pill status-pill--<%= booking.status %>"><%= booking.status %></span>
+                </div>
+              </li>
+            <% }); %>
+          </ul>
+        <% } %>
+      </div>
+
+      <%# ------------------------------------------------------ Orders %>
+      <div class="dash-card" id="orders">
+        <div class="dash-card__head">
+          <h2 class="mb-0">Orders</h2>
+          <a class="section-head__link" href="/shop">Go to the shop →</a>
+        </div>
+
+        <% if (!orders.length) { %>
+          <div class="empty-state">
+            <p class="mb-1">No shop orders yet — trackers, OBD2 scanners and care kits are delivered around Port Harcourt.</p>
+            <a class="btn btn--primary btn--sm" href="/shop">Browse the shop</a>
+          </div>
+        <% } else { %>
+          <ul class="account-list">
+            <% orders.forEach(function (order) { %>
+              <li class="account-item">
+                <div class="account-item__main">
+                  <a class="account-item__title tabular" href="/order/<%= order.orderNo %>"><%= order.orderNo %></a>
+                  <span class="account-item__meta">
+                    <%= helpers.formatNaira(order.totalKobo) %> · <%= order.deliveryArea %> ·
+                    <%= helpers.relativeDays(order.createdAt) %>
+                  </span>
+                </div>
+                <div class="account-item__side">
+                  <span class="status-pill status-pill--<%= order.status %>"><%= order.status.replace(/_/g, ' ') %></span>
+                  <a class="btn btn--secondary btn--sm" href="/order/<%= order.orderNo %>">View</a>
+                </div>
+              </li>
+            <% }); %>
+          </ul>
+        <% } %>
+
+        <% if (subscriptions.length) { %>
+          <h3 class="mt-3 mb-1">My tracked vehicles</h3>
+          <ul class="account-list account-list--tight">
+            <% subscriptions.forEach(function (subscription) { %>
+              <li class="account-item">
+                <div class="account-item__main">
+                  <span class="account-item__title"><%= subscription.productName %></span>
+                  <span class="account-item__meta">
+                    Order <a href="/order/<%= subscription.orderNo %>" class="tabular"><%= subscription.orderNo %></a> ·
+                    renewal <%= new Date(subscription.renewalAt).toLocaleDateString('en-NG', { day: 'numeric', month: 'short', year: 'numeric' }) %>
+                  </span>
+                </div>
+                <div class="account-item__side">
+                  <span class="status-pill status-pill--<%= subscription.deviceState %>"><%= subscription.deviceState %></span>
+                </div>
+              </li>
+            <% }); %>
+          </ul>
+          <p class="note-inline mb-0">
+            Device tracking lives in the telematics partner app (§11). Renewal reminders are sent 30, 7 and 1 day
+            before the date above once the notification layer is wired.
+          </p>
+        <% } %>
+      </div>
+
+      <%# ----------------------------------------------- Saved cars %>
+      <div class="dash-card" id="saved">
+        <div class="dash-card__head">
+          <h2 class="mb-0">Saved cars</h2>
+          <span class="note-inline">Prices re-check against the market band on every visit</span>
+        </div>
+
+        <% if (!savedCars.length) { %>
+          <div class="empty-state">
+            <p class="mb-1">Nothing saved yet. Tap <strong>Save</strong> on any car and it lands here — even if it sells, it stays for your own records.</p>
+            <a class="btn btn--primary btn--sm" href="/cars">Find something to save</a>
+          </div>
+        <% } else { %>
+          <div class="saved-grid">
+            <% savedCars.forEach(function (listing) { %>
+              <div class="saved-car" data-saved-car="<%= listing.id %>">
+                <a class="saved-car__media" href="<%= listing.url %>">
+                  <% if (listing.primaryImage) { %>
+                    <img src="<%= listing.primaryImage.url %>" alt="<%= helpers.esc(listing.primaryImage.alt) %>"
+                         <%= helpers.srcsetFor(listing.primaryImage.url) ? `srcset="${helpers.srcsetFor(listing.primaryImage.url)}" sizes="(min-width: 768px) 180px, 40vw"` : '' %>
+                         width="1200" height="900" loading="lazy" decoding="async">
+                  <% } %>
+                </a>
+                <div class="saved-car__body">
+                  <a class="saved-car__title" href="<%= listing.url %>"><%= listing.title %></a>
+                  <span class="saved-car__price tabular"><%= helpers.formatNaira(listing.priceKobo) %></span>
+                  <span class="account-item__meta">
+                    <%= listing.mileageKm ? helpers.formatMileage(listing.mileageKm) : 'Mileage TBC' %> ·
+                    <%= listing.area %> · saved <%= helpers.relativeDays(listing.savedAt) %>
+                  </span>
+                  <div class="btn-row btn-row--tight">
+                    <span class="badge <%= listing.status === 'sold' ? 'badge--sold' : 'badge--ghost' %>"><%= listing.status %></span>
+                    <button class="btn btn--ghost btn--sm" type="button"
+                            data-save-car data-listing-id="<%= listing.id %>" data-action="remove"
+                            data-source="account" data-saved="true">Remove</button>
+                  </div>
+                </div>
+              </div>
+            <% }); %>
+          </div>
+        <% } %>
+      </div>
+
+      <%# ------------------------------------------- Saved searches %>
+      <div class="dash-card" id="searches">
+        <div class="dash-card__head">
+          <h2 class="mb-0">Saved searches</h2>
+          <a class="section-head__link" href="/cars">Run a new search →</a>
+        </div>
+
+        <% if (!savedSearches.length) { %>
+          <div class="empty-state">
+            <p class="mb-1">Filter <a href="/cars">/cars</a> the way you like it, then use <strong>Save this search</strong> to keep the filter — and the alerts — here.</p>
+          </div>
+        <% } else { %>
+          <ul class="account-list">
+            <% savedSearches.forEach(function (search) { %>
+              <li class="account-item" data-saved-search="<%= search.id %>">
+                <div class="account-item__main">
+                  <a class="account-item__title" href="<%= search.url %>"><%= search.label %></a>
+                  <span class="account-item__meta"><code class="query-chip"><%= search.query %></code></span>
+                </div>
+                <div class="account-item__side">
+                  <label class="checkbox-row checkbox-row--tight">
+                    <input type="checkbox" data-search-alerts data-id="<%= search.id %>" <%= search.alertsEnabled ? 'checked' : '' %>>
+                    <span>Alerts</span>
+                  </label>
+                  <button class="btn btn--ghost btn--sm" type="button" data-delete-search data-id="<%= search.id %>">Delete</button>
+                </div>
+              </li>
+            <% }); %>
+          </ul>
+          <p class="note-inline mb-0">
+            Alerts are captured per search today; the sending side (WhatsApp/email, new-match and price-drop) lands
+            with the notification layer.
+          </p>
+        <% } %>
+      </div>
+
+      <%# ----------------------------------------------- Profile %>
+      <div class="dash-card" id="profile">
+        <div class="dash-card__head">
+          <h2 class="mb-0">Your details</h2>
+          <span class="note-inline">Keyed to <span class="tabular"><%= user.maskedPhone %></span></span>
+        </div>
+
+        <form class="stack" data-profile-form>
+          <div class="field">
+            <label class="field__label" for="profile-name">Name</label>
+            <input class="input" id="profile-name" name="name" type="text" autocomplete="name"
+                   value="<%= user.name || '' %>" placeholder="Ada Obi" required>
+          </div>
+          <div class="field">
+            <label class="field__label" for="profile-email">Email <span class="field__optional">optional</span></label>
+            <input class="input" id="profile-email" name="email" type="email" autocomplete="email"
+                   value="<%= user.email || '' %>" placeholder="you@example.com">
+            <p class="field__hint">Used for receipts and documents. We never sell it.</p>
+          </div>
+          <label class="checkbox-row">
+            <input type="checkbox" name="marketingOptIn" <%= user.marketingOptIn ? 'checked' : '' %>>
+            <span>Send me deal alerts and new-stock notes on this number or email.</span>
+          </label>
+          <div class="btn-row">
+            <button class="btn btn--primary" type="submit">Save details</button>
+            <span class="auth-message" data-profile-message role="status" aria-live="polite"></span>
+          </div>
+        </form>
+      </div>
+
+      <%# ------------------------------------- Documents & referrals %>
+      <div class="dash-card" id="documents">
+        <div class="dash-card__head">
+          <h2 class="mb-0">Documents &amp; referrals</h2>
+          <span class="phase-note">Phase 2</span>
+        </div>
+        <p class="mb-2">
+          Receipts, inspection report PDFs and memos land here as one file per job, next to your order history.
+          Referral links and reward status are specified in §7.1 too. Neither is faked in this build — the records
+          they read (orders, bookings, requests) are already the ones above.
+        </p>
+        <div class="btn-row">
+          <a class="btn btn--secondary btn--sm" href="/account/export" download>Download my data (JSON)</a>
+          <button class="btn btn--ghost btn--sm" type="button" data-account-delete>Close my account</button>
+        </div>
+
+        <form class="stack hidden" data-delete-form hidden>
+          <div class="field">
+            <label class="field__label" for="delete-confirm">Type <strong>delete</strong> to confirm</label>
+            <input class="input" id="delete-confirm" name="confirm" type="text" autocomplete="off" placeholder="delete">
+            <p class="field__hint">
+              Your account, sessions and saved cars are deleted. Requests, bookings and orders are kept for finance
+              and warranty, with your name and number removed.
+            </p>
+          </div>
+          <div class="btn-row">
+            <button class="btn btn--primary btn--danger" type="submit">Close my account</button>
+            <button class="btn btn--ghost" type="button" data-account-delete-cancel>Keep my account</button>
+          </div>
+          <p class="auth-message" data-delete-message role="status" aria-live="polite"></p>
+        </form>
+      </div>
+
     </div>
-    <div class="grid grid--3">
-      <div class="card card__body">
-        <h3>Requests</h3>
-        <p class="mb-0">Concierge, sell, swap, parts and research requests each get a tracking ID (like HC-2481) with a status page you can open right now.</p>
-      </div>
-      <div class="card card__body">
-        <h3>Bookings</h3>
-        <p class="mb-0">Inspections, installs and consultations carry a reference (HC-BK-0001) and land in the dispatch queue the moment you submit.</p>
-      </div>
-      <div class="card card__body">
-        <h3>Orders</h3>
-        <p class="mb-0">Shop orders have an order number, a receipt trail and delivery status. Trackers also create their own subscription record.</p>
-      </div>
-    </div>
-    <p class="field__hint mt-2">
-      Have a tracking ID from a confirmation message? Open it directly:
-      <a href="/concierge/HC-2481">/concierge/HC-2481</a> (demo record).
-    </p>
   </div>
 </section>

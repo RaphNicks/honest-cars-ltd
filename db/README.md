@@ -45,6 +45,26 @@ after the first deploy lands in `db/migrations/NNN-name.sql` and is recorded in
 | `002-content-and-flows.sql` | `services` template columns, `service_requests`, `bookings`, `products`, `orders`, `order_items`, `pages`, `hire_classes`, service/blog/testimonial extras |
 | `003-subscriptions-and-delivery.sql` | `delivery_areas`, `subscriptions` |
 | `004-hire-request-type.sql` | `hire` as a `service_requests.type` |
+| `005-hire-class-image.sql` | `hire_classes.image_url` |
+| `006-accounts.sql` | `users`, `auth_codes`, `sessions`, `saved_cars`, `saved_searches` (§7.1) |
+
+---
+
+## Accounts (§7.1) — the five tables behind `/login` and `/account`
+
+| Table | Holds | Rules |
+|---|---|---|
+| `users` | one row per person | `phone` is the key, stored `+234XXXXXXXXXX`; `status` is `active` / `blocked` / `deleted`; `marketing_opt_in` is explicit and revocable (NDPA) |
+| `auth_codes` | login codes | only an HMAC-SHA256 hash, never the code; `channel` (`whatsapp` / `sms` / `console`), `expires_at` (10 min), `attempts` / `max_attempts` (5), `consumed_at` for single use |
+| `sessions` | signed-in browsers | 32 random bytes hashed with SHA-256; `expires_at` (30 days) and `revoked_at`; cascades with the user |
+| `saved_cars` | shortlist | unique on `(user_id, listing_id)`; cascades with the user *and* the listing |
+| `saved_searches` | filters worth keeping | `query` is the raw query string, `alerts_enabled` is the price-drop / new-match toggle the notification layer will read |
+
+Deleting an account deletes the person and everything that belongs to them, but
+**keeps the operational paper trail**: `service_requests`, `bookings`, `orders`
+and `leads` are anonymised in place (`name` → `Deleted account`, `phone` →
+`DELETED-<id>`) rather than deleted, because finance and warranty need them.
+`src/db/users.js` is the only writer for any of this.
 
 ---
 

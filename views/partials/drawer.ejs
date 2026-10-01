@@ -29,7 +29,8 @@
     <a class="drawer__link" href="/about">About</a>
     <a class="drawer__link" href="/faq">FAQ</a>
     <a class="drawer__link" href="/contact">Contact</a>
-    <a class="drawer__link" href="/account">Account</a>
+    <% var signedIn = typeof user !== 'undefined' && Boolean(user); %>
+    <a class="drawer__link" href="<%= signedIn ? '/account' : '/login' %>"><%= signedIn ? 'Your account' : 'Sign in' %></a>
   </div>
 
   <div class="drawer__foot">

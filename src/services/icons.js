@@ -35,6 +35,8 @@ const PATHS = {
   share: '<path d="M12 4v11"/><path d="m8 8 4-4 4 4"/><path d="M6 13v6a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1v-6"/>',
   link: '<path d="M10 13a4 4 0 0 0 5.7 0l2.3-2.3a4 4 0 1 0-5.7-5.7L11 6.3"/><path d="M14 11a4 4 0 0 0-5.7 0L6 13.3a4 4 0 1 0 5.7 5.7l1.3-1.3"/>',
   heart: '<path d="M12 20s-7-4.4-7-9a4 4 0 0 1 7-2.6A4 4 0 0 1 19 11c0 4.6-7 9-7 9Z"/>',
+  heartFilled: '<path fill="currentColor" d="M12 20s-7-4.4-7-9a4 4 0 0 1 7-2.6A4 4 0 0 1 19 11c0 4.6-7 9-7 9Z"/>',
+  logout: '<path d="M15 12H4"/><path d="m7 8-4 4 4 4"/><path d="M11 4h6a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-6"/>',
   scale: '<path d="M12 4v16"/><path d="M6 8h12"/><path d="m6 8-3 6h6L6 8Z"/><path d="m18 8-3 6h6l-3-6Z"/>',
   gauge: '<path d="M4 17a9 9 0 1 1 16 0"/><path d="M12 13.5 15 10"/><circle cx="12" cy="15" r="1.6"/>',
   calendar: '<rect x="4" y="5" width="16" height="16" rx="2"/><path d="M4 10h16M9 3v4M15 3v4"/>',

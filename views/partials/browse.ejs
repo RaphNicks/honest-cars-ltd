@@ -32,10 +32,18 @@
       <noscript><button class="btn btn--secondary btn--sm" type="submit">Sort</button></noscript>
     </form>
 
-    <button class="btn btn--secondary btn--sm" type="button" data-save-search
-            data-event="saved_search_created" data-source="<%= basePath %>">
-      <%- helpers.icon('heart', { size: 18 }) %> Save search
-    </button>
+    <% if (typeof user !== 'undefined' && user) { %>
+      <button class="btn btn--secondary btn--sm" type="button" data-save-search
+              data-label="<%= typeof pageTitleForCount === 'string' ? pageTitleForCount : 'Search' %>"
+              data-event="saved_search_created" data-source="<%= basePath %>">
+        <%- helpers.icon('heart', { size: 18 }) %> Save search
+      </button>
+    <% } else { %>
+      <a class="btn btn--secondary btn--sm"
+         href="/login?next=<%= encodeURIComponent(basePath + (typeof queryString !== 'undefined' && queryString ? '?' + queryString : '')) %>">
+        <%- helpers.icon('heart', { size: 18 }) %> Save search
+      </a>
+    <% } %>
   </div>
 </div>
 

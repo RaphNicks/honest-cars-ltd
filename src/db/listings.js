@@ -384,6 +384,26 @@ function runningCostEstimate(listing) {
   return Math.round(fuel + service + insurance) * 100; // kobo
 }
 
+/**
+ * Any-status fetch for account surfaces (§7.1 saved cars): a saved car that has
+ * since sold must still render with its status badge rather than vanish.
+ */
+async function byIds(ids = [], { limit = 24 } = {}) {
+  const clean = [...new Set(ids.map((id) => Number.parseInt(id, 10)).filter((id) => Number.isFinite(id)))].slice(0, limit);
+  if (!clean.length) return [];
+  const rows = await query(
+    `SELECT l.*, d.name AS dealer_name, d.lot_area AS dealer_area, d.verified AS dealer_verified
+       FROM vehicle_listings l
+       JOIN dealers d ON d.id = l.dealer_id
+      WHERE l.id IN (${clean.map(() => '?').join(',')})`,
+    clean,
+  );
+  const listings = rows.map(shapeListing);
+  await attachMedia(listings);
+  const byId = new Map(listings.map((listing) => [listing.id, { ...listing, runningCostKobo: runningCostEstimate(listing) }]));
+  return clean.map((id) => byId.get(id)).filter(Boolean);
+}
+
 async function findByIds(ids = []) {
   const clean = ids.map((id) => Number.parseInt(id, 10)).filter((id) => Number.isFinite(id)).slice(0, 3);
   if (!clean.length) return [];
@@ -631,6 +651,7 @@ module.exports = {
   homeFeed,
   findBySlug,
   findByIds,
+  byIds,
   runningCostEstimate,
   findArchivedSoldBySlug,
   findRedirectTarget,

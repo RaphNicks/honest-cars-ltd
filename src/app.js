@@ -23,6 +23,9 @@ const { router: flowRoutes } = require('./routes/flow');
 const { router: blogRoutes } = require('./routes/blog');
 const { router: shopRoutes } = require('./routes/shop');
 const { router: pageRoutes } = require('./routes/pages');
+const { router: authRoutes } = require('./routes/auth');
+const { router: accountRoutes } = require('./routes/account');
+const auth = require('./services/auth');
 const og = require('./services/og');
 
 function createApp() {
@@ -105,7 +108,16 @@ function createApp() {
     return next();
   });
 
+  // --- Who is asking? (§7.1) ------------------------------------------------
+  // Attaches req.user and req.savedCarIds; it never blocks a request, so the
+  // public site behaves identically for signed-out visitors.
+  app.use(auth.attachUser);
+
   // --- Routes ---------------------------------------------------------------
+  // Account and sign-in come first: /login, /account and the /api/auth and
+  // /api/account endpoints must win over the marketing-page routes below.
+  app.use('/api/auth', authRoutes);
+  app.use('/', accountRoutes);
   app.use('/api', apiRoutes);
   app.use('/services', serviceRoutes);
   app.use('/', flowRoutes);

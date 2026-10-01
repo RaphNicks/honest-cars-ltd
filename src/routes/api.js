@@ -26,7 +26,7 @@ const seo = require('../services/seo');
 const og = require('../services/og');
 const listingQuery = require('../services/listing-query');
 const render = require('../lib/render');
-const { sendJson, sendFragment } = require('../lib/respond');
+const { sendJson, sendFragment, personalise } = require('../lib/respond');
 const { helpers } = require('../lib/locals');
 
 const router = express.Router();
@@ -440,11 +440,11 @@ router.get('/listings', rateLimit({ windowMs: 60_000, max: 90 }), async (req, re
       });
     }
 
-    const html = await render.renderFragment('fragment-listing-grid', {
+    const html = await render.renderFragment('fragment-listing-grid', personalise(req, {
       result,
       helpers: helpers(),
       facets,
-    });
+    }));
     return sendFragment(res, html);
   } catch (error) {
     return next(error);

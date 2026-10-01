@@ -9,6 +9,7 @@
  */
 
 const { query, queryOne, transaction } = require('./pool');
+const phones = require('../lib/phone');
 const { parseJson } = require('./shape');
 
 const DELIVERY_OPTIONS = {
@@ -123,7 +124,7 @@ async function createOrder({ name, phone, items, deliveryArea, notes = null }) {
       [
         orderNo,
         String(name || '').slice(0, 120),
-        String(phone || '').slice(0, 40),
+        phones.canonical(phone, { fallback: '' }),
         String(deliveryArea || 'Pickup at a PH meet-point').slice(0, 80),
         deliveryFee,
         subtotal,
@@ -145,7 +146,7 @@ async function createOrder({ name, phone, items, deliveryArea, notes = null }) {
           await conn.query(
             `INSERT INTO subscriptions (order_id, product_id, customer_name, customer_phone, device_state, renewal_at)
              VALUES (?, ?, ?, ?, 'ordered', DATE_ADD(UTC_TIMESTAMP(), INTERVAL 12 MONTH))`,
-            [result.insertId, line.product.id, String(name || '').slice(0, 120), String(phone || '').slice(0, 40)],
+            [result.insertId, line.product.id, String(name || '').slice(0, 120), phones.canonical(phone, { fallback: '' })],
           );
         }
       }
@@ -169,9 +170,13 @@ async function findByOrderNo(orderNo) {
 }
 
 async function listForPhone(phone) {
-  const rows = await query('SELECT * FROM orders WHERE phone = ? ORDER BY created_at DESC LIMIT 20', [
-    String(phone || '').slice(0, 40),
-  ]);
+  const shapes = phones.variants(phone);
+  if (!shapes.length) return [];
+  const rows = await query(
+    `SELECT * FROM orders WHERE phone IN (${shapes.map(() => '?').join(',')})
+     ORDER BY created_at DESC LIMIT 20`,
+    shapes,
+  );
   return rows.map((row) => shapeOrder(row));
 }
 
@@ -194,6 +199,30 @@ async function subscriptionsForOrder(orderNo) {
   }));
 }
 
+/** Tracker subscriptions belonging to a phone number (§7.1 “My tracked vehicles”). */
+async function subscriptionsForPhone(phone) {
+  const shapes = phones.variants(phone);
+  if (!shapes.length) return [];
+  const rows = await query(
+    `SELECT s.*, p.name AS product_name, o.order_no
+       FROM subscriptions s
+       JOIN products p ON p.id = s.product_id
+       JOIN orders o ON o.id = s.order_id
+      WHERE s.customer_phone IN (${shapes.map(() => '?').join(',')})
+      ORDER BY s.id DESC LIMIT 20`,
+    shapes,
+  );
+  return rows.map((row) => ({
+    id: row.id,
+    productName: row.product_name,
+    orderNo: row.order_no,
+    deviceState: row.device_state,
+    renewalAt: row.renewal_at,
+    installedAt: row.installed_at,
+    activatedAt: row.activated_at,
+  }));
+}
+
 /** Cart totals without writing anything — used to render /cart honestly. */
 function summariseCart(lines) {
   const subtotalKobo = lines.reduce((sum, line) => sum + line.product.priceKobo * line.qty, 0);
@@ -208,6 +237,7 @@ module.exports = {
   findByOrderNo,
   listForPhone,
   subscriptionsForOrder,
+  subscriptionsForPhone,
   summariseCart,
   shapeOrder,
 };

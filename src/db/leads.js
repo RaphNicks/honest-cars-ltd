@@ -6,6 +6,7 @@
  */
 
 const { query, queryOne } = require('./pool');
+const phones = require('../lib/phone');
 
 const LEAD_TYPES = ['viewing', 'concierge', 'sell_swap', 'hire', 'service', 'parts', 'b2b', 'deal_alert'];
 
@@ -18,7 +19,7 @@ async function createLead(lead) {
       type,
       lead.listingId || null,
       String(lead.name || '').slice(0, 120),
-      String(lead.phone || '').slice(0, 40),
+      phones.canonical(lead.phone, { fallback: '' }),
       lead.message ? String(lead.message).slice(0, 2000) : null,
       lead.preferredDay || null,
       String(lead.sourcePath || '/').slice(0, 200),

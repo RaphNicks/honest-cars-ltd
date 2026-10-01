@@ -5,10 +5,14 @@ The Honest Cars LTD storefront, ported from the approved specification
 **vanilla HTML, CSS and JavaScript on the front end, Node.js + Express on the
 server, MySQL for data.** No React, no Tailwind, no frontend build step.
 
-This repository currently contains the **agreed vertical slice**: the design
-system, the homepage, `/cars`, the curated facet pages, the VDP and the
-sold-archive rule — running on the real stack against a real database. The
-remaining ~27 PRD routes are ported next on these same templates.
+The **whole public storefront is ported and running** — the design system, the
+homepage, `/cars` with the curated facet pages, the VDP and the sold-archive
+rule, the nine service pages, the concierge and sell/swap funnels, the blog, the
+shop, the trust and legal pages — plus **phone-first customer accounts (§7.1)**:
+OTP sign-in, the `/account` dashboard, saved cars and saved searches. The
+remaining PRD work is the authenticated back office (§7.3 admin console), the PSP
+integration and the notification layer; see *What is built, and what comes
+next*.
 
 ---
 
@@ -104,6 +108,54 @@ Implemented once in `src/db/listings.js` and asserted in `test/routes.test.js`:
 
 ---
 
+## Customer accounts and sign-in (PRD §7.1)
+
+Phone-number-first, no passwords. `/login` is two steps on one page — number
+(plus an explicit consent tick, §12.2 NDPA) then the six-digit code — and
+`/account` is the dashboard: requests, bookings, orders with receipts,
+saved cars, saved searches with alert toggles, tracker subscriptions, and data
+export / account deletion.
+
+```
+POST /api/auth/otp      { phone }                → { ok, maskedPhone, channel, delivered, devCode? }
+POST /api/auth/verify   { phone, code, next }    → sets hc_session, returns the user + redirect
+POST /api/auth/logout                            → revokes the session
+GET  /account                                    -> dashboard (302 to /login?next=… when signed out)
+GET  /account/export                             → every row keyed to the number, as JSON
+POST /api/account/saved-cars                     → add / remove, idempotent
+POST /api/account/saved-searches                 → add / toggle alerts / delete
+POST /api/account/profile                        → name, email, marketing consent
+POST /api/account/delete                         → anonymise ops records, delete the person
+```
+
+How it is put together:
+
+* **One number, one account.** `src/lib/phone.js` normalises `0803…`, `803…`
+  and `+234 803…` to `+234XXXXXXXXXX`. Every public form writes the normalised
+  number, and every account lookup matches the shapes that might already be in
+  the table, so a concierge request made before signing in still appears on the
+  dashboard afterwards.
+* **Codes are never stored or logged in clear.** HMAC-SHA256 with a pepper
+  (`AUTH_PEPPER`), compared with `timingSafeEqual`, single-use, 10 minutes,
+  five attempts, five per number per hour. The masked number is all that
+  reaches a log line or an analytics event.
+* **Sessions** are 32 random bytes in an `HttpOnly; SameSite=Lax; Secure`-in-
+  production `hc_session` cookie; the database stores only the SHA-256 hash,
+  with expiry and revocation. Signed-in HTML is always `Cache-Control: no-store`
+  and is rendered per request — the prebuilt files in `dist/` are the signed-out
+  view.
+* **CSRF** is SameSite=Lax plus a same-origin check (`Origin` /
+  `Sec-Fetch-Site`) on every state-changing account endpoint (§12.2).
+* **OTP delivery is a seam.** `AUTH_OTP_PROVIDER=console|whatsapp|sms`. With
+  `console` (the development default) the code is logged masked and — outside
+  production only — returned as `devCode` so the flow can be driven without a
+  phone. Wiring the real provider is one function in `src/services/auth.js`.
+* **Deleting an account is honest.** The person, sessions, saved cars and saved
+  searches go; requests, bookings and orders stay for finance and warranty with
+  the name and number replaced by `Deleted account` / `DELETED-<id>`.
+
+---
+
 ## Scripts
 
 | Command | What it does |
@@ -117,7 +169,7 @@ Implemented once in `src/db/listings.js` and asserted in `test/routes.test.js`:
 | `npm run images:check` | Fail if any photo still needs preparing (CI gate) |
 | `npm run lint:type` | Six-step type-scale audit (fails the build on a violation) |
 | `npm run lint:js` | ES-module parse check + every event name against the §15.1 plan |
-| `npm test` | 70 tests: routes, sold-archive windows, facet rules, SEO schemas, filter safety, form validation, concierge/SLA rules, shop commerce |
+| `npm test` | 84 tests: routes, sold-archive windows, facet rules, SEO schemas, filter safety, form validation, concierge/SLA rules, shop commerce, OTP auth and the account dashboard |
 | `npm run check` | lint + test |
 | `npm run artifacts` | Build the static pages and re-run the type audit |
 
@@ -138,12 +190,14 @@ honest 404.
 | Funnels | `/find-my-car` (4-step concierge + `/concierge/{trackingId}` status), `/sell-swap` (3-step, free valuation < 24h) |
 | Content | `/blog`, `/blog/{slug}`, `/blog/rss.xml`, `/guide` |
 | Shop | `/shop`, `/shop/{slug}`, `/cart`, `/checkout`, `/order/{orderNo}` (guest checkout, tracker SKUs create a subscription row) |
-| Trust & company | `/verification`, `/how-it-works`, `/about`, `/faq`, `/contact`, `/partner`, `/account`, `/dealer`, `/admin` (entry pages) |
+| Trust & company | `/verification`, `/how-it-works`, `/about`, `/faq`, `/contact`, `/partner` |
+| Accounts (§7.1) | `/login` (OTP), `/account` (dashboard), `/account/export`, `/api/auth/*`, `/api/account/*` — dealer and admin remain phase-2 entry pages |
 | Legal | `/terms`, `/privacy`, `/refunds`, `/disclaimer` (placeholder wording, flagged in the DB) |
 | Machine | `/sitemap.xml`, `/robots.txt`, `/api/listings`, `/api/posts`, `/api/leads`, `/api/events`, `/api/orders`, `/api/bookings`, `/api/service-requests`, `/api/contact`, `/api/og/listing/{slug}.png`, `/api/health` |
 
-**Phase 2 — the authenticated back office** (§7.1–§7.4: customer dashboard,
-dealer portal, admin console). The public site already writes every record
+**Phase 2 — the back office** (§7.2–§7.4: dealer portal, admin console, plus the
+payments and notification integrations the customer account already has seams
+for). The public site already writes every record
 these screens read — `service_requests`, `bookings`, `orders`, `subscriptions`,
 `leads`, `analytics_events` — so this is UI, auth and workflow only. Until a
 route is ported it returns a 404 that says so, shows the slice map and links
@@ -163,12 +217,13 @@ src/
   app.js            Express wiring, CSP, static assets, redirect map
   server.js         entry point
   db/               THE data-access layer: pool, listings, facets, content,
-                    requests, commerce, ids, leads, analytics, redirects, static-pages
-  lib/              render (hybrid HTML pipeline) · locals · respond · rate-limit
+                    requests, commerce, users, ids, leads, analytics, redirects,
+                    static-pages
+  lib/              render (hybrid HTML pipeline) · locals · respond · rate-limit · phone
   services/         seo · og · icons · nav · events · sitemap · listing-query ·
-                    validate · concierge · slice
-  routes/           public · services · flow · blog · shop · pages · api ·
-                    registry (static build)
+                    validate · concierge · auth · slice
+  routes/           public · services · flow · blog · shop · pages · auth ·
+                    account · api · registry (static build)
 views/
   layouts/base      partials/ (header, drawer, footer, cards, filters, forms, …)
   pages/            home · cars · facet · vdp · sold-archive · services · service ·
@@ -177,9 +232,10 @@ views/
                     compare · verification · how-it-works · faq · contact ·
                     about · partner · page (CMS/legal) · portal-stub · 404 · 500
 public/
-  css/              tokens · base · components · pages · sections (the design system)
+  css/              tokens · base · components · pages · sections · account
+                    (the design system)
   js/               main · header · filters · leads · ui · events · flow ·
-                    service-forms · blog · cart (vanilla ES modules)
+                    service-forms · blog · cart · account (vanilla ES modules)
   fonts/            Inter 400/500/600/700, self-hosted
   img/seed/         42 placeholder media files
 assets/fonts/       Inter variable TTF, used only to render OG cards
@@ -211,14 +267,17 @@ assets/fonts/       Inter variable TTF, used only to render OG cards
 3. **Prices, phone number and legal copy are placeholders.** The business phone
    is `+2348000000000` and the CAC line is a stub — send me the real values
    (§19 open questions) and I will update `.env` and the copy.
-4. **Payments, WhatsApp Cloud API, OTP and email are not wired.** Everything
-   that will call them (leads, service requests, analytics events) already
-   exists and posts to our own endpoints, so the integration points are ready.
-6. **Payments are a seam, not an integration.** Checkout writes a
+4. **The integrations are seams, not services.** Checkout writes a
    `pending_payment` order with a `HC-ORD-` number and hands off to WhatsApp;
-   the PSP call, webhook and `payment_ref` column are stubbed (§11). Same for
-   the WhatsApp Cloud API and OTP login.
-5. **Visual QA was structural, not visual.** There is no browser or headless
+   the PSP call, webhook and `payment_ref` column are stubbed (§11). The same is
+   true of the WhatsApp Cloud API, SMS and email: `AUTH_OTP_PROVIDER` selects
+   the delivery channel and the `console` provider is the development default.
+   Every record the real services will read already exists.
+5. **No CI and no container.** The gates exist as scripts
+   (`npm run check`, `check-links`, `images:check`) but nothing runs them on
+   push yet; there is no Dockerfile or compose file (§17). Worth adding before
+   the first deploy.
+6. **Visual QA was structural, not visual.** There is no browser or headless
    renderer in this sandbox — it is verified by rendered HTML, computed
    markup checks, CORS-free link crawling and OG-card renders. Your eyes on the
    live preview are the visual sign-off.

@@ -13,7 +13,8 @@
  *   GET /guide          evergreen shelf — start-here reading path
  *   GET /partner        B2B dealer recruitment + packages
  *   GET /terms /privacy /refunds /disclaimer   CMS-driven legal pages
- *   GET /account /login /dealer /admin         entry stubs, noindex
+ *   GET /dealer /admin                        phase-2 entry stubs, noindex
+ *   GET /account /login                       §7.1 — served by routes/account.js
  */
 
 const express = require('express');
@@ -467,36 +468,6 @@ for (const slug of LEGAL_SLUGS) {
 // ---------------------------------------------------------------------------
 // Account / portal entry points — §7.1 and §7.2 interiors are phase 2.
 // ---------------------------------------------------------------------------
-async function buildAccountLocals() {
-  const trail = [{ label: 'Account' }];
-  return {
-    view: 'account',
-    page: {
-      title: 'Your account',
-      metaTitle: 'Your account',
-      titleSuffix: false,
-      description: 'Phone-number-first account: requests, bookings, orders, saved cars and documents in one place.',
-      canonical: '/account',
-      robots: 'noindex,nofollow',
-      breadcrumbs: trail,
-      bodyClass: 'page-account',
-      jsonLd: [],
-    },
-    data: { trail },
-  };
-}
-
-router.get('/account', async (req, res, next) => {
-  try {
-    const locals = await buildAccountLocals();
-    return await sendPage(req, res, { routePath: '/account', cache: CACHE.private, ...locals });
-  } catch (error) {
-    return next(error);
-  }
-});
-
-router.get('/login', (req, res) => res.redirect(301, '/account'));
-
 const PORTALS = {
   '/dealer': {
     view: 'portal-stub',
