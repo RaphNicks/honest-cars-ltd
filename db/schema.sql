@@ -478,12 +478,17 @@ CREATE TABLE IF NOT EXISTS `users` (
   email            VARCHAR(160)  NULL,
   marketing_opt_in TINYINT(1)    NOT NULL DEFAULT 0,    -- NDPA: explicit, revocable
   status           ENUM('active','blocked','deleted') NOT NULL DEFAULT 'active',
+  referral_code    VARCHAR(16)   NULL,              -- the holder's personal link code
+  referred_by      INT UNSIGNED  NULL,              -- who brought them here (§7.1 referrals)
   last_seen_at     DATETIME      NULL,
   created_at       TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at       TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (id),
   UNIQUE KEY uq_user_phone (phone),
-  KEY idx_user_email (email)
+  UNIQUE KEY uq_user_referral_code (referral_code),
+  KEY idx_user_email (email),
+  KEY idx_user_referred_by (referred_by),
+  CONSTRAINT fk_user_referrer FOREIGN KEY (referred_by) REFERENCES `users` (id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS `auth_codes` (
@@ -534,7 +539,9 @@ CREATE TABLE IF NOT EXISTS `saved_searches` (
   user_id         INT UNSIGNED NOT NULL,
   label           VARCHAR(120) NOT NULL,
   query           TEXT         NOT NULL,
-  alerts_enabled  TINYINT(1)   NOT NULL DEFAULT 1,
+  alerts_enabled  TINYINT(1)   NOT NULL DEFAULT 1,   -- master: any alert at all
+  alert_price_drop TINYINT(1)  NOT NULL DEFAULT 1,   -- §7.1 price-drop toggle
+  alert_new_match  TINYINT(1)  NOT NULL DEFAULT 1,   -- §7.1 new-match toggle
   last_alerted_at DATETIME     NULL,
   created_at      TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (id),

@@ -42,7 +42,7 @@ at a different MySQL is a `.env` change and nothing more.
 
 ```js
 const db = require('../db');
-const listing = await db.listings.findBySlug('2015-toyota-camry-le-hc-ph-0001');
+const listing = await db.listings.findBySlug('2010-toyota-camry-le-hc-ph-0032');
 const facets  = await db.facets.allIndexable();
 const leads   = await db.leads.createLead({ type: 'viewing', name: '…', phone: '…' });
 ```
@@ -112,9 +112,12 @@ Implemented once in `src/db/listings.js` and asserted in `test/routes.test.js`:
 
 Phone-number-first, no passwords. `/login` is two steps on one page — number
 (plus an explicit consent tick, §12.2 NDPA) then the six-digit code — and
-`/account` is the dashboard: requests, bookings, orders with receipts,
-saved cars, saved searches with alert toggles, tracker subscriptions, and data
-export / account deletion.
+`/account` is the dashboard, one card per §7.1 line item: **requests** (with
+stage and SLA), **hire bookings**, **bookings**, **orders** and tracker
+subscriptions, **documents** (receipts now, report PDFs when dispatch lands),
+**saved cars**, **saved searches** with separate price-drop and new-match
+switches, **your details**, and **referrals** (personal link, sign-ups and
+orders credited to it). Data export and account deletion sit at the bottom.
 
 ```
 POST /api/auth/otp      { phone }                → { ok, maskedPhone, channel, delivered, devCode? }
@@ -123,7 +126,7 @@ POST /api/auth/logout                            → revokes the session
 GET  /account                                    -> dashboard (302 to /login?next=… when signed out)
 GET  /account/export                             → every row keyed to the number, as JSON
 POST /api/account/saved-cars                     → add / remove, idempotent
-POST /api/account/saved-searches                 → add / toggle alerts / delete
+POST /api/account/saved-searches                 → add / toggle price-drop & new-match / delete
 POST /api/account/profile                        → name, email, marketing consent
 POST /api/account/delete                         → anonymise ops records, delete the person
 ```
@@ -153,6 +156,14 @@ How it is put together:
 * **Deleting an account is honest.** The person, sessions, saved cars and saved
   searches go; requests, bookings and orders stay for finance and warranty with
   the name and number replaced by `Deleted account` / `DELETED-<id>`.
+* **Referrals** are a code on the account (`HC0001`, then random readable
+  codes). `/login?ref=CODE` is recorded once, at account creation, and never as
+  a self-referral; the dashboard shows how many people joined and how many
+  orders they placed. Reward amounts are deliberately *not* invented — the ops
+  desk sets those, and the card says so.
+* **Blocked accounts lose access immediately**: the next request revokes every
+  live session and clears the cookie. Expired and revoked session rows are
+  pruned on each successful sign-in, so the table cannot grow forever.
 
 ---
 
@@ -169,7 +180,7 @@ How it is put together:
 | `npm run images:check` | Fail if any photo still needs preparing (CI gate) |
 | `npm run lint:type` | Six-step type-scale audit (fails the build on a violation) |
 | `npm run lint:js` | ES-module parse check + every event name against the §15.1 plan |
-| `npm test` | 84 tests: routes, sold-archive windows, facet rules, SEO schemas, filter safety, form validation, concierge/SLA rules, shop commerce, OTP auth and the account dashboard |
+| `npm test` | 90 tests: routes, sold-archive windows, facet rules, SEO schemas, filter safety, form validation, concierge/SLA rules, shop commerce, OTP auth, referrals and the account dashboard |
 | `npm run check` | lint + test |
 | `npm run artifacts` | Build the static pages and re-run the type audit |
 
@@ -273,14 +284,20 @@ assets/fonts/       Inter variable TTF, used only to render OG cards
    true of the WhatsApp Cloud API, SMS and email: `AUTH_OTP_PROVIDER` selects
    the delivery channel and the `console` provider is the development default.
    Every record the real services will read already exists.
-5. **No CI and no container.** The gates exist as scripts
+5. **Referral rewards and report PDFs are the two honest blanks.** The referral
+   *link* and the counts behind it are real; the reward amount and payout are a
+   business decision, so the page states the counts and leaves the promise to
+   the ops desk. Inspection report PDFs are listed as documents only when they
+   exist — today that means shop receipts; the generator arrives with the
+   dispatch module (§7.3).
+6. **No CI and no container.** The gates exist as scripts
    (`npm run check`, `check-links`, `images:check`) but nothing runs them on
    push yet; there is no Dockerfile or compose file (§17). Worth adding before
    the first deploy.
-6. **Visual QA was structural, not visual.** There is no browser or headless
+7. **Visual QA was structural, not visual.** There is no browser or headless
    renderer in this sandbox — it is verified by rendered HTML, computed
    markup checks, CORS-free link crawling and OG-card renders. Your eyes on the
    live preview are the visual sign-off.
-7. **`npm run db:seed` is destructive by design** (it truncates and reloads).
+8. **`npm run db:seed` is destructive by design** (it truncates and reloads).
    It is for development and for the pilot seed; production loads get an
    importer instead.

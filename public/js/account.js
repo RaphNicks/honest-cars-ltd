@@ -15,6 +15,7 @@
  */
 
 import { track } from './events.js';
+import { toast } from './ui.js';
 
 async function postJson(url, body) {
   const response = await fetch(url, {
@@ -54,6 +55,7 @@ export function initLogin(root = document) {
   const phoneLabel = card.querySelector('[data-auth-phone]');
 
   const next = card.dataset.next || '';
+  const referral = card.dataset.ref || '';
   const params = new URLSearchParams(window.location.search);
   const pendingSave = params.get('save');
   let phone = '';
@@ -108,7 +110,7 @@ export function initLogin(root = document) {
 
     const button = codeStep.querySelector('button[type="submit"]');
     if (button) button.disabled = true;
-    const result = await postJson('/api/auth/verify', { phone, code, next });
+    const result = await postJson('/api/auth/verify', { phone, code, next, ref: referral });
     if (button) button.disabled = false;
 
     if (!result.ok) return setMessage(message, result.error || 'That code did not work.', 'error');
@@ -227,13 +229,21 @@ export function initAccount(root = document) {
     });
   }
 
+  // §7.1: price-drop and new-match are separate switches per saved search.
   root.querySelectorAll('[data-search-alerts]').forEach((input) => {
     input.addEventListener('change', async () => {
-      await postJson('/api/account/saved-searches', {
+      const key = input.dataset.searchAlerts === 'new_match' ? 'newMatch' : 'priceDrop';
+      input.disabled = true;
+      const result = await postJson('/api/account/saved-searches', {
         action: 'toggle',
         id: Number(input.dataset.id),
-        alertsEnabled: input.checked,
+        [key]: input.checked,
       });
+      input.disabled = false;
+      if (!result.ok) {
+        input.checked = !input.checked;
+        toast('That switch did not save — check your connection and try again.', { variant: 'error' });
+      }
     });
   });
 
@@ -246,6 +256,26 @@ export function initAccount(root = document) {
       }
     });
   });
+
+  const copyReferral = root.querySelector('[data-copy-referral]');
+  if (copyReferral) {
+    copyReferral.addEventListener('click', async () => {
+      const field = root.querySelector('[data-referral-link]');
+      if (!field) return;
+      field.select();
+      try {
+        await navigator.clipboard.writeText(field.value);
+        copyReferral.textContent = 'Copied';
+      } catch {
+        // Clipboard blocked (http, or a locked-down browser): leave the field
+        // selected so the visitor can copy it by hand.
+        copyReferral.textContent = 'Press Ctrl+C';
+      }
+      setTimeout(() => {
+        copyReferral.textContent = 'Copy link';
+      }, 2500);
+    });
+  }
 
   const deleteStart = root.querySelector('[data-account-delete]');
   const deleteForm = root.querySelector('[data-delete-form]');

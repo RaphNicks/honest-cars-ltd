@@ -1,11 +1,11 @@
 <%#
-  /account — §7.1 dashboard. Cards, in the order the PRD lists them:
-    Requests · Bookings · Orders + tracker subscriptions · Saved cars ·
-    Saved searches · (Hire requests are requests of type hire) ·
-    Documents · Referrals (phase 2 — stated plainly, not faked)
+  /account — §7.1 dashboard, card for card:
+    Requests · Hire bookings · Bookings · Orders + tracker subscriptions ·
+    Documents (receipts) · Saved cars · Saved searches (price-drop and
+    new-match switches) · Your details · Referrals
   Every card reads a record the public site already wrote, matched by phone.
-  Locals: user, requests, bookings, orders, subscriptions, savedCars,
-          savedSearches, hireRequests, counts, trail
+  Locals: user, requests, hireRequests, bookings, orders, subscriptions,
+          documents, savedCars, savedSearches, referral, counts, trail
 %>
 <section class="page-hero page-hero--account">
   <div class="container">
@@ -26,8 +26,9 @@
     </div>
 
     <div class="dash-counts">
-      <% [['Requests', counts.requests], ['Bookings', counts.bookings], ['Orders', counts.orders],
-          ['Trackers', counts.subscriptions], ['Saved cars', counts.savedCars], ['Saved searches', counts.savedSearches]]
+      <% [['Requests', counts.requests], ['Hire', counts.hireRequests], ['Bookings', counts.bookings],
+          ['Orders', counts.orders], ['Trackers', counts.subscriptions], ['Saved cars', counts.savedCars],
+          ['Saved searches', counts.savedSearches]]
          .forEach(function (pair) { %>
         <span class="trust-chip"><strong class="tabular"><%= pair[1] %></strong> <%= pair[0] %></span>
       <% }); %>
@@ -72,6 +73,57 @@
               </li>
             <% }); %>
           </ul>
+        <% } %>
+      </div>
+
+      <%# ----------------------------------------------- Hire bookings %>
+      <div class="dash-card" id="hire">
+        <div class="dash-card__head">
+          <h2 class="mb-0">Hire bookings</h2>
+          <a class="section-head__link" href="/hire">Book a car →</a>
+        </div>
+
+        <% if (!hireRequests.length) { %>
+          <div class="empty-state">
+            <p class="mb-1">No hire bookings yet — daily, weekly and corporate hire around Port Harcourt, with or without a driver.</p>
+            <a class="btn btn--primary btn--sm" href="/hire">See the fleet</a>
+          </div>
+        <% } else { %>
+          <ul class="account-list">
+            <% hireRequests.forEach(function (hire) { %>
+              <% var brief = hire.brief || {}; %>
+              <% var nights = brief.date_from && brief.date_to
+                   ? Math.round((new Date(brief.date_to) - new Date(brief.date_from)) / 86400000)
+                   : null; %>
+              <li class="account-item">
+                <div class="account-item__main">
+                  <a class="account-item__title" href="<%= hire.url %>">
+                    <%= brief.vehicle_class || 'Car hire' %>
+                    <% if (brief.with_driver === 'yes') { %>· with driver<% } %>
+                  </a>
+                  <span class="account-item__meta">
+                    <% if (brief.date_from && brief.date_to) { %>
+                      <%= brief.date_from %> → <%= brief.date_to %>
+                      <% if (nights && nights > 0) { %> · <%= nights %> day<%= nights === 1 ? '' : 's' %><% } %>
+                    <% } else { %>
+                      Dates to confirm
+                    <% } %>
+                    <% if (brief.location) { %> · <%= brief.location %><% } %>
+                    <% if (brief.airport_pickup === 'yes') { %> · airport pickup<% } %>
+                    <% if (brief.corporate === 'yes') { %> · corporate<% } %>
+                  </span>
+                </div>
+                <div class="account-item__side">
+                  <span class="status-pill status-pill--<%= hire.status %>"><%= hire.statusLabel %></span>
+                  <a class="btn btn--secondary btn--sm" href="<%= hire.url %>">Track</a>
+                </div>
+              </li>
+            <% }); %>
+          </ul>
+          <p class="note-inline mb-0">
+            A hire is confirmed once the ops desk has confirmed the car and the dates — you will get a WhatsApp with
+            the driver's details on the day.
+          </p>
         <% } %>
       </div>
 
@@ -165,6 +217,45 @@
         <% } %>
       </div>
 
+      <%# ------------------------------------------------- Documents %>
+      <div class="dash-card" id="documents">
+        <div class="dash-card__head">
+          <h2 class="mb-0">Documents</h2>
+          <span class="note-inline">Receipts and memos, one file per job</span>
+        </div>
+
+        <% if (!documents.length) { %>
+          <div class="empty-state">
+            <p class="mb-1">
+              Nothing to file yet. Shop receipts land here the moment an order is placed, and inspection report PDFs
+              arrive with the dispatch module (§7.3).
+            </p>
+          </div>
+        <% } else { %>
+          <ul class="account-list">
+            <% documents.forEach(function (doc) { %>
+              <li class="account-item">
+                <div class="account-item__main">
+                  <a class="account-item__title" href="<%= doc.url %>"><%= doc.title %></a>
+                  <span class="account-item__meta">
+                    <span class="badge badge--ghost"><%= doc.kind %></span>
+                    · <%= helpers.relativeDays(doc.createdAt) %>
+                    <% if (doc.amountKobo) { %> · <%= helpers.formatNaira(doc.amountKobo) %><% } %>
+                  </span>
+                </div>
+                <div class="account-item__side">
+                  <span class="status-pill status-pill--<%= doc.status %>"><%= doc.status.replace(/_/g, ' ') %></span>
+                  <a class="btn btn--secondary btn--sm" href="<%= doc.url %>">Open</a>
+                </div>
+              </li>
+            <% }); %>
+          </ul>
+          <p class="note-inline mb-0">
+            Inspection reports, valuation memos and NDPA export copies land in this list as they are produced.
+          </p>
+        <% } %>
+      </div>
+
       <%# ----------------------------------------------- Saved cars %>
       <div class="dash-card" id="saved">
         <div class="dash-card__head">
@@ -225,12 +316,24 @@
               <li class="account-item" data-saved-search="<%= search.id %>">
                 <div class="account-item__main">
                   <a class="account-item__title" href="<%= search.url %>"><%= search.label %></a>
-                  <span class="account-item__meta"><code class="query-chip"><%= search.query %></code></span>
+                  <span class="account-item__meta">
+                    <% if (search.chips && search.chips.length) { %>
+                      <% search.chips.forEach(function (chip) { %><span class="query-chip"><%= chip %></span><% }); %>
+                    <% } else { %>
+                      <code class="query-chip"><%= search.query %></code>
+                    <% } %>
+                  </span>
                 </div>
                 <div class="account-item__side">
                   <label class="checkbox-row checkbox-row--tight">
-                    <input type="checkbox" data-search-alerts data-id="<%= search.id %>" <%= search.alertsEnabled ? 'checked' : '' %>>
-                    <span>Alerts</span>
+                    <input type="checkbox" data-search-alerts="price_drop" data-id="<%= search.id %>"
+                           <%= search.priceDrop ? 'checked' : '' %>>
+                    <span>Price drops</span>
+                  </label>
+                  <label class="checkbox-row checkbox-row--tight">
+                    <input type="checkbox" data-search-alerts="new_match" data-id="<%= search.id %>"
+                           <%= search.newMatch ? 'checked' : '' %>>
+                    <span>New matches</span>
                   </label>
                   <button class="btn btn--ghost btn--sm" type="button" data-delete-search data-id="<%= search.id %>">Delete</button>
                 </div>
@@ -238,8 +341,8 @@
             <% }); %>
           </ul>
           <p class="note-inline mb-0">
-            Alerts are captured per search today; the sending side (WhatsApp/email, new-match and price-drop) lands
-            with the notification layer.
+            The switches are recorded per search today; the sending side (WhatsApp or email, price drop and new
+            match) lands with the notification layer — nothing will be sent until then.
           </p>
         <% } %>
       </div>
@@ -274,17 +377,39 @@
         </form>
       </div>
 
-      <%# ------------------------------------- Documents & referrals %>
-      <div class="dash-card" id="documents">
+      <%# ------------------------------------------------ Referrals %>
+      <div class="dash-card" id="referrals">
         <div class="dash-card__head">
-          <h2 class="mb-0">Documents &amp; referrals</h2>
-          <span class="phase-note">Phase 2</span>
+          <h2 class="mb-0">Referrals</h2>
+          <span class="note-inline">§7.1 personal link</span>
         </div>
-        <p class="mb-2">
-          Receipts, inspection report PDFs and memos land here as one file per job, next to your order history.
-          Referral links and reward status are specified in §7.1 too. Neither is faked in this build — the records
-          they read (orders, bookings, requests) are already the ones above.
-        </p>
+
+        <% if (!referral) { %>
+          <p class="mb-0">Your referral link appears here once your account has a code.</p>
+        <% } else { %>
+          <p class="mb-2">
+            Anyone who signs in for the first time through your link is attached to your account — that is how the
+            ops desk knows who to credit.
+          </p>
+          <div class="referral-box">
+            <label class="visually-hidden" for="referral-link">Your referral link</label>
+            <input class="input referral-box__input tabular" id="referral-link" type="text" readonly
+                   value="<%= site.url %><%= referral.path %>" data-referral-link>
+            <button class="btn btn--secondary btn--sm" type="button" data-copy-referral>Copy link</button>
+          </div>
+          <p class="account-item__meta mt-2">
+            Code <strong class="tabular"><%= referral.code %></strong> ·
+            <strong class="tabular"><%= referral.joined %></strong> signed up ·
+            <strong class="tabular"><%= referral.orders %></strong> order<%= referral.orders === 1 ? '' : 's' %> placed
+          </p>
+          <p class="note-inline mb-0">
+            Reward amounts and payouts are set by the ops desk, not by this page — the counts above are the records
+            they work from, and nothing is promised until they confirm it on WhatsApp.
+          </p>
+        <% } %>
+
+        <hr class="rule">
+
         <div class="btn-row">
           <a class="btn btn--secondary btn--sm" href="/account/export" download>Download my data (JSON)</a>
           <button class="btn btn--ghost btn--sm" type="button" data-account-delete>Close my account</button>

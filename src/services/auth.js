@@ -159,7 +159,7 @@ async function requestCode({ rawPhone, ip, userAgent }) {
   };
 }
 
-async function verifyCode({ rawPhone, code, ip, userAgent }) {
+async function verifyCode({ rawPhone, code, ip, userAgent, referralCode = null }) {
   const phone = normalisePhone(rawPhone);
   if (!phone || !code) return { ok: false, status: 422, error: 'Enter the code we sent you.' };
 
@@ -187,13 +187,28 @@ async function verifyCode({ rawPhone, code, ip, userAgent }) {
   }
 
   await db.users.consumeCode(active.id);
-  const user = await db.users.upsertByPhone({ phone });
+  const user = await db.users.upsertByPhone({ phone, referralCode });
+
+  // A blocked number can prove it owns the phone; it still cannot get in.
+  if (user.status !== 'active') {
+    await db.users.revokeAllForUser(user.id);
+    return {
+      ok: false,
+      status: 403,
+      error: 'That number cannot sign in right now. Message us on WhatsApp and a human will sort it out.',
+    };
+  }
 
   const token = newSessionToken();
   const expiresAt = new Date(Date.now() + config.auth.sessionDays * 86_400_000);
   await db.users.createSession({ userId: user.id, tokenHash: hashToken(token), expiresAt, ip, userAgent });
 
   await db.analytics.record('otp_verify_succeeded', { payload: { new_account: !user.name }, sourcePath: '/login' }).catch(() => {});
+
+  // Housekeeping at the one moment we know this person is here: expired and
+  // revoked sessions are worthless rows, and this keeps the table from growing
+  // forever without a scheduler (§12.2).
+  db.users.pruneSessions().catch(() => {});
 
   return { ok: true, user, token, expiresAt };
 }
@@ -239,11 +254,19 @@ async function attachUser(req, res, next) {
 
   try {
     const session = await db.users.findSession(hashToken(token));
-    if (session) {
+    if (session && session.user.status === 'active') {
       req.user = session.user;
       req.session = { id: session.sessionId, expiresAt: session.expiresAt, token };
       res.locals.user = session.user;
+      return next();
     }
+
+    // The cookie is there but it no longer buys anything: expired, revoked, or
+    // the account was blocked or deleted. Clear it and let the page that needed
+    // the visitor explain why they are back at /login.
+    if (session) await db.users.revokeAllForUser(session.user.id);
+    clearSessionCookie(res);
+    req.sessionEnded = true;
     return next();
   } catch (error) {
     // A database blip must never take the public site down with it.

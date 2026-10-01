@@ -4,8 +4,9 @@
  * Customer account — §7.1.
  *
  *   GET  /login              phone + code entry (two steps, one page)
- *   GET  /account            dashboard: requests, bookings, orders, tracker
- *                            subscriptions, saved cars, saved searches
+ *   GET  /account            dashboard: requests, hire, bookings, orders,
+ *                            receipts, tracker subscriptions, saved cars,
+ *                            saved searches, referrals
  *   GET  /account/export     NDPA right of access — one JSON file
  *   POST /api/account/saved-cars      save / unsave a car
  *   POST /api/account/saved-searches  save / delete a search, toggle alerts
@@ -20,13 +21,15 @@ const config = require('../config');
 const db = require('../db');
 const auth = require('../services/auth');
 const validate = require('../services/validate');
+const listingQuery = require('../services/listing-query');
+const { helpers } = require('../lib/locals');
 const { sendPage, sendJson, CACHE } = require('../lib/respond');
 
 const router = express.Router();
 
 const DASHBOARD_PATH = '/account';
 
-function loginLocals({ next, reason } = {}) {
+function loginLocals({ next, reason, ref: referralCode } = {}) {
   return {
     view: 'login',
     page: {
@@ -43,6 +46,7 @@ function loginLocals({ next, reason } = {}) {
     data: {
       next: typeof next === 'string' && next.startsWith('/') && !next.startsWith('//') ? next.slice(0, 300) : '',
       reason: validate.text(reason, 80) || null,
+      ref: validate.text(referralCode, 16).toUpperCase(),
       trail: [{ label: 'Sign in' }],
       otp: {
         length: config.auth.otpLength,
@@ -61,7 +65,7 @@ router.get('/login', async (req, res, next) => {
   try {
     if (req.user) return res.redirect(302, auth.safeNextPath(req.query.next) || DASHBOARD_PATH);
     return await sendPage(req, res, {
-      ...loginLocals({ next: req.query.next, reason: req.query.reason }),
+      ...loginLocals({ next: req.query.next, reason: req.query.reason, ref: req.query.ref }),
       routePath: '/login',
       cache: CACHE.private,
     });
@@ -73,8 +77,31 @@ router.get('/login', async (req, res, next) => {
 // ---------------------------------------------------------------------------
 // /account — the dashboard
 // ---------------------------------------------------------------------------
+/**
+ * Saved searches are stored as the raw querystring. Show them the way the
+ * site shows filters everywhere else — as labelled chips — and keep the raw
+ * string for the link target.
+ */
+function savedSearchChips(searches) {
+  const withChips = searches.map((search) => {
+    let chips = [];
+    try {
+      const parsed = new URLSearchParams(search.query.startsWith('?') ? search.query.slice(1) : search.query);
+      const { view } = listingQuery.parseListingQuery(Object.fromEntries(parsed.entries()));
+      chips = listingQuery.activeFilterPills(view, helpers()).map((pill) => `${pill.label}: ${pill.value}`);
+    } catch {
+      chips = [];
+    }
+    return { ...search, chips };
+  });
+  return withChips;
+}
+
 async function buildAccountLocals(user) {
   const dashboard = await db.users.dashboard(user);
+  dashboard.savedSearches = savedSearchChips(dashboard.savedSearches);
+  // §7.1 lists hire separately, so it does not also sit in the Requests card.
+  dashboard.requests = dashboard.requests.filter((request) => request.type !== 'hire');
   const trail = [{ label: 'Account' }];
 
   return {
@@ -97,7 +124,8 @@ async function buildAccountLocals(user) {
 router.get('/account', async (req, res, next) => {
   try {
     if (!req.user) {
-      return res.redirect(302, `/login?next=${encodeURIComponent(req.originalUrl || DASHBOARD_PATH)}`);
+      const reason = req.sessionEnded ? '&reason=expired' : '';
+      return res.redirect(302, `/login?next=${encodeURIComponent(req.originalUrl || DASHBOARD_PATH)}${reason}`);
     }
     const locals = await buildAccountLocals(req.user);
     return await sendPage(req, res, {
@@ -189,8 +217,13 @@ router.post('/api/account/saved-searches', auth.sameOriginOnly, auth.requireUser
     if (action === 'toggle') {
       const id = validate.integer(body.id, { min: 1, fallback: 0 });
       if (!id) return sendJson(res, { ok: false, error: 'That saved search no longer exists.' }, { status: 422 });
-      await db.users.setSearchAlerts(req.user.id, id, Boolean(body.alertsEnabled));
-      return sendJson(res, { ok: true, alertsEnabled: Boolean(body.alertsEnabled) });
+      // §7.1: price-drop and new-match are separate switches. `alertsEnabled`
+      // is still accepted so the master toggle keeps working.
+      const priceDrop = body.priceDrop === undefined ? (body.alertsEnabled === undefined ? undefined : Boolean(body.alertsEnabled)) : Boolean(body.priceDrop);
+      const newMatch = body.newMatch === undefined ? (body.alertsEnabled === undefined ? undefined : Boolean(body.alertsEnabled)) : Boolean(body.newMatch);
+      await db.users.setSearchAlerts(req.user.id, id, { priceDrop, newMatch });
+      const [saved] = (await db.users.savedSearches(req.user.id)).filter((row) => row.id === id);
+      return sendJson(res, { ok: true, savedSearch: saved || null });
     }
 
     const queryString = validate.text(body.query, 300).replace(/^\?/, '');
@@ -201,6 +234,8 @@ router.post('/api/account/saved-searches', auth.sameOriginOnly, auth.requireUser
       label,
       query: queryString,
       alertsEnabled: body.alertsEnabled !== false,
+      priceDrop: body.priceDrop !== false,
+      newMatch: body.newMatch !== false,
     });
 
     await db.analytics

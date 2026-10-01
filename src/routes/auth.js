@@ -65,6 +65,8 @@ router.post('/verify', verifyLimiter, async (req, res, next) => {
     const result = await auth.verifyCode({
       rawPhone: body.phone,
       code: validate.text(body.code, 12),
+      // §7.1 referrals: the invitation code rides along from /login?ref=…
+      referralCode: validate.text(body.ref, 16),
       ip: req.ip,
       userAgent: req.get('user-agent'),
     });

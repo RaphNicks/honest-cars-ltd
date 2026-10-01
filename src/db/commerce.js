@@ -62,6 +62,9 @@ function shapeOrder(row, items = []) {
     notes: row.notes,
     createdAt: row.created_at,
     items,
+    // Present on list reads, where loading every line of every order would be
+    // wasteful: the dashboard only needs “how many things”.
+    itemCount: items.length || Number(row.item_count || 0),
     url: `/order/${row.order_no}`,
   };
 }
@@ -173,8 +176,10 @@ async function listForPhone(phone) {
   const shapes = phones.variants(phone);
   if (!shapes.length) return [];
   const rows = await query(
-    `SELECT * FROM orders WHERE phone IN (${shapes.map(() => '?').join(',')})
-     ORDER BY created_at DESC LIMIT 20`,
+    `SELECT o.*, (SELECT COUNT(*) FROM order_items i WHERE i.order_id = o.id) AS item_count
+       FROM orders o
+      WHERE o.phone IN (${shapes.map(() => '?').join(',')})
+      ORDER BY o.created_at DESC LIMIT 20`,
     shapes,
   );
   return rows.map((row) => shapeOrder(row));

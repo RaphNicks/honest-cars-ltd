@@ -47,6 +47,8 @@ after the first deploy lands in `db/migrations/NNN-name.sql` and is recorded in
 | `004-hire-request-type.sql` | `hire` as a `service_requests.type` |
 | `005-hire-class-image.sql` | `hire_classes.image_url` |
 | `006-accounts.sql` | `users`, `auth_codes`, `sessions`, `saved_cars`, `saved_searches` (§7.1) |
+| `007-referrals-and-alert-switches.sql` | `users.referral_code` / `users.referred_by`; `saved_searches.alert_price_drop` / `alert_new_match` |
+| `008-referral-code-backfill.sql` | `HC0001`-shaped codes for accounts that predate 007 |
 
 ---
 
@@ -54,11 +56,11 @@ after the first deploy lands in `db/migrations/NNN-name.sql` and is recorded in
 
 | Table | Holds | Rules |
 |---|---|---|
-| `users` | one row per person | `phone` is the key, stored `+234XXXXXXXXXX`; `status` is `active` / `blocked` / `deleted`; `marketing_opt_in` is explicit and revocable (NDPA) |
+| `users` | one row per person | `phone` is the key, stored `+234XXXXXXXXXX`; `status` is `active` / `blocked` / `deleted` (blocked revokes live sessions on the next request); `marketing_opt_in` is explicit and revocable (NDPA); `referral_code` is unique and `referred_by` points at the inviter — set once, at creation, never to itself |
 | `auth_codes` | login codes | only an HMAC-SHA256 hash, never the code; `channel` (`whatsapp` / `sms` / `console`), `expires_at` (10 min), `attempts` / `max_attempts` (5), `consumed_at` for single use |
 | `sessions` | signed-in browsers | 32 random bytes hashed with SHA-256; `expires_at` (30 days) and `revoked_at`; cascades with the user |
 | `saved_cars` | shortlist | unique on `(user_id, listing_id)`; cascades with the user *and* the listing |
-| `saved_searches` | filters worth keeping | `query` is the raw query string, `alerts_enabled` is the price-drop / new-match toggle the notification layer will read |
+| `saved_searches` | filters worth keeping | `query` is the raw query string; `alert_price_drop` and `alert_new_match` are the two §7.1 switches, and `alerts_enabled` is derived (`priceDrop OR newMatch`) so older reads still mean "any alert" |
 
 Deleting an account deletes the person and everything that belongs to them, but
 **keeps the operational paper trail**: `service_requests`, `bookings`, `orders`

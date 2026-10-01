@@ -11,6 +11,7 @@
  * the hash plus an expiry.
  */
 
+const crypto = require('node:crypto');
 const { query, queryOne, transaction } = require('./pool');
 
 const USER_STATUSES = ['active', 'blocked', 'deleted'];
@@ -24,6 +25,8 @@ function shapeUser(row) {
     email: row.email || null,
     marketingOptIn: Boolean(row.marketing_opt_in),
     status: row.status,
+    referralCode: row.referral_code || null,
+    referredBy: row.referred_by || null,
     lastSeenAt: row.last_seen_at,
     createdAt: row.created_at,
     // What the header shows — never render a full phone number back at the user.
@@ -48,10 +51,33 @@ async function findById(id) {
 }
 
 /**
+ * The referral code on a personal link (§7.1 “Referrals”). Readable alphabet
+ * — no I/O/0/1 — because people read these aloud and type them by hand.
+ */
+const REFERRAL_ALPHABET = '23456789ABCDEFGHJKLMNPQRSTUVWXYZ';
+function newReferralCode() {
+  const bytes = crypto.randomBytes(7);
+  let code = '';
+  for (let i = 0; i < 6; i += 1) code += REFERRAL_ALPHABET[bytes[i] % REFERRAL_ALPHABET.length];
+  return code;
+}
+
+/** Resolve an invitation code to the account that owns it — never the inviter. */
+async function findReferrer(code, excludeUserId = null) {
+  const clean = String(code || '').trim().toUpperCase().slice(0, 16);
+  if (!clean) return null;
+  const row = await queryOne('SELECT id, status FROM `users` WHERE referral_code = ? LIMIT 1', [clean]);
+  if (!row || row.status !== 'active') return null;
+  if (excludeUserId && Number(row.id) === Number(excludeUserId)) return null;
+  return row.id;
+}
+
+/**
  * Every successful OTP verify upserts: the first login creates the account.
  * A name supplied on the login form is only used when we do not have one.
+ * A referral code is only ever recorded once, at creation.
  */
-async function upsertByPhone({ phone, name = null }) {
+async function upsertByPhone({ phone, name = null, referralCode = null }) {
   const existing = await queryOne('SELECT * FROM `users` WHERE phone = ? LIMIT 1', [phone]);
   if (existing) {
     await query('UPDATE `users` SET last_seen_at = UTC_TIMESTAMP() WHERE id = ?', [existing.id]);
@@ -61,11 +87,50 @@ async function upsertByPhone({ phone, name = null }) {
     return shapeUser(await queryOne('SELECT * FROM `users` WHERE id = ? LIMIT 1', [existing.id]));
   }
 
-  const result = await query(
-    'INSERT INTO `users` (phone, name, last_seen_at) VALUES (?, ?, UTC_TIMESTAMP())',
-    [phone, name ? String(name).slice(0, 120) : null],
+  // Unique index on referral_code: retry the (unlikely) collision.
+  let inserted = null;
+  for (let attempt = 0; attempt < 5 && !inserted; attempt += 1) {
+    try {
+      inserted = await query(
+        'INSERT INTO `users` (phone, name, referral_code, last_seen_at) VALUES (?, ?, ?, UTC_TIMESTAMP())',
+        [phone, name ? String(name).slice(0, 120) : null, newReferralCode()],
+      );
+    } catch (error) {
+      if (error.code !== 'ER_DUP_ENTRY') throw error;
+      // Either the phone (a race) or the code: only the code is worth retrying.
+      const raced = await queryOne('SELECT id FROM `users` WHERE phone = ? LIMIT 1', [phone]);
+      if (raced) return shapeUser(await queryOne('SELECT * FROM `users` WHERE id = ? LIMIT 1', [raced.id]));
+    }
+  }
+  if (!inserted) throw new Error('Could not allocate a referral code');
+
+  const referrerId = await findReferrer(referralCode, inserted.insertId);
+  if (referrerId) {
+    await query('UPDATE `users` SET referred_by = ? WHERE id = ?', [referrerId, inserted.insertId]);
+  }
+  return findById(inserted.insertId);
+}
+
+/** Shown on the dashboard: the link, how many people used it, what they bought. */
+async function referralStats(user) {
+  if (!user || !user.referralCode) return null;
+  const [joined] = await query(
+    'SELECT COUNT(*) AS n FROM `users` WHERE referred_by = ? AND status <> ?',
+    [user.id, 'deleted'],
   );
-  return findById(result.insertId);
+  const [ordered] = await query(
+    `SELECT COUNT(DISTINCT o.id) AS n
+       FROM orders o
+       JOIN \`users\` u ON u.phone = o.phone
+      WHERE u.referred_by = ? AND o.status <> 'cancelled'`,
+    [user.id],
+  );
+  return {
+    code: user.referralCode,
+    path: `/login?ref=${user.referralCode}`,
+    joined: Number(joined ? joined.n : 0),
+    orders: Number(ordered ? ordered.n : 0),
+  };
 }
 
 async function updateProfile(userId, { name, email, marketingOptIn }) {
@@ -238,6 +303,8 @@ function shapeSearch(row) {
     label: row.label,
     query: row.query,
     alertsEnabled: Boolean(row.alerts_enabled),
+    priceDrop: Boolean(row.alert_price_drop),
+    newMatch: Boolean(row.alert_new_match),
     lastAlertedAt: row.last_alerted_at,
     createdAt: row.created_at,
     url: `/cars${String(row.query || '').startsWith('?') ? row.query : row.query ? `?${row.query}` : ''}`,
@@ -249,21 +316,43 @@ async function savedSearches(userId) {
   return rows.map(shapeSearch);
 }
 
-async function addSavedSearch(userId, { label, query: queryString, alertsEnabled = true }) {
+async function addSavedSearch(userId, { label, query: queryString, alertsEnabled = true, priceDrop = true, newMatch = true }) {
   const existing = await queryOne('SELECT id FROM saved_searches WHERE user_id = ? AND query = ? LIMIT 1', [userId, queryString]);
+  const master = alertsEnabled && (priceDrop || newMatch);
   if (existing) {
-    await query('UPDATE saved_searches SET label = ?, alerts_enabled = ? WHERE id = ?', [label, alertsEnabled ? 1 : 0, existing.id]);
+    await query(
+      'UPDATE saved_searches SET label = ?, alerts_enabled = ?, alert_price_drop = ?, alert_new_match = ? WHERE id = ?',
+      [label, master ? 1 : 0, priceDrop ? 1 : 0, newMatch ? 1 : 0, existing.id],
+    );
     return shapeSearch(await queryOne('SELECT * FROM saved_searches WHERE id = ?', [existing.id]));
   }
   const result = await query(
-    'INSERT INTO saved_searches (user_id, label, query, alerts_enabled) VALUES (?, ?, ?, ?)',
-    [userId, label, queryString, alertsEnabled ? 1 : 0],
+    `INSERT INTO saved_searches (user_id, label, query, alerts_enabled, alert_price_drop, alert_new_match)
+     VALUES (?, ?, ?, ?, ?, ?)`,
+    [userId, label, queryString, master ? 1 : 0, priceDrop ? 1 : 0, newMatch ? 1 : 0],
   );
   return shapeSearch(await queryOne('SELECT * FROM saved_searches WHERE id = ?', [result.insertId]));
 }
 
-async function setSearchAlerts(userId, id, enabled) {
-  await query('UPDATE saved_searches SET alerts_enabled = ? WHERE id = ? AND user_id = ?', [enabled ? 1 : 0, id, userId]);
+/** Toggle the alert switches. `alerts_enabled` is derived: any switch on. */
+async function setSearchAlerts(userId, id, { priceDrop, newMatch } = {}) {
+  const fields = [];
+  const params = [];
+  if (priceDrop !== undefined) {
+    fields.push('alert_price_drop = ?');
+    params.push(priceDrop ? 1 : 0);
+  }
+  if (newMatch !== undefined) {
+    fields.push('alert_new_match = ?');
+    params.push(newMatch ? 1 : 0);
+  }
+  if (!fields.length) return;
+  params.push(userId, id);
+  await query(`UPDATE saved_searches SET ${fields.join(', ')} WHERE user_id = ? AND id = ?`, params);
+  await query(
+    'UPDATE saved_searches SET alerts_enabled = (alert_price_drop OR alert_new_match) WHERE user_id = ? AND id = ?',
+    [userId, id],
+  );
 }
 
 async function deleteSavedSearch(userId, id) {
@@ -275,35 +364,56 @@ async function deleteSavedSearch(userId, id) {
 // ---------------------------------------------------------------------------
 async function dashboard(user) {
   const phone = user.phone;
-  const [requests, bookings, orders, subscriptions, savedCarList, searches] = await Promise.all([
+  const [requests, bookings, orders, subscriptions, savedCarList, searches, referral] = await Promise.all([
     require('./requests').listRequestsForPhone(phone),
     require('./requests').listBookingsForPhone(phone),
     require('./commerce').listForPhone(phone),
     require('./commerce').subscriptionsForPhone(phone),
     savedCars(user.id),
     savedSearches(user.id),
+    referralStats(user),
   ]);
+
+  // §7.1 lists hire separately from the other requests, and the briefing
+  // fields are what a customer with a booking actually wants to see.
+  const hireRequests = requests.filter((request) => request.type === 'hire');
+
+  // “Documents” is receipts today; inspection report PDFs arrive with the
+  // dispatch module (§7.3), and the card says so rather than pretending.
+  const documents = orders.map((order) => ({
+    id: `order-${order.id}`,
+    kind: 'Receipt',
+    title: `${order.orderNo} — ${order.itemCount} item${order.itemCount === 1 ? '' : 's'}`,
+    amountKobo: order.totalKobo,
+    status: order.status,
+    createdAt: order.createdAt,
+    url: `/order/${order.orderNo}`,
+  }));
 
   return {
     requests,
+    hireRequests,
     bookings,
     orders,
     subscriptions,
+    documents,
     savedCars: savedCarList,
     savedSearches: searches,
-    hireRequests: requests.filter((request) => request.type === 'hire'),
+    referral,
     counts: {
-      requests: requests.length,
+      allRequests: requests.length,
+      requests: requests.length - hireRequests.length,
+      hireRequests: hireRequests.length,
       bookings: bookings.length,
       orders: orders.length,
       subscriptions: subscriptions.length,
       savedCars: savedCarList.length,
       savedSearches: searches.length,
+      documents: documents.length,
     },
   };
 }
 
-/** NDPA right of access — everything we hold, as one JSON object. */
 async function exportData(userId) {
   const user = await findById(userId);
   if (!user) return null;
@@ -317,11 +427,15 @@ async function exportData(userId) {
       marketingOptIn: user.marketingOptIn,
       createdAt: user.createdAt,
       lastSeenAt: user.lastSeenAt,
+      referralCode: user.referralCode,
     },
     requests: data.requests,
+    hireRequests: data.hireRequests,
     bookings: data.bookings,
     orders: data.orders,
     subscriptions: data.subscriptions,
+    documents: data.documents,
+    referrals: data.referral,
     savedCars: data.savedCars.map((listing) => ({ id: listing.id, title: listing.title, url: listing.url, status: listing.status })),
     savedSearches: data.savedSearches,
     note: 'This export covers everything keyed to your phone number on honestcarsltd.com. Analytics events carry no personal data.',
@@ -369,6 +483,9 @@ module.exports = {
   revokeSession,
   revokeAllForUser,
   pruneSessions,
+  newReferralCode,
+  findReferrer,
+  referralStats,
   savedCarIds,
   savedCars,
   addSavedCar,

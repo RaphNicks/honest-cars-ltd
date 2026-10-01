@@ -5,7 +5,7 @@
   The code step is revealed by account.js; without JavaScript the page still
   posts to the API and shows the JSON response, and the WhatsApp fallback link
   is right there.
-  Locals: next, reason, otp { length, ttlMinutes, provider, whatsappLink }
+  Locals: next, reason, ref, otp { length, ttlMinutes, provider, whatsappLink }
 %>
 <section class="page-hero">
   <div class="container container--narrow">
@@ -21,13 +21,26 @@
 
 <section class="section">
   <div class="container container--narrow">
-    <div class="auth-card" data-auth-card data-next="<%= next %>" data-channel="<%= otp.provider %>">
+    <% if (reason === 'expired') { %>
+      <p class="auth-message auth-message--banner" data-state="error">
+        Your session ended, so we asked you to sign in again. Nothing was lost.
+      </p>
+    <% } %>
+
+    <div class="auth-card" data-auth-card data-next="<%= next %>" data-ref="<%= ref %>" data-channel="<%= otp.provider %>">
       <%# ---- Step 1: the phone number ---------------------------------- %>
       <form class="auth-form" data-auth-step="phone" novalidate>
         <h2 class="mb-1">Your phone number</h2>
         <p class="note-inline">
           Any format works — <span class="tabular">0803 123 4567</span>, <span class="tabular">+234 803 123 4567</span>.
         </p>
+
+        <% if (ref) { %>
+          <p class="note-inline">
+            Invitation code <strong class="tabular"><%= ref %></strong> — it is recorded on your account when you
+            sign in for the first time.
+          </p>
+        <% } %>
 
         <div class="field">
           <label class="field__label" for="login-phone">WhatsApp number</label>
@@ -103,10 +116,3 @@
   </div>
 </section>
 
-<% if (reason === 'expired') { %>
-  <section class="section section--surface">
-    <div class="container container--narrow">
-      <p class="mb-0">Your session ended, so we asked you to sign in again. Nothing was lost.</p>
-    </div>
-  </section>
-<% } %>

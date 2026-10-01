@@ -265,7 +265,10 @@ function buildListing({ index, status, soldDaysAgo = null, upgraded = false, cat
   // Curated facet /cars/suv-under-15m needs honest depth.
   if (cat.body === 'suv' && priceMillions > 14.4 && chance(0.55)) priceMillions = Math.round((9.5 + rnd() * 4.5) * 10) / 10;
 
-  const condition = chance(0.14) ? 'new' : chance(0.62) ? 'tokunbo' : 'nigerian_used';
+  // “New” means unregistered, so it can only apply to current-model stock —
+  // a 2013 SUV with 40 km on the clock is a data bug, not a listing.
+  const canBeNew = year >= 2019;
+  const condition = canBeNew && chance(0.14) ? 'new' : chance(0.62) ? 'tokunbo' : 'nigerian_used';
   const mileage = condition === 'new' ? int(10, 90) : Math.max(12_000, Math.round((2026 - year) * int(9_000, 22_000) * (chance(0.25) ? 0.55 : 1) / 500) * 500);
   const area = pick(AREAS);
   const dealer = pick(DEALERS);

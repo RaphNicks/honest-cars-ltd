@@ -73,6 +73,7 @@
 }
 
 .auth-message[data-state="error"] { color: var(--color-danger, #b3261e); }
+.auth-message--banner { margin-bottom: var(--space-2); }
 .auth-message[data-state="ok"] { color: var(--color-accent-strong, #0f8a44); }
 
 .auth-devnote {
@@ -103,7 +104,7 @@
 
 @media (min-width: 1025px) {
   .dash-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .dash-grid > #saved, .dash-grid > #documents { grid-column: 1 / -1; }
+  .dash-grid > #saved, .dash-grid > #documents, .dash-grid > #referrals { grid-column: 1 / -1; }
 }
 
 .dash-card {
@@ -152,11 +153,14 @@
 .account-item__side { display: flex; align-items: center; gap: var(--space-1); flex-wrap: wrap; }
 
 .query-chip {
+  display: inline-block;
   font-size: var(--text-14);
   background: var(--surface, #f7fafc);
+  border: var(--border);
   border-radius: var(--radius-sm, 6px);
   padding: 2px 6px;
-  word-break: break-all;
+  margin: 0 4px 4px 0;
+  word-break: break-word;
 }
 
 .status-pill {
@@ -210,6 +214,26 @@
 .saved-car__title { font-weight: 600; color: var(--honest-navy); text-decoration: none; font-size: var(--text-16); }
 .saved-car__title:hover { text-decoration: underline; }
 .saved-car__price { font-weight: 700; color: var(--honest-navy); font-size: var(--text-16); }
+
+/* --- Referrals ----------------------------------------------------------- */
+.referral-box {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+  align-items: center;
+}
+
+.referral-box__input {
+  flex: 1 1 18rem;
+  min-width: 0;
+  font-size: var(--text-14);
+}
+
+.rule {
+  border: 0;
+  border-top: var(--border);
+  margin: var(--space-3) 0;
+}
 
 /* --- Small helpers ------------------------------------------------------- */
 .checkbox-row--tight { font-size: var(--text-14); gap: var(--space-1); }
