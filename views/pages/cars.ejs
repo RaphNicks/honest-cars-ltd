@@ -1,0 +1,44 @@
+<%#
+  /cars — the store (§6.2). SERVER-RENDERED per request (PRD §12.4) because
+  stock, filters, sort and pagination all change through the day.
+%>
+<section class="container">
+  <%- include('../partials/breadcrumbs', { crumbs: [{ label: 'Cars for sale' }] }) %>
+
+  <div class="facet-hero">
+    <h1 class="facet-hero__h1">Cars for sale in Port Harcourt</h1>
+    <p class="facet-hero__intro">
+      Live stock from partner lots across Port Harcourt — with the mileage, documents status and
+      verification grade shown before you travel. Prices are what the dealer is asking; we tell you
+      where each one sits against the current market band.
+    </p>
+    <div class="facet-links">
+      <a class="chip" href="/cars/certified">HonestCars-Certified</a>
+      <a class="chip" href="/cars/suv-under-15m">SUVs under ₦15m</a>
+      <a class="chip" href="/cars/sedan-under-10m">Sedans under ₦10m</a>
+      <a class="chip" href="/cars/toyota">Toyota</a>
+      <a class="chip" href="/cars/lexus">Lexus</a>
+    </div>
+  </div>
+
+  <%- include('../partials/browse', {
+        result: result, facets: facets, filters: filters, models: models,
+        basePath: '/cars', queryString: queryString, activePills: activePills,
+        nearMatches: nearMatches, hiddenQuery: hiddenQuery, locationLabel: 'Port Harcourt'
+      }) %>
+</section>
+
+<%# Concierge fallback band — §6.2 “every empty state routes to the concierge” %>
+<section class="section">
+  <div class="container">
+    <div class="surface-panel">
+      <div class="row row--between">
+        <div>
+          <h2 class="mb-0">Not seeing it? Hand us the brief.</h2>
+          <p class="mb-0 note-inline">Up to 3 verified, inspected options within 48–72 hours. Retainer credited against the success fee.</p>
+        </div>
+        <a class="btn btn--primary" href="/find-my-car" data-event="concierge_started" data-source="cars_footer">Start a search</a>
+      </div>
+    </div>
+  </div>
+</section>

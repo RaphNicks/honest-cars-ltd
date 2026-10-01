@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en-NG">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#0E2A47">
+  <%- include('../partials/head-meta') %>
+  <link rel="preload" as="font" type="font/woff2" href="/fonts/inter-latin-400-normal.woff2" crossorigin>
+  <link rel="preload" as="font" type="font/woff2" href="/fonts/inter-latin-700-normal.woff2" crossorigin>
+  <link rel="stylesheet" href="/css/tokens.css">
+  <link rel="stylesheet" href="/css/base.css">
+  <link rel="stylesheet" href="/css/components.css">
+  <link rel="stylesheet" href="/css/pages.css">
+  <link rel="alternate" type="application/rss+xml" title="HonestCars blog" href="/blog/rss.xml">
+  <%- include('../partials/analytics') %>
+</head>
+<body class="<%= page.bodyClass %>" data-page="<%= site.currentPath %>">
+  <a class="skip-link" href="#main">Skip to content</a>
+
+  <%- include('../partials/header') %>
+  <%- include('../partials/drawer') %>
+
+  <main id="main">
+    <%- body %>
+  </main>
+
+  <%- include('../partials/footer') %>
+  <%- include('../partials/bottom-nav') %>
+  <%- include('../partials/whatsapp-float') %>
+
+  <div class="toast" id="toast" role="status" aria-live="polite" data-open="false"></div>
+
+  <script type="module" src="/js/main.js"></script>
+  <noscript>
+    <style>
+      .header__nav { display: flex !important; }
+      .header__menu-toggle { display: none !important; }
+      .filters-toggle { display: none !important; }
+      .filters { position: static !important; visibility: visible !important; display: block !important; }
+      .filters__panel { transform: none !important; border-radius: 0 !important; }
+      .filters__head, .filters__foot, .filters__scrim { display: none !important; }
+    </style>
+  </noscript>
+</body>
+</html>

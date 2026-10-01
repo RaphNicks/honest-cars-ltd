@@ -1,0 +1,15 @@
+<%# 500 / unexpected error — plain, honest, no stack traces (§12.2). %>
+<section class="container section">
+  <div class="empty-state">
+    <h1>Something went wrong on our side</h1>
+    <p>
+      That is on us, not you. Nothing was charged and nothing was submitted twice — refresh to try
+      again, or message us on WhatsApp and we will handle it manually.
+    </p>
+    <div class="btn-row mt-2" style="justify-content:center">
+      <a class="btn btn--primary" href="/">Back to the homepage</a>
+      <a class="btn btn--secondary" href="<%= site.nav.whatsapp.general %>" target="_blank" rel="noopener"
+         data-event="whatsapp_click" data-source="error_page">Chat on WhatsApp</a>
+    </div>
+  </div>
+</section>

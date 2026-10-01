@@ -1,0 +1,24 @@
+<%#
+  §6.2 “Load more” pagination, 24/page — no infinite scroll traps before the
+  footer cross-links. Crawlable: each page is a real URL with rel prev/next.
+  Locals: page (current), pages, basePath, queryString, total
+%>
+<% if (pages > 1) { %>
+  <nav class="pagination" aria-label="Listings pagination"
+       data-pagination data-page="<%= page %>" data-pages="<%= pages %>"
+       data-base="<%= basePath %>" data-query="<%= queryString %>">
+    <% if (page < pages) { %>
+      <button class="btn btn--secondary" type="button" data-load-more>
+        Load more cars
+      </button>
+    <% } %>
+    <span class="pagination__status" data-pagination-status>
+      Showing <%= Math.min(page * 24, total) %> of <%= total %> cars
+    </span>
+    <noscript>
+      <span class="pagination__status">
+        <% if (page < pages) { %><a href="<%= basePath %><%= queryString %><%= queryString ? '&' : '?' %>page=<%= page + 1 %>">Next page →</a><% } %>
+      </span>
+    </noscript>
+  </nav>
+<% } %>

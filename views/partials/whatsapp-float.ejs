@@ -1,0 +1,8 @@
+<%# §5.2 persistent floating WhatsApp button, collapsible, sits above the bottom nav %>
+<a class="whatsapp-float" id="whatsapp-float" href="<%= site.nav.whatsapp.general %>"
+   target="_blank" rel="noopener" data-collapsed="false"
+   data-event="whatsapp_click" data-source="floating_button"
+   aria-label="Chat with HonestCars on WhatsApp">
+  <%- helpers.icon('whatsapp', { size: 24 }) %>
+  <span class="whatsapp-float__label">Chat</span>
+</a>

@@ -1,0 +1,65 @@
+<%# §5.2 sticky header: Logo · Buy Cars · Services ▾ · Sell/Swap · Hire · Blog
+    · Search · Account · [Find My Car] primary green button. Slim, white. %>
+<header class="header" id="site-header" data-scrolled="false">
+  <div class="container header__inner">
+    <a class="header__logo" href="/" aria-label="HonestCars home">
+      <%- helpers.icon('shield', { size: 28, className: 'header__logo-mark' }) %>
+      <span>Honest<em>Cars</em></span>
+    </a>
+
+    <nav class="header__nav" aria-label="Primary">
+      <% site.nav.header.forEach(function (item) { %>
+        <% if (item.mega) { %>
+          <div class="mega" data-mega>
+            <a class="header__nav-link" href="<%= item.href %>" aria-expanded="false" data-mega-trigger
+               <%= item.current ? 'aria-current="page"' : '' %>>
+              <%= item.label %> <%- helpers.icon('chevronDown', { size: 16 }) %>
+            </a>
+            <div class="mega__panel" hidden data-mega-panel>
+              <% site.megaMenu.forEach(function (service) { %>
+                <a class="mega__item" href="/services/<%= service.slug %>">
+                  <%- service.iconSvg %>
+                  <span>
+                    <strong><%= service.name %></strong>
+                    <span><%= service.promise %></span>
+                  </span>
+                </a>
+              <% }); %>
+            </div>
+          </div>
+        <% } else { %>
+          <a class="header__nav-link" href="<%= item.href %>" <%= item.current ? 'aria-current="page"' : '' %>><%= item.label %></a>
+        <% } %>
+      <% }); %>
+    </nav>
+
+    <div class="header__actions">
+      <button class="header__search-toggle" type="button" aria-label="Search cars" data-search-toggle
+              aria-controls="header-search">
+        <%- helpers.icon('search', { size: 22 }) %>
+      </button>
+      <a class="header__search-toggle" href="/account" aria-label="Your account">
+        <%- helpers.icon('account', { size: 22 }) %>
+      </a>
+      <a class="btn btn--primary header__cta" href="/find-my-car">Find My Car</a>
+      <button class="header__menu-toggle" type="button" aria-label="Open menu"
+              aria-expanded="false" aria-controls="mobile-drawer" data-drawer-open>
+        <%- helpers.icon('menu', { size: 24 }) %>
+      </button>
+    </div>
+  </div>
+
+  <div class="container hidden" id="header-search" data-search-panel>
+    <form class="search-bar" action="/cars" method="get" role="search" aria-label="Search cars">
+      <div class="field">
+        <label class="field__label" for="header-search-q">Make or model</label>
+        <input class="input" id="header-search-q" name="q" type="search" placeholder="Camry, RAV4, Hilux…" autocomplete="off">
+      </div>
+      <div class="field">
+        <label class="field__label" for="header-search-max">Max budget ₦</label>
+        <input class="input" id="header-search-max" name="max" type="number" inputmode="numeric" min="0" step="100000" placeholder="15000000">
+      </div>
+      <button class="btn btn--primary" type="submit">Search</button>
+    </form>
+  </div>
+</header>
