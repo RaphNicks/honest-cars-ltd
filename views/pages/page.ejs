@@ -1,0 +1,38 @@
+<%#
+  Generic CMS page — §6.10 legal pages (terms, privacy, refunds, disclaimer)
+  built from the `pages` table. Copy is supplied by HonestCars legal counsel;
+  this template is the editable envelope around it, so wording can change
+  without a deploy.
+%>
+<section class="page-hero">
+  <div class="container container--narrow">
+    <%- include('../partials/breadcrumbs', { crumbs: trail }) %>
+    <h1><%= cmsPage.h1 %></h1>
+    <% if (cmsPage.heroCopy) { %><p class="lead"><%= cmsPage.heroCopy %></p><% } %>
+    <p class="page-hero__meta">
+      <span>Last updated <%= new Date(cmsPage.updatedAt).toLocaleDateString('en-NG', { day: 'numeric', month: 'long', year: 'numeric' }) %></span>
+    </p>
+    <% if (cmsPage.legalReview) { %>
+      <p class="legal-note">
+        Placeholder wording for review. The final text is supplied by the HonestCars legal retainer
+        before launch — this page exists so the structure, links and dates are already right.
+      </p>
+    <% } %>
+  </div>
+</section>
+
+<section class="section">
+  <div class="container container--narrow">
+    <%- include('../partials/content-blocks', { blocks: cmsPage.body, helpers: helpers }) %>
+
+    <div class="card card__body mt-3">
+      <h2 class="mb-1">Questions about this page</h2>
+      <p class="mb-2">Ask us directly — a human answers, and the answer will be in writing.</p>
+      <div class="btn-row">
+        <a class="btn btn--secondary" href="/contact">Contact us</a>
+        <a class="btn btn--ghost" href="<%= site.nav.whatsapp.general %>" target="_blank" rel="noopener"
+           data-event="whatsapp_click" data-source="legal_page">WhatsApp</a>
+      </div>
+    </div>
+  </div>
+</section>

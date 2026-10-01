@@ -19,6 +19,10 @@ import {
 } from './ui.js';
 import { initFilters } from './filters.js';
 import { initViewingModal, initInlineLeadForms } from './leads.js';
+import { initServiceForms } from './service-forms.js';
+import { initFlows } from './flow.js';
+import { initAddToCart, initCartPage, initCheckoutPage, initComparePage } from './cart.js';
+import { initLoadMore, initVideoFacades, initTableOfContents, initHelpful } from './blog.js';
 
 function boot() {
   bindDeclarativeEvents();
@@ -31,6 +35,16 @@ function boot() {
   initFilters();
   initViewingModal();
   initInlineLeadForms();
+  initServiceForms();
+  initFlows();
+  initAddToCart();
+  initCartPage();
+  initCheckoutPage();
+  initComparePage();
+  initLoadMore();
+  initVideoFacades();
+  initTableOfContents();
+  initHelpful();
   initGallery();
   initCompare();
   observeImpressions();

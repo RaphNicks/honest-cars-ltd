@@ -3,14 +3,12 @@
   stock, filters, sort and pagination all change through the day.
 %>
 <section class="container">
-  <%- include('../partials/breadcrumbs', { crumbs: [{ label: 'Cars for sale' }] }) %>
+  <%- include('../partials/breadcrumbs', { crumbs: locals.crumbs || [{ label: 'Cars for sale' }] }) %>
 
   <div class="facet-hero">
-    <h1 class="facet-hero__h1">Cars for sale in Port Harcourt</h1>
+    <h1 class="facet-hero__h1"><%= locals.heading || 'Cars for sale in Port Harcourt' %></h1>
     <p class="facet-hero__intro">
-      Live stock from partner lots across Port Harcourt — with the mileage, documents status and
-      verification grade shown before you travel. Prices are what the dealer is asking; we tell you
-      where each one sits against the current market band.
+      <%- locals.intro || 'Live stock from partner lots across Port Harcourt — with the mileage, documents status and verification grade shown before you travel. Prices are what the dealer is asking; we tell you where each one sits against the current market band.' %>
     </p>
     <div class="facet-links">
       <a class="chip" href="/cars/certified">HonestCars-Certified</a>

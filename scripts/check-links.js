@@ -18,7 +18,27 @@
 const base = (process.argv.find((arg) => arg.startsWith('--base=')) || '').split('=')[1] || 'http://127.0.0.1:3000';
 const slice = require('../src/services/slice');
 
-const SEEDS = ['/', '/cars', '/cars/toyota', '/cars/toyota/camry', '/cars/suv-under-15m', '/cars/certified'];
+/**
+ * Pages we crawl for links. Every built route with a fixed path is seeded, so a
+ * new page cannot ship with a broken link just because nobody added it here —
+ * plus the dynamic entry points that render without an id.
+ */
+const FIXED_BUILT = slice.BUILT
+  .map((route) => route.path)
+  .filter((path) => !path.includes('{'));
+
+const SEEDS = [
+  ...FIXED_BUILT,
+  '/cars',
+  '/cars/toyota',
+  '/cars/toyota/camry',
+  '/cars/suv-under-15m',
+  '/cars/certified',
+  '/cars/compare?ids=1,2,3',
+  '/concierge/HC-2481',
+  '/blog?category=honest_buyers_guide',
+  '/faq?q=inspection',
+];
 
 const INTERNAL = /^(?:https?:\/\/[^/]+)?(\/[^"'#?]*)/;
 

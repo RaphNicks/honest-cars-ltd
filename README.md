@@ -113,9 +113,11 @@ Implemented once in `src/db/listings.js` and asserted in `test/routes.test.js`:
 | `npm run db:setup` | Create database, apply `db/schema.sql`, load `db/seed.sql` |
 | `npm run db:seed` | Regenerate the seed from `scripts/generate-seed.js`, then load it |
 | `npm run build:static` | Render stable pages + `sitemap.xml` + `robots.txt` into `dist/` |
+| `npm run images` | Normalise photos to 1200×900 + 600×450 siblings (`scripts/prepare-images.js`) |
+| `npm run images:check` | Fail if any photo still needs preparing (CI gate) |
 | `npm run lint:type` | Six-step type-scale audit (fails the build on a violation) |
 | `npm run lint:js` | ES-module parse check + every event name against the §15.1 plan |
-| `npm test` | 43 tests: routes, sold-archive windows, facet rules, SEO schemas, filter safety |
+| `npm test` | 70 tests: routes, sold-archive windows, facet rules, SEO schemas, filter safety, form validation, concierge/SLA rules, shop commerce |
 | `npm run check` | lint + test |
 | `npm run artifacts` | Build the static pages and re-run the type audit |
 
@@ -127,20 +129,26 @@ honest 404.
 
 ## What is built, and what comes next
 
-**Built and testable now:** `/`, `/cars`, 10 curated facet pages, the VDP,
-`/cars/sold/{slug}`, `/sitemap.xml`, `/robots.txt`, `/api/listings`,
-`/api/leads`, `/api/events`, `/api/og/listing/{slug}.png`, `/api/health`.
+**Built and testable now (the whole public storefront):**
 
-**Next in the port** (each one is a view + a `build()` function, no new
-infrastructure): the services hub and 9 service pages, `/find-my-car`,
-`/sell-swap`, `/hire`, `/partner`, `/blog` + posts, `/guide`, `/how-it-works`,
-`/about`, `/verification`, `/faq`, `/contact`, `/shop`, `/cars/compare`, the
-four legal pages, then the authenticated portals (customer account, dealer
-portal, admin console).
+| Area | Routes |
+|---|---|
+| Find a car | `/`, `/cars`, 10 curated facet pages, the VDP, `/cars/sold/{slug}`, `/cars/compare` |
+| Services | `/services` + 9 service pages (`inspection`, `documents`, `concierge`, `tracking`, `research`, `consultation`, `parts`, `sell-swap`, `dealer-services`), `/hire` |
+| Funnels | `/find-my-car` (4-step concierge + `/concierge/{trackingId}` status), `/sell-swap` (3-step, free valuation < 24h) |
+| Content | `/blog`, `/blog/{slug}`, `/blog/rss.xml`, `/guide` |
+| Shop | `/shop`, `/shop/{slug}`, `/cart`, `/checkout`, `/order/{orderNo}` (guest checkout, tracker SKUs create a subscription row) |
+| Trust & company | `/verification`, `/how-it-works`, `/about`, `/faq`, `/contact`, `/partner`, `/account`, `/dealer`, `/admin` (entry pages) |
+| Legal | `/terms`, `/privacy`, `/refunds`, `/disclaimer` (placeholder wording, flagged in the DB) |
+| Machine | `/sitemap.xml`, `/robots.txt`, `/api/listings`, `/api/posts`, `/api/leads`, `/api/events`, `/api/orders`, `/api/bookings`, `/api/service-requests`, `/api/contact`, `/api/og/listing/{slug}.png`, `/api/health` |
 
-Until a route is ported it returns a 404 that says so, shows the slice map and
-links back into live stock — `src/services/slice.js` holds that list, so
-"not built yet" never looks like a broken link.
+**Phase 2 — the authenticated back office** (§7.1–§7.4: customer dashboard,
+dealer portal, admin console). The public site already writes every record
+these screens read — `service_requests`, `bookings`, `orders`, `subscriptions`,
+`leads`, `analytics_events` — so this is UI, auth and workflow only. Until a
+route is ported it returns a 404 that says so, shows the slice map and links
+back into live stock — `src/services/slice.js` holds that list, so "not built
+yet" never looks like a broken link.
 
 ---
 
@@ -155,16 +163,23 @@ src/
   app.js            Express wiring, CSP, static assets, redirect map
   server.js         entry point
   db/               THE data-access layer: pool, listings, facets, content,
-                    leads, analytics, redirects, static-pages
+                    requests, commerce, ids, leads, analytics, redirects, static-pages
   lib/              render (hybrid HTML pipeline) · locals · respond · rate-limit
-  services/         seo · og · icons · nav · events · sitemap · listing-query · slice
-  routes/           public (SSR + static-capable) · api · registry (static build)
+  services/         seo · og · icons · nav · events · sitemap · listing-query ·
+                    validate · concierge · slice
+  routes/           public · services · flow · blog · shop · pages · api ·
+                    registry (static build)
 views/
-  layouts/base      partials/ (header, drawer, footer, cards, filters, …)
-  pages/            home · cars · facet · vdp · sold-archive · not-found · error
+  layouts/base      partials/ (header, drawer, footer, cards, filters, forms, …)
+  pages/            home · cars · facet · vdp · sold-archive · services · service ·
+                    find-my-car · concierge-status · sell-swap · hire · blog ·
+                    post · guide · shop · product · cart · checkout · order ·
+                    compare · verification · how-it-works · faq · contact ·
+                    about · partner · page (CMS/legal) · portal-stub · 404 · 500
 public/
-  css/              tokens · base · components · pages   (the design system)
-  js/               main · header · filters · leads · ui · events (vanilla ES modules)
+  css/              tokens · base · components · pages · sections (the design system)
+  js/               main · header · filters · leads · ui · events · flow ·
+                    service-forms · blog · cart (vanilla ES modules)
   fonts/            Inter 400/500/600/700, self-hosted
   img/seed/         42 placeholder media files
 assets/fonts/       Inter variable TTF, used only to render OG cards
@@ -181,20 +196,32 @@ assets/fonts/       Inter variable TTF, used only to render OG cards
    Appendix A wireframes and Appendix D microcopy. **If the Next.js build turns
    up, drop it somewhere I can read and I will diff the tokens and markup
    against it.**
-2. **Photography is placeholder.** `public/img/seed/` holds 42 generated SVGs
-   labelled "Photo pending — media pipeline stub". The media pipeline (S3 + CDN
-   + WebP variants, §11) is not built; the schema and `listing_media` shape are
-   ready for it.
+2. **Photography is real, but representative.** Listings carry real
+   photographs (`public/img/cars/`), each taken through the same preparation
+   step — 4:3, 1200×900, plus a 600×450 sibling for cards and thumbnails. The
+   resolver in `scripts/seed-media.js` matches a listing to a photo by model,
+   then body type, so a Camry listing leads with the Camry photo and an SUV with
+   an SUV photo. Two honest caveats: (a) a model we have no photo for borrows a
+   same-body-type photo — replace it by dropping the right file in
+   `public/img/cars/` and adding one line to `scripts/seed-media.js`; (b) the
+   dealer media pipeline (S3 + CDN + WebP/AVIF variants + per-listing upload,
+   §11) is still to build — the schema, `listing_media` shape and the
+   `-600` variant convention are ready for it. `public/img/seed/*.svg` remains
+   only as the fallback for a row with no photo at all.
 3. **Prices, phone number and legal copy are placeholders.** The business phone
    is `+2348000000000` and the CAC line is a stub — send me the real values
    (§19 open questions) and I will update `.env` and the copy.
 4. **Payments, WhatsApp Cloud API, OTP and email are not wired.** Everything
    that will call them (leads, service requests, analytics events) already
    exists and posts to our own endpoints, so the integration points are ready.
+6. **Payments are a seam, not an integration.** Checkout writes a
+   `pending_payment` order with a `HC-ORD-` number and hands off to WhatsApp;
+   the PSP call, webhook and `payment_ref` column are stubbed (§11). Same for
+   the WhatsApp Cloud API and OTP login.
 5. **Visual QA was structural, not visual.** There is no browser or headless
    renderer in this sandbox — it is verified by rendered HTML, computed
    markup checks, CORS-free link crawling and OG-card renders. Your eyes on the
    live preview are the visual sign-off.
-6. **`npm run db:seed` is destructive by design** (it truncates and reloads).
+7. **`npm run db:seed` is destructive by design** (it truncates and reloads).
    It is for development and for the pilot seed; production loads get an
    importer instead.

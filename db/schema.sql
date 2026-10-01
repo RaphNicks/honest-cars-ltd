@@ -209,6 +209,19 @@ CREATE TABLE IF NOT EXISTS services (
   cta_label     VARCHAR(60)   NOT NULL DEFAULT 'Book',
   position      TINYINT       NOT NULL DEFAULT 0,
   is_active     TINYINT(1)    NOT NULL DEFAULT 1,
+
+  -- §6.7 service-page template: the five content blocks below the hero.
+  hero_copy     TEXT          NULL,
+  deliverables  JSON          NULL,   -- [{title, copy}]  “What you get”
+  included      JSON          NULL,   -- string[]         included / not included
+  excluded      JSON          NULL,
+  steps         JSON          NULL,   -- [{title, copy, timeline}]  “How it works”
+  pricing       JSON          NULL,   -- [{tier, price_kobo, includes[]}]  price cards
+  proof         JSON          NULL,   -- [{name, area, quote}]
+  jobs_done     INT UNSIGNED  NOT NULL DEFAULT 0,
+  booking_kind  VARCHAR(40)   NULL,   -- inspection|documents|consultation|install|request…
+  sla_copy      VARCHAR(200)  NULL,   -- “Report within 4 hours of the check”
+
   PRIMARY KEY (id),
   UNIQUE KEY uq_services_slug (slug)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
@@ -247,6 +260,10 @@ CREATE TABLE IF NOT EXISTS blog_posts (
   published_at   DATETIME      NULL,
   is_featured    TINYINT(1)    NOT NULL DEFAULT 0,
   make_tags      JSON          NULL,                          -- auto-pulls live listings (§6.9)
+  body           JSON          NULL,                          -- block list: paragraph|heading|callout|checklist|table|quote|youtube|listing
+  service_cta    VARCHAR(80)   NULL,                          -- contextual service footer (§6.9)
+  author_bio     VARCHAR(300)  NULL,                          -- E-E-A-T author card
+  updated_at     TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (id),
   UNIQUE KEY uq_blog_slug (slug),
   KEY idx_blog_publish (status, published_at)
@@ -309,6 +326,194 @@ CREATE TABLE IF NOT EXISTS static_pages (
   rendered_at   DATETIME      NOT NULL,
   status        ENUM('ok','stale') NOT NULL DEFAULT 'ok',
   PRIMARY KEY (path)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ---------------------------------------------------------------------------
+-- pages — CMS-editable static pages: company, trust and legal copy (§6.10).
+-- Legal wording is supplied by the client's counsel; these rows are the
+-- editable envelope around it.
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS pages (
+  id                INT UNSIGNED  NOT NULL AUTO_INCREMENT,
+  slug              VARCHAR(120)  NOT NULL,               -- 'about' | 'privacy' | …
+  title             VARCHAR(200)  NOT NULL,
+  h1                VARCHAR(200)  NOT NULL,
+  hero_copy         TEXT          NULL,
+  meta_title        VARCHAR(200)  NOT NULL,
+  meta_description  VARCHAR(320)  NOT NULL,
+  body              JSON          NULL,                   -- same block list as blog bodies
+  indexable         TINYINT(1)    NOT NULL DEFAULT 1,
+  legal_review      TINYINT(1)    NOT NULL DEFAULT 0,     -- 1 = placeholder awaiting counsel
+  updated_at        TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  UNIQUE KEY uq_pages_slug (slug)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ---------------------------------------------------------------------------
+-- hire_classes — the vehicle classes quoted on /hire (§6.7: “vehicle class…
+-- quote workflow; corporate RFQ variant”).
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS hire_classes (
+  id               INT UNSIGNED  NOT NULL AUTO_INCREMENT,
+  slug             VARCHAR(60)   NOT NULL,
+  name             VARCHAR(120)  NOT NULL,
+  seats            TINYINT       NOT NULL,
+  examples         VARCHAR(200)  NOT NULL,
+  image            VARCHAR(200)  NULL,                     -- /img/hire/{slug}.jpg
+  daily_rate_kobo  BIGINT        NOT NULL,
+  weekly_rate_kobo BIGINT        NULL,
+  with_driver_kobo BIGINT        NULL,     -- per day, on top of the class rate
+  airport_pickup   TINYINT(1)    NOT NULL DEFAULT 1,
+  corporate        TINYINT(1)    NOT NULL DEFAULT 0,
+  position         TINYINT       NOT NULL DEFAULT 0,
+  PRIMARY KEY (id),
+  UNIQUE KEY uq_hire_class_slug (slug)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ---------------------------------------------------------------------------
+-- products + orders — the shop (§6.8). Categories are fixed: trackers &
+-- security, OBD2 & diagnostics, care kits. Parts are service-led and route to
+-- /services/parts, never to self-checkout.
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS products (
+  id               INT UNSIGNED  NOT NULL AUTO_INCREMENT,
+  slug             VARCHAR(120)  NOT NULL,
+  category         ENUM('trackers','diagnostics','care_kits') NOT NULL,
+  name             VARCHAR(160)  NOT NULL,
+  summary          VARCHAR(300)  NOT NULL,
+  description      TEXT          NULL,
+  price_kobo       BIGINT        NOT NULL,
+  specs            JSON          NULL,
+  install_included TINYINT(1)    NOT NULL DEFAULT 0,   -- tracker install = booking at checkout
+  warranty_text    VARCHAR(200)  NULL,
+  stock_status     ENUM('in_stock','low_stock','out_of_stock') NOT NULL DEFAULT 'in_stock',
+  delivery_options JSON          NULL,                 -- ['pickup_meet_point','ph_delivery']
+  image            VARCHAR(400)  NULL,
+  position         TINYINT       NOT NULL DEFAULT 0,
+  is_active        TINYINT(1)    NOT NULL DEFAULT 1,
+  PRIMARY KEY (id),
+  UNIQUE KEY uq_products_slug (slug),
+  KEY idx_products_category (category, position)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS orders (
+  id                INT UNSIGNED  NOT NULL AUTO_INCREMENT,
+  order_no          VARCHAR(24)   NOT NULL,             -- HC-ORD-0001
+  name              VARCHAR(120)  NOT NULL,
+  phone             VARCHAR(40)   NOT NULL,
+  delivery_area     VARCHAR(80)   NOT NULL,
+  delivery_fee_kobo BIGINT        NOT NULL DEFAULT 0,
+  subtotal_kobo     BIGINT        NOT NULL,
+  total_kobo        BIGINT        NOT NULL,
+  status            ENUM('pending_payment','paid','processing','fulfilled','cancelled')
+                                  NOT NULL DEFAULT 'pending_payment',
+  payment_ref       VARCHAR(80)   NULL,                 -- PSP reference (§11)
+  notes             VARCHAR(400)  NULL,
+  created_at        TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  UNIQUE KEY uq_order_no (order_no),
+  KEY idx_order_status (status, created_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS order_items (
+  id               INT UNSIGNED  NOT NULL AUTO_INCREMENT,
+  order_id         INT UNSIGNED  NOT NULL,
+  product_id       INT UNSIGNED  NULL,
+  name             VARCHAR(160)  NOT NULL,
+  qty              SMALLINT      NOT NULL DEFAULT 1,
+  unit_price_kobo  BIGINT        NOT NULL,
+  install_requested TINYINT(1)   NOT NULL DEFAULT 0,    -- creates the install booking
+  PRIMARY KEY (id),
+  KEY idx_order_items_order (order_id),
+  CONSTRAINT fk_order_items_order FOREIGN KEY (order_id) REFERENCES orders (id) ON DELETE CASCADE,
+  CONSTRAINT fk_order_items_product FOREIGN KEY (product_id) REFERENCES products (id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ---------------------------------------------------------------------------
+-- delivery_areas + subscriptions — §6.8 delivery-fee rules by area, and the
+-- subscription record a tracker SKU creates at checkout (activation checklist
+-- lives in the admin order manager, §7.3).
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS delivery_areas (
+  id          INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  name        VARCHAR(80)  NOT NULL,
+  fee_kobo    BIGINT       NOT NULL DEFAULT 0,
+  note        VARCHAR(160) NULL,
+  position    TINYINT      NOT NULL DEFAULT 0,
+  is_active   TINYINT(1)   NOT NULL DEFAULT 1,
+  PRIMARY KEY (id),
+  UNIQUE KEY uq_delivery_area (name)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS subscriptions (
+  id             INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  order_id       INT UNSIGNED NULL,
+  product_id     INT UNSIGNED NULL,
+  customer_name  VARCHAR(120) NULL,
+  customer_phone VARCHAR(40)  NULL,
+  device_state   ENUM('ordered','installed','activated','renewal_due','lapsed','cancelled')
+                               NOT NULL DEFAULT 'ordered',
+  installed_at   DATETIME     NULL,
+  activated_at   DATETIME     NULL,
+  renewal_at     DATETIME     NULL,
+  created_at     TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  KEY idx_subscription_renewal (device_state, renewal_at),
+  CONSTRAINT fk_subscription_order FOREIGN KEY (order_id) REFERENCES orders (id) ON DELETE SET NULL,
+  CONSTRAINT fk_subscription_product FOREIGN KEY (product_id) REFERENCES products (id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ---------------------------------------------------------------------------
+-- service_requests — §10.1: “User has many ServiceRequest (types: concierge,
+-- sell, swap, documents, research, parts, consultation)”. One table, a JSON
+-- brief, and a tracking id that the customer can watch at /concierge/{id}.
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS service_requests (
+  id            INT UNSIGNED  NOT NULL AUTO_INCREMENT,
+  tracking_id   VARCHAR(16)   NOT NULL,                 -- HC-2481
+  type          ENUM('concierge','sell','swap','documents','research','parts','consultation','tracking','hire')
+                              NOT NULL,
+  status        ENUM('new','searching','options_ready','viewings','closed','lost')
+                              NOT NULL DEFAULT 'new',
+  name          VARCHAR(120)  NOT NULL,
+  phone         VARCHAR(40)   NOT NULL,
+  brief         JSON          NULL,                     -- step answers, must-haves, timeline…
+  listing_id    INT UNSIGNED  NULL,                     -- parts/documents requests may point at a car
+  sla_due_at    DATETIME      NULL,                     -- 48–72h for concierge (§6.5)
+  source_path   VARCHAR(200)  NOT NULL,
+  notes         VARCHAR(500)  NULL,
+  created_at    TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at    TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  UNIQUE KEY uq_request_tracking (tracking_id),
+  KEY idx_request_pipeline (type, status, created_at),
+  CONSTRAINT fk_request_listing FOREIGN KEY (listing_id) REFERENCES vehicle_listings (id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ---------------------------------------------------------------------------
+-- bookings — inspections, installs and consultations (§6.7, §7.3 dispatch).
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS bookings (
+  id             INT UNSIGNED  NOT NULL AUTO_INCREMENT,
+  reference      VARCHAR(24)   NOT NULL,                -- HC-BK-0001
+  type           ENUM('inspection','install','consultation') NOT NULL,
+  service_slug   VARCHAR(80)   NULL,
+  slot_at        DATETIME      NULL,
+  location       VARCHAR(200)  NULL,
+  vehicle        JSON          NULL,                    -- {make, model, year, vin, mileage_km}
+  addons         JSON          NULL,
+  name           VARCHAR(120)  NOT NULL,
+  phone          VARCHAR(40)   NOT NULL,
+  amount_kobo    BIGINT        NULL,
+  payment_status ENUM('unpaid','pending','paid','refunded') NOT NULL DEFAULT 'unpaid',
+  status         ENUM('requested','confirmed','dispatched','completed','cancelled')
+                                NOT NULL DEFAULT 'requested',
+  request_id     INT UNSIGNED  NULL,
+  created_at     TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  UNIQUE KEY uq_booking_reference (reference),
+  KEY idx_booking_dispatch (status, slot_at),
+  CONSTRAINT fk_booking_request FOREIGN KEY (request_id) REFERENCES service_requests (id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ---------------------------------------------------------------------------

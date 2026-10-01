@@ -18,6 +18,7 @@ const {
   BODY_TYPE_LABELS,
   TRANSMISSION_LABELS,
   FUEL_LABELS,
+  PRICE_POSITION,
 } = require('./shape');
 
 const SORTS = {
@@ -215,6 +216,17 @@ function shapeListing(row) {
     description: row.description,
     honestNote: row.honest_note,
     inspectionSummary: parseJson(row.inspection_summary, null),
+    // Derived, human-readable fields the compare table (§6.4) and cards reuse.
+    pricePositionLabel: (PRICE_POSITION[row.price_position] || PRICE_POSITION.no_data).label,
+    documentsSummary: [
+      documents.customs_verified ? 'customs verified' : null,
+      documents.registration ? 'registered' : null,
+      documents.duty_sighted ? 'duty papers sighted' : null,
+      documents.tinted_permit ? 'tinted permit' : null,
+    ].filter(Boolean).join(', ') || 'pending',
+    knownFaults: parseJson(row.inspection_summary, null) && parseJson(row.inspection_summary, null).faults
+      ? parseJson(row.inspection_summary, null).faults
+      : row.honest_note || null,
     slug: row.seo_slug,
     url: `/cars/${row.seo_slug}`,
     views: row.views,
@@ -352,6 +364,44 @@ async function findBySlug(slug, { scope = 'browsable' } = {}) {
 }
 
 /** Sold-archive lookup: only the 7→90 day window returns a row. */
+/**
+ * Compare tool (§6.4): up to 3 listings by id, live/reserved/sold-≤7d only.
+ * Order follows the ids the visitor picked so the table never reshuffles.
+ */
+/**
+ * Running-cost estimate for the compare table (§6.4 row
+ * “running-cost estimate”). Deliberately a transparent estimate: fuel at PH
+ * pump price + servicing + insurance band, over 5 years, from the car's own
+ * fuel type and engine size. Not a quote, and the UI says so.
+ */
+function runningCostEstimate(listing) {
+  const kmPerYear = 15_000;
+  const pumpPrice = 985; // ₦/litre — placeholder, ops-editable in one place
+  const litresPer100 = listing.fuelType === 'diesel' ? 7.5 : listing.fuelType === 'hybrid' ? 4.5 : listing.engineSize && /3\.[0-9]/.test(listing.engineSize) ? 12.5 : 9.5;
+  const fuel = (kmPerYear * 5 * litresPer100 * pumpPrice) / 100;
+  const service = 5 * (listing.condition === 'tokunbo' ? 220_000 : 320_000);
+  const insurance = 5 * Math.max(180_000, Number(listing.priceKobo || 0) / 100 * 0.035);
+  return Math.round(fuel + service + insurance) * 100; // kobo
+}
+
+async function findByIds(ids = []) {
+  const clean = ids.map((id) => Number.parseInt(id, 10)).filter((id) => Number.isFinite(id)).slice(0, 3);
+  if (!clean.length) return [];
+  const rows = await query(
+    `SELECT l.*, d.name AS dealer_name, d.lot_area AS dealer_area, d.verified AS dealer_verified
+       FROM vehicle_listings l
+       JOIN dealers d ON d.id = l.dealer_id
+      WHERE l.id IN (${clean.map(() => '?').join(',')})
+        AND (l.status IN ('live','reserved')
+             OR (l.status = 'sold' AND l.sold_at > DATE_SUB(UTC_TIMESTAMP(), INTERVAL 7 DAY)))`,
+    clean,
+  );
+  const listings = rows.map(shapeListing);
+  await attachMedia(listings);
+  const byId = new Map(listings.map((listing) => [listing.id, { ...listing, runningCostKobo: runningCostEstimate(listing) }]));
+  return clean.map((id) => byId.get(id)).filter(Boolean);
+}
+
 async function findArchivedSoldBySlug(slug) {
   const row = await queryOne(
     `SELECT l.*, d.name AS dealer_name
@@ -580,6 +630,8 @@ module.exports = {
   browse,
   homeFeed,
   findBySlug,
+  findByIds,
+  runningCostEstimate,
   findArchivedSoldBySlug,
   findRedirectTarget,
   findSimilar,

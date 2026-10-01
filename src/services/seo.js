@@ -289,6 +289,115 @@ function webSiteSchema() {
   };
 }
 
+
+/**
+ * Service page schema (§12.4 lists Vehicle/LocalBusiness/FAQPage/Article/
+ * BreadcrumbList; Service + Offer is the natural extension for the service
+ * suite and is what Google wants for priced services). Prices are kobo in the
+ * DB, naira in markup.
+ */
+function serviceSchema(service, { areaServed = ['Port Harcourt', 'Rivers State'] } = {}) {
+  const offers = (service.pricing || [])
+    .filter((tier) => tier.price_kobo)
+    .map((tier) => ({
+      '@type': 'Offer',
+      name: tier.tier,
+      price: Number(tier.price_kobo) / 100,
+      priceCurrency: 'NGN',
+      url: absolute(`/services/${service.slug}`),
+      availability: 'https://schema.org/InStock',
+      seller: { '@id': `${config.siteUrl}/#organization` },
+    }));
+
+  return pruneUndefined({
+    '@context': 'https://schema.org',
+    '@type': 'Service',
+    name: service.name,
+    serviceType: service.name,
+    description: service.heroCopy || service.promise,
+    url: absolute(`/services/${service.slug}`),
+    provider: { '@id': `${config.siteUrl}/#organization` },
+    areaServed: areaServed.map((name) => ({ '@type': 'City', name })),
+    offers: offers.length ? (offers.length === 1 ? offers[0] : offers) : undefined,
+    hasOfferCatalog: service.deliverables && service.deliverables.length
+      ? {
+          '@type': 'OfferCatalog',
+          name: service.name,
+          itemListElement: service.deliverables.map((item) => ({
+            '@type': 'Offer',
+            itemOffered: { '@type': 'Service', name: item.title },
+            description: item.copy,
+          })),
+        }
+      : undefined,
+  });
+}
+
+/** Product + Offer for shop items (§6.8, §12.4 spirit). */
+function productSchema(product) {
+  return pruneUndefined({
+    '@context': 'https://schema.org',
+    '@type': 'Product',
+    name: product.name,
+    description: product.summary,
+    sku: product.slug,
+    image: product.image ? [absolute(product.image)] : undefined,
+    brand: { '@type': 'Brand', name: SITE_NAME },
+    category: product.categoryLabel,
+    offers: {
+      '@type': 'Offer',
+      price: Number(product.priceKobo) / 100,
+      priceCurrency: 'NGN',
+      url: absolute(product.url),
+      availability:
+        product.stockStatus === 'out_of_stock'
+          ? 'https://schema.org/OutOfStock'
+          : 'https://schema.org/InStock',
+      seller: { '@id': `${config.siteUrl}/#organization` },
+    },
+  });
+}
+
+/** HowTo for a service page’s numbered steps — only when steps carry copy. */
+function howToSchema(service) {
+  const steps = (service.steps || []).filter((step) => step && step.title);
+  if (steps.length < 3) return null;
+  return {
+    '@context': 'https://schema.org',
+    '@type': 'HowTo',
+    name: `How ${service.name} works at HonestCars`,
+    description: service.promise,
+    step: steps.map((step, index) => ({
+      '@type': 'HowToStep',
+      position: index + 1,
+      name: step.title,
+      text: step.copy || step.title,
+    })),
+  };
+}
+
+/** Meta template for blog posts (§14.2 spirit — title + description patterns). */
+function postMeta(post) {
+  const title = `${post.title} | HonestCars`;
+  const suffix = post.excerpt && post.excerpt.includes(post.categoryLabel) ? '' : ` — ${post.categoryLabel}.`;
+  return {
+    title: truncate(title, 62),
+    fullTitle: title,
+    description: truncate(`${post.excerpt}${suffix}`, 158),
+    canonical: absolute(post.url),
+  };
+}
+
+/** Meta template for CMS pages: the CMS owns title/description verbatim. */
+function pageMeta(page) {
+  return {
+    title: truncate(page.metaTitle || page.title, 62),
+    fullTitle: page.metaTitle || page.title,
+    description: truncate(page.metaDescription || page.title, 158),
+    canonical: absolute(`/${page.slug}`),
+  };
+}
+
 function pruneUndefined(value) {
   if (Array.isArray(value)) return value.filter((v) => v !== undefined).map(pruneUndefined);
   if (value && typeof value === 'object') {
@@ -310,6 +419,11 @@ module.exports = {
   vdpPath,
   vdpMeta,
   serviceMeta,
+  postMeta,
+  pageMeta,
+  serviceSchema,
+  productSchema,
+  howToSchema,
   formatNairaForTitle,
   openGraph,
   jsonLdScript,

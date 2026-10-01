@@ -25,6 +25,53 @@ const skipSeed = args.has('--no-seed') || schemaOnly;
 const ADMIN_USER = process.env.DB_ADMIN_USER || (process.env.DB_USER === 'root' ? 'root' : 'root');
 const ADMIN_PASSWORD = process.env.DB_ADMIN_PASSWORD ?? (process.env.DB_USER === 'root' ? config.db.password : '');
 
+/**
+ * Apply db/migrations/*.sql in order, tolerating “already present” errors so a
+ * database created from schema.sql and one upgraded by migrations converge.
+ * Mirrors scripts/migrate.js — kept inline so `db:setup` is a single command.
+ */
+async function runMigrations(conn) {
+  const dir = path.join(__dirname, '..', 'db', 'migrations');
+  if (!fs.existsSync(dir)) return;
+
+  await conn.query(
+    `CREATE TABLE IF NOT EXISTS schema_migrations (
+       filename   VARCHAR(120) NOT NULL,
+       applied_at TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+       statements SMALLINT     NOT NULL DEFAULT 0,
+       PRIMARY KEY (filename)
+     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+  );
+
+  const [applied] = await conn.query('SELECT filename FROM schema_migrations');
+  const done = new Set(applied.map((row) => row.filename));
+  const tolerated = new Set(['ER_DUP_FIELDNAME', 'ER_DUP_KEYNAME', 'ER_TABLE_EXISTS_ERROR', 'ER_CANT_DROP_FIELD_OR_KEY']);
+
+  let count = 0;
+  for (const file of fs.readdirSync(dir).filter((f) => f.endsWith('.sql')).sort()) {
+    if (done.has(file)) continue;
+    const statements = fs
+      .readFileSync(path.join(dir, file), 'utf8')
+      .split('\n')
+      .filter((line) => !/^\s*--/.test(line))
+      .join('\n')
+      .split(';')
+      .map((statement) => statement.trim())
+      .filter(Boolean);
+
+    for (const statement of statements) {
+      try {
+        await conn.query(statement);
+      } catch (error) {
+        if (!tolerated.has(error.code)) throw error;
+      }
+    }
+    await conn.query('INSERT INTO schema_migrations (filename, statements) VALUES (?, ?)', [file, statements.length]);
+    count += 1;
+  }
+  if (count) console.log(`✓ migrations applied (${count})`);
+}
+
 async function main() {
   const baseOptions = {
     host: config.db.host,
@@ -70,6 +117,9 @@ async function main() {
   const schema = fs.readFileSync(path.join(__dirname, '..', 'db', 'schema.sql'), 'utf8');
   await conn.query(schema);
   console.log('✓ schema applied (tables + views)');
+
+  // Bring an older database up to the current schema, then record it.
+  await runMigrations(conn);
 
   if (!skipSeed) {
     const seed = fs.readFileSync(path.join(__dirname, '..', 'db', 'seed.sql'), 'utf8');

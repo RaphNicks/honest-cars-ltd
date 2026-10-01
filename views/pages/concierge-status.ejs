@@ -1,0 +1,78 @@
+<%#
+  Concierge status page — §6.5: /concierge/{id}: Searching → Options ready →
+  Viewings → Closed stages, pushes WhatsApp updates at each stage.
+  Private by design: noindex, not cached (the route sets both).
+%>
+<section class="page-hero">
+  <div class="container">
+    <%- include('../partials/breadcrumbs', { crumbs: trail }) %>
+    <p class="eyebrow">Concierge request</p>
+    <h1 class="mb-1">Your brief is with the team</h1>
+    <p class="reference-big mb-2"><%= request.trackingId %></p>
+    <p class="page-hero__meta">
+      <span class="badge badge--verified"><%= request.statusLabel %></span>
+      <span>Opened <%= helpers.relativeDays(request.createdAt) %></span>
+      <% if (request.slaDueAt) { %>
+        <span>SLA due <%= new Date(request.slaDueAt).toLocaleDateString('en-NG', { day: 'numeric', month: 'short' }) %></span>
+      <% } %>
+    </p>
+  </div>
+</section>
+
+<section class="section">
+  <div class="container">
+    <div class="grid grid--2" style="align-items:start">
+      <div>
+        <h2>Where this is</h2>
+        <ol class="timeline">
+          <% stages.forEach(function (stage, index) { %>
+            <%
+              var state = index < request.stageIndex ? 'done' : index === request.stageIndex ? 'current' : 'todo';
+            %>
+            <li class="timeline__item" data-state="<%= state %>">
+              <span class="timeline__dot" aria-hidden="true"></span>
+              <p class="timeline__title mb-0">
+                <%= stage.label %>
+                <% if (state === 'done') { %><span class="timeline__meta">· done</span><% } %>
+                <% if (state === 'current') { %><span class="timeline__meta">· where we are now</span><% } %>
+              </p>
+              <p class="timeline__body"><%= stage.blurb %></p>
+            </li>
+          <% }); %>
+        </ol>
+      </div>
+
+      <aside class="stack">
+        <div class="card card__body">
+          <h2 class="mb-1">The brief we are working from</h2>
+          <dl class="summary-list">
+            <% Object.entries(request.brief || {}).forEach(function ([key, value]) { %>
+              <% if (value === null || value === '' || (Array.isArray(value) && !value.length)) return; %>
+              <div class="summary-list__row">
+                <dt><%= key.replace(/_/g, ' ') %></dt>
+                <dd><%= Array.isArray(value) ? value.join(', ') : value %></dd>
+              </div>
+            <% }); %>
+          </dl>
+          <p class="field__hint mb-0">Wrong on any line? Reply on WhatsApp and we update it before the search continues.</p>
+        </div>
+
+        <div class="card card__body">
+          <h2 class="mb-1">Talk to the team</h2>
+          <p class="mb-2">Quote your tracking ID when you message — it saves you repeating the brief.</p>
+          <a class="btn btn--primary btn--block" href="<%= site.nav.whatsapp.general %>" target="_blank" rel="noopener"
+             data-event="whatsapp_click" data-source="concierge_status">Continue on WhatsApp</a>
+        </div>
+
+        <div class="card card__body">
+          <h2 class="mb-1">While you wait</h2>
+          <ul class="tick-list">
+            <li class="tick-list__yes"><%- helpers.icon('check', { size: 16 }) %> <span><a href="/cars">Browse verified stock</a> — options may already be live.</span></li>
+            <li class="tick-list__yes"><%- helpers.icon('check', { size: 16 }) %> <span><a href="/services/inspection">Book an inspection</a> on a car you found yourself.</span></li>
+            <li class="tick-list__yes"><%- helpers.icon('check', { size: 16 }) %> <span><a href="/guide">Read the Honest Buyer’s Guide</a> — what to check before you pay.</span></li>
+          </ul>
+        </div>
+      </aside>
+    </div>
+  </div>
+</section>

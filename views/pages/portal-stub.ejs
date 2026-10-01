@@ -1,0 +1,38 @@
+<%#
+  Dealer portal / admin console entry stubs — §7.2 and §7 are phase-2 builds.
+  This page exists so the links in the footer, /partner and robots.txt resolve
+  to something honest instead of a 404, and so nobody mistakes phase 1 for the
+  full back office.
+%>
+<section class="page-hero">
+  <div class="container">
+    <%- include('../partials/breadcrumbs', { crumbs: trail }) %>
+    <p class="eyebrow"><%= portal.title %></p>
+    <h1><%= portal.heading %></h1>
+  </div>
+</section>
+
+<section class="section">
+  <div class="container container--narrow">
+    <div class="portal-stub">
+      <span class="portal-stub__icon"><%- helpers.icon(portal.icon, { size: 28 }) %></span>
+      <span class="phase-note">Phase 2</span>
+      <p class="mb-0"><%= portal.copy %></p>
+      <div class="btn-row">
+        <a class="btn btn--primary" href="<%= site.nav.whatsapp.general %>" target="_blank" rel="noopener"
+           data-event="whatsapp_click" data-source="portal_stub"><%= portal.ctaLabel %></a>
+        <a class="btn btn--secondary" href="<%= portal.secondHref %>"><%= portal.secondLabel %></a>
+      </div>
+    </div>
+
+    <div class="card card__body mt-3">
+      <h2 class="mb-1">What this build does ship</h2>
+      <ul class="tick-list">
+        <li class="tick-list__yes"><%- helpers.icon('check', { size: 16 }) %> <span>The full public site: listings, VDP, services, funnels, blog, shop, trust and legal pages.</span></li>
+        <li class="tick-list__yes"><%- helpers.icon('check', { size: 16 }) %> <span>The database schema the portals will read from — requests, bookings, orders, subscriptions, leads, analytics.</span></li>
+        <li class="tick-list__yes"><%- helpers.icon('check', { size: 16 }) %> <span>Every public form writing real records with tracking IDs and references.</span></li>
+        <li class="tick-list__no"><%- helpers.icon('close', { size: 16 }) %> <span>Authenticated staff and dealer screens — specified in §7, built next.</span></li>
+      </ul>
+    </div>
+  </div>
+</section>

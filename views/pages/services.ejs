@@ -1,0 +1,102 @@
+<%#
+  Services hub — §6.7: “grid of all services (same 8 as homepage + any future),
+  each card → dedicated page”, with a short trust band and the suite-wide FAQs.
+%>
+<section class="page-hero">
+  <div class="container">
+    <%- include('../partials/breadcrumbs', { crumbs: trail }) %>
+    <p class="eyebrow">The suite</p>
+    <h1>Everything around the car, handled</h1>
+    <p class="lead">
+      Ten services that all exist because Port Harcourt buyers kept asking for them — from a
+      single inspection before you pay, to documents, tracking, hire and the concierge search
+      that brings verified options to your WhatsApp in 48–72 hours.
+    </p>
+    <div class="hero__chips">
+      <span class="trust-chip"><%- helpers.icon('checkCircle', { size: 16 }) %><strong><%= counters.carsLive %></strong> cars live in the network</span>
+      <span class="trust-chip"><%- helpers.icon('store', { size: 16 }) %><strong><%= counters.partnerDealers %></strong> partner dealers in PH</span>
+      <span class="trust-chip"><%- helpers.icon('shield', { size: 16 }) %><strong>Protected</strong> payments on every purchase we handle</span>
+    </div>
+  </div>
+</section>
+
+<section class="section">
+  <div class="container">
+    <div class="grid grid--3">
+      <% services.forEach(function (service) { %>
+        <%- include('../partials/service-card', { service: service, helpers: helpers }) %>
+      <% }); %>
+    </div>
+  </div>
+</section>
+
+<section class="section section--surface" aria-labelledby="suite-promise">
+  <div class="container">
+    <div class="section-head">
+      <h2 id="suite-promise">One suite, one standard</h2>
+    </div>
+    <div class="grid grid--3">
+      <div class="card card__body">
+        <h3>Priced before we start</h3>
+        <p class="mb-0">Every service page shows its tiers and what is in them. No “call for price”, no surprise line items after the work is done.</p>
+      </div>
+      <div class="card card__body">
+        <h3>Done by people who are here</h3>
+        <p class="mb-0">Inspectors, document runners and installers work across Port Harcourt every day. Timelines on this site are the ones we actually hit.</p>
+      </div>
+      <div class="card card__body">
+        <h3>Honest when it fails</h3>
+        <p class="mb-0">If an inspection kills the deal, or a part cannot be matched, you get that answer in writing — not a silence and a refund delay.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<% if (testimonials.length) { %>
+  <section class="section" aria-labelledby="services-proof">
+    <div class="container">
+      <div class="section-head">
+        <h2 id="services-proof">What Port Harcourt says</h2>
+        <a class="section-head__link" href="/verification">How we verify →</a>
+      </div>
+      <div class="grid grid--3">
+        <% testimonials.forEach(function (testimonial) { %>
+          <figure class="testimonial">
+            <span class="testimonial__stars" aria-label="<%= testimonial.rating %> out of 5">★★★★★</span>
+            <blockquote class="testimonial__quote">“<%= testimonial.quote %>”</blockquote>
+            <figcaption class="testimonial__meta">
+              <%= testimonial.name %> · <%= testimonial.area %><% if (testimonial.serviceTag) { %> · <%= testimonial.serviceTag %><% } %>
+            </figcaption>
+          </figure>
+        <% }); %>
+      </div>
+    </div>
+  </section>
+<% } %>
+
+<% if (faqs.length) { %>
+  <section class="section section--surface" aria-labelledby="services-faq">
+    <div class="container container--narrow">
+      <div class="section-head">
+        <h2 id="services-faq">Questions people ask before choosing</h2>
+      </div>
+      <%- include('../partials/accordion', { faqs: faqs, idPrefix: 'services-faq' }) %>
+    </div>
+  </section>
+<% } %>
+
+<section class="section">
+  <div class="container">
+    <div class="cta-band">
+      <div>
+        <h2>Not sure which one you need?</h2>
+        <p class="mb-0">Describe the problem, not the service. We will tell you — honestly — whether it is an inspection, a document issue, or a car you should not buy.</p>
+      </div>
+      <div class="btn-row">
+        <a class="btn btn--primary" href="/find-my-car" data-event="concierge_started" data-source="services_hub">Start with my brief</a>
+        <a class="btn btn--secondary" href="<%= site.nav.whatsapp.general %>" target="_blank" rel="noopener"
+           data-event="whatsapp_click" data-source="services_hub">Ask on WhatsApp</a>
+      </div>
+    </div>
+  </div>
+</section>

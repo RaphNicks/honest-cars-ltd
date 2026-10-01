@@ -11,6 +11,8 @@
     "db:setup": "node scripts/db-setup.js",
     "db:seed": "node scripts/generate-seed.js && node scripts/db-setup.js",
     "build:static": "node scripts/build-static.js",
+    "images": "node scripts/prepare-images.js",
+    "images:check": "node scripts/prepare-images.js --check",
     "lint:type": "node scripts/lint-type-scale.js",
     "lint:js": "node scripts/lint-js.js",
     "lint": "npm run lint:type && npm run lint:js",

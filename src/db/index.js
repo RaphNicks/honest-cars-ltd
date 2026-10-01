@@ -18,6 +18,8 @@ const { pool, query, queryOne, transaction, healthcheck } = require('./pool');
 const listings = require('./listings');
 const facets = require('./facets');
 const content = require('./content');
+const requests = require('./requests');
+const commerce = require('./commerce');
 const leads = require('./leads');
 const analytics = require('./analytics');
 const redirects = require('./redirects');
@@ -34,6 +36,8 @@ module.exports = {
   listings,
   facets,
   content,
+  requests,
+  commerce,
   leads,
   analytics,
   redirects,

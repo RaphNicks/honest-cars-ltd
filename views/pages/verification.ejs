@@ -1,0 +1,205 @@
+<%#
+  /verification — §6.10: “the trust page: explains the three grades, the
+  HonestCars Checklist, photo examples of catches (flood, odometer), integrity
+  rules (‘inspectors never take seller money’). Most underrated page on the
+  site — give it design love.”
+%>
+<section class="trust-hero">
+  <div class="container">
+    <%- include('../partials/breadcrumbs', { crumbs: trail }) %>
+    <p class="eyebrow">Verification</p>
+    <h1>Every grade is a promise about how much we actually know</h1>
+    <p class="lead">
+      There is no “we think it is fine” grade. Each listing carries exactly one of three labels, and
+      each label says precisely what has been checked — and what has not.
+    </p>
+    <div class="stat-band mt-3">
+      <div class="stat"><span class="stat__value"><%= counters.carsLive %></span><span class="stat__label">cars in the network today</span></div>
+      <div class="stat"><span class="stat__value"><%= counters.certified %></span><span class="stat__label">HonestCars-Certified</span></div>
+      <div class="stat"><span class="stat__value"><%= counters.partnerDealers %></span><span class="stat__label">verified partner lots</span></div>
+      <div class="stat"><span class="stat__value"><%= counters.carsSold90d %></span><span class="stat__label">deals closed in 90 days</span></div>
+    </div>
+  </div>
+</section>
+
+<section class="section">
+  <div class="container">
+    <div class="section-head">
+      <h2>The three grades</h2>
+      <p class="section-head__note mb-0">Admin-set, visible on every card and every VDP. No grade is ever upgraded without a new inspection.</p>
+    </div>
+
+    <div class="grade-deep">
+      <article class="grade-deep__card grade-deep__card--network_listed">
+        <div class="row row--between">
+          <h3 class="mb-0">● Network-Listed</h3>
+          <span class="badge badge--network_listed">Dealer data only</span>
+        </div>
+        <p class="mb-0">
+          A partner dealer supplied the details and the photos. We have not stood next to the car. Useful for
+          price range and availability — and honestly labelled so you never assume more than that.
+        </p>
+        <ul class="tick-list">
+          <li class="tick-list__yes"><%- helpers.icon('check', { size: 16 }) %> <span>VIN-level data recorded (ops side), asking price and location verified with the dealer</span></li>
+          <li class="tick-list__no"><%- helpers.icon('close', { size: 16 }) %> <span>No physical inspection, no OBD2 scan, no documents sighted</span></li>
+        </ul>
+        <p class="grade-deep__meta mb-0">Best for: narrowing a shortlist. Not enough to pay on.</p>
+      </article>
+
+      <article class="grade-deep__card grade-deep__card--field_checked">
+        <div class="row row--between">
+          <h3 class="mb-0">● Field-Checked</h3>
+          <span class="badge badge--field_checked">Inspector on site</span>
+        </div>
+        <p class="mb-0">
+          One of our inspectors physically visited the car, photographed it where it stands and confirmed the
+          basics. It is more than a listing — it is not yet a full report.
+        </p>
+        <ul class="tick-list">
+          <li class="tick-list__yes"><%- helpers.icon('check', { size: 16 }) %> <span>Exterior and interior photos taken by us, on site, on the day</span></li>
+          <li class="tick-list__yes"><%- helpers.icon('check', { size: 16 }) %> <span>Mileage, panel condition and obvious faults recorded</span></li>
+          <li class="tick-list__no"><%- helpers.icon('close', { size: 16 }) %> <span>No road test or full mechanical checklist unless a report is attached</span></li>
+        </ul>
+        <p class="grade-deep__meta mb-0">Best for: deciding whether the car is worth a full inspection.</p>
+      </article>
+
+      <article class="grade-deep__card grade-deep__card--certified">
+        <div class="row row--between">
+          <h3 class="mb-0">● HonestCars-Certified</h3>
+          <span class="badge badge--certified">Full checklist passed</span>
+        </div>
+        <p class="mb-0">
+          The whole checklist was run: OBD2 scan, documents sighted at source, body read for repair, road test,
+          and an honest note written for a buyer. The report is attached to the listing.
+        </p>
+        <ul class="tick-list">
+          <li class="tick-list__yes"><%- helpers.icon('check', { size: 16 }) %> <span>Ten-point checklist with photos of every finding</span></li>
+          <li class="tick-list__yes"><%- helpers.icon('check', { size: 16 }) %> <span>Documents sighted at the source, not photocopies</span></li>
+          <li class="tick-list__yes"><%- helpers.icon('check', { size: 16 }) %> <span>Honest note: what made us hesitate, written plainly</span></li>
+        </ul>
+        <p class="grade-deep__meta mb-0">Best for: buying remotely, or when you cannot bring a mechanic.</p>
+      </article>
+    </div>
+  </div>
+</section>
+
+<section class="section section--surface">
+  <div class="container">
+    <div class="section-head">
+      <h2>The HonestCars Checklist</h2>
+      <p class="section-head__note mb-0">Ten things, every certified car. The report shows which line produced which finding.</p>
+    </div>
+    <div class="checklist-grid">
+      <% checklist.forEach(function (item) { %>
+        <div class="checklist-grid__item">
+          <%- helpers.icon('checkCircle', { size: 18 }) %>
+          <span><%= item %></span>
+        </div>
+      <% }); %>
+    </div>
+    <p class="page-hero__meta mt-3">
+      What we do not do: open engines or gearboxes, or certify structural repairs without a workshop report.
+      When a car needs that, we say so and point you at the right specialist — see the
+      <a href="/services/inspection">inspection page</a>.
+    </p>
+  </div>
+</section>
+
+<section class="section">
+  <div class="container">
+    <div class="section-head">
+      <h2>What we actually catch</h2>
+      <p class="section-head__note mb-0">Three real examples, with the finding that changed the deal.</p>
+    </div>
+    <div class="grid grid--3">
+      <% catches.forEach(function (item) { %>
+        <article class="catch-card">
+          <div class="catch-card__media">
+            <img src="<%= item.image %>" alt="Placeholder for a condition photo: <%= helpers.esc(item.title) %>"
+                 width="1200" height="900" loading="lazy" decoding="async">
+          </div>
+          <span class="catch-card__tag"><%= item.tag %></span>
+          <h3 class="mb-0"><%= item.title %></h3>
+          <p class="mb-0"><%= item.copy %></p>
+        </article>
+      <% }); %>
+    </div>
+    <p class="field__hint mt-2">
+      Photos are placeholders in this build. On the live site each catch links to the actual listing photos
+      with the fault circled.
+    </p>
+  </div>
+</section>
+
+<section class="section">
+  <div class="container">
+    <div class="integrity-band">
+      <h2>Integrity rules we work under</h2>
+      <ul>
+        <li><strong>Inspectors never take money from sellers.</strong> Not for a good report, not for a fast one. It is a dismissable offence and we audit it.</li>
+        <li><strong>We write what we find, including the faults that cost us the sale.</strong> A listed car with a fault note is worth more to us than a silent problem.</li>
+        <li><strong>Buyer money never goes to the seller directly.</strong> Protected channels only, every time.</li>
+        <li><strong>Grades are earned, not sold.</strong> Dealers cannot buy a Certified badge, and featured placement never changes a grade.</li>
+        <li><strong>If we are wrong, we correct it in writing</strong> — and we show you the corrected report.</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<% if (examples.length) { %>
+<section class="section section--surface">
+  <div class="container">
+    <div class="section-head">
+      <h2>Certified cars you can look at today</h2>
+      <a class="section-head__link" href="/cars?grade=certified">All certified cars →</a>
+    </div>
+    <div class="grid grid--3">
+      <% examples.forEach(function (listing) { %>
+        <%- include('../partials/car-card', { listing: listing, helpers: helpers }) %>
+      <% }); %>
+    </div>
+  </div>
+</section>
+<% } %>
+
+<% if (testimonials.length) { %>
+<section class="section">
+  <div class="container">
+    <div class="section-head"><h2>From buyers who were told the truth</h2></div>
+    <div class="grid grid--2">
+      <% testimonials.forEach(function (testimonial) { %>
+        <figure class="testimonial">
+          <span class="testimonial__stars" aria-label="<%= testimonial.rating %> out of 5">★★★★★</span>
+          <blockquote class="testimonial__quote">“<%= testimonial.quote %>”</blockquote>
+          <figcaption class="testimonial__meta"><%= testimonial.name %> · <%= testimonial.area %></figcaption>
+        </figure>
+      <% }); %>
+    </div>
+  </div>
+</section>
+<% } %>
+
+<% if (faqs.length) { %>
+<section class="section section--surface">
+  <div class="container container--narrow">
+    <div class="section-head"><h2>Verification questions</h2></div>
+    <%- include('../partials/accordion', { faqs: faqs, idPrefix: 'verification-faq' }) %>
+  </div>
+</section>
+<% } %>
+
+<section class="section">
+  <div class="container">
+    <div class="cta-band">
+      <div>
+        <h2>Want this run on a car you found somewhere else?</h2>
+        <p class="mb-0">Send us the location. An inspector goes, scans and writes the report — usually the same day.</p>
+      </div>
+      <div class="btn-row">
+        <a class="btn btn--primary" href="/services/inspection">Book an inspection</a>
+        <a class="btn btn--ghost" href="<%= site.nav.whatsapp.general %>" target="_blank" rel="noopener"
+           data-event="whatsapp_click" data-source="verification">Ask a question first</a>
+      </div>
+    </div>
+  </div>
+</section>

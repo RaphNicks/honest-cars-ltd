@@ -1,0 +1,155 @@
+<%#
+  /partner — §6.7 B2B dealer services: “Recruitment + media/lead-gen/intelligence
+  packages enquiry → B2B lead pipeline; links to dealer portal login”.
+%>
+<section class="page-hero">
+  <div class="container">
+    <%- include('../partials/breadcrumbs', { crumbs: trail }) %>
+    <p class="eyebrow">For dealers</p>
+    <h1>Own a car lot in PH? We bring you buyers.</h1>
+    <p class="lead">
+      <%= service ? service.promise : 'Media, featured placement and market intelligence for Port Harcourt lots — plus leads routed straight to your phone.' %>
+      Buyers arrive already qualified: brief checked, budget checked, inspection explained.
+    </p>
+    <div class="hero__chips">
+      <span class="trust-chip"><%- helpers.icon('checkCircle', { size: 16 }) %><strong><%= counters.partnerDealers %></strong> verified lots in the network</span>
+      <span class="trust-chip"><%- helpers.icon('car', { size: 16 }) %><strong><%= counters.carsLive %></strong> cars listed right now</span>
+      <span class="trust-chip"><%- helpers.icon('store', { size: 16 }) %><strong>No listing fee</strong> — pay only for what you use</span>
+    </div>
+  </div>
+</section>
+
+<section class="section">
+  <div class="container">
+    <div class="section-head">
+      <h2>Packages</h2>
+      <p class="section-head__note mb-0">Placeholder pricing for review — per-car and monthly rates are agreed with each lot.</p>
+    </div>
+    <div class="package-cards">
+      <% packages.forEach(function (entry) { %>
+        <div class="package-card<%= entry.lead ? ' package-card--lead' : '' %>">
+          <h3><%= entry.name %></h3>
+          <p class="package-card__price"><%= entry.price %></p>
+          <p class="mb-0"><%= entry.copy %></p>
+          <ul class="tick-list">
+            <% entry.includes.forEach(function (line) { %>
+              <li class="tick-list__yes"><%- helpers.icon('check', { size: 16 }) %> <span><%= line %></span></li>
+            <% }); %>
+          </ul>
+          <a class="btn <%= entry.lead ? 'btn--primary' : 'btn--secondary' %> btn--block" href="#apply">Talk to us</a>
+        </div>
+      <% }); %>
+    </div>
+  </div>
+</section>
+
+<section class="section section--surface">
+  <div class="container">
+    <div class="grid grid--2" style="align-items:start">
+      <div>
+        <h2>What we ask of a partner lot</h2>
+        <ul class="tick-list">
+          <li class="tick-list__yes"><%- helpers.icon('check', { size: 16 }) %> <span>Real mileage: no dash corrections, no “the book got lost”.</span></li>
+          <li class="tick-list__yes"><%- helpers.icon('check', { size: 16 }) %> <span>Documents sighted and available when a buyer is serious.</span></li>
+          <li class="tick-list__yes"><%- helpers.icon('check', { size: 16 }) %> <span>Faults disclosed before inspection, not discovered during it.</span></li>
+          <li class="tick-list__yes"><%- helpers.icon('check', { size: 16 }) %> <span>Buyer money through HonestCars-protected channels on cars we handle.</span></li>
+          <li class="tick-list__yes"><%- helpers.icon('check', { size: 16 }) %> <span>One contact who answers when a buyer is standing next to the car.</span></li>
+        </ul>
+
+        <h2 class="mt-3">How the pipeline works</h2>
+        <ol class="steps steps--compact">
+          <li class="step"><span class="step__num">1</span><div><strong>You add stock</strong><p class="mb-0">Photos and the honest condition note — we help with the shoot if you want the media package.</p></div></li>
+          <li class="step"><span class="step__num">2</span><div><strong>We moderate and publish</strong><p class="mb-0">Grade assigned, listing live, facets updated.</p></div></li>
+          <li class="step"><span class="step__num">3</span><div><strong>Leads arrive qualified</strong><p class="mb-0">Buyer contact released to you when a viewing is agreed — not before.</p></div></li>
+          <li class="step"><span class="step__num">4</span><div><strong>We handle the protected side</strong><p class="mb-0">Payment, documents and handover coordination, so you sell cars and skip the chasing.</p></div></li>
+        </ol>
+      </div>
+
+      <form class="card card__body service-form" id="apply" data-service-form data-kind="dealer" data-service-slug="dealer-services"
+            data-endpoint="/api/service-requests" method="post" action="/api/service-requests" novalidate>
+        <h2 class="mb-1">Apply to join the network</h2>
+        <p class="form-hint">
+          We visit, check the papers and take two references before a lot goes live. Expect a reply within
+          two working days.
+        </p>
+
+        <div class="form-grid">
+          <div class="field">
+            <label class="field__label" for="partner-lot">Lot name</label>
+            <input class="input" id="partner-lot" name="lot_name" type="text" placeholder="Example Autos" required>
+          </div>
+          <div class="field">
+            <label class="field__label" for="partner-area">Where is the lot?</label>
+            <input class="input" id="partner-area" name="area" type="text" placeholder="Trans-Amadi, Port Harcourt" required>
+          </div>
+          <div class="field">
+            <label class="field__label" for="partner-cars">Cars in stock</label>
+            <input class="input" id="partner-cars" name="stock_size" type="number" inputmode="numeric" min="1" placeholder="12">
+          </div>
+          <div class="field">
+            <label class="field__label" for="partner-interest">What are you interested in?</label>
+            <select class="select" id="partner-interest" name="interest">
+              <option value="media">Media &amp; listing</option>
+              <option value="featured">Featured placement</option>
+              <option value="intelligence">Market intelligence</option>
+              <option value="all">All of it</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="field">
+          <label class="field__label" for="partner-notes">Anything else</label>
+          <textarea class="textarea" id="partner-notes" name="notes" rows="3"
+                    placeholder="Mostly tokunbo SUVs, and we want help with photography before January."></textarea>
+        </div>
+
+        <div class="form-grid">
+          <div class="field">
+            <label class="field__label" for="partner-name">Your name</label>
+            <input class="input" id="partner-name" name="name" type="text" autocomplete="name" required>
+          </div>
+          <div class="field">
+            <label class="field__label" for="partner-phone">WhatsApp number</label>
+            <input class="input" id="partner-phone" name="phone" type="tel" inputmode="numeric" autocomplete="tel" required>
+          </div>
+        </div>
+
+        <label class="checkbox-row">
+          <input type="checkbox" name="consent" required>
+          <span>HonestCars can contact me on WhatsApp about this application.</span>
+        </label>
+
+        <button class="btn btn--primary btn--lg btn--block" type="submit" data-submit>Send application</button>
+        <p class="field__error hidden" data-form-error role="alert"></p>
+        <p class="field__hint mb-0">
+          Already a partner? <a href="/dealer">Go to the dealer portal</a> — the full portal ships in phase 2.
+        </p>
+      </form>
+    </div>
+  </div>
+</section>
+
+<% if (feed.length) { %>
+<section class="section">
+  <div class="container">
+    <div class="section-head">
+      <h2>Cars your buyers are looking at this week</h2>
+      <a class="section-head__link" href="/cars">All cars →</a>
+    </div>
+    <div class="grid grid--3">
+      <% feed.forEach(function (listing) { %>
+        <%- include('../partials/car-card', { listing: listing, helpers: helpers }) %>
+      <% }); %>
+    </div>
+  </div>
+</section>
+<% } %>
+
+<% if (faqs.length) { %>
+<section class="section section--surface">
+  <div class="container container--narrow">
+    <div class="section-head"><h2>Dealer questions</h2></div>
+    <%- include('../partials/accordion', { faqs: faqs, idPrefix: 'partner-faq' }) %>
+  </div>
+</section>
+<% } %>

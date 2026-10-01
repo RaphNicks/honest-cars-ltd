@@ -1,0 +1,36 @@
+<%# Product card — §6.8 shop grid. Photo, price, stock status, install note. %>
+<article class="product-card">
+  <a class="product-card__media" href="<%= product.url %>" aria-label="<%= helpers.esc(product.name) %>">
+    <% if (product.image) { %>
+      <img src="<%= product.image %>" alt="<%= helpers.esc(product.name) %> — product image"
+           <% if (helpers.srcsetFor(product.image)) { %>srcset="<%= helpers.srcsetFor(product.image) %>" sizes="(min-width: 1024px) 300px, (min-width: 640px) 45vw, 92vw"<% } %>
+           width="1200" height="900" loading="lazy" decoding="async">
+    <% } %>
+  </a>
+  <div class="product-card__body">
+    <span class="badge badge--ghost"><%= product.categoryLabel %></span>
+    <h3 class="product-card__name"><a href="<%= product.url %>"><%= product.name %></a></h3>
+    <p class="product-card__summary"><%= product.summary %></p>
+    <p class="mb-0">
+      <span class="product-card__price"><%= helpers.formatNaira(product.priceKobo) %></span>
+      <span class="stock-pill stock-pill--<%= product.stockStatus %>">
+        <%= product.stockStatus === 'in_stock' ? 'In stock' : product.stockStatus === 'low_stock' ? 'Low stock' : 'Out of stock' %>
+      </span>
+    </p>
+    <% if (product.installIncluded) { %>
+      <p class="field__hint mb-0"><%- helpers.icon('cog', { size: 14 }) %> Installation included in Port Harcourt</p>
+    <% } %>
+  </div>
+  <div class="product-card__foot">
+    <% if (product.stockStatus === 'out_of_stock') { %>
+      <button class="btn btn--ghost btn--block" type="button" disabled>Out of stock</button>
+    <% } else { %>
+      <button class="btn btn--secondary btn--block" type="button"
+              data-add-to-cart data-slug="<%= product.slug %>" data-name="<%= helpers.esc(product.name) %>"
+              data-price="<%= product.priceKobo %>" data-image="<%= product.image %>"
+              data-category="<%= product.category %>" data-install="<%= product.installIncluded ? 'yes' : 'no' %>"
+              data-label="Add to cart"
+              data-event="view_item" data-source="shop_grid">Add to cart</button>
+    <% } %>
+  </div>
+</article>

@@ -1,0 +1,98 @@
+<%#
+  /guide — §6.9: “the curated evergreen shelf — a ‘start-here’ reading path
+  drawn from the Honest Buyer’s Guide category.”
+%>
+<section class="page-hero">
+  <div class="container">
+    <%- include('../partials/breadcrumbs', { crumbs: trail }) %>
+    <p class="eyebrow">Start here</p>
+    <h1>Read three things before you buy a car in Port Harcourt</h1>
+    <p class="lead">
+      Most bad buys in this market go wrong in the same three places: the budget, the inspection, and
+      the papers. This shelf is the ordered path through everything we have learned doing it for buyers.
+    </p>
+  </div>
+</section>
+
+<section class="section">
+  <div class="container">
+    <ol class="steps steps--numbered">
+      <li class="step">
+        <span class="step__num">1</span>
+        <div>
+          <strong>Set a budget that survives the car</strong>
+          <p class="mb-0">Purchase price is the easy number. Fuel, service, insurance and the first repair bill are what break budgets in PH.</p>
+          <span class="timeline-chip"><%- helpers.icon('clock', { size: 14 }) %> 15 minutes</span>
+        </div>
+      </li>
+      <li class="step">
+        <span class="step__num">2</span>
+        <div>
+          <strong>Inspect before you pay — always</strong>
+          <p class="mb-0">What our inspectors look for, what they cannot see, and how to read a report that says the car is fine.</p>
+          <span class="timeline-chip"><%- helpers.icon('clock', { size: 14 }) %> 20 minutes</span>
+        </div>
+      </li>
+      <li class="step">
+        <span class="step__num">3</span>
+        <div>
+          <strong>Get the papers straight before money moves</strong>
+          <p class="mb-0">Customs, registration, change of ownership — the order of operations that stops a car being unusable after you have paid.</p>
+          <span class="timeline-chip"><%- helpers.icon('clock', { size: 14 }) %> 15 minutes</span>
+        </div>
+      </li>
+    </ol>
+  </div>
+</section>
+
+<section class="section section--surface">
+  <div class="container">
+    <div class="section-head">
+      <h2>The Honest Buyer’s Guide shelf</h2>
+      <a class="section-head__link" href="/blog?category=honest_buyers_guide">See the category →</a>
+    </div>
+    <% if (shelf.length) { %>
+      <div class="grid grid--3">
+        <% shelf.forEach(function (post) { %>
+          <%- include('../partials/post-card', { post: post, helpers: helpers }) %>
+        <% }); %>
+      </div>
+    <% } else { %>
+      <div class="empty-state">
+        <h3>The shelf is being stocked</h3>
+        <p>The first guides are in review. Meanwhile, the full blog is open — and the concierge answers specific questions in 48–72 hours.</p>
+      </div>
+    <% } %>
+  </div>
+</section>
+
+<% if (latest.length) { %>
+<section class="section">
+  <div class="container">
+    <div class="section-head">
+      <h2>Also worth your time</h2>
+      <a class="section-head__link" href="/blog">All posts →</a>
+    </div>
+    <div class="grid grid--3">
+      <% latest.slice(0, 3).forEach(function (post) { %>
+        <%- include('../partials/post-card', { post: post, helpers: helpers }) %>
+      <% }); %>
+    </div>
+  </div>
+</section>
+<% } %>
+
+<section class="section section--navy">
+  <div class="container">
+    <div class="grid grid--2" style="align-items:center">
+      <div>
+        <h2>Reading is cheaper than repairing</h2>
+        <p>When you are ready to move, the inspection and the concierge are one click away — and both start with a conversation, not a payment.</p>
+      </div>
+      <div class="btn-row">
+        <a class="btn btn--primary" href="/services/inspection">Book an inspection</a>
+        <a class="btn btn--secondary" href="/find-my-car">Start a concierge search</a>
+      </div>
+    </div>
+  </div>
+</section>

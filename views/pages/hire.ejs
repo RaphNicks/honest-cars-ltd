@@ -1,0 +1,187 @@
+<%#
+  Car hire — §6.7 table entry: “/hire · Request form (dates, vehicle class,
+  with-driver?, airport pickup toggle for Omagwa) → quote workflow; corporate
+  RFQ variant”. Classes and rates come from hire_classes.
+%>
+
+<section class="page-hero">
+  <div class="container">
+    <%- include('../partials/breadcrumbs', { crumbs: trail }) %>
+    <p class="eyebrow">Car hire</p>
+    <h1>Hire by the day, the week or the month — with or without a driver</h1>
+    <p class="lead">
+      Clean, serviced cars out of Port Harcourt, delivered where you are. Airport pickup at Omagwa,
+      corporate accounts, and a driver who knows the city if you would rather not drive it yourself.
+    </p>
+    <div class="hero__chips">
+      <span class="trust-chip"><%- helpers.icon('checkCircle', { size: 16 }) %><strong>Serviced</strong> and fuelled before every hire</span>
+      <span class="trust-chip"><%- helpers.icon('mapPin', { size: 16 }) %><strong>Airport pickup</strong> at Omagwa</span>
+      <span class="trust-chip"><%- helpers.icon('store', { size: 16 }) %><strong>Corporate</strong> monthly accounts</span>
+    </div>
+  </div>
+</section>
+
+<section class="section">
+  <div class="container">
+    <div class="section-head">
+      <h2>Vehicle classes and rates</h2>
+      <p class="section-head__note mb-0">Placeholder rates for review — weekly rates apply from 6 days; longer hires are quoted individually.</p>
+    </div>
+
+    <div class="table-wrap">
+      <table class="table hire-table">
+        <caption class="visually-hidden">Vehicle classes, seats, examples and rates</caption>
+        <thead>
+          <tr>
+            <th scope="col"><span class="visually-hidden">Photo</span></th>
+            <th scope="col">Class</th>
+            <th scope="col">Seats</th>
+            <th scope="col">Examples</th>
+            <th scope="col">Per day</th>
+            <th scope="col">Per week</th>
+            <th scope="col">With driver</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% classes.forEach(function (entry) { %>
+            <tr>
+              <td class="hire-table__media">
+                <% if (entry.image) { %>
+                  <img src="<%= entry.image %>" alt="<%= entry.imageAlt %>" width="160" height="120" loading="lazy" decoding="async">
+                <% } else { %>
+                  <span class="hire-table__media-empty" aria-hidden="true"></span>
+                <% } %>
+              </td>
+              <th scope="row">
+                <%= entry.name %>
+                <% if (entry.airportPickup) { %><br><span class="badge badge--ghost">Airport pickup</span><% } %>
+                <% if (entry.corporate) { %><span class="badge badge--ghost">Corporate</span><% } %>
+              </th>
+              <td><%= entry.seats %></td>
+              <td><%= entry.examples %></td>
+              <td><strong><%= helpers.formatNaira(entry.dailyRateKobo) %></strong></td>
+              <td><%= entry.weeklyRateKobo ? helpers.formatNaira(entry.weeklyRateKobo) : '—' %></td>
+              <td><%= entry.withDriverKobo ? `+ ${helpers.formatNaira(entry.withDriverKobo)}/day` : '—' %></td>
+            </tr>
+          <% }); %>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="grid grid--3 mt-3">
+      <div class="card card__body">
+        <h3>Fuel, tolls and fines</h3>
+        <p class="mb-0">Not included. The car leaves with a full tank and comes back full, or we charge the difference at pump price.</p>
+      </div>
+      <div class="card card__body">
+        <h3>Outside Rivers State</h3>
+        <p class="mb-0">Allowed with written approval before the trip — it changes the insurance cover. Ask when you book.</p>
+      </div>
+      <div class="card card__body">
+        <h3>Caution deposit</h3>
+        <p class="mb-0">Refundable, stated on the quote before you pay. Corporate accounts sign a monthly agreement instead.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="section section--surface" id="quote" aria-labelledby="hire-quote">
+  <div class="container">
+    <div class="grid grid--2" style="align-items:start">
+      <div>
+        <h2 id="hire-quote">Request a quote</h2>
+        <p>
+          Tell us the dates and the class. Quotes go out the same working day — and we will say honestly
+          if we do not have the class free rather than hold your booking.
+        </p>
+        <ul class="tick-list">
+          <li class="tick-list__yes"><%- helpers.icon('check', { size: 16 }) %> <span>Delivery and pickup inside Port Harcourt included.</span></li>
+          <li class="tick-list__yes"><%- helpers.icon('check', { size: 16 }) %> <span>Driver option: <%= service && service.fromPriceKobo ? helpers.formatNaira(service.fromPriceKobo) : '' %> and up, quoted per day.</span></li>
+          <li class="tick-list__yes"><%- helpers.icon('check', { size: 16 }) %> <span>Corporate RFQ: monthly invoicing with a signed agreement.</span></li>
+        </ul>
+      </div>
+
+      <form class="card card__body service-form" data-service-form data-kind="hire" data-service-slug="hire"
+            data-endpoint="/api/service-requests" method="post" action="/api/service-requests" novalidate>
+        <p class="form-hint">Guest-first: no account needed. Ops confirms availability on WhatsApp before anything is charged.</p>
+
+        <div class="form-grid">
+          <div class="field">
+            <label class="field__label" for="hire-from">Pick-up date</label>
+            <input class="input" id="hire-from" name="date_from" type="date" required>
+          </div>
+          <div class="field">
+            <label class="field__label" for="hire-to">Return date</label>
+            <input class="input" id="hire-to" name="date_to" type="date" required>
+          </div>
+          <div class="field">
+            <label class="field__label" for="hire-class">Vehicle class</label>
+            <select class="select" id="hire-class" name="vehicle_class">
+              <% classes.forEach(function (entry) { %>
+                <option value="<%= entry.slug %>"><%= entry.name %> — <%= helpers.formatNaira(entry.dailyRateKobo) %>/day</option>
+              <% }); %>
+            </select>
+          </div>
+          <div class="field">
+            <label class="field__label" for="hire-where">Where should we deliver?</label>
+            <input class="input" id="hire-where" name="location" type="text" placeholder="Hotel or office address, or Omagwa arrivals">
+          </div>
+        </div>
+
+        <fieldset class="field">
+          <legend class="field__label">Options</legend>
+          <div class="radio-cards">
+            <label class="radio-card">
+              <input type="checkbox" name="with_driver" value="yes">
+              <span><strong>With a driver</strong><span class="radio-card__price">Quoted per day on top of the class rate.</span></span>
+            </label>
+            <label class="radio-card">
+              <input type="checkbox" name="airport_pickup" value="yes">
+              <span><strong>Airport pickup (Omagwa)</strong><span class="radio-card__price">We meet you at arrivals with the car and the driver.</span></span>
+            </label>
+            <label class="radio-card">
+              <input type="checkbox" name="corporate" value="yes">
+              <span><strong>Corporate RFQ</strong><span class="radio-card__price">Monthly account, invoiced with an agreement.</span></span>
+            </label>
+          </div>
+        </fieldset>
+
+        <div class="field">
+          <label class="field__label" for="hire-notes">Trip details</label>
+          <textarea class="textarea" id="hire-notes" name="notes" rows="2"
+                    placeholder="Two weeks, mostly within Trans-Amadi, occasional Onne trips. Driver needed on weekdays."></textarea>
+        </div>
+
+        <div class="form-grid">
+          <div class="field">
+            <label class="field__label" for="hire-name">Your name</label>
+            <input class="input" id="hire-name" name="name" type="text" autocomplete="name" required>
+          </div>
+          <div class="field">
+            <label class="field__label" for="hire-phone">WhatsApp number</label>
+            <input class="input" id="hire-phone" name="phone" type="tel" inputmode="numeric" autocomplete="tel" required>
+          </div>
+        </div>
+
+        <label class="checkbox-row">
+          <input type="checkbox" name="consent" required>
+          <span>HonestCars can contact me on WhatsApp about this quote. No marketing spam.</span>
+        </label>
+
+        <button class="btn btn--primary btn--lg btn--block" type="submit" data-submit>Request my quote</button>
+        <p class="field__error hidden" data-form-error role="alert"></p>
+      </form>
+    </div>
+  </div>
+</section>
+
+<% if (faqs.length) { %>
+<section class="section" aria-labelledby="hire-faq">
+  <div class="container container--narrow">
+    <div class="section-head">
+      <h2 id="hire-faq">Hire questions</h2>
+    </div>
+    <%- include('../partials/accordion', { faqs: faqs, idPrefix: 'hire-faq' }) %>
+  </div>
+</section>
+<% } %>

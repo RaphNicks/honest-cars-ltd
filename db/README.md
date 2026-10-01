@@ -4,8 +4,9 @@ MySQL 5.7+ / MariaDB 10.3+. `schema.sql` is idempotent, `seed.sql` is
 generated — never edit the seed by hand.
 
 ```bash
-node scripts/db-setup.js            # schema + seed  (what `npm run db:setup` calls)
+node scripts/db-setup.js            # schema + migrations + seed (what `npm run db:setup` calls)
 node scripts/db-setup.js --schema-only
+node scripts/migrate.js             # apply only db/migrations/*.sql
 node scripts/generate-seed.js       # regenerate db/seed.sql + public/img/seed/
 ```
 
@@ -33,6 +34,20 @@ connection; the rest of the application talks to `src/db/index.js`.
 
 ---
 
+## Migrations
+
+`db/schema.sql` is the schema of record and stays idempotent. Anything added
+after the first deploy lands in `db/migrations/NNN-name.sql` and is recorded in
+`schema_migrations`:
+
+| File | Adds |
+|---|---|
+| `002-content-and-flows.sql` | `services` template columns, `service_requests`, `bookings`, `products`, `orders`, `order_items`, `pages`, `hire_classes`, service/blog/testimonial extras |
+| `003-subscriptions-and-delivery.sql` | `delivery_areas`, `subscriptions` |
+| `004-hire-request-type.sql` | `hire` as a `service_requests.type` |
+
+---
+
 ## Conventions
 
 * **All money is an integer number of kobo.** `₦8,650,000` is stored as
@@ -55,14 +70,24 @@ connection; the rest of the application talks to `src/db/index.js`.
 | `listing_media` | Ordered photos per listing (`shot_label` follows the §3.4 photo guide). |
 | `price_bands` | Make/model/year market bands that drive the price-position indicator and valuations. |
 | `facets` | **Curated** facet pages only. Raw filter combinations are never rows here and are never indexable. |
-| `leads` | Every public enquiry: viewing, concierge, sell/swap, hire, service, parts, B2B, deal alert. |
-| `services` | The service suite shown on the homepage and hub. |
+| `leads` | Every public enquiry: viewing, concierge, sell/swap, hire, service, parts, B2B, deal alert, contact. |
+| `services` | The service suite shown on the homepage and hub — hero, deliverables, included/excluded, staged process, pricing tiers and proof, all as data. |
+| `service_requests` | The concierge / sell / swap / documents / research / parts / tracking intake. Carries the human tracking id (`HC-2481`) the customer watches at `/concierge/{id}`, the SLA due date, and the free-form brief as JSON. |
+| `bookings` | Scheduled work: inspections, tracker installs, consultations. Carries `reference` (`HC-BK-0001`), `slot_at`, `location`, `vehicle` JSON and `addons` JSON. |
+| `products` | Shop SKUs in three categories — trackers, diagnostics, care kits. `install_included` drives the checkout install toggle. Parts are deliberately **not** products. |
+| `orders` | Guest checkout orders (§6.8): name + WhatsApp number + delivery area. `order_no` is `HC-ORD-0001`, `status` starts at `pending_payment` (the PSP is a seam — §11). |
+| `order_items` | Line items with the server-recomputed unit price and per-line install flag. |
+| `delivery_areas` | Delivery zones and their fee in kobo. A pickup meet-point is the zero-fee default; the checkout total is always recomputed from this table. |
+| `subscriptions` | One row per tracker SKU purchased: `device_state` (`ordered → installed → activated → renewal_due → lapsed`) and `renewal_at` 12 months out. This is the record the admin activation checklist and renewal reminders read. |
+| `pages` | CMS pages for the trust, company and legal set (`about`, `how-it-works`, `contact`, `verification`, `terms`, `privacy`, `refunds`, `disclaimer`) with block-based `body` JSON. |
+| `hire_classes` | Car-hire classes with daily/weekly rates, driver and airport rates, seating and example models. |
 | `testimonials` | Social proof with real names and areas. |
-| `blog_posts` | Content, with the CMS workflow states from §6.9. |
-| `faqs` | Scoped FAQs; `scope` drives FAQPage schema (`global`, `facet:toyota`, `service:inspection`). |
+| `blog_posts` | Content, with the CMS workflow states from §6.9 and the category / make-tag taxonomy that drives `/blog` and `/guide`. |
+| `faqs` | Scoped FAQs; `scope` drives FAQPage schema (`global`, `facet:toyota`, `service:inspection`, `page:verification`, `shop:trackers`). |
 | `analytics_events` | Server-side mirror of the §15.1 event plan. Purchase-adjacent events are server-only. |
 | `redirects` | 301 map: the 90-day sold hand-off and any legacy URL. |
 | `static_pages` | Build bookkeeping — which stable pages were written to disk, when, and from which view. |
+| `schema_migrations` | Which files under `db/migrations/` have been applied, so `npm run db:setup` is safe to re-run. |
 
 ## Views
 
@@ -95,6 +120,12 @@ Harcourt listings across 12 partner lots — including deliberate edge cases:
 | Sold >90 days | 3 | The 301-to-facet hand-off |
 | Draft / in review / expired | 3 | Never public |
 
-Media rows point at the 42 placeholder SVGs in `public/img/seed/`. Swap the
-generator for a real importer when the first lot uploads stock — the schema is
-the contract, not the generator.
+`listing_media` rows point at prepared photographs in `public/img/cars/` and
+`public/img/details/` (resolved per listing by `scripts/seed-media.js`). Every
+prepared photo is 1200×900 with a `-600.jpg` sibling produced by
+`npm run images`; `width`/`height` in the row match the full-size file, so the
+templates can reserve the right box and avoid layout shift. Rows for listings we
+have no photo for fall back to the placeholder SVGs in `public/img/seed/`.
+
+Swap the generator for a real importer when the first lot uploads stock — the
+schema is the contract, not the generator.

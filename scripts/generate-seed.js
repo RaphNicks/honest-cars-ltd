@@ -14,6 +14,8 @@
 const fs = require('node:fs');
 const path = require('node:path');
 
+const CONTENT = require('./seed-content');
+
 const ROOT = path.join(__dirname, '..');
 const SEED_SQL = path.join(ROOT, 'db', 'seed.sql');
 const IMG_DIR = path.join(ROOT, 'public', 'img', 'seed');
@@ -106,6 +108,8 @@ const CATALOG = [
   { make: 'BMW', model: '3 Series', body: 'sedan', fuel: 'petrol', years: [2013, 2017], band: [11.0, 22.0], trims: ['328i', '320i', '335i'], engines: ['2.0L Turbo', '3.0L Turbo'] },
   { make: 'Volkswagen', model: 'Passat', body: 'sedan', fuel: 'petrol', years: [2013, 2017], band: [6.5, 13.0], trims: ['S', 'SE', 'SEL'], engines: ['1.8L Turbo', '2.5L I5'] },
 ];
+
+const seedMedia = require('./seed-media');
 
 const SHOTS = [
   { key: 'front-3q', label: 'Front three-quarter' },
@@ -354,7 +358,31 @@ function buildListing({ index, status, soldDaysAgo = null, upgraded = false, cat
   return listing;
 }
 
+/**
+ * Gallery rows. Real photographs come first (public/img/cars + public/img/details,
+ * resolved by seed-media.js); listings we have no photo for still get the honest
+ * placeholder rather than a broken image.
+ */
 function mediaRows(listing) {
+  const real = seedMedia.galleryFor(listing);
+
+  const rows = real.map((shot, i) => {
+    const label = seedMedia.SHOT_LABELS[shot.key] || 'Photo';
+    return {
+      listingId: listing.id,
+      type: 'image',
+      shotKey: shot.key,
+      shotLabel: label,
+      url: shot.url,
+      alt: `${listing.year} ${listing.make} ${listing.model} ${listing.trim} — ${label.toLowerCase()} (${listing.area}, Port Harcourt)`,
+      position: i,
+      width: 1200,
+      height: 900,
+    };
+  });
+
+  if (rows.length) return rows;
+
   const shots = listing.verificationGrade === 'certified' ? SHOTS : sample(SHOTS, int(6, 8));
   return shots.map((shot, i) => ({
     listingId: listing.id,
@@ -455,6 +483,15 @@ SET @NOW = UTC_TIMESTAMP();
 DELETE FROM analytics_events;
 DELETE FROM leads;
 DELETE FROM listing_media;
+DELETE FROM subscriptions;
+DELETE FROM delivery_areas;
+DELETE FROM order_items;
+DELETE FROM orders;
+DELETE FROM bookings;
+DELETE FROM service_requests;
+DELETE FROM products;
+DELETE FROM hire_classes;
+DELETE FROM pages;
 DELETE FROM vehicle_listings;
 DELETE FROM price_bands;
 DELETE FROM facets;
@@ -575,6 +612,15 @@ DELETE FROM dealers;
     ['slug', 'page_type', 'parent_slug', 'h1', 'title', 'intro_copy', 'meta_title', 'meta_description', 'rules', 'canonical_path', 'indexable', 'position'],
     facets));
 
+  // “from ₦25,000” → 2500000 kobo, so pricing tiers carry structured prices as
+  // well as their display string (§12.4 Service Offers).
+  const priceKobo = (text) => {
+    const match = String(text || '').replace(/,/g, '').match(/₦\s*(\d+)(?:\.(\d{1,2}))?/);
+    if (!match) return null;
+    return Number(match[1]) * 100 + Number((match[2] || '0').padEnd(2, '0'));
+  };
+
+  // §6.7 — the suite, each with its full service-page template content.
   const services = [
     ['inspection', 'Pre-Purchase Inspection', 'An inspector stands next to the car, scans it and tells you the truth before you pay.', 'search-check', 2_500_000, 'Book inspection', 10],
     ['concierge', 'Find-My-Car Concierge', 'Tell us the brief once. We bring up to 3 verified, inspected options in 48–72 hours.', 'compass', 5_000_000, 'Start my search', 20],
@@ -588,8 +634,54 @@ DELETE FROM dealers;
     ['dealer-services', 'B2B: Dealer Services', 'Media shoots, featured placement and market intelligence for lots in Port Harcourt.', 'store', null, 'See packages', 100],
   ];
   out.push(insert('services',
-    ['slug', 'name', 'promise', 'icon', 'from_price_kobo', 'cta_label', 'position', 'is_active'],
-    services.map((s) => [s[0], s[1], s[2], s[3], s[4], s[5], s[6], 1])));
+    ['slug', 'name', 'promise', 'icon', 'from_price_kobo', 'cta_label', 'position', 'is_active',
+      'hero_copy', 'deliverables', 'included', 'excluded', 'steps', 'pricing', 'proof', 'jobs_done', 'booking_kind', 'sla_copy'],
+    services.map((s) => {
+      const page = CONTENT.SERVICES[s[0]] || {};
+      return [
+        s[0], s[1], s[2], s[3], s[4], s[5], s[6], 1,
+        page.hero_copy || s[2],
+        page.deliverables || [],
+        page.included || [],
+        page.excluded || [],
+        page.steps || [],
+        (page.pricing || []).map((tier) => ({ ...tier, price_kobo: priceKobo(tier.price) })),
+        page.proof || [],
+        page.jobs_done || 0,
+        page.booking_kind || 'request',
+        page.sla_copy || null,
+      ];
+    })));
+
+  // §6.10 — CMS pages: company, trust and legal.
+  const pageRows = Object.entries(CONTENT.PAGES).map(([slug, page]) => [
+    slug, page.title, page.h1, page.hero || null, page.metaTitle, page.metaDescription,
+    page.body || [], page.legal ? 0 : 1, page.legal ? 1 : 0,
+  ]);
+  out.push(insert('pages',
+    ['slug', 'title', 'h1', 'hero_copy', 'meta_title', 'meta_description', 'body', 'indexable', 'legal_review'],
+    pageRows));
+
+  // §6.7 /hire — vehicle classes.
+  out.push(insert('hire_classes',
+    ['slug', 'name', 'seats', 'examples', 'image', 'daily_rate_kobo', 'weekly_rate_kobo', 'with_driver_kobo', 'airport_pickup', 'corporate', 'position'],
+    CONTENT.HIRE_CLASSES.map((c) => [c.slug, c.name, c.seats, c.examples, seedMedia.photo('hire', c.slug), millions(c.daily / 1_000_000), c.weekly ? millions(c.weekly / 1_000_000) : null, c.driver ? millions(c.driver / 1_000_000) : null, c.airport, c.corporate, c.position])));
+
+  // §6.8 — shop products.
+  out.push(insert('products',
+    ['slug', 'category', 'name', 'summary', 'description', 'price_kobo', 'specs', 'install_included', 'warranty_text', 'stock_status', 'delivery_options', 'image', 'position', 'is_active'],
+    CONTENT.PRODUCTS.map((prod) => [
+      prod.slug, prod.category, prod.name, prod.summary, prod.description,
+      millions(prod.price / 1_000_000), prod.specs || [], prod.install, prod.warranty, prod.stock,
+      prod.options || [], seedMedia.photo('shop', prod.slug) || prod.image, prod.position, 1,
+    ])));
+
+  // Demo operational record so the concierge status page can be reviewed.
+  const demo = CONTENT.DEMO_REQUEST;
+  out.push(insert('service_requests',
+    ['tracking_id', 'type', 'status', 'name', 'phone', 'brief', 'sla_due_at', 'source_path', 'notes'],
+    [[demo.trackingId, demo.type, demo.status, demo.name, demo.phone, demo.brief,
+      new Date(Date.UTC(2026, 9, 1) + demo.slaHours * 3_600_000), '/find-my-car', demo.notes]]));
 
   const testimonials = [
     ['Chidi O.', 'Woji', 'They told me the Camry I liked had a resprayed boot lid before I paid for the inspection. No other lot would have said that. I bought it anyway, with my eyes open.', 'inspection', 5],
@@ -624,15 +716,27 @@ DELETE FROM dealers;
       'Tyres and tread depth check on a used car', 'Raph Nicks', 'Head of Inspections', 4, 0],
   ];
   out.push(insert('blog_posts',
-    ['slug', 'title', 'category', 'excerpt', 'hero_image', 'hero_alt', 'author_name', 'author_role', 'read_minutes', 'status', 'published_at', 'is_featured', 'make_tags'],
-    posts.map((p, i) => [p[0], p[1], p[2], p[3], `/img/seed/og-default.svg`, p[4], p[5], p[6], p[7], 'published',
-      new Date(Date.UTC(2026, 8, 28) - i * 4 * 86_400_000), p[8], JSON.stringify(p[2] === 'market_intel' ? ['Toyota', 'Honda'] : ['Toyota'])])));
+    ['slug', 'title', 'category', 'excerpt', 'hero_image', 'hero_alt', 'author_name', 'author_role', 'read_minutes',
+      'status', 'published_at', 'is_featured', 'make_tags', 'body', 'service_cta', 'author_bio'],
+    posts.map((p, i) => {
+      const content = CONTENT.POST_BODIES[p[0]] || {};
+      const hero = seedMedia.photo('blog', p[0]) || '/img/seed/og-default.svg';
+      return [p[0], p[1], p[2], p[3], hero, p[4], p[5], p[6], p[7], 'published',
+        new Date(Date.UTC(2026, 8, 28) - i * 4 * 86_400_000), p[8],
+        JSON.stringify(p[2] === 'market_intel' ? ['Toyota', 'Honda'] : ['Toyota']),
+        content.body || [], content.serviceCta || null, content.authorBio || null];
+    })));
 
   const faqRows = [];
-  for (const [scope, items] of Object.entries(FAQS)) {
+  for (const [scope, items] of Object.entries({ ...FAQS, ...CONTENT.FAQS })) {
     items.forEach(([q, a], i) => faqRows.push([scope, q, a, i + 1, 1]));
   }
   out.push(insert('faqs', ['scope', 'question', 'answer', 'position', 'is_active'], faqRows));
+
+  // §6.8 delivery-fee rules by area (admin table).
+  out.push(insert('delivery_areas',
+    ['name', 'fee_kobo', 'note', 'position', 'is_active'],
+    CONTENT.DELIVERY_AREAS.map((area) => [area.name, millions(area.fee / 1_000_000), area.note, area.position, 1])));
 
   // Sold-archive hand-off: >90-day sales map to their facet (§14.1).
   const expired = listings.filter((l) => l.status === 'sold' && l.soldAt && (Date.UTC(2026, 8, 30) - l.soldAt.getTime()) / 86_400_000 > 90);

@@ -14,6 +14,7 @@
     <% if (listing.primaryImage) { %>
       <img class="car-card__img"
            src="<%= listing.primaryImage.url %>"
+           <% if (helpers.srcsetFor(listing.primaryImage.url)) { %>srcset="<%= helpers.srcsetFor(listing.primaryImage.url) %>" sizes="(min-width: 1024px) 320px, (min-width: 640px) 45vw, 92vw"<% } %>
            alt="<%= helpers.esc(listing.primaryImage.alt) %>"
            width="1200" height="900"
            <%= eager ? 'fetchpriority="high"' : 'loading="lazy" decoding="async"' %>>
@@ -70,6 +71,7 @@
       <label class="compare-toggle">
         <input type="checkbox" name="compare" value="<%= listing.id %>"
                data-compare-toggle data-listing-id="<%= listing.id %>"
+               aria-label="Add <%= helpers.esc(listing.title) %> to the comparison"
                <%= (typeof compareIds !== 'undefined' && compareIds.includes(String(listing.id))) ? 'checked' : '' %>>
         <span>＋ Compare</span>
       </label>

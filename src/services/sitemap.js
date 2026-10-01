@@ -46,9 +46,68 @@ async function buildSitemap(db, { siteUrl = config.siteUrl } = {}) {
 
   const entries = [];
 
-  // Stable pages — extended as the remaining routes are ported.
+  // Stable pages (§5.1 sitemap): only indexable URLs.
   entries.push(urlEntry({ loc: `${siteUrl}/`, changefreq: 'daily', priority: '1.0' }));
   entries.push(urlEntry({ loc: `${siteUrl}/cars`, changefreq: 'hourly', priority: '0.9' }));
+
+  // §6.7 services hub + the nine service pages (car hire lives at /hire).
+  entries.push(urlEntry({ loc: `${siteUrl}/services`, changefreq: 'weekly', priority: '0.8' }));
+  const [services, pages] = await Promise.all([
+    db.content.serviceSuite().catch(() => []),
+    db.content.allPages().catch(() => []),
+  ]);
+  for (const service of services) {
+    if (service.slug === 'hire') continue;
+    entries.push(urlEntry({ loc: `${siteUrl}/services/${service.slug}`, changefreq: 'monthly', priority: '0.7' }));
+  }
+
+  // Funnels and company pages.
+  entries.push(urlEntry({ loc: `${siteUrl}/find-my-car`, changefreq: 'monthly', priority: '0.9' }));
+  entries.push(urlEntry({ loc: `${siteUrl}/sell-swap`, changefreq: 'monthly', priority: '0.8' }));
+  entries.push(urlEntry({ loc: `${siteUrl}/hire`, changefreq: 'monthly', priority: '0.7' }));
+  entries.push(urlEntry({ loc: `${siteUrl}/verification`, changefreq: 'monthly', priority: '0.8' }));
+  entries.push(urlEntry({ loc: `${siteUrl}/how-it-works`, changefreq: 'monthly', priority: '0.7' }));
+  entries.push(urlEntry({ loc: `${siteUrl}/about`, changefreq: 'monthly', priority: '0.6' }));
+  entries.push(urlEntry({ loc: `${siteUrl}/faq`, changefreq: 'monthly', priority: '0.6' }));
+  entries.push(urlEntry({ loc: `${siteUrl}/contact`, changefreq: 'monthly', priority: '0.6' }));
+  entries.push(urlEntry({ loc: `${siteUrl}/partner`, changefreq: 'monthly', priority: '0.7' }));
+  entries.push(urlEntry({ loc: `${siteUrl}/guide`, changefreq: 'weekly', priority: '0.7' }));
+  entries.push(urlEntry({ loc: `${siteUrl}/blog`, changefreq: 'daily', priority: '0.8' }));
+
+  // §6.8 shop + products.
+  entries.push(urlEntry({ loc: `${siteUrl}/shop`, changefreq: 'weekly', priority: '0.6' }));
+  const products = await db.content.products().catch(() => []);
+  for (const product of products) {
+    entries.push(urlEntry({ loc: `${siteUrl}${product.url}`, changefreq: 'weekly', priority: '0.5' }));
+  }
+
+  // Blog posts — the organic-growth engine.
+  const feed = await db.content.blogIndex({ page: 1, perPage: 100 }).catch(() => ({ posts: [] }));
+  for (const post of feed.posts) {
+    entries.push(
+      urlEntry({
+        loc: `${siteUrl}${post.url}`,
+        lastmod: post.updatedAt || post.publishedAt,
+        changefreq: 'monthly',
+        priority: '0.6',
+      }),
+    );
+  }
+
+  // CMS pages that are cleared for indexing. Legal pages stay out until
+  // counsel's wording replaces the placeholder text (pages.indexable = 0).
+  for (const page of pages) {
+    if (!page.indexable) continue;
+    if (['about', 'how-it-works', 'contact'].includes(page.slug)) continue; // already added above
+    entries.push(
+      urlEntry({
+        loc: `${siteUrl}/${page.slug}`,
+        lastmod: page.updatedAt,
+        changefreq: 'monthly',
+        priority: '0.5',
+      }),
+    );
+  }
 
   // Curated facets only (§14.1)
   for (const facet of facets) {

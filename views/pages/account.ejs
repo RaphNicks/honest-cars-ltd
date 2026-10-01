@@ -1,0 +1,63 @@
+<%#
+  /account — §7.1. Phone-number-first auth (OTP via WhatsApp/SMS) is the real
+  build; this page is the phase-1 entry point and says so plainly rather than
+  faking a dashboard. Noindex (see the route).
+%>
+<section class="page-hero">
+  <div class="container">
+    <%- include('../partials/breadcrumbs', { crumbs: trail }) %>
+    <p class="eyebrow">Account</p>
+    <h1>Your cars, requests and receipts — in one place</h1>
+    <p class="lead">
+      The account opens with your phone number and an OTP on WhatsApp. Nothing to remember, no password
+      to leak.
+    </p>
+  </div>
+</section>
+
+<section class="section">
+  <div class="container container--narrow">
+    <div class="portal-stub">
+      <span class="portal-stub__icon"><%- helpers.icon('account', { size: 28 }) %></span>
+      <span class="phase-note">Phase 2</span>
+      <h2 class="mb-1">Sign-in opens with the portal release</h2>
+      <p class="mb-0">
+        Phase 1 ships the storefront, the concierge pipeline and the records behind it. When the account
+        opens you will see requests (concierge, sell, swap, parts), bookings, orders and receipts, saved
+        cars and searches, hire bookings, tracker subscriptions and referral status — all keyed to the phone
+        number you already use with us.
+      </p>
+      <div class="btn-row">
+        <a class="btn btn--primary" href="/find-my-car">Start a request instead</a>
+        <a class="btn btn--secondary" href="/contact">Talk to the ops desk</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="section section--surface">
+  <div class="container">
+    <div class="section-head">
+      <h2>What is already tracked for you</h2>
+      <p class="section-head__note mb-0">Every submission on this site already writes a record — the account is the window, not the plumbing.</p>
+    </div>
+    <div class="grid grid--3">
+      <div class="card card__body">
+        <h3>Requests</h3>
+        <p class="mb-0">Concierge, sell, swap, parts and research requests each get a tracking ID (like HC-2481) with a status page you can open right now.</p>
+      </div>
+      <div class="card card__body">
+        <h3>Bookings</h3>
+        <p class="mb-0">Inspections, installs and consultations carry a reference (HC-BK-0001) and land in the dispatch queue the moment you submit.</p>
+      </div>
+      <div class="card card__body">
+        <h3>Orders</h3>
+        <p class="mb-0">Shop orders have an order number, a receipt trail and delivery status. Trackers also create their own subscription record.</p>
+      </div>
+    </div>
+    <p class="field__hint mt-2">
+      Have a tracking ID from a confirmation message? Open it directly:
+      <a href="/concierge/HC-2481">/concierge/HC-2481</a> (demo record).
+    </p>
+  </div>
+</section>

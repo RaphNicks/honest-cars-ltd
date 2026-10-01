@@ -18,6 +18,11 @@ const config = require('./config');
 const render = require('./lib/render');
 const { router: publicRoutes, sendNotFound } = require('./routes/public');
 const { router: apiRoutes } = require('./routes/api');
+const { router: serviceRoutes } = require('./routes/services');
+const { router: flowRoutes } = require('./routes/flow');
+const { router: blogRoutes } = require('./routes/blog');
+const { router: shopRoutes } = require('./routes/shop');
+const { router: pageRoutes } = require('./routes/pages');
 const og = require('./services/og');
 
 function createApp() {
@@ -102,6 +107,11 @@ function createApp() {
 
   // --- Routes ---------------------------------------------------------------
   app.use('/api', apiRoutes);
+  app.use('/services', serviceRoutes);
+  app.use('/', flowRoutes);
+  app.use('/blog', blogRoutes);
+  app.use('/', shopRoutes);
+  app.use('/', pageRoutes);
   app.use('/', publicRoutes);
 
   // --- 404 ------------------------------------------------------------------

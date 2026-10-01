@@ -40,7 +40,7 @@ async function buildHomeLocals() {
   return {
     view: 'home',
     page: {
-      title: 'Cars for sale in Port Harcourt — verified, priced honestly',
+      title: 'Verified cars for sale in Port Harcourt',
       metaTitle: 'Verified cars in Port Harcourt — every price compared',
       description:
         'Browse verified cars from trusted Port Harcourt lots. Honest inspection grades, real mileage, documents checked, and negotiation handled for you.',
@@ -163,6 +163,111 @@ async function buildFacetLocals(facet) {
  *   5. a sold listing past 90 days → 301 to the facet
  *   6. otherwise 404
  */
+// ---------------------------------------------------------------------------
+// Compare tool — §6.4. Up to 3 cars side-by-side with best values highlighted.
+// Rendered server-side from ?ids= so a shared link shows the same table, and
+// hydrated by compare.js from the device’s comparison list.
+// ---------------------------------------------------------------------------
+const COMPARE_ROWS = [
+  { key: 'priceKobo', label: 'Price', best: 'min', format: 'naira' },
+  { key: 'pricePosition', label: 'Price position', format: 'position' },
+  { key: 'year', label: 'Year', best: 'max' },
+  { key: 'mileageKm', label: 'Mileage', best: 'min', format: 'mileage' },
+  { key: 'transmissionLabel', label: 'Transmission' },
+  { key: 'fuelTypeLabel', label: 'Fuel' },
+  { key: 'conditionLabel', label: 'Condition' },
+  { key: 'grade', label: 'Verification grade', best: 'grade', format: 'grade' },
+  { key: 'documentsSummary', label: 'Documents', format: 'documents' },
+  { key: 'knownFaults', label: 'Known faults (certified)', format: 'faults' },
+  { key: 'runningCostKobo', label: 'Running cost — 5-year estimate', best: 'min', format: 'naira' },
+];
+
+function compareValue(listing, key) {
+  switch (key) {
+    case 'documentsSummary':
+      return listing.documentsSummary || '';
+    case 'knownFaults':
+      return listing.knownFaults || '';
+    default:
+      return listing[key];
+  }
+}
+
+function gradeRank(grade) {
+  return { network_listed: 1, field_checked: 2, certified: 3 }[grade] || 0;
+}
+
+function bestValueIndex(listings, row) {
+  if (!row.best || listings.length < 2) return -1;
+  const values = listings.map((listing) => {
+    const value = compareValue(listing, row.key);
+    if (row.best === 'grade') return gradeRank(listing.grade);
+    if (row.best === 'documents') return value ? 1 : 0;
+    return Number(value);
+  });
+  const target = row.best === 'max' ? Math.max(...values) : Math.min(...values);
+  // "Best" is only a highlight — ties keep every winning cell green.
+  return values.findIndex((value) => value === target);
+}
+
+router.get('/cars/compare', async (req, res, next) => {
+  try {
+    const ids = String(req.query.ids || '')
+      .split(',')
+      .map((value) => value.trim())
+      .filter(Boolean)
+      .slice(0, 3);
+    const listings = await db.listings.findByIds(ids);
+
+    const rows = COMPARE_ROWS.map((row) => ({
+      ...row,
+      values: listings.map((listing) => {
+        const raw = compareValue(listing, row.key);
+        if (row.format === 'naira') return raw ? db.shape.formatNaira(raw) : '—';
+        if (row.format === 'mileage') return raw ? db.shape.formatMileage(raw) : '—';
+        if (row.format === 'grade') return listing.gradeLabel || '—';
+        if (row.format === 'position') return listing.pricePositionLabel || '—';
+        if (row.format === 'documents') return listing.documentsSummary || '—';
+        if (row.format === 'faults') return listing.knownFaults || '—';
+        return raw === null || raw === undefined ? '—' : String(raw);
+      }),
+      bestIndex: bestValueIndex(listings, row),
+    }));
+
+    const trail = [{ label: 'Cars', href: '/cars' }, { label: 'Compare' }];
+    const canonical = ids.length ? `/cars/compare?ids=${listings.map((l) => l.id).join(',')}` : '/cars/compare';
+
+    return await sendPage(req, res, {
+      routePath: '/cars/compare',
+      view: 'compare',
+      cache: CACHE.ssr,
+      page: {
+        title: 'Compare cars side by side',
+        metaTitle: 'Compare cars — price, mileage, grade, documents',
+        titleSuffix: true,
+        description:
+          'Up to three verified cars side-by-side: price position, mileage, condition, documents, known faults and a transparent five-year running-cost estimate.',
+        canonical,
+        // A comparison is a personal view of listings — useful, not indexable.
+        robots: 'noindex,follow',
+        breadcrumbs: trail,
+        bodyClass: 'page-compare',
+        jsonLd: [seo.breadcrumbSchema([{ label: 'Home', href: '/' }, { label: 'Cars', href: '/cars' }, { label: 'Compare' }])],
+      },
+      data: {
+        listings,
+        rows,
+        requestedIds: ids,
+        comparedCount: listings.length,
+        trail,
+        compareIds: listings.map((listing) => listing.id).join(','),
+      },
+    });
+  } catch (error) {
+    return next(error);
+  }
+});
+
 router.get('/cars/*', async (req, res, next) => {
   const rest = String(req.params[0] || '').replace(/\/+$/, '');
   if (!rest) return res.redirect(301, '/cars');
@@ -213,6 +318,57 @@ router.get('/cars/*', async (req, res, next) => {
     const listing = await db.listings.findBySlug(rest);
     if (listing) return await renderVdp(req, res, listing);
 
+    // 3b — a make or make+model that has no curated facet: browse, not 404.
+    const [makeSlug, modelSlug, ...extra] = rest.split('/');
+    if (!extra.length) {
+      const makePage = await buildMakeBrowseLocals(makeSlug, modelSlug || null);
+      if (makePage) {
+        const filters = makePage.filters;
+        const view = { ...filters };
+        const built = await buildBrowseLocals({
+          routePath: `/cars/${rest}`,
+          filters,
+          view,
+          sort: 'recommended',
+          page: 1,
+        });
+        const label = makePage.model ? `${makePage.make} ${makePage.model}` : makePage.make;
+        return await sendPage(req, res, {
+          routePath: `/cars/${rest}`,
+          view: 'cars',
+          cache: CACHE.ssr,
+          page: {
+            title: `${label} cars for sale in Port Harcourt`,
+            metaTitle: `${label} cars for sale in Port Harcourt`,
+            description: `Every verified ${label} in Port Harcourt with its price position, documents and known faults checked. Browse live stock and compare before you buy.`,
+            canonical: '/cars',
+            robots: 'noindex,follow',
+            jsonLd: [
+              seo.breadcrumbSchema([
+                { label: 'Cars', href: '/cars' },
+                { label },
+              ]),
+            ],
+            bodyClass: 'page-cars',
+          },
+          data: {
+            ...built,
+            filters: view,
+            activePills: listingQuery.activeFilterPills(view, helpers()),
+            basePath: `/cars/${rest}`,
+            queryString: '',
+            hiddenQuery: view,
+            nearMatches: built.nearMatches,
+            locationLabel: 'Port Harcourt',
+            makeBrowse: { label, count: built.result.total },
+            heading: `${label} cars for sale in Port Harcourt`,
+            intro: `${built.result.total} verified ${label} cars in stock right now, each with its mileage, documents status and verification grade checked before it was listed. Prices are what the dealer is asking — we show where each sits against the market band.`,
+            crumbs: [{ label: 'Cars for sale', href: '/cars' }, { label }],
+          },
+        });
+      }
+    }
+
     // 4 — 7→90 days: hand the old VDP URL to its canonical archive page.
     const archived = await db.listings.findArchivedSoldBySlug(rest);
     if (archived) return res.redirect(301, `/cars/sold/${rest}`);
@@ -232,6 +388,32 @@ router.get('/cars/*', async (req, res, next) => {
 });
 
 /**
+ * /cars/{make} and /cars/{make}/{model} — the fallback for a make that has no
+ * curated facet page. Curated facets are the indexable subset (§14.1); a bare
+ * make+model combination is a raw filter, so it renders a real, working browse
+ * page with `noindex,follow` and canonical /cars rather than a 404 — which is
+ * what a dealer's brand link or a VDP breadcrumb deserves.
+ */
+async function buildMakeBrowseLocals(makeSlug, modelSlug) {
+  const facets = await db.listings.filterFacets();
+  const makeEntry = (facets.makes || []).find((entry) => slugify(entry.value) === makeSlug);
+  if (!makeEntry) return null;
+
+  const filters = { make: makeEntry.value };
+  let modelLabel = null;
+
+  if (modelSlug) {
+    const models = await db.listings.modelCounts(makeEntry.value);
+    const modelEntry = (models || []).find((entry) => slugify(entry.value) === modelSlug);
+    if (!modelEntry) return null;
+    filters.model = modelEntry.value;
+    modelLabel = modelEntry.value;
+  }
+
+  return { make: makeEntry.value, model: modelLabel, filters };
+}
+
+/**
  * Sold archive page (§6.2 + §14.1).
  *   0–7 days    handled by the VDP itself, with the "Sold in N days" badge
  *   7–90 days   this page: indexable, similar cars, routes to live stock
@@ -242,7 +424,7 @@ async function sendSoldArchiveOrRedirect(req, res, slug, canonicalPrefix) {
   if (archived) {
     const similar = await db.listings.findSimilar(archived, config.listings.similarLimit);
     const canonical = canonicalPrefix ? `/cars/sold/${slug}` : `/cars/${slug}`;
-    return sendPage(req, res, {
+    return await sendPage(req, res, {
       routePath: canonical,
       view: 'sold-archive',
       cache: CACHE.static,
@@ -295,7 +477,7 @@ async function renderVdp(req, res, listing) {
   const meta = seo.vdpMeta(listing);
   const ogImage = listing.primaryImage ? ogImagePath(listing) : '/og/default.png';
 
-  return sendPage(req, res, {
+  return await sendPage(req, res, {
     routePath: `/cars/${listing.slug}`,
     view: 'vdp',
     cache: CACHE.ssr,
@@ -373,7 +555,7 @@ router.get('/robots.txt', (req, res) => {
  */
 async function sendNotFound(req, res) {
   const pending = slice.pendingRouteFor(req.path);
-  return sendPage(req, res, {
+  return await sendPage(req, res, {
     routePath: req.path,
     view: 'not-found',
     status: 404,

@@ -39,6 +39,7 @@
           <% if (listing.media.length) { %>
             <img class="gallery__img" id="gallery-main"
                  src="<%= listing.media[0].url %>" alt="<%= helpers.esc(listing.media[0].alt) %>"
+                 <% if (helpers.srcsetFor(listing.media[0].url)) { %>srcset="<%= helpers.srcsetFor(listing.media[0].url) %>" sizes="(min-width: 1024px) 720px, 92vw"<% } %>
                  width="1200" height="900" fetchpriority="high" data-gallery-main>
           <% } %>
         </div>
@@ -48,7 +49,8 @@
               <button class="gallery__thumb" type="button" role="tab"
                       aria-current="<%= index === 0 ? 'true' : 'false' %>"
                       data-gallery-thumb data-src="<%= media.url %>" data-alt="<%= helpers.esc(media.alt) %>">
-                <img src="<%= media.url %>" alt="<%= helpers.esc(media.shotLabel) %>" width="1200" height="900" loading="lazy" decoding="async">
+                <img src="<%= media.url.replace(/\.jpg$/, helpers.srcsetFor(media.url) ? '-600.jpg' : '.jpg') %>"
+                     alt="<%= helpers.esc(media.shotLabel) %>" width="1200" height="900" loading="lazy" decoding="async">
               </button>
             <% }); %>
           </div>
@@ -167,7 +169,8 @@
 
             <div class="inspection-strip mt-2">
               <% listing.media.slice(0, 6).forEach(function (media) { %>
-                <img src="<%= media.url %>" alt="<%= helpers.esc(media.alt) %>" width="1200" height="900" loading="lazy" decoding="async">
+                <img src="<%= media.url.replace(/\.jpg$/, helpers.srcsetFor(media.url) ? '-600.jpg' : '.jpg') %>"
+                     alt="<%= helpers.esc(media.alt) %>" width="1200" height="900" loading="lazy" decoding="async">
               <% }); %>
             </div>
 
@@ -289,7 +292,8 @@
             </button>
             <label class="compare-toggle">
               <input type="checkbox" name="compare" value="<%= listing.id %>"
-                     data-compare-toggle data-listing-id="<%= listing.id %>">
+                     data-compare-toggle data-listing-id="<%= listing.id %>"
+                     aria-label="Add <%= helpers.esc(listing.title) %> to the comparison">
               <span>＋ Compare</span>
             </label>
           </div>

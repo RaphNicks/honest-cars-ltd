@@ -40,8 +40,21 @@ function invalidateChrome() {
   chromeCache = { at: 0, data: null };
 }
 
+const PHOTO_PATH = /^\/img\/(?:cars|details|site|blog|shop|hire)\/[\w-]+\.jpg$/;
+
+/**
+ * Every prepared photo has a 600×450 `-600` sibling (scripts/prepare-images.js).
+ * Returns a srcset so cards and galleries stop shipping the 1200px file to a
+ * phone, or null when the media is a placeholder/dealer URL we cannot resize.
+ */
+function srcsetFor(url) {
+  if (!url || !PHOTO_PATH.test(url)) return null;
+  return `${url.replace(/\.jpg$/, '-600.jpg')} 600w, ${url} 1200w`;
+}
+
 function helpers() {
   return {
+    srcsetFor,
     icon,
     SERVICE_ICONS,
     whatsappLink,
@@ -105,18 +118,25 @@ async function buildLocals(routePath, page = {}, extra = {}) {
 const BASE_DESCRIPTION =
   'Verified cars from trusted Port Harcourt lots — inspections, documents and negotiation handled for you. Every vehicle verified. Every price compared. Every deal honest.';
 
+const TITLE_SUFFIX = ' | HonestCars';
+const TITLE_BUDGET = 64; // §14.2 keeps titles inside the SERP line
+const DESCRIPTION_BUDGET = 158;
+
 function defaultPage(page = {}) {
-  const title = page.title || 'Cars for sale in Port Harcourt';
+  const raw = page.title || 'Cars for sale in Port Harcourt';
+  // Hard ceiling as a safety net: no route can push a title past the SERP
+  // width even if someone writes long copy into a CMS row.
+  const base = page.titleSuffix === false ? seo.truncate(raw, TITLE_BUDGET) : seo.truncate(raw, TITLE_BUDGET - TITLE_SUFFIX.length);
   return {
-    title: page.titleSuffix === false ? title : `${title} | HonestCars`,
-    metaTitle: title,
-    description: page.description || BASE_DESCRIPTION,
+    title: page.titleSuffix === false ? base : `${base}${TITLE_SUFFIX}`,
+    metaTitle: base,
+    description: seo.truncate(page.description || BASE_DESCRIPTION, DESCRIPTION_BUDGET),
     canonical: seo.absolute(page.canonical || '/'),
     robots: page.robots || 'index,follow',
     og: {
       type: page.ogType || 'website',
       image: seo.absolute(page.ogImage || '/og/default.png'),
-      imageAlt: page.ogImageAlt || title,
+      imageAlt: page.ogImageAlt || base,
       imageWidth: 1200,
       imageHeight: 630,
     },
@@ -128,4 +148,4 @@ function defaultPage(page = {}) {
   };
 }
 
-module.exports = { buildLocals, siteChrome, invalidateChrome, helpers, defaultPage, BASE_DESCRIPTION };
+module.exports = { buildLocals, siteChrome, invalidateChrome, helpers, defaultPage, srcsetFor, BASE_DESCRIPTION };
