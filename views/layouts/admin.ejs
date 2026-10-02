@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en-NG">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#0E2A47">
+  <meta name="robots" content="noindex, nofollow">
+  <title><%= page.metaTitle %></title>
+  <link rel="preload" as="font" type="font/woff2" href="/fonts/inter-latin-400-normal.woff2" crossorigin>
+  <link rel="preload" as="font" type="font/woff2" href="/fonts/inter-latin-700-normal.woff2" crossorigin>
+  <link rel="stylesheet" href="/css/tokens.css">
+  <link rel="stylesheet" href="/css/base.css">
+  <link rel="stylesheet" href="/css/components.css">
+  <link rel="stylesheet" href="/css/admin.css">
+</head>
+<body class="admin<%= page.bodyClass ? ' ' + page.bodyClass : '' %>" data-admin>
+  <a class="skip-link" href="#console">Skip to the console</a>
+
+  <header class="admin-bar">
+    <div class="admin-bar__inner">
+      <a class="admin-bar__brand" href="/admin">
+        <span class="admin-bar__mark">HC</span>
+        <span class="admin-bar__name">Console</span>
+      </a>
+
+      <nav class="admin-bar__nav" aria-label="Console sections">
+        <% admin.nav.forEach(function (item) { %>
+          <a class="admin-bar__link<%= admin.active === item.href ? ' is-current' : '' %>"
+             href="<%= item.href %>" <%= admin.active === item.href ? 'aria-current="page"' : '' %>>
+            <%- helpers.icon(item.icon, { size: 18 }) %><span><%= item.label %></span>
+          </a>
+        <% }); %>
+      </nav>
+
+      <div class="admin-bar__me">
+        <a class="admin-bar__link" href="/" target="_blank" rel="noopener">Site</a>
+        <span class="admin-bar__who">
+          <span class="admin-bar__role"><%= admin.roleLabel %></span>
+          <%= helpers.esc(admin.user.shortName) %>
+        </span>
+        <form method="post" action="/api/auth/logout" class="inline">
+          <button class="btn btn--ghost btn--sm" type="submit">Sign out</button>
+        </form>
+      </div>
+    </div>
+  </header>
+
+  <main class="admin-main" id="console">
+    <div class="admin-main__inner">
+      <div class="admin-head">
+        <div>
+          <p class="eyebrow">Console</p>
+          <h1><%= page.title %></h1>
+          <% if (page.description) { %><p class="admin-head__lead"><%= page.description %></p><% } %>
+        </div>
+      </div>
+
+      <% if (typeof ok !== 'undefined' && ok) { %>
+        <p class="flash flash--ok" role="status"><%- helpers.icon('checkCircle', { size: 18 }) %> <%= ok %></p>
+      <% } %>
+      <% if (typeof error !== 'undefined' && error) { %>
+        <p class="flash flash--error" role="alert"><%- helpers.icon('alert', { size: 18 }) %> <%= error %></p>
+      <% } %>
+
+      <%- body %>
+    </div>
+  </main>
+
+  <footer class="admin-foot">
+    <div class="admin-main__inner">
+      <p class="mb-0">
+        Honest Cars console · §7.3 modules · every sensitive action is written to the
+        <a href="/admin/audit">audit log</a>. Customer pages are at <a href="/">honestcarsltd.com</a>.
+      </p>
+    </div>
+  </footer>
+
+  <script type="module" src="/js/admin.js"></script>
+</body>
+</html>

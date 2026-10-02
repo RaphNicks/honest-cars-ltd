@@ -1,0 +1,5 @@
+<%# Load-more fragment — §6.9 “Latest-posts grid (9 per load more)”.
+    Returned by GET /api/posts so the client can append without a reload. %>
+<% posts.forEach(function (post) { %>
+  <%- include('../partials/post-card', { post: post, helpers: helpers }) %>
+<% }); %>

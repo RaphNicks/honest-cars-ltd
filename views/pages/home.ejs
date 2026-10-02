@@ -1,0 +1,265 @@
+<%#
+  Homepage — §6.1, section by section:
+    2. Hero + instant search (Make · Model · Max budget ₦ · Search) + 3 trust chips
+    3. Live inventory — “Fresh on the market”, 8 cards, tabs
+    4. How it works — 3 steps
+    5. Verification grades strip
+    6. Services suite (all live services from the DB)
+    7. Social proof — testimonials + counters
+    8. From the Blog — 3 latest
+    9. Dealer CTA band
+   10. Deal-alert opt-in
+%>
+
+<section class="hero">
+  <div class="container hero__grid">
+    <div>
+      <h1 class="hero__title">Every vehicle verified. Every price compared. Every deal honest.</h1>
+      <p class="hero__sub">
+        Verified cars from 37+ trusted Port Harcourt lots — with inspections, documents and
+        negotiation handled for you.
+      </p>
+
+      <%# §6.1 module 2 — instant search → /cars with filters applied %>
+      <form class="search-bar" action="/cars" method="get" role="search" aria-label="Search cars">
+        <div class="field">
+          <label class="field__label" for="hero-make">Make</label>
+          <select class="select" id="hero-make" name="make" data-make-select>
+            <option value="">Any make</option>
+            <% facets.makes.forEach(function (row) { %>
+              <option value="<%= row.value %>"><%= row.value %></option>
+            <% }); %>
+          </select>
+        </div>
+        <div class="field">
+          <label class="field__label" for="hero-body">Body type</label>
+          <select class="select" id="hero-body" name="body">
+            <option value="">Any body type</option>
+            <% facets.bodyTypes.forEach(function (row) { %>
+              <option value="<%= row.value %>"><%= helpers.BODY_TYPE_LABELS[row.value] || row.value %></option>
+            <% }); %>
+          </select>
+        </div>
+        <div class="field">
+          <label class="field__label" for="hero-max">Max budget ₦</label>
+          <input class="input" id="hero-max" name="max" type="number" inputmode="numeric" step="100000" min="0"
+                 placeholder="<%= Math.round(facets.range.maxPrice / 100) %>">
+        </div>
+        <button class="btn btn--primary" type="submit" data-event="search_used" data-source="hero">
+          <%- helpers.icon('search', { size: 20 }) %> Search
+        </button>
+      </form>
+
+      <%# Three trust chips: cars live · partner dealers in PH · verified-only badge system %>
+      <div class="hero__chips">
+        <span class="trust-chip"><%- helpers.icon('car', { size: 16 }) %><strong><%= site.counters.carsLive %></strong> cars live now</span>
+        <span class="trust-chip"><%- helpers.icon('store', { size: 16 }) %><strong><%= site.counters.partnerDealers %></strong> partner dealers in PH</span>
+        <span class="trust-chip"><%- helpers.icon('checkCircle', { size: 16 }) %><strong><%= site.counters.certified %></strong> certified listings</span>
+      </div>
+    </div>
+
+    <div class="hero__media">
+      <img src="/img/site/home-hero.jpg"
+           srcset="/img/site/home-hero-600.jpg 600w, /img/site/home-hero.jpg 1200w"
+           sizes="(min-width: 1025px) 560px, 92vw"
+           alt="A HonestCars inspector running the checklist on a silver sedan in Port Harcourt"
+           width="1200" height="900" fetchpriority="high" decoding="async">
+    </div>
+  </div>
+</section>
+
+<%# ------------------------------------------------ 3. Live inventory (tabs) %>
+<section class="section section--surface" aria-labelledby="fresh-heading">
+  <div class="container">
+    <div class="section-head">
+      <h2 id="fresh-heading">Fresh on the market</h2>
+      <a class="section-head__link" href="/cars">View all <%= site.counters.carsLive %> cars →</a>
+    </div>
+
+    <div class="tabs" role="tablist" aria-label="Filter the fresh feed">
+      <% Object.entries(feed.tabs).forEach(function ([key, tab], index) { %>
+        <button class="tab" type="button" role="tab" id="tab-<%= key %>"
+                aria-selected="<%= index === 0 ? 'true' : 'false' %>"
+                aria-controls="panel-<%= key %>" data-feed-tab="<%= key %>">
+          <%= tab.label %> (<%= tab.total %>)
+        </button>
+      <% }); %>
+    </div>
+
+    <% Object.entries(feed.tabs).forEach(function ([key, tab], index) { %>
+      <div class="grid grid--3 mt-2" id="panel-<%= key %>" role="tabpanel" aria-labelledby="tab-<%= key %>"
+           <%= index === 0 ? '' : 'hidden' %> data-feed-panel="<%= key %>">
+        <% tab.listings.slice(0, 8).forEach(function (listing) { %>
+          <%- include('../partials/car-card', { listing: listing, helpers: helpers, eager: index === 0 && listing === tab.listings[0] }) %>
+        <% }); %>
+      </div>
+    <% }); %>
+  </div>
+</section>
+
+<%# ------------------------------------------------------- 4. How it works %>
+<section class="section" aria-labelledby="how-heading">
+  <div class="container">
+    <div class="section-head">
+      <h2 id="how-heading">How it works</h2>
+      <a class="section-head__link" href="/how-it-works">The full checklist →</a>
+    </div>
+    <div class="steps">
+      <div class="step">
+        <span class="step__num">1</span>
+        <div>
+          <strong>Pick a car, or tell us what you want</strong>
+          <p>Browse verified stock, or hand us the brief and let the concierge find it in 48–72 hours.</p>
+        </div>
+      </div>
+      <div class="step">
+        <span class="step__num">2</span>
+        <div>
+          <strong>We verify &amp; compare the price</strong>
+          <p>An inspector visits, scans the OBD2, sights the documents and writes down what is actually wrong.</p>
+        </div>
+      </div>
+      <div class="step">
+        <span class="step__num">3</span>
+        <div>
+          <strong>You buy protected, or we walk away</strong>
+          <p>Payment moves through HonestCars-protected channels, never to a seller directly. Handover with papers in hand.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<%# --------------------------------------- 5. Verification grades strip (§3.5) %>
+<section class="section section--surface" aria-labelledby="grades-heading">
+  <div class="container">
+    <div class="section-head">
+      <h2 id="grades-heading">Three grades. No grey areas.</h2>
+      <a class="section-head__link" href="/verification">What each grade means →</a>
+    </div>
+    <div class="grade-strip">
+      <div class="grade-card">
+        <div>
+          <strong>● Network-Listed</strong>
+          <p>Dealer data only — we have not seen this car. Useful for range and price checking.</p>
+        </div>
+      </div>
+      <div class="grade-card grade-card--field_checked">
+        <div>
+          <strong>● Field-Checked</strong>
+          <p>One of our inspectors has physically seen this car and photographed it on site.</p>
+        </div>
+      </div>
+      <div class="grade-card grade-card--certified">
+        <div>
+          <strong>● HonestCars-Certified</strong>
+          <p>Full inspection passed: OBD2 scan, documents sighted, honest condition note written.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<%# ---------------------------------------------------- 6. Services suite %>
+<section class="section" aria-labelledby="services-heading">
+  <div class="container">
+    <div class="section-head">
+      <h2 id="services-heading">Everything around the car, handled</h2>
+      <a class="section-head__link" href="/services">All services →</a>
+    </div>
+    <div class="grid grid--3">
+      <% services.forEach(function (service) { %>
+        <%- include('../partials/service-card', { service: service, helpers: helpers }) %>
+      <% }); %>
+    </div>
+  </div>
+</section>
+
+<%# ------------------------------------------------ 7. Social proof + counters %>
+<section class="section section--surface" aria-labelledby="proof-heading">
+  <div class="container">
+    <div class="section-head">
+      <h2 id="proof-heading">What Port Harcourt says</h2>
+    </div>
+
+    <div class="counter-row">
+      <div class="counter">
+        <span class="counter__value"><%= site.counters.carsLive %></span>
+        <span class="counter__label">cars live in the network</span>
+      </div>
+      <div class="counter">
+        <span class="counter__value"><%= site.counters.partnerDealers %></span>
+        <span class="counter__label">partner dealers in PH</span>
+      </div>
+      <div class="counter">
+        <span class="counter__value"><%= site.counters.certified %></span>
+        <span class="counter__label">HonestCars-Certified cars</span>
+      </div>
+      <div class="counter">
+        <span class="counter__value"><%= site.counters.carsSold90d %></span>
+        <span class="counter__label">deals closed in 90 days</span>
+      </div>
+    </div>
+
+    <div class="grid grid--3 mt-3">
+      <% testimonials.forEach(function (testimonial) { %>
+        <figure class="testimonial">
+          <span class="testimonial__stars" aria-label="<%= testimonial.rating %> out of 5">★★★★★</span>
+          <blockquote class="testimonial__quote">“<%= testimonial.quote %>”</blockquote>
+          <figcaption class="testimonial__meta"><%= testimonial.name %> · <%= testimonial.area %></figcaption>
+        </figure>
+      <% }); %>
+    </div>
+  </div>
+</section>
+
+<%# ------------------------------------------------------- 8. From the Blog %>
+<section class="section" aria-labelledby="blog-heading">
+  <div class="container">
+    <div class="section-head">
+      <h2 id="blog-heading">From the Honest Buyer’s Guide</h2>
+      <a class="section-head__link" href="/blog">All posts →</a>
+    </div>
+    <div class="grid grid--3">
+      <% posts.forEach(function (post) { %>
+        <%- include('../partials/post-card', { post: post, helpers: helpers }) %>
+      <% }); %>
+    </div>
+  </div>
+</section>
+
+<%# ------------------------------------------------------- 9. Dealer CTA band %>
+<section class="section section--navy" aria-labelledby="dealer-heading">
+  <div class="container">
+    <div class="grid grid--2" style="align-items:center">
+      <div>
+        <h2 id="dealer-heading">Own a car lot in PH? We bring you buyers.</h2>
+        <p>List on HonestCars and get photographed, verified stock in front of buyers who are ready to pay — plus leads routed straight to your phone.</p>
+      </div>
+      <div class="btn-row">
+        <a class="btn btn--primary" href="/partner">Partner with us</a>
+        <a class="btn btn--secondary" href="<%= site.nav.whatsapp.general %>" target="_blank" rel="noopener"
+           data-event="whatsapp_click" data-source="dealer_band">Talk to us first</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<%# ----------------------------------------------------- 10. Deal-alert opt-in %>
+<section class="section" aria-labelledby="alert-heading">
+  <div class="container">
+    <div class="alert-band">
+      <div>
+        <h2 id="alert-heading">Get hot verified deals on WhatsApp</h2>
+        <p class="mb-0">One message when a car matches your budget and grade. No spamming, unsubscribe anytime — we ask once and remember.</p>
+      </div>
+      <form class="alert-form" data-lead-form data-lead-type="deal_alert" novalidate>
+        <label class="visually-hidden" for="alert-phone">WhatsApp number</label>
+        <input class="input" id="alert-phone" name="phone" type="tel" inputmode="numeric"
+               placeholder="080 0000 0000" autocomplete="tel" required>
+        <button class="btn btn--primary" type="submit" data-submit>Send me deals</button>
+        <p class="field__error hidden full-width" data-form-error role="alert"></p>
+      </form>
+    </div>
+  </div>
+</section>

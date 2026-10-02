@@ -1,0 +1,133 @@
+<%#
+  The inspection report (FR-07) — one document, three outputs: this page, the
+  print stylesheet, and the A4 PDF the customer keeps. Everything comes from
+  src/services/report.js, so the three can never disagree.
+  Locals: report, pdfUrl, backHref, backLabel
+%>
+<article class="report">
+  <header class="report__head">
+    <p class="eyebrow">Pre-purchase inspection</p>
+    <h1 class="report__title">Inspection report <%= report.reference %></h1>
+    <p class="report__lead">
+      <% if (report.vehicle) { %>
+        <strong><%= report.vehicle.title %></strong>
+        <% if (report.vehicle.vin) { %> · VIN <span class="tabular"><%= report.vehicle.vin %></span><% } %>
+        <% if (report.vehicle.mileageKm) { %> · <span class="tabular"><%= Number(report.vehicle.mileageKm).toLocaleString('en-NG') %> km</span> seen<% } %>
+      <% } else { %>
+        <strong><%= report.type === 'install' ? 'Installation visit' : 'Consultation' %></strong>
+      <% } %>
+    </p>
+    <div class="report__actions">
+      <% if (report.ready) { %>
+        <a class="btn btn--primary" href="<%= pdfUrl %>">Download the PDF</a>
+      <% } %>
+      <button class="btn btn--secondary" type="button" data-print>Print this page</button>
+      <% if (backHref) { %><a class="btn btn--ghost" href="<%= backHref %>"><%= backLabel || 'Back' %></a><% } %>
+    </div>
+  </header>
+
+  <% if (!report.ready) { %>
+    <section class="card card__body">
+      <h2 class="card__title">No checklist on file yet</h2>
+      <p>
+        This booking exists, but the inspector has not filed the seven-section checklist, so there is no report to
+        show. Once the checklist, the OBD2 codes and a verdict are saved in the console, this page and the PDF
+        appear by themselves.
+      </p>
+    </section>
+  <% } else { %>
+    <section class="report__verdict report__verdict--<%= report.verdict || 'pending' %>">
+      <div>
+        <p class="report__verdict-label">Verdict</p>
+        <p class="report__verdict-value"><%= report.verdictLabel %></p>
+      </div>
+      <div class="report__verdict-counts">
+        <span><strong class="tabular"><%= report.counts.recorded %>/7</strong> sections recorded</span>
+        <span><strong class="tabular"><%= report.counts.attention %></strong> advisory</span>
+        <span><strong class="tabular"><%= report.counts.failed %></strong> failing</span>
+      </div>
+    </section>
+
+    <section class="report__facts">
+      <div class="report__fact">
+        <p class="report__fact-label">Customer</p>
+        <p class="report__fact-value"><%= report.customer.name %></p>
+      </div>
+      <div class="report__fact">
+        <p class="report__fact-label">Inspector</p>
+        <p class="report__fact-value"><%= report.inspectorName %></p>
+      </div>
+      <div class="report__fact">
+        <p class="report__fact-label">Inspected</p>
+        <p class="report__fact-value">
+          <%= report.filedAt ? new Date(report.filedAt).toLocaleDateString('en-NG', { day: 'numeric', month: 'long', year: 'numeric' }) : '—' %>
+        </p>
+      </div>
+      <div class="report__fact">
+        <p class="report__fact-label">Where</p>
+        <p class="report__fact-value"><%= report.location || '—' %></p>
+      </div>
+      <div class="report__fact">
+        <p class="report__fact-label">Fee</p>
+        <p class="report__fact-value">
+          <%= report.amountKobo ? helpers.formatNaira(report.amountKobo) : '—' %>
+          <span class="muted"><%= report.paymentStatus %></span>
+        </p>
+      </div>
+      <% if (report.trackingId) { %>
+        <div class="report__fact">
+          <p class="report__fact-label">Request</p>
+          <p class="report__fact-value tabular"><%= report.trackingId %></p>
+        </div>
+      <% } %>
+    </section>
+
+    <section class="card card__body">
+      <h2 class="card__title">The checklist</h2>
+      <table class="table">
+        <caption class="visually-hidden">Seven inspection sections and how each one was marked</caption>
+        <thead>
+          <tr><th scope="col">Section</th><th scope="col">Finding</th></tr>
+        </thead>
+        <tbody>
+          <% report.sections.forEach(function (section) { %>
+            <tr>
+              <th scope="row"><%= section.label %></th>
+              <td>
+                <span class="badge badge--<%= section.mark === '—' ? 'pending' : section.mark %>"><%= section.markLabel %></span>
+              </td>
+            </tr>
+          <% }); %>
+        </tbody>
+      </table>
+      <dl class="report__extra">
+        <dt>OBD2 codes read</dt>
+        <dd><%= report.checklist.obd2Codes %></dd>
+        <% if (report.checklist.photos) { %>
+          <dt>Photos</dt>
+          <dd><%= report.checklist.photos %></dd>
+        <% } %>
+        <% if (report.checklist.checkedOn) { %>
+          <dt>Checked on</dt>
+          <dd><%= report.checklist.checkedOn %></dd>
+        <% } %>
+      </dl>
+    </section>
+
+    <% if (report.notes) { %>
+      <section class="card card__body">
+        <h2 class="card__title">What the inspector found</h2>
+        <p class="report__notes"><%= report.notes %></p>
+      </section>
+    <% } %>
+  <% } %>
+
+  <footer class="report__foot">
+    <p class="report__disclaimer"><%= report.disclaimer %></p>
+    <p class="report__sign">
+      <%= report.business.name %> · <%= report.business.area %> ·
+      <a href="tel:<%= report.business.phone %>"><%= report.business.phone %></a> ·
+      <a href="mailto:<%= report.business.email %>"><%= report.business.email %></a>
+    </p>
+  </footer>
+</article>

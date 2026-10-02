@@ -1,0 +1,64 @@
+<%# §5.2 / Appendix C footer: 4 columns, contact block, CAC line, payment-partner
+    marks and the Port Harcourt local note. %>
+<footer class="footer">
+  <div class="container">
+    <div class="footer__cols">
+      <div>
+        <h3>Shop</h3>
+        <ul>
+          <% site.nav.footer.shop.forEach(function (item) { %>
+            <li><a href="<%= item.href %>"><%= item.label %></a></li>
+          <% }); %>
+        </ul>
+      </div>
+
+      <div>
+        <h3>Services</h3>
+        <ul>
+          <% site.nav.footer.services.slice(0, 7).forEach(function (item) { %>
+            <li><a href="<%= item.href %>"><%= item.label %></a></li>
+          <% }); %>
+          <li><a href="/services">All services →</a></li>
+        </ul>
+      </div>
+
+      <div>
+        <h3>Company</h3>
+        <ul>
+          <% site.nav.footer.company.forEach(function (item) { %>
+            <li><a href="<%= item.href %>"><%= item.label %></a></li>
+          <% }); %>
+        </ul>
+      </div>
+
+      <div>
+        <h3>Legal</h3>
+        <ul>
+          <% site.nav.footer.legal.forEach(function (item) { %>
+            <li><a href="<%= item.href %>"><%= item.label %></a></li>
+          <% }); %>
+        </ul>
+      </div>
+
+      <div>
+        <h3>Talk to us</h3>
+        <div class="footer__contact">
+          <p class="mb-0"><a href="<%= site.nav.whatsapp.general %>" data-event="whatsapp_click" data-source="footer">WhatsApp us</a></p>
+          <p class="mb-0"><a href="tel:<%= site.business.phone %>"><%= site.business.phone %></a></p>
+          <p class="mb-0"><a href="mailto:<%= site.business.email %>"><%= site.business.email %></a></p>
+          <p class="mt-1"><%= site.business.addressNote %></p>
+          <p>Port Harcourt, Nigeria</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="footer__bottom">
+      <span><%= site.business.cacLine %></span>
+      <span class="footer__pays" aria-label="Payment partners">
+        <span class="footer__pay">Paystack</span>
+        <span class="footer__pay">Flutterwave</span>
+        <span class="footer__pay">Bank transfer</span>
+      </span>
+    </div>
+  </div>
+</footer>

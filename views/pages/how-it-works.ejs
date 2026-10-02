@@ -1,0 +1,87 @@
+<%#
+  /how-it-works — §6.10. The journey from “browsing” to “keys and papers”,
+  with the CMS copy underneath (§6.10 CMS-editable pages).
+%>
+<section class="page-hero">
+  <div class="container">
+    <%- include('../partials/breadcrumbs', { crumbs: trail }) %>
+    <p class="eyebrow">How it works</p>
+    <h1><%= cmsPage ? cmsPage.h1 : 'From “I like this one” to keys in hand' %></h1>
+    <p class="lead">
+      <%= cmsPage && cmsPage.heroCopy ? cmsPage.heroCopy : 'Five steps, no surprises, and a clear answer at every stage — including when the answer is “walk away”.' %>
+    </p>
+    <div class="hero__chips">
+      <span class="trust-chip"><%- helpers.icon('checkCircle', { size: 16 }) %><strong><%= counters.carsLive %></strong> cars live now</span>
+      <span class="trust-chip"><%- helpers.icon('store', { size: 16 }) %><strong><%= counters.partnerDealers %></strong> verified partner lots</span>
+      <span class="trust-chip"><%- helpers.icon('shield', { size: 16 }) %><strong>Protected</strong> payments only</span>
+    </div>
+  </div>
+</section>
+
+<section class="section">
+  <div class="container">
+    <ol class="steps steps--numbered">
+      <% journey.forEach(function (step, index) { %>
+        <li class="step">
+          <span class="step__num"><%= index + 1 %></span>
+          <div>
+            <strong><%= step.title %></strong>
+            <p class="mb-0"><%= step.copy %></p>
+            <span class="timeline-chip"><%- helpers.icon('clock', { size: 14 }) %> <%= step.timeline %></span>
+          </div>
+        </li>
+      <% }); %>
+    </ol>
+  </div>
+</section>
+
+<section class="section section--surface">
+  <div class="container">
+    <div class="grid grid--3">
+      <div class="card card__body">
+        <h3>What you pay for</h3>
+        <p class="mb-0">Inspections, documents, tracking, research, hire and the concierge retainer. Every price is on its service page before you commit.</p>
+      </div>
+      <div class="card card__body">
+        <h3>What is free</h3>
+        <p class="mb-0">Browsing, comparing, asking questions and getting an honest answer about a car you found yourself.</p>
+      </div>
+      <div class="card card__body">
+        <h3>What we never do</h3>
+        <p class="mb-0">Take money from sellers, hide a fault, or ask you to pay a stranger directly. Those three are the whole business model.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<% if (cmsPage && cmsPage.body && cmsPage.body.length) { %>
+<section class="section">
+  <div class="container container--narrow">
+    <%- include('../partials/content-blocks', { blocks: cmsPage.body, helpers: helpers }) %>
+  </div>
+</section>
+<% } %>
+
+<% if (faqs.length) { %>
+<section class="section section--surface">
+  <div class="container container--narrow">
+    <div class="section-head"><h2>How-it-works questions</h2></div>
+    <%- include('../partials/accordion', { faqs: faqs, idPrefix: 'hiw-faq' }) %>
+  </div>
+</section>
+<% } %>
+
+<section class="section">
+  <div class="container">
+    <div class="cta-band">
+      <div>
+        <h2>Start where you are</h2>
+        <p class="mb-0">Browsing, shortlisting, or ready to buy — each of those has a next step and none of them starts with a payment.</p>
+      </div>
+      <div class="btn-row">
+        <a class="btn btn--primary" href="/cars">Browse cars</a>
+        <a class="btn btn--secondary" href="/find-my-car">Hand us the brief</a>
+      </div>
+    </div>
+  </div>
+</section>

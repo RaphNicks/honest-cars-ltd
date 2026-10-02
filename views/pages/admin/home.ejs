@@ -1,0 +1,157 @@
+<%#
+  /admin — Today (§7.3 KPI home).
+  Today’s numbers, the trend and funnel, revenue by pillar, the moderation
+  queue waiting on someone, the SLA clock, and a one-click summary the ops
+  lead can paste into WhatsApp.
+  Locals: kpis, trend, funnel, revenue, queue, summary, whatsappSummary,
+          recentAudit, staleDays, refreshGraceDays
+%>
+<div class="kpi-grid">
+  <div class="kpi">
+    <span class="kpi__label">New leads today</span>
+    <strong class="kpi__value tabular"><%= kpis.leads_today %></strong>
+    <span class="kpi__foot"><%= kpis.leads_open %> still open</span>
+  </div>
+  <div class="kpi">
+    <span class="kpi__label">Bookings today</span>
+    <strong class="kpi__value tabular"><%= kpis.bookings_today %></strong>
+    <span class="kpi__foot"><%= kpis.bookings_open %> in flight</span>
+  </div>
+  <div class="kpi">
+    <span class="kpi__label">Order value today</span>
+    <strong class="kpi__value tabular"><%= helpers.formatNaira(kpis.order_value_today) %></strong>
+    <span class="kpi__foot">shop, before payment lands</span>
+  </div>
+  <div class="kpi">
+    <span class="kpi__label">Pending verification</span>
+    <strong class="kpi__value tabular"><%= kpis.pending_verification %></strong>
+    <span class="kpi__foot"><a href="/admin/listings">in the moderation queue</a></span>
+  </div>
+  <div class="kpi">
+    <span class="kpi__label">Listings due a refresh</span>
+    <strong class="kpi__value tabular"><%= kpis.stale_due %></strong>
+    <span class="kpi__foot">idle <%= staleDays %> days</span>
+  </div>
+  <div class="kpi">
+    <span class="kpi__label">Concierge awaiting options</span>
+    <strong class="kpi__value tabular"><%= kpis.requests_new %></strong>
+    <span class="kpi__foot"><a href="/admin/concierge">pipeline board</a></span>
+  </div>
+  <div class="kpi">
+    <span class="kpi__label">Live stock</span>
+    <strong class="kpi__value tabular"><%= kpis.listings_live %></strong>
+    <span class="kpi__foot"><%= kpis.listings_sold %> sold</span>
+  </div>
+  <div class="kpi">
+    <span class="kpi__label">Active trackers</span>
+    <strong class="kpi__value tabular"><%= kpis.trackers_active %></strong>
+    <span class="kpi__foot">subscription records</span>
+  </div>
+</div>
+
+<div class="admin-grid admin-grid--2">
+  <section class="panel" aria-labelledby="trend-h">
+    <h2 class="panel__title" id="trend-h">Listings added, last 14 days</h2>
+    <% var maxTrend = Math.max(1, ...trend.map(function (d) { return d.count; })); %>
+    <div class="spark" role="img" aria-label="Listings added per day for the last 14 days">
+      <% trend.forEach(function (day) { %>
+        <span class="spark__day" title="<%= day.day %>: <%= day.count %>">
+          <span class="spark__bar" style="height: <%= Math.round((day.count / maxTrend) * 100) %>%"></span>
+          <span class="spark__label"><%= day.label %></span>
+        </span>
+      <% }); %>
+    </div>
+    <p class="note-inline mb-0">Total in the window: <strong class="tabular"><%= trend.reduce(function (a, d) { return a + d.count; }, 0) %></strong> listings.</p>
+  </section>
+
+  <section class="panel" aria-labelledby="funnel-h">
+    <h2 class="panel__title" id="funnel-h">Lead funnel, last 30 days</h2>
+    <ul class="funnel">
+      <% funnel.stages.forEach(function (stage) { %>
+        <li class="funnel__row">
+          <span class="funnel__label"><%= stage.label %></span>
+          <span class="funnel__track"><span class="funnel__fill" style="width: <%= stage.width %>%"></span></span>
+          <strong class="funnel__count tabular"><%= stage.count %></strong>
+        </li>
+      <% }); %>
+    </ul>
+    <p class="note-inline mb-0">
+      Concierge requests: <strong class="tabular"><%= funnel.requests.open %></strong> waiting ·
+      <strong class="tabular"><%= funnel.requests.options %></strong> options ready ·
+      <strong class="tabular"><%= funnel.requests.closed %></strong> closed.
+    </p>
+  </section>
+
+  <section class="panel" aria-labelledby="revenue-h">
+    <h2 class="panel__title" id="revenue-h">Revenue by service line, last 30 days</h2>
+    <table class="table">
+      <thead>
+        <tr><th scope="col">Pillar</th><th scope="col">Volume</th><th scope="col">Recorded money</th></tr>
+      </thead>
+      <tbody>
+        <% revenue.forEach(function (row) { %>
+          <tr>
+            <th scope="row"><%= row.pillar %></th>
+            <td class="tabular"><%= row.count %></td>
+            <td class="tabular"><%= row.kobo ? helpers.formatNaira(row.kobo) : '—' %></td>
+          </tr>
+        <% }); %>
+      </tbody>
+    </table>
+    <p class="note-inline mb-0">
+      Only money the site actually recorded is shown. PSP settlement and the
+      dealer ledger are the payments module (§7.3), which is not built yet —
+      these are order and booking records, not bank statements.
+    </p>
+  </section>
+
+  <section class="panel" aria-labelledby="summary-h">
+    <h2 class="panel__title" id="summary-h">Daily summary</h2>
+    <p class="note-inline">One click: copy it or send it to WhatsApp. Nothing is sent automatically.</p>
+    <textarea class="textarea admin-summary" id="summary-text" rows="8" readonly><%= summary %></textarea>
+    <div class="btn-row">
+      <button class="btn btn--secondary btn--sm" type="button" data-copy-summary="summary-text">Copy summary</button>
+      <a class="btn btn--primary btn--sm" href="<%= whatsappSummary %>" target="_blank" rel="noopener">Send on WhatsApp</a>
+    </div>
+  </section>
+</div>
+
+<div class="admin-grid admin-grid--2">
+  <section class="panel" aria-labelledby="queue-h">
+    <div class="panel__head">
+      <h2 class="panel__title" id="queue-h">Waiting on a moderator</h2>
+      <a class="btn btn--secondary btn--sm" href="/admin/listings">Open the queue</a>
+    </div>
+    <% if (!queue.length) { %>
+      <p class="empty-line">Nothing is waiting — the moderation queue is empty.</p>
+    <% } else { %>
+      <ul class="mini-list">
+        <% queue.forEach(function (row) { %>
+          <li>
+            <a href="/admin/listings?q=<%= encodeURIComponent(row.stockNo) %>"><%= row.year %> <%= row.make %> <%= row.model %></a>
+            <span class="muted"><%= row.stockNo %> · <%= row.dealer || 'unknown dealer' %> · added <%= row.ageDays %>d ago</span>
+          </li>
+        <% }); %>
+      </ul>
+    <% } %>
+  </section>
+
+  <section class="panel" aria-labelledby="audit-h">
+    <div class="panel__head">
+      <h2 class="panel__title" id="audit-h">Latest sensitive actions</h2>
+      <a class="btn btn--secondary btn--sm" href="/admin/audit">Full audit log</a>
+    </div>
+    <% if (!recentAudit.length) { %>
+      <p class="empty-line">No publishes, grade changes or price overrides yet.</p>
+    <% } else { %>
+      <ul class="mini-list">
+        <% recentAudit.forEach(function (entry) { %>
+          <li>
+            <span class="chip"><%= entry.action %></span>
+            <span class="muted"><%= entry.actor %> · <%= helpers.relativeDays(entry.createdAt) %></span>
+          </li>
+        <% }); %>
+      </ul>
+    <% } %>
+  </section>
+</div>

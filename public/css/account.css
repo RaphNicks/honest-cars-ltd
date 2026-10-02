@@ -1,0 +1,249 @@
+/* ==========================================================================
+   Account — §7.1 sign-in, dashboard, saved cars and the save toggle.
+   Same tokens as everything else: navy on white, one accent, 8px rhythm.
+   Type stays on the six-step ladder (12/14/16/20/24/32) — 14px minimum for
+   prose.
+   ========================================================================== */
+
+/* --- Save toggle (cards + VDP) ------------------------------------------- */
+.save-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-1);
+  min-width: 40px;
+  min-height: 40px;
+  padding: 0 var(--space-1);
+  border: var(--border);
+  border-radius: var(--radius);
+  background: var(--white);
+  color: var(--color-text-muted);
+  font-size: var(--text-14);
+  line-height: 1;
+  cursor: pointer;
+  text-decoration: none;
+}
+
+.save-toggle:hover { color: var(--honest-navy); border-color: var(--honest-navy); }
+.save-toggle.is-saved { color: var(--color-accent-strong, #0f8a44); border-color: currentColor; background: var(--color-success-bg, #f1fbf5); }
+.save-toggle--wide { padding-inline: var(--space-2); }
+.save-toggle[aria-busy="true"] { opacity: 0.6; pointer-events: none; }
+
+/* --- Header / drawer sign-in chrome -------------------------------------- */
+.header__signin {
+  font-size: var(--text-14);
+  font-weight: 500;
+  color: var(--honest-navy);
+  text-decoration: none;
+  padding: 0 var(--space-1);
+  white-space: nowrap;
+}
+
+.header__signin:hover { text-decoration: underline; }
+.header__search-toggle--on { color: var(--color-accent-strong, #0f8a44); }
+
+/* --- Sign-in page -------------------------------------------------------- */
+.auth-card {
+  background: var(--white);
+  border: var(--border);
+  border-radius: var(--radius);
+  padding: var(--space-4);
+  box-shadow: var(--shadow-sm, 0 1px 2px rgba(14, 42, 71, 0.06));
+}
+
+@media (min-width: 769px) {
+  .auth-card { padding: var(--space-5, var(--space-4)); }
+}
+
+.auth-form { display: grid; gap: var(--space-2); }
+.auth-form .btn-row { margin-top: var(--space-1); }
+
+.input--code {
+  letter-spacing: 0.35em;
+  font-size: var(--text-20);
+  text-align: center;
+  max-width: 12rem;
+}
+
+.auth-message {
+  font-size: var(--text-14);
+  margin: 0;
+  min-height: 1.25rem;
+  color: var(--color-text-muted);
+}
+
+.auth-message[data-state="error"] { color: var(--color-danger, #b3261e); }
+.auth-message--banner { margin-bottom: var(--space-2); }
+.auth-message[data-state="ok"] { color: var(--color-accent-strong, #0f8a44); }
+
+.auth-devnote {
+  margin-top: var(--space-3);
+  padding: var(--space-2);
+  border-radius: var(--radius);
+  border: 1px dashed var(--honest-amber, #e8a13d);
+  background: var(--surface, #f7fafc);
+  font-size: var(--text-14);
+  color: var(--color-text-muted);
+}
+
+.auth-devnote code {
+  /* §3.3: one family. Codes are set apart with letter-spacing, not a second face. */
+  font-size: var(--text-14);
+  font-weight: 600;
+  letter-spacing: 0.08em;
+}
+
+/* --- Dashboard ----------------------------------------------------------- */
+.page-hero--account .row { gap: var(--space-2); align-items: flex-start; }
+.dash-counts { display: flex; flex-wrap: wrap; gap: var(--space-1); margin-top: var(--space-3); }
+
+.dash-grid {
+  display: grid;
+  gap: var(--space-3);
+}
+
+@media (min-width: 1025px) {
+  .dash-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .dash-grid > #saved, .dash-grid > #documents, .dash-grid > #referrals { grid-column: 1 / -1; }
+}
+
+.dash-card {
+  background: var(--white);
+  border: var(--border);
+  border-radius: var(--radius);
+  padding: var(--space-3);
+}
+
+.dash-card__head {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+  align-items: baseline;
+  justify-content: space-between;
+  margin-bottom: var(--space-2);
+}
+
+.dash-card__head h2 { font-size: var(--text-20); }
+
+.account-list { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--space-1); }
+.account-list--tight { margin-top: var(--space-1); }
+
+.account-item {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-2) 0;
+  border-bottom: var(--border);
+}
+
+.account-item:last-child { border-bottom: 0; }
+.account-item__main { display: grid; gap: 2px; min-width: 0; }
+
+.account-item__title {
+  font-weight: 600;
+  color: var(--honest-navy);
+  text-decoration: none;
+  font-size: var(--text-16);
+}
+
+.account-item__title:hover { text-decoration: underline; }
+.account-item__meta { font-size: var(--text-14); color: var(--color-text-muted); }
+.account-item__side { display: flex; align-items: center; gap: var(--space-1); flex-wrap: wrap; }
+
+.query-chip {
+  display: inline-block;
+  font-size: var(--text-14);
+  background: var(--surface, #f7fafc);
+  border: var(--border);
+  border-radius: var(--radius-sm, 6px);
+  padding: 2px 6px;
+  margin: 0 4px 4px 0;
+  word-break: break-word;
+}
+
+.status-pill {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 999px;
+  border: var(--border);
+  font-size: var(--text-12);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--color-text-muted);
+}
+
+.status-pill--pending_payment,
+.status-pill--requested,
+.status-pill--new { border-color: var(--honest-amber, #e8a13d); color: #8a5a10; }
+
+.status-pill--confirmed,
+.status-pill--searching,
+.status-pill--options_ready { border-color: var(--honest-navy); color: var(--honest-navy); }
+
+.status-pill--completed,
+.status-pill--closed,
+.status-pill--paid,
+.status-pill--activated { border-color: var(--color-accent-strong, #0f8a44); color: var(--color-accent-strong, #0f8a44); }
+
+/* --- Saved cars ---------------------------------------------------------- */
+.saved-grid {
+  display: grid;
+  gap: var(--space-2);
+  grid-template-columns: 1fr;
+}
+
+@media (min-width: 641px) {
+  .saved-grid { grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); }
+}
+
+.saved-car {
+  display: grid;
+  grid-template-columns: 120px minmax(0, 1fr);
+  gap: var(--space-2);
+  border: var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+  background: var(--white);
+}
+
+.saved-car__media { display: block; background: var(--surface, #f7fafc); }
+.saved-car__media img { width: 100%; height: 100%; object-fit: cover; aspect-ratio: 4 / 3; }
+.saved-car__body { display: grid; gap: 2px; padding: var(--space-2) var(--space-2) var(--space-2) 0; align-content: start; }
+.saved-car__title { font-weight: 600; color: var(--honest-navy); text-decoration: none; font-size: var(--text-16); }
+.saved-car__title:hover { text-decoration: underline; }
+.saved-car__price { font-weight: 700; color: var(--honest-navy); font-size: var(--text-16); }
+
+/* --- Referrals ----------------------------------------------------------- */
+.referral-box {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+  align-items: center;
+}
+
+.referral-box__input {
+  flex: 1 1 18rem;
+  min-width: 0;
+  font-size: var(--text-14);
+}
+
+.rule {
+  border: 0;
+  border-top: var(--border);
+  margin: var(--space-3) 0;
+}
+
+/* --- Small helpers ------------------------------------------------------- */
+.checkbox-row--tight { font-size: var(--text-14); gap: var(--space-1); }
+.btn--danger { background: var(--color-danger, #b3261e); border-color: var(--color-danger, #b3261e); color: var(--white); }
+.btn--danger:hover { filter: brightness(0.94); }
+.row--between { display: flex; justify-content: space-between; align-items: flex-start; gap: var(--space-2); flex-wrap: wrap; }
+.btn-row--tight { gap: var(--space-1); }
+.mt-4 { margin-top: var(--space-4); }
+
+/* Escrow on the dashboard: the same ladder the console shows, read-only. */
+.escrow-list { margin-top: var(--space-2); border-top: var(--border); padding-top: var(--space-2); }
+.escrow-item + .escrow-item { margin-top: var(--space-2); border-top: 1px dashed var(--color-border); padding-top: var(--space-2); }
+.escrow-item h4, .escrow-item h3 { font-size: var(--text-16); }

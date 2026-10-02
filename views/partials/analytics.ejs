@@ -1,0 +1,24 @@
+<%# §15 analytics bootstrap. Event names are the §15.1 contract — the same list
+    the server validates against in src/services/events.js. No PII is sent. %>
+<script>
+  window.HonestCars = window.HonestCars || {};
+  window.HonestCars.config = {
+    siteUrl: <%- JSON.stringify(site.url) %>,
+    whatsapp: <%- JSON.stringify(site.business.whatsapp) %>,
+    soldVisibleDays: <%= site.soldArchive.visibleDays %>,
+    ga4Id: <%- JSON.stringify(site.analytics.ga4Id) %>,
+    metaPixelId: <%- JSON.stringify(site.analytics.metaPixelId) %>,
+    eventsEndpoint: '/api/events',
+    logEndpoint: '/api/leads'
+  };
+  window.HonestCars.eventNames = <%- JSON.stringify(helpers.eventNames) %>;
+</script>
+<% if (site.analytics.ga4Id) { %>
+<script async src="https://www.googletagmanager.com/gtag/js?id=<%= site.analytics.ga4Id %>"></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){ dataLayer.push(arguments); }
+  gtag('js', new Date());
+  gtag('config', '<%= site.analytics.ga4Id %>', { send_page_view: true, anonymize_ip: true });
+</script>
+<% } %>

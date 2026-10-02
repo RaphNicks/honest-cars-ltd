@@ -1,0 +1,159 @@
+<%#
+  /admin/listings — moderation (§7.3).
+  The queue, the verification-grade setter with its checklist, the 14-day
+  freshness rule, price override and lifecycle actions. Everything here writes
+  an audit entry.
+  Locals: rows, counts, status, q, grades, dealers, staleDays, refreshGraceDays
+%>
+<div class="admin-grid admin-grid--4">
+  <div class="kpi kpi--sm">
+    <span class="kpi__label">In review</span>
+    <strong class="kpi__value tabular"><%= counts.in_review %></strong>
+    <span class="kpi__foot">waiting on a moderator</span>
+  </div>
+  <div class="kpi kpi--sm">
+    <span class="kpi__label">Drafts</span>
+    <strong class="kpi__value tabular"><%= counts.draft %></strong>
+    <span class="kpi__foot">not submitted yet</span>
+  </div>
+  <div class="kpi kpi--sm">
+    <span class="kpi__label">Live</span>
+    <strong class="kpi__value tabular"><%= counts.live %></strong>
+    <span class="kpi__foot"><%= counts.reserved %> reserved</span>
+  </div>
+  <div class="kpi kpi--sm">
+    <span class="kpi__label">Flagged stale</span>
+    <strong class="kpi__value tabular"><%= counts.stale_flagged %></strong>
+    <span class="kpi__foot">unlisted after <%= refreshGraceDays %>d</span>
+  </div>
+</div>
+
+<section class="panel">
+  <div class="panel__head">
+    <h2 class="panel__title">The queue</h2>
+    <form class="admin-filters" method="get" action="/admin/listings">
+      <label class="visually-hidden" for="listing-status">Status</label>
+      <select class="select select--compact" id="listing-status" name="status" data-auto-submit>
+        <% ['in_review','draft','live','reserved','sold','expired','all'].forEach(function (value) { %>
+          <option value="<%= value %>" <%= status === value ? 'selected' : '' %>><%= value.replace(/_/g, ' ') %></option>
+        <% }); %>
+      </select>
+      <label class="visually-hidden" for="listing-q">Search</label>
+      <input class="input input--compact" id="listing-q" name="q" type="search" value="<%= q || '' %>" placeholder="Stock no, make or model">
+      <button class="btn btn--secondary btn--sm" type="submit">Filter</button>
+    </form>
+  </div>
+
+  <form class="admin-inline-form" method="post" action="/admin/listings/stale-sweep">
+    <p class="mb-0">
+      <strong>Freshness rule.</strong> A live listing nobody has touched for <%= staleDays %> days gets a refresh
+      request; one still untouched <%= refreshGraceDays %> days later is auto-unlisted to <em>expired</em>. Running
+      this twice changes nothing.
+    </p>
+    <div class="btn-row">
+      <button class="btn btn--secondary btn--sm" type="submit" name="dry_run" value="1">Dry run</button>
+      <button class="btn btn--primary btn--sm" type="submit">Run the sweep now</button>
+    </div>
+  </form>
+</section>
+
+<% if (!rows.length) { %>
+  <p class="empty-line">Nothing matches that filter.</p>
+<% } else { %>
+  <div class="stack">
+    <% rows.forEach(function (row) { %>
+      <section class="panel listing-row" aria-labelledby="l-<%= row.id %>">
+        <div class="panel__head">
+          <div>
+            <h2 class="listing-row__title" id="l-<%= row.id %>">
+              <%= row.year %> <%= row.make %> <%= row.model %><% if (row.trim) { %> <%= row.trim %><% } %>
+            </h2>
+            <p class="listing-row__meta">
+              <span class="chip"><%= row.stockNo %></span>
+              <span class="badge badge--<%= row.status %>"><%= row.status.replace(/_/g, ' ') %></span>
+              <span class="badge badge--grade-<%= row.grade %>"><%= row.grade.replace(/_/g, ' ') %></span>
+              <%= row.dealer || 'unknown dealer' %> · <%= row.area %> ·
+              <span class="tabular"><%= helpers.formatNaira(row.priceKobo) %></span>
+            </p>
+            <p class="listing-row__meta">
+              <span class="tabular"><%= row.views %></span> views ·
+              <span class="tabular"><%= row.enquiries %></span> enquiries ·
+              <span class="tabular"><%= row.saves %></span> saves ·
+              added <%= row.ageDays %>d ago · idle <%= row.idleDays %>d
+              <% if (row.soldAt) { %> · sold <%= helpers.relativeDays(row.soldAt) %><% } %>
+              <% if (row.staleFlaggedAt) { %> · <strong class="warn">flagged stale</strong><% } %>
+            </p>
+          </div>
+          <a class="btn btn--ghost btn--sm" href="<%= row.url %>" target="_blank" rel="noopener">View on site</a>
+        </div>
+
+        <div class="admin-actions">
+          <% if (row.status !== 'live') { %>
+            <form class="admin-actions__group" method="post" action="/admin/listings/<%= row.id %>/publish">
+              <p class="admin-actions__label">Publish to the storefront</p>
+              <label class="visually-hidden" for="publish-grade-<%= row.id %>">Verification grade</label>
+              <select class="select select--compact" id="publish-grade-<%= row.id %>" name="grade">
+                <% grades.forEach(function (grade) { %>
+                  <option value="<%= grade %>" <%= row.grade === grade ? 'selected' : '' %>><%= grade.replace(/_/g, ' ') %></option>
+                <% }); %>
+              </select>
+              <div class="check-row">
+                <label class="checkbox-row"><input type="checkbox" name="vin_checked"><span>VIN checked</span></label>
+                <label class="checkbox-row"><input type="checkbox" name="docs_sighted"><span>Documents sighted</span></label>
+                <label class="checkbox-row"><input type="checkbox" name="obd2_scanned"><span>OBD2 scanned</span></label>
+                <label class="checkbox-row"><input type="checkbox" name="road_tested"><span>Road tested</span></label>
+              </div>
+              <button class="btn btn--primary btn--sm" type="submit">Publish</button>
+            </form>
+          <% } %>
+
+          <form class="admin-actions__group" method="post" action="/admin/listings/<%= row.id %>/grade">
+            <p class="admin-actions__label">Verification grade</p>
+            <label class="visually-hidden" for="grade-<%= row.id %>">Grade</label>
+            <select class="select select--compact" id="grade-<%= row.id %>" name="grade">
+              <% grades.forEach(function (grade) { %>
+                <option value="<%= grade %>" <%= row.grade === grade ? 'selected' : '' %>><%= grade.replace(/_/g, ' ') %></option>
+              <% }); %>
+            </select>
+            <div class="check-row">
+              <label class="checkbox-row"><input type="checkbox" name="vin_checked" <%= row.gradeChecklist && row.gradeChecklist.vin_checked ? 'checked' : '' %>><span>VIN</span></label>
+              <label class="checkbox-row"><input type="checkbox" name="docs_sighted" <%= row.gradeChecklist && row.gradeChecklist.docs_sighted ? 'checked' : '' %>><span>Docs</span></label>
+              <label class="checkbox-row"><input type="checkbox" name="obd2_scanned" <%= row.gradeChecklist && row.gradeChecklist.obd2_scanned ? 'checked' : '' %>><span>OBD2</span></label>
+              <label class="checkbox-row"><input type="checkbox" name="road_tested" <%= row.gradeChecklist && row.gradeChecklist.road_tested ? 'checked' : '' %>><span>Road test</span></label>
+            </div>
+            <label class="visually-hidden" for="grade-note-<%= row.id %>">Note for the audit log</label>
+            <input class="input input--compact" id="grade-note-<%= row.id %>" name="note" type="text" placeholder="Why (audit log)">
+            <button class="btn btn--secondary btn--sm" type="submit">Set grade</button>
+          </form>
+
+          <form class="admin-actions__group" method="post" action="/admin/listings/<%= row.id %>/price">
+            <p class="admin-actions__label">Price override</p>
+            <label class="visually-hidden" for="price-<%= row.id %>">Price in naira</label>
+            <input class="input input--compact tabular" id="price-<%= row.id %>" name="price_naira" type="text"
+                   inputmode="numeric" value="<%= Math.round(row.priceKobo / 100) %>">
+            <label class="visually-hidden" for="price-note-<%= row.id %>">Reason</label>
+            <input class="input input--compact" id="price-note-<%= row.id %>" name="note" type="text" placeholder="Reason (audit log)">
+            <button class="btn btn--secondary btn--sm" type="submit">Update price</button>
+          </form>
+
+          <form class="admin-actions__group" method="post" action="/admin/listings/<%= row.id %>/status">
+            <p class="admin-actions__label">Lifecycle</p>
+            <label class="visually-hidden" for="status-<%= row.id %>">Status</label>
+            <select class="select select--compact" id="status-<%= row.id %>" name="status">
+              <% ['draft','in_review','live','reserved','sold','expired'].forEach(function (value) { %>
+                <option value="<%= value %>" <%= row.status === value ? 'selected' : '' %>><%= value %></option>
+              <% }); %>
+            </select>
+            <button class="btn btn--secondary btn--sm" type="submit">Set status</button>
+          </form>
+
+          <form class="admin-actions__group" method="post" action="/admin/listings/<%= row.id %>/refresh">
+            <p class="admin-actions__label">Freshness</p>
+            <p class="note-inline">Confirm with the dealer that it is still current.</p>
+            <button class="btn btn--ghost btn--sm" type="submit">Mark refreshed</button>
+          </form>
+        </div>
+      </section>
+    <% }); %>
+  </div>
+<% } %>

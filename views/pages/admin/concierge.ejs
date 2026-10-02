@@ -1,0 +1,152 @@
+<%#
+  /admin/concierge — the pipeline board (§7.3).
+  New → Searching → Options ready → Viewings → Closed, every card carrying its
+  SLA clock, plus the panel where cars are attached to a request (those rows
+  are what the buyer’s comparison is rendered from).
+  Locals: columns, all, staff, focus, candidates, type, stages
+%>
+<section class="panel">
+  <div class="panel__head">
+    <h2 class="panel__title">Pipeline</h2>
+    <form class="admin-filters" method="get" action="/admin/concierge">
+      <label class="visually-hidden" for="pipe-type">Request type</label>
+      <select class="select select--compact" id="pipe-type" name="type" data-auto-submit>
+        <option value="">All request types</option>
+        <% ['concierge','sell','swap','documents','research','parts','tracking','hire','consultation'].forEach(function (value) { %>
+          <option value="<%= value %>" <%= type === value ? 'selected' : '' %>><%= value %></option>
+        <% }); %>
+      </select>
+      <noscript><button class="btn btn--secondary btn--sm" type="submit">Filter</button></noscript>
+    </form>
+  </div>
+
+  <% if (!all.length) { %>
+    <p class="empty-line">No requests yet. They arrive from /find-my-car, /sell-swap, the service pages and /hire.</p>
+  <% } else { %>
+    <div class="board">
+      <% columns.forEach(function (column) { %>
+        <section class="board__col" aria-labelledby="col-<%= column.stage %>">
+          <h3 class="board__title" id="col-<%= column.stage %>">
+            <%= column.stage.replace(/_/g, ' ') %>
+            <span class="board__count tabular"><%= column.rows.length %></span>
+          </h3>
+          <% if (!column.rows.length) { %>
+            <p class="empty-line empty-line--tight">Empty</p>
+          <% } %>
+          <% column.rows.forEach(function (row) { %>
+            <article class="board-card">
+              <a class="board-card__id" href="/admin/concierge?open=<%= row.id %>"><%= row.trackingId %></a>
+              <p class="board-card__title"><%= row.name %></p>
+              <p class="board-card__meta">
+                <span class="chip"><%= row.type %></span>
+                <% if (row.candidateCount) { %><span class="chip"><%= row.candidateCount %> car<%= row.candidateCount === 1 ? '' : 's' %></span><% } %>
+              </p>
+              <% if (row.budget) { %><p class="board-card__meta">Budget: <strong><%= row.budget %></strong></p><% } %>
+              <p class="board-card__meta">
+                <% if (row.slaHoursLeft === null) { %>
+                  <span class="muted">no SLA set</span>
+                <% } else if (row.slaHoursLeft < 0) { %>
+                  <span class="warn">SLA overdue by <%= Math.abs(row.slaHoursLeft) %>h</span>
+                <% } else { %>
+                  <span class="<%= row.slaHoursLeft <= 12 ? 'warn' : 'muted' %>">SLA in <%= row.slaHoursLeft %>h</span>
+                <% } %>
+              </p>
+              <details class="board-card__move">
+                <summary>Move</summary>
+                <form method="post" action="/admin/concierge/<%= row.id %>/stage">
+                  <label class="visually-hidden" for="stage-<%= row.id %>">Stage</label>
+                  <select class="select select--compact" id="stage-<%= row.id %>" name="status">
+                    <% stages.forEach(function (stage) { %>
+                      <option value="<%= stage %>" <%= row.status === stage ? 'selected' : '' %>><%= stage.replace(/_/g, ' ') %></option>
+                    <% }); %>
+                  </select>
+                  <label class="visually-hidden" for="stage-lost-<%= row.id %>">Lost reason</label>
+                  <input class="input input--compact" id="stage-lost-<%= row.id %>" name="lost_reason" type="text" placeholder="Lost reason (when lost)">
+                  <button class="btn btn--primary btn--sm" type="submit">Save</button>
+                </form>
+                <form method="post" action="/admin/leads/<%= row.id %>/assign">
+                  <input type="hidden" name="kind" value="request">
+                  <label class="visually-hidden" for="owner-<%= row.id %>">Owner</label>
+                  <select class="select select--compact" id="owner-<%= row.id %>" name="assigned_to">
+                    <option value="0">Unassigned</option>
+                    <% staff.forEach(function (person) { %>
+                      <option value="<%= person.id %>" <%= String(row.assignedTo) === String(person.id) ? 'selected' : '' %>><%= person.name %></option>
+                    <% }); %>
+                  </select>
+                  <button class="btn btn--secondary btn--sm" type="submit">Assign</button>
+                </form>
+              </details>
+            </article>
+          <% }); %>
+        </section>
+      <% }); %>
+    </div>
+  <% } %>
+</section>
+
+<% if (focus) { %>
+  <section class="panel" aria-labelledby="focus-h">
+    <div class="panel__head">
+      <div>
+        <h2 class="panel__title" id="focus-h"><%= focus.trackingId %> — <%= focus.name %></h2>
+        <p class="note-inline mb-0">
+          <span class="tabular"><%= focus.maskedPhone %></span> ·
+          <%= focus.type %> ·
+          <% if (focus.slaDueAt) { %>SLA due <%= new Date(focus.slaDueAt).toLocaleString('en-NG', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) %><% } else { %>no SLA<% } %>
+        </p>
+      </div>
+      <a class="btn btn--ghost btn--sm" href="/concierge/<%= focus.trackingId %>" target="_blank" rel="noopener">Buyer’s status page</a>
+    </div>
+
+    <h3 class="mb-1">The brief</h3>
+    <% var briefKeys = Object.keys(focus.brief || {}); %>
+    <% if (!briefKeys.length) { %>
+      <p class="empty-line">No brief fields were captured.</p>
+    <% } else { %>
+      <dl class="brief">
+        <% briefKeys.forEach(function (key) { %>
+          <dt><%= key.replace(/_/g, ' ') %></dt>
+          <dd><%= typeof focus.brief[key] === 'object' ? JSON.stringify(focus.brief[key]) : focus.brief[key] %></dd>
+        <% }); %>
+      </dl>
+    <% } %>
+
+    <h3 class="mt-3 mb-1">Attached cars (<%= candidates.length %>)</h3>
+    <% if (!candidates.length) { %>
+      <p class="empty-line">Nothing attached yet. Attach two or three and the buyer’s comparison is rendered from these rows.</p>
+    <% } else { %>
+      <ul class="mini-list mini-list--cars">
+        <% candidates.forEach(function (car) { %>
+          <li>
+            <a href="<%= car.url %>" target="_blank" rel="noopener"><%= car.title %></a>
+            <span class="tabular"><%= helpers.formatNaira(car.priceKobo) %></span>
+            <span class="badge badge--grade-<%= car.grade %>"><%= car.grade.replace(/_/g, ' ') %></span>
+            <span class="badge badge--<%= car.status %>"><%= car.status %></span>
+            <% if (car.note) { %><span class="muted"><%= car.note %></span><% } %>
+            <form method="post" action="/admin/concierge/<%= focus.id %>/candidates/<%= car.listingId %>/remove">
+              <button class="btn btn--ghost btn--sm" type="submit">Remove</button>
+            </form>
+          </li>
+        <% }); %>
+      </ul>
+    <% } %>
+
+    <form class="admin-actions__group admin-actions__group--wide mt-2" method="post" action="/admin/concierge/<%= focus.id %>/candidates">
+      <p class="admin-actions__label">Attach a car</p>
+      <label class="visually-hidden" for="candidate-id">Listing id</label>
+      <input class="input input--compact tabular" id="candidate-id" name="listing_id" type="number" min="1"
+             placeholder="Listing id" required>
+      <label class="visually-hidden" for="candidate-note">Why this one</label>
+      <input class="input input--compact" id="candidate-note" name="note" type="text" placeholder="Why this one (shown to the buyer)">
+      <button class="btn btn--primary btn--sm" type="submit">Attach</button>
+      <p class="note-inline mb-0">
+        Find the id in the moderation queue or the listing URL; the note travels with the car to the buyer’s page.
+      </p>
+    </form>
+
+    <p class="note-inline mt-2 mb-0">
+      Stage moves and attachments are audited. A comparison PDF is a print of this page —
+      the generated document is part of the reports module (§7.3), still to build.
+    </p>
+  </section>
+<% } %>

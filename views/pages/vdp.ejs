@@ -1,0 +1,330 @@
+<%#
+  Vehicle Detail Page — §6.3. SERVER-RENDERED per request (§12.4) because stock,
+  price and badges move during the day.
+  Every VDP carries: freshness chip, stock #, canonical URL, Vehicle+Offer
+  schema and OG tags tuned for WhatsApp sharing.
+  Locals: listing, similar, priceBand, recentlyViewed, serviceCrossSell
+%>
+<% var pricePosition = helpers.PRICE_POSITION[listing.pricePosition] || helpers.PRICE_POSITION.no_data; %>
+
+<section class="container">
+  <%- include('../partials/breadcrumbs', { crumbs: trail }) %>
+
+  <article class="vdp" data-listing-view data-listing-id="<%= listing.id %>"
+           data-stock="<%= listing.stockNo %>" data-grade="<%= listing.grade %>"
+           data-price-position="<%= listing.pricePosition %>">
+
+    <%# ------------------------------------------------ LEFT: 60% (§6.3) %>
+    <div class="vdp__main">
+      <div class="vdp__header">
+        <h1 class="vdp__title"><%= listing.title %></h1>
+        <p class="vdp__subtitle mb-0">
+          Stock <span class="tabular"><%= listing.stockNo %></span>
+          <% if (listing.dealer) { %> · <span>Partner dealer · <%= listing.dealer.area %> — verified by HonestCars</span><% } %>
+        </p>
+        <div class="row">
+          <%- include('../partials/grade-badge', { listing: listing, helpers: helpers }) %>
+          <span class="freshness-chip">
+            <%- helpers.icon('clock', { size: 14 }) %>
+            Listed <%= helpers.relativeDays(listing.publishedAt) %><% if (listing.updatedAt) { %> · updated <%= helpers.relativeDays(listing.updatedAt) %><% } %>
+          </span>
+          <% if (listing.status === 'reserved') { %><span class="badge badge--reserved">Reserved</span><% } %>
+          <% if (listing.status === 'sold') { %><span class="badge badge--sold">Sold<% if (listing.soldInDays) { %> in <%= listing.soldInDays %> days<% } %></span><% } %>
+        </div>
+      </div>
+
+      <%# Gallery — main image + thumbs, swipe on mobile, pinch-zoom is native %>
+      <section class="gallery" aria-label="Photos of <%= helpers.esc(listing.title) %>" data-gallery>
+        <div class="gallery__main">
+          <% if (listing.media.length) { %>
+            <img class="gallery__img" id="gallery-main"
+                 src="<%= listing.media[0].url %>" alt="<%= helpers.esc(listing.media[0].alt) %>"
+                 <% if (helpers.srcsetFor(listing.media[0].url)) { %>srcset="<%= helpers.srcsetFor(listing.media[0].url) %>" sizes="(min-width: 1024px) 720px, 92vw"<% } %>
+                 width="1200" height="900" fetchpriority="high" data-gallery-main>
+          <% } %>
+        </div>
+        <% if (listing.media.length > 1) { %>
+          <div class="gallery__thumbs" role="tablist" aria-label="Choose a photo">
+            <% listing.media.forEach(function (media, index) { %>
+              <button class="gallery__thumb" type="button" role="tab"
+                      aria-current="<%= index === 0 ? 'true' : 'false' %>"
+                      data-gallery-thumb data-src="<%= media.url %>" data-alt="<%= helpers.esc(media.alt) %>">
+                <img src="<%= media.url.replace(/\.jpg$/, helpers.srcsetFor(media.url) ? '-600.jpg' : '.jpg') %>"
+                     alt="<%= helpers.esc(media.shotLabel) %>" width="1200" height="900" loading="lazy" decoding="async">
+              </button>
+            <% }); %>
+          </div>
+        <% } %>
+      </section>
+
+      <%# Price + key facts (mobile shows these above the fold; desktop mirrors in the rail) %>
+      <section aria-labelledby="key-facts-heading">
+        <h2 class="vdp__section-title" id="key-facts-heading">Key facts</h2>
+        <p class="vdp-price mb-0"><%= helpers.formatNaira(listing.priceKobo) %></p>
+        <p class="price-position price-position--<%= listing.pricePosition %> mt-1">
+          <span class="price-position__dot" aria-hidden="true"></span>
+          <%= pricePosition.label %>
+          <% if (listing.negotiable) { %><span class="note-inline">· price negotiable</span><% } %>
+        </p>
+        <% if (priceBand) { %>
+          <p class="note-inline mt-1">
+            Current PH market band for this model and year: <%= helpers.formatNaira(priceBand.min) %> – <%= helpers.formatNaira(priceBand.max) %>
+            <% if (priceBand.sampleSize) { %>(from <span class="tabular"><%= priceBand.sampleSize %></span> live comparables)<% } %>.
+          </p>
+        <% } %>
+
+        <dl class="spec-grid mt-2">
+          <% [
+            ['Year', listing.year],
+            ['Mileage', helpers.formatMileage(listing.mileageKm) + (listing.mileageVerified ? ' · verified' : '')],
+            ['Transmission', listing.transmissionLabel],
+            ['Fuel', listing.fuelTypeLabel],
+            ['Body type', listing.bodyTypeLabel],
+            ['Engine', listing.engineSize || '—'],
+            ['Drivetrain', listing.drivetrain ? listing.drivetrain.toUpperCase() : '—'],
+            ['Condition', listing.conditionLabel],
+            ['Exterior', listing.extColour || '—'],
+            ['Interior', listing.intColour || '—'],
+            ['Area', listing.area],
+            ['City', listing.city]
+          ].forEach(function (row) { %>
+            <div class="spec-grid__row">
+              <dt class="spec-grid__label"><%= row[0] %></dt>
+              <dd class="spec-grid__value mb-0"><%= row[1] %></dd>
+            </div>
+          <% }); %>
+        </dl>
+      </section>
+
+      <%# Honest note — amber framed box, certified cars only (§3.5) %>
+      <% if (listing.honestNote) { %>
+        <div class="honest-note">
+          <p class="honest-note__head"><%- helpers.icon('alert', { size: 16 }) %> Honest note from our inspector</p>
+          <p><%= listing.honestNote %></p>
+        </div>
+      <% } %>
+
+      <%# Documents strip — green when verified, grey when pending (§3.5) %>
+      <section aria-labelledby="docs-heading">
+        <h2 class="vdp__section-title" id="docs-heading">Documents</h2>
+        <ul class="docs-strip">
+          <li class="doc-item <%= listing.documents.customs ? 'doc-item--ok' : '' %>">
+            <%- helpers.icon(listing.documents.customs ? 'checkCircle' : 'clock', { size: 16 }) %>
+            Customs <%= listing.documents.customs ? 'verified' : 'pending' %>
+          </li>
+          <li class="doc-item <%= listing.documents.registration ? 'doc-item--ok' : '' %>">
+            <%- helpers.icon(listing.documents.registration ? 'checkCircle' : 'clock', { size: 16 }) %>
+            Registration <%= listing.documents.registration ? 'verified' : 'pending' %>
+          </li>
+          <li class="doc-item <%= listing.documents.dutySighted ? 'doc-item--ok' : '' %>">
+            <%- helpers.icon(listing.documents.dutySighted ? 'checkCircle' : 'clock', { size: 16 }) %>
+            Duty papers <%= listing.documents.dutySighted ? 'sighted' : 'pending' %>
+          </li>
+          <li class="doc-item <%= listing.documents.tintedPermit ? 'doc-item--ok' : '' %>">
+            <%- helpers.icon(listing.documents.tintedPermit ? 'checkCircle' : 'clock', { size: 16 }) %>
+            Tinted permit <%= listing.documents.tintedPermit ? 'verified' : 'pending' %>
+          </li>
+        </ul>
+        <p class="note-inline mt-1">
+          <%= listing.documents.customs && listing.documents.registration
+                ? 'Papers are ready for transfer. We verify documents again at handover.'
+                : 'We can complete the missing papers through our Customs & Document service before handover.' %>
+        </p>
+      </section>
+
+      <% if (listing.description) { %>
+        <section aria-labelledby="about-heading">
+          <h2 class="vdp__section-title" id="about-heading">About this car</h2>
+          <div class="prose"><p><%= listing.description %></p></div>
+        </section>
+      <% } %>
+
+      <% if (listing.features.length) { %>
+        <section aria-labelledby="features-heading">
+          <h2 class="vdp__section-title" id="features-heading">Features</h2>
+          <ul class="feature-list">
+            <% listing.features.forEach(function (feature) { %>
+              <li><%- helpers.icon('check', { size: 16 }) %><span><%= feature %></span></li>
+            <% }); %>
+          </ul>
+        </section>
+      <% } %>
+
+      <%# Inspection section — certified cars only (§6.3 below fold) %>
+      <% if (listing.inspectionSummary) { %>
+        <section aria-labelledby="inspection-heading">
+          <h2 class="vdp__section-title" id="inspection-heading">The inspection</h2>
+          <div class="surface-panel">
+            <div class="row row--between">
+              <div>
+                <p class="mb-0"><strong><%= listing.inspectionSummary.verdict %></strong></p>
+                <p class="note-inline mb-0">
+                  Grade <%= listing.inspectionSummary.grade %> · checked
+                  <%= listing.inspectionSummary.checked_on %> ·
+                  OBD2 codes: <span class="tabular"><%= listing.inspectionSummary.obd2_codes %></span>
+                </p>
+              </div>
+              <span class="badge badge--certified"><span class="badge__dot" aria-hidden="true"></span>HonestCars-Certified</span>
+            </div>
+
+            <div class="inspection-strip mt-2">
+              <% listing.media.slice(0, 6).forEach(function (media) { %>
+                <img src="<%= media.url.replace(/\.jpg$/, helpers.srcsetFor(media.url) ? '-600.jpg' : '.jpg') %>"
+                     alt="<%= helpers.esc(media.alt) %>" width="1200" height="900" loading="lazy" decoding="async">
+              <% }); %>
+            </div>
+
+            <p class="note-inline mt-2 mb-0">
+              Full inspection report (OBD2 readings, panel-by-panel notes and photos) is sent on request —
+              ask us on WhatsApp and we will forward it before you travel.
+            </p>
+          </div>
+        </section>
+      <% } %>
+
+      <%# Service cross-sell strip (§6.3) %>
+      <section aria-labelledby="crosssell-heading">
+        <h2 class="vdp__section-title" id="crosssell-heading">While you are here</h2>
+        <div class="grid grid--3">
+          <a class="service-card" href="/services/tracking">
+            <span class="service-card__icon"><%- helpers.icon('shield', { size: 22 }) %></span>
+            <span class="service-card__name">Tracker install</span>
+            <p class="service-card__promise">Fit a tracker before this car leaves the lot — Standard, Premium or Fleet.</p>
+            <span class="service-card__price">from <%= helpers.formatNaira(450000) %></span>
+          </a>
+          <a class="service-card" href="/services/documents">
+            <span class="service-card__icon"><%- helpers.icon('fileCheck', { size: 22 }) %></span>
+            <span class="service-card__name">Insurance &amp; documents</span>
+            <p class="service-card__promise">Customs verification, registration, insurance and tinted permit handled.</p>
+            <span class="service-card__price">from <%= helpers.formatNaira(300000) %></span>
+          </a>
+          <a class="service-card" href="/hire">
+            <span class="service-card__icon"><%- helpers.icon('car', { size: 22 }) %></span>
+            <span class="service-card__name">Need a driver?</span>
+            <p class="service-card__promise">Hire a vetted driver for the day while you handle the transfer.</p>
+          </a>
+        </div>
+      </section>
+
+      <%# Similar cars — same make, then same budget band (§6.3) %>
+      <% if (similar.length) { %>
+        <section aria-labelledby="similar-heading">
+          <h2 class="vdp__section-title" id="similar-heading">Similar cars</h2>
+          <div class="similar-scroll">
+            <% similar.forEach(function (car) { %>
+              <%- include('../partials/car-card', { listing: car, helpers: helpers }) %>
+            <% }); %>
+          </div>
+        </section>
+      <% } %>
+
+      <%# Recently viewed — rendered client-side from localStorage (no PII) %>
+      <section aria-labelledby="recent-heading" data-recently-viewed hidden>
+        <h2 class="vdp__section-title" id="recent-heading">Recently viewed</h2>
+        <div class="similar-scroll" data-recently-viewed-list></div>
+      </section>
+    </div>
+
+    <%# ------------------------------------------- RIGHT: 40% sticky rail %>
+    <aside class="vdp-rail" aria-label="Price and contact">
+      <div class="card">
+        <div class="card__body">
+          <p class="vdp-price mb-0"><%= helpers.formatNaira(listing.priceKobo) %></p>
+          <p class="price-position price-position--<%= listing.pricePosition %> mt-1">
+            <span class="price-position__dot" aria-hidden="true"></span><%= pricePosition.label %>
+          </p>
+          <p class="note-inline"><%= pricePosition.copy %></p>
+
+          <div class="row mt-1">
+            <%- include('../partials/grade-badge', { listing: listing, helpers: helpers }) %>
+          </div>
+
+          <dl class="key-facts mt-2">
+            <div class="key-fact">
+              <dt>Year</dt>
+              <dd><%= listing.year %></dd>
+            </div>
+            <div class="key-fact">
+              <dt>Mileage</dt>
+              <dd class="tabular"><%= helpers.formatMileage(listing.mileageKm) %></dd>
+            </div>
+            <div class="key-fact">
+              <dt>Transmission</dt>
+              <dd><%= listing.transmissionLabel %></dd>
+            </div>
+            <div class="key-fact">
+              <dt>Area</dt>
+              <dd><%= listing.area %></dd>
+            </div>
+          </dl>
+
+          <div class="stack mt-2">
+            <button class="btn btn--primary btn--block btn--lg" type="button"
+                    data-open-viewing data-listing-id="<%= listing.id %>"
+                    data-event="viewing_requested" data-source="vdp">
+              Request Viewing
+            </button>
+            <a class="btn btn--secondary btn--block" href="/find-my-car"
+               data-event="concierge_started" data-source="vdp_buy_protected">
+              Buy via HonestCars Concierge
+            </a>
+            <a class="btn btn--ghost btn--block" target="_blank" rel="noopener"
+               href="<%= helpers.whatsappLink('Hi HonestCars, I want to talk about ' + listing.title + ' (' + listing.stockNo + ' · ' + helpers.formatNaira(listing.priceKobo) + ').', 'vdp:' + listing.stockNo) %>"
+               data-event="whatsapp_click" data-source="vdp">
+              <%- helpers.icon('whatsapp', { size: 20 }) %> Chat on WhatsApp
+            </a>
+          </div>
+
+          <p class="note-inline mt-2 mb-0">
+            Buying through the concierge means we inspect, negotiate and move the payment through protected
+            channels for you — the dealer never sees your money.
+          </p>
+
+          <div class="row mt-2">
+            <a class="icon-btn" target="_blank" rel="noopener"
+               href="https://wa.me/?text=<%= encodeURIComponent(listing.title + ' · ' + helpers.formatNaira(listing.priceKobo) + ' · ' + helpers.absolute(listing.url)) %>"
+               data-event="blog_post_shared" data-source="vdp_share_whatsapp" aria-label="Share on WhatsApp">
+              <%- helpers.icon('whatsapp', { size: 20 }) %>
+            </a>
+            <button class="icon-btn" type="button" data-copy-link data-event="blog_post_shared"
+                    data-source="vdp_share_copy" aria-label="Copy link">
+              <%- helpers.icon('link', { size: 20 }) %>
+            </button>
+            <%- include('../partials/save-button', { listing: listing, helpers: helpers, variant: 'wide' }) %>
+
+            <label class="compare-toggle">
+              <input type="checkbox" name="compare" value="<%= listing.id %>"
+                     data-compare-toggle data-listing-id="<%= listing.id %>"
+                     aria-label="Add <%= helpers.esc(listing.title) %> to the comparison">
+              <span>＋ Compare</span>
+            </label>
+          </div>
+        </div>
+      </div>
+
+      <p class="safety-note">
+        <strong>Safety note:</strong> All payments for this car go through HonestCars-protected channels.
+        Never pay a seller or third party directly.
+      </p>
+
+      <p class="note-inline mb-0">
+        Shown as “Partner dealer · <%= listing.area %> — verified by HonestCars”. We keep dealer contact
+        details off the site so your enquiry stays with us and gets followed up properly.
+      </p>
+    </aside>
+  </article>
+</section>
+
+<%# Sticky mobile CTA bar (§13.1) — never covers content, respects safe areas %>
+<div class="vdp-sticky-bar" aria-label="Actions for this car">
+  <button class="btn btn--primary" type="button" data-open-viewing data-listing-id="<%= listing.id %>">
+    Request Viewing
+  </button>
+  <a class="btn btn--secondary" target="_blank" rel="noopener"
+     href="<%= helpers.whatsappLink('Hi HonestCars, I want to talk about ' + listing.title + ' (' + listing.stockNo + ').', 'vdp_sticky:' + listing.stockNo) %>"
+     data-event="whatsapp_click" data-source="vdp_sticky">
+    <%- helpers.icon('whatsapp', { size: 18 }) %> WhatsApp
+  </a>
+</div>
+
+<%- include('../partials/viewing-modal', { listing: listing, helpers: helpers }) %>

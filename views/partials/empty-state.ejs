@@ -1,0 +1,18 @@
+<%#
+  §6.2 empty state: “No exact matches — {n} near matches” + concierge CTA.
+  Every empty state routes to the concierge (Appendix D microcopy).
+%>
+<div class="empty-state">
+  <h3>No exact matches in the network right now</h3>
+  <p>
+    <% if (nearMatches > 0) { %>
+      But <strong><%= nearMatches %></strong> car<%= nearMatches === 1 ? '' : 's' %> come<%= nearMatches === 1 ? 's' : '' %> close.
+    <% } %>
+    Or tell us what you want and we’ll find and verify it within 72 hours.
+  </p>
+  <div class="btn-row mt-2" style="justify-content:center">
+    <a class="btn btn--primary" href="/find-my-car" data-event="concierge_started" data-source="empty_state">Find It For Me</a>
+    <a class="btn btn--secondary" href="<%= site.nav.whatsapp.general %>" target="_blank" rel="noopener"
+       data-event="whatsapp_click" data-source="empty_state">Chat on WhatsApp</a>
+  </div>
+</div>

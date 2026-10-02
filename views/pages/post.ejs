@@ -1,0 +1,177 @@
+<%#
+  Blog post — §6.9.
+  16:9 hero, H1, meta row, auto table of contents for long posts, body components,
+  “Cars mentioned in this article”, author card (E-E-A-T), share row,
+  related posts, prev/next, contextual service CTA, helpful feedback widget.
+  No public comments at launch.
+%>
+<article data-article>
+  <header class="page-hero">
+    <div class="container">
+      <%- include('../partials/breadcrumbs', { crumbs: trail }) %>
+      <span class="badge badge--ghost"><%= post.categoryLabel %></span>
+      <h1 class="mt-1"><%= post.title %></h1>
+      <p class="lead"><%= post.excerpt %></p>
+      <p class="page-hero__meta">
+        <span>By <%= post.author.name %>, <%= post.author.role %></span> ·
+        <time datetime="<%= new Date(post.publishedAt).toISOString() %>">
+          <%= new Date(post.publishedAt).toLocaleDateString('en-NG', { day: 'numeric', month: 'long', year: 'numeric' }) %>
+        </time> ·
+        <span><%= post.readMinutes %> min read</span>
+        <% if (post.updatedAt && new Date(post.updatedAt) > new Date(post.publishedAt)) { %>
+          · <span>updated <%= new Date(post.updatedAt).toLocaleDateString('en-NG', { day: 'numeric', month: 'short' }) %></span>
+        <% } %>
+      </p>
+    </div>
+  </header>
+
+  <div class="container">
+    <div class="blog-hero__media" style="margin-bottom: var(--space-4)">
+      <img src="<%= post.heroImage %>" alt="<%= helpers.esc(post.heroAlt) %>"
+           <% if (helpers.srcsetFor(post.heroImage)) { %>srcset="<%= helpers.srcsetFor(post.heroImage) %>" sizes="(min-width: 1024px) 760px, 92vw"<% } %>
+           width="1200" height="900" fetchpriority="high" decoding="async">
+    </div>
+
+    <div class="article-grid">
+      <div>
+        <% var headings = post.body.filter(function (b) { return b.type === 'heading'; }); %>
+        <div data-post-body>
+          <%- include('../partials/content-blocks', { blocks: post.body, mentioned: mentioned, helpers: helpers }) %>
+        </div>
+
+        <%# “Cars mentioned in this article” — auto-pulled live listings (§6.9). %>
+        <% if (mentioned.length) { %>
+          <section class="section" aria-labelledby="cars-mentioned">
+            <div class="section-head">
+              <h2 id="cars-mentioned">Cars mentioned in this article</h2>
+              <a class="section-head__link" href="/cars">All verified cars →</a>
+            </div>
+            <p class="page-hero__meta">Live listings matching this post’s tags — photographed and priced by the same standard.</p>
+            <div class="grid grid--3">
+              <% mentioned.forEach(function (listing) { %>
+                <%- include('../partials/car-card', { listing: listing, helpers: helpers }) %>
+              <% }); %>
+            </div>
+          </section>
+        <% } %>
+
+        <%# Contextual service CTA footer — inspection / concierge / consultation. %>
+        <% if (ctaService) { %>
+          <section class="section">
+            <div class="cta-band">
+              <div>
+                <h2><%= ctaService.name %></h2>
+                <p class="mb-0"><%= ctaService.promise %> <% if (ctaService.fromPriceKobo) { %>from <strong><%= helpers.formatNaira(ctaService.fromPriceKobo) %></strong>.<% } %></p>
+              </div>
+              <div class="btn-row">
+                <a class="btn btn--primary" href="<%= ctaService.url %>"><%= ctaService.ctaLabel %></a>
+                <a class="btn btn--ghost" href="<%= site.nav.whatsapp.general %>" target="_blank" rel="noopener"
+                   data-event="whatsapp_click" data-source="post_cta">Ask first on WhatsApp</a>
+              </div>
+            </div>
+          </section>
+        <% } %>
+
+        <div class="helpful" data-helpful>
+          <span>Was this helpful?</span>
+          <button class="btn btn--sm btn--secondary" type="button" data-helpful-yes>Yes, it answered my question</button>
+          <button class="btn btn--sm btn--ghost" type="button" data-helpful-no>Not quite</button>
+          <span class="hidden" data-helpful-thanks>Thanks — we read every reply and write the follow-up.</span>
+        </div>
+
+        <% if (faqs.length) { %>
+          <section class="section" aria-labelledby="post-faq">
+            <div class="section-head"><h2 id="post-faq">Follow-up questions</h2></div>
+            <%- include('../partials/accordion', { faqs: faqs, idPrefix: 'post-faq' }) %>
+          </section>
+        <% } %>
+
+        <nav class="post-nav section" aria-label="More posts">
+          <% if (neighbours.previous) { %>
+            <a href="<%= neighbours.previous.url %>">
+              <span class="page-hero__meta">Previous post</span>
+              <strong><%= neighbours.previous.title %></strong>
+            </a>
+          <% } else { %><span></span><% } %>
+          <% if (neighbours.next) { %>
+            <a href="<%= neighbours.next.url %>" style="text-align:right">
+              <span class="page-hero__meta">Next post</span>
+              <strong><%= neighbours.next.title %></strong>
+            </a>
+          <% } %>
+        </nav>
+      </div>
+
+      <aside class="article-aside">
+        <% if (headings.length >= 3) { %>
+          <nav class="article-toc" aria-label="On this page" data-toc>
+            <h2>On this page</h2>
+            <ol>
+              <% headings.forEach(function (heading) { %>
+                <%
+                  var id = 's-' + String(heading.text).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 60);
+                %>
+                <li><a href="#<%= id %>"><%= heading.text %></a></li>
+              <% }); %>
+            </ol>
+          </nav>
+        <% } %>
+
+        <div class="card card__body">
+          <h2 class="mb-1">Get the next one</h2>
+          <p class="mb-2">One message when a deal matches your budget. No spam, unsubscribe by replying STOP.</p>
+          <form class="alert-form" data-lead-form data-lead-type="deal_alert" novalidate>
+            <label class="visually-hidden" for="post-alert-phone">WhatsApp number</label>
+            <input class="input" id="post-alert-phone" name="phone" type="tel" inputmode="numeric" placeholder="080 0000 0000" required>
+            <button class="btn btn--primary btn--block" type="submit" data-submit>Send me deals</button>
+            <p class="field__error hidden full-width" data-form-error role="alert"></p>
+          </form>
+        </div>
+
+        <div class="author-card">
+          <span class="author-card__avatar" aria-hidden="true"><%= post.author.name.slice(0, 1) %></span>
+          <div>
+            <strong><%= post.author.name %></strong>
+            <p class="author-card__role mb-0"><%= post.author.role %></p>
+            <% if (post.author.bio) { %><p class="mb-0 mt-1"><%= post.author.bio %></p><% } %>
+          </div>
+        </div>
+
+        <div class="card card__body">
+          <h2 class="mb-1">Share</h2>
+          <div class="share-row" data-share-row>
+            <span class="visually-hidden">Share this post</span>
+            <a class="btn btn--sm btn--secondary" target="_blank" rel="noopener"
+               href="https://wa.me/?text=<%= encodeURIComponent(post.title + ' — ' + site.url + post.url) %>"
+               data-event="blog_post_shared" data-source="post" data-share-target="whatsapp">
+              <%- helpers.icon('whatsapp', { size: 18 }) %> WhatsApp
+            </a>
+            <a class="btn btn--sm btn--ghost" target="_blank" rel="noopener"
+               href="https://twitter.com/intent/tweet?text=<%= encodeURIComponent(post.title) %>&url=<%= encodeURIComponent(site.url + post.url) %>"
+               data-event="blog_post_shared" data-source="post" data-share-target="x">X</a>
+            <a class="btn btn--sm btn--ghost" target="_blank" rel="noopener"
+               href="https://www.facebook.com/sharer/sharer.php?u=<%= encodeURIComponent(site.url + post.url) %>"
+               data-event="blog_post_shared" data-source="post" data-share-target="facebook">Facebook</a>
+            <button class="btn btn--sm btn--ghost" type="button" data-copy-link>Copy link</button>
+          </div>
+        </div>
+      </aside>
+    </div>
+  </div>
+</article>
+
+<% if (related.length) { %>
+<section class="section section--surface">
+  <div class="container">
+    <div class="section-head">
+      <h2>Keep reading</h2>
+      <a class="section-head__link" href="/blog">All posts →</a>
+    </div>
+    <div class="grid grid--3">
+      <% related.forEach(function (item) { %>
+        <%- include('../partials/post-card', { post: item, helpers: helpers }) %>
+      <% }); %>
+    </div>
+  </div>
+</section>
+<% } %>

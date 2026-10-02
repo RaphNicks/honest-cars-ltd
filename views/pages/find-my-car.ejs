@@ -1,0 +1,351 @@
+<%#
+  “Find My Car” concierge — §6.5.
+  Flagship service: a guided 4-step form replaces the intimidating search.
+  Progress bar, auto-saved between steps, SLA options inside 48–72 hours and a
+  retainer credited against the success fee. The success screen returns the
+  tracking ID and the status-page link (/concierge/{id}).
+%>
+
+<section class="page-hero">
+  <div class="container">
+    <%- include('../partials/breadcrumbs', { crumbs: trail }) %>
+    <p class="eyebrow">Flagship service</p>
+    <h1>Tell us the brief once. We bring three verified options.</h1>
+    <p class="lead">
+      Four short steps. A human reads every brief, checks the cars in person, and comes back with
+      up to three options in 48–72 hours — with the price position and the faults written down.
+    </p>
+    <div class="hero__chips">
+      <span class="trust-chip"><%- helpers.icon('checkCircle', { size: 16 }) %><strong>3 verified options</strong> or the retainer back</span>
+      <span class="trust-chip"><%- helpers.icon('clock', { size: 16 }) %><strong>48–72 hours</strong> confirmed SLA</span>
+      <span class="trust-chip"><%- helpers.icon('shield', { size: 16 }) %><strong>Inspection included</strong> on every option</span>
+    </div>
+  </div>
+</section>
+
+<section class="section">
+  <div class="container">
+    <div class="grid grid--2" style="align-items:start">
+      <div class="flow" data-flow="concierge" data-endpoint="/api/service-requests" data-storage-key="hc-concierge-brief">
+        <div class="flow__progress">
+          <div class="flow__bar" aria-hidden="true">
+            <span data-state="current"></span><span></span><span></span><span></span>
+          </div>
+          <div class="flow__steps">
+            <span data-state="current">1 · The car</span>
+            <span>2 · Protection</span>
+            <span>3 · About you</span>
+            <span>4 · Retainer &amp; SLA</span>
+          </div>
+          <p class="flow__saved" data-flow-saved role="status" aria-live="polite"></p>
+        </div>
+
+        <form data-flow-form novalidate>
+          <%# ------------------------------------------------------- Step 1 %>
+          <div class="flow__panel" data-step="1">
+            <h2>What car are you looking for?</h2>
+            <p class="field__hint">Nothing here is binding. Rough is fine — the brief is what we work from.</p>
+
+            <div class="budget-row">
+              <div class="field">
+                <label class="field__label" for="fm-min">Budget from (₦)</label>
+                <input class="input" id="fm-min" name="budget_min" type="number" inputmode="numeric" step="500000" min="0"
+                       value="8000000" placeholder="8000000">
+                <input class="range-slider" type="range" min="1000000" max="60000000" step="500000" value="8000000"
+                       data-range-sync="fm-min" aria-label="Minimum budget slider">
+              </div>
+              <div class="field">
+                <label class="field__label" for="fm-max">Budget to (₦)</label>
+                <input class="input" id="fm-max" name="budget_max" type="number" inputmode="numeric" step="500000" min="0"
+                       value="15000000" placeholder="15000000">
+                <input class="range-slider" type="range" min="1000000" max="80000000" step="500000" value="15000000"
+                       data-range-sync="fm-max" aria-label="Maximum budget slider">
+              </div>
+            </div>
+            <p class="range-readout" data-budget-readout>₦8,000,000 – ₦15,000,000</p>
+
+            <div class="field">
+              <span class="field__label">Make — pick as many as you like</span>
+              <div class="chip-set chip-set--selectable" data-chip-group="makes" role="group" aria-label="Preferred makes">
+                <% facets.makes.forEach(function (row) { %>
+                  <button class="chip" type="button" data-chip="<%= row.value %>" aria-pressed="false">
+                    <%= row.value %> <span class="count"><%= row.count %></span>
+                  </button>
+                <% }); %>
+                <button class="chip" type="button" data-chip="not_sure" aria-pressed="false">Not sure</button>
+              </div>
+            </div>
+
+            <div class="field">
+              <span class="field__label">Body type</span>
+              <div class="chip-set chip-set--selectable" data-chip-group="body_types" role="group" aria-label="Body type">
+                <% facets.bodyTypes.forEach(function (row) { %>
+                  <button class="chip" type="button" data-chip="<%= row.value %>" aria-pressed="false">
+                    <%= helpers.BODY_TYPE_LABELS[row.value] || row.value %>
+                  </button>
+                <% }); %>
+              </div>
+            </div>
+
+            <div class="form-grid">
+              <div class="field">
+                <label class="field__label" for="fm-transmission">Transmission</label>
+                <select class="select" id="fm-transmission" name="transmission">
+                  <option value="any">Any</option>
+                  <% facets.transmissions.forEach(function (row) { %>
+                    <option value="<%= row.value %>"><%= helpers.TRANSMISSION_LABELS[row.value] || row.value %></option>
+                  <% }); %>
+                </select>
+              </div>
+              <div class="field">
+                <label class="field__label" for="fm-fuel">Fuel</label>
+                <select class="select" id="fm-fuel" name="fuel">
+                  <option value="any">Any</option>
+                  <% facets.fuels.forEach(function (row) { %>
+                    <option value="<%= row.value %>"><%= helpers.FUEL_LABELS[row.value] || row.value %></option>
+                  <% }); %>
+                </select>
+              </div>
+            </div>
+
+            <div class="field">
+              <span class="field__label">Must-haves — the things that actually matter to you</span>
+              <div class="chip-set chip-set--selectable" data-chip-group="must_haves" role="group" aria-label="Must haves">
+                <% spec.MUST_HAVES.forEach(function (item) { %>
+                  <button class="chip" type="button" data-chip="<%= item %>" aria-pressed="false"><%= item %></button>
+                <% }); %>
+              </div>
+            </div>
+
+            <fieldset class="field">
+              <legend class="field__label">What is it for?</legend>
+              <div class="radio-cards">
+                <% spec.INTENDED_USE.forEach(function (option, index) { %>
+                  <label class="radio-card">
+                    <input type="radio" name="intended_use" value="<%= option.key %>" <%= index === 0 ? 'checked' : '' %>>
+                    <span><strong><%= option.label %></strong></span>
+                  </label>
+                <% }); %>
+              </div>
+            </fieldset>
+
+            <div class="flow__nav">
+              <span></span>
+              <button class="btn btn--primary" type="button" data-flow-next>Next: protection</button>
+            </div>
+          </div>
+
+          <%# ------------------------------------------------------- Step 2 %>
+          <div class="flow__panel" data-step="2" hidden>
+            <h2>Protection on every option</h2>
+            <p class="field__hint">Physical inspection is not an add-on here — it is how the options are produced.</p>
+
+            <label class="radio-card radio-card--static">
+              <input type="checkbox" checked disabled>
+              <span>
+                <strong>Physical inspection of every option ✓</strong>
+                <span class="radio-card__price">Included: an inspector stands next to each car, scans the OBD2 and photographs the faults before it reaches you.</span>
+              </span>
+            </label>
+
+            <fieldset class="field">
+              <legend class="field__label">Optional add-ons</legend>
+              <div class="radio-cards">
+                <% spec.ADDONS.filter(function (a) { return !a.included; }).forEach(function (addon) { %>
+                  <label class="radio-card">
+                    <input type="checkbox" name="addons" value="<%= addon.key %>">
+                    <span>
+                      <strong><%= addon.label %><%= addon.priceKobo ? ` — ${helpers.formatNaira(addon.priceKobo)}` : ' — free' %></strong>
+                      <span class="radio-card__price"><%= addon.copy %></span>
+                    </span>
+                  </label>
+                <% }); %>
+              </div>
+            </fieldset>
+
+            <div class="flow__nav">
+              <button class="btn btn--secondary" type="button" data-flow-back>Back</button>
+              <button class="btn btn--primary" type="button" data-flow-next>Next: about you</button>
+            </div>
+          </div>
+
+          <%# ------------------------------------------------------- Step 3 %>
+          <div class="flow__panel" data-step="3" hidden>
+            <h2>About you</h2>
+            <p class="field__hint">We use WhatsApp, not email. Nothing is shared with dealers until you accept a viewing.</p>
+
+            <div class="form-grid">
+              <div class="field">
+                <label class="field__label" for="fm-name">Your name</label>
+                <input class="input" id="fm-name" name="name" type="text" autocomplete="name" required>
+              </div>
+              <div class="field">
+                <label class="field__label" for="fm-phone">WhatsApp number</label>
+                <input class="input" id="fm-phone" name="phone" type="tel" inputmode="numeric" autocomplete="tel"
+                       placeholder="080 0000 0000" required>
+              </div>
+            </div>
+
+            <fieldset class="field">
+              <legend class="field__label">Timeline</legend>
+              <div class="radio-cards">
+                <% spec.TIMELINES.forEach(function (option, index) { %>
+                  <label class="radio-card">
+                    <input type="radio" name="timeline" value="<%= option.key %>" <%= index === 0 ? 'checked' : '' %>>
+                    <span><strong><%= option.label %></strong></span>
+                  </label>
+                <% }); %>
+              </div>
+            </fieldset>
+
+            <fieldset class="field">
+              <legend class="field__label">Do you need financing?</legend>
+              <div class="radio-cards">
+                <label class="radio-card">
+                  <input type="radio" name="financing" value="no" checked>
+                  <span><strong>No — I am paying</strong></span>
+                </label>
+                <label class="radio-card">
+                  <input type="radio" name="financing" value="yes">
+                  <span>
+                    <strong>Yes — I would like options</strong>
+                    <span class="radio-card__price">We route this to a partner lender and say plainly that we earn nothing on it.</span>
+                  </span>
+                </label>
+              </div>
+            </fieldset>
+
+            <div class="flow__nav">
+              <button class="btn btn--secondary" type="button" data-flow-back>Back</button>
+              <button class="btn btn--primary" type="button" data-flow-next>Next: retainer &amp; SLA</button>
+            </div>
+          </div>
+
+          <%# ------------------------------------------------------- Step 4 %>
+          <div class="flow__panel" data-step="4" hidden>
+            <h2>Retainer &amp; confirmed SLA</h2>
+            <p class="field__hint">
+              The retainer is credited against the success fee when you buy through us, and refunded if we
+              find nothing that meets the brief.
+            </p>
+
+            <fieldset class="field">
+              <legend class="field__label">Choose your SLA</legend>
+              <div class="radio-cards">
+                <% slaOptions.forEach(function (option, index) { %>
+                  <label class="radio-card">
+                    <input type="radio" name="sla" value="<%= option.key %>" data-sla-hours="<%= option.hours %>"
+                           data-retainer="<%= option.retainerKobo %>" <%= index === 0 ? 'checked' : '' %>>
+                    <span>
+                      <strong><%= option.label %> — <%= helpers.formatNaira(option.retainerKobo) %> retainer</strong>
+                      <span class="radio-card__price"><%= option.note %></span>
+                    </span>
+                  </label>
+                <% }); %>
+              </div>
+            </fieldset>
+
+            <div class="card card__body">
+              <h3 class="mb-1">Summary</h3>
+              <dl class="summary-list" data-flow-summary></dl>
+            </div>
+
+            <label class="checkbox-row">
+              <input type="checkbox" name="consent" required>
+              <span>HonestCars can contact me on WhatsApp about this brief. No marketing spam.</span>
+            </label>
+
+            <p class="field__hint">
+              Card checkout (Paystack / Flutterwave) is not wired in this build. Confirming creates your
+              brief and tracking ID; ops sends the retainer payment link on WhatsApp.
+            </p>
+
+            <div class="flow__nav">
+              <button class="btn btn--secondary" type="button" data-flow-back>Back</button>
+              <button class="btn btn--primary btn--lg" type="submit" data-submit>Confirm my brief</button>
+            </div>
+            <p class="field__error hidden" data-form-error role="alert"></p>
+          </div>
+        </form>
+
+        <div class="card card__body service-form__success hidden" data-flow-success role="status" aria-live="polite"></div>
+      </div>
+
+      <aside class="stack">
+        <div class="card card__body">
+          <h2 class="mb-1">What happens next</h2>
+          <ol class="steps steps--compact">
+            <li class="step"><span class="step__num">1</span><div><strong>Brief read by a human</strong><p class="mb-0">Within working hours, not by a bot and not next week.</p></div></li>
+            <li class="step"><span class="step__num">2</span><div><strong>We search the network + the lots</strong><p class="mb-0">Partner stock, dealer lots and cars we know are about to be listed.</p></div></li>
+            <li class="step"><span class="step__num">3</span><div><strong>Every option is inspected</strong><p class="mb-0">OBD2 scan, documents sighted, photos of what is actually wrong.</p></div></li>
+            <li class="step"><span class="step__num">4</span><div><strong>Three options on WhatsApp</strong><p class="mb-0">Price position included — below, within or above market, with reasons.</p></div></li>
+          </ol>
+        </div>
+
+        <div class="card card__body">
+          <h2 class="mb-1">The retainer, plainly</h2>
+          <ul class="tick-list">
+            <li class="tick-list__yes"><%- helpers.icon('check', { size: 16 }) %> <span>Credited against the success fee when you buy through us.</span></li>
+            <li class="tick-list__yes"><%- helpers.icon('check', { size: 16 }) %> <span>Refunded if we find nothing that meets the brief you confirmed.</span></li>
+            <li class="tick-list__no"><%- helpers.icon('close', { size: 16 }) %> <span>Never a fee for browsing, comparing or asking questions.</span></li>
+          </ul>
+        </div>
+
+        <div class="card card__body">
+          <h2 class="mb-1">Prefer to talk first?</h2>
+          <p class="mb-2">Send the brief on WhatsApp instead. Same team, same SLA.</p>
+          <a class="btn btn--secondary btn--block" href="<%= site.nav.whatsapp.general %>" target="_blank" rel="noopener"
+             data-event="whatsapp_click" data-source="find_my_car_rail">Chat on WhatsApp</a>
+        </div>
+
+        <div class="card card__body">
+          <h2 class="mb-1">Looking at a specific car?</h2>
+          <p class="mb-2">If you already found one, skip the concierge and book an inspection.</p>
+          <a class="btn btn--ghost btn--block" href="/services/inspection">Book an inspection</a>
+        </div>
+      </aside>
+    </div>
+  </div>
+</section>
+
+<%# Tracking entry — the status page is where tracking IDs land. %>
+<section class="section section--surface" aria-labelledby="track-request">
+  <div class="container container--narrow">
+    <h2 id="track-request">Already have a tracking ID?</h2>
+    <p>It looks like <strong>HC-2481</strong> and it is in the WhatsApp message we sent when your brief was confirmed.</p>
+    <form class="faq-search" method="get" action="/concierge/lookup" data-tracking-lookup>
+      <div class="field">
+        <label class="field__label" for="tracking-id">Tracking ID</label>
+        <input class="input" id="tracking-id" name="id" type="text" placeholder="HC-2481" required>
+      </div>
+      <button class="btn btn--primary" type="submit">Open my status page</button>
+    </form>
+    <p class="field__hint mb-0">Demo record for review: <a href="/concierge/HC-2481">/concierge/HC-2481</a></p>
+  </div>
+</section>
+
+<% if (faqs.length) { %>
+<section class="section" aria-labelledby="concierge-faq">
+  <div class="container container--narrow">
+    <div class="section-head">
+      <h2 id="concierge-faq">Concierge questions</h2>
+    </div>
+    <%- include('../partials/accordion', { faqs: faqs, idPrefix: 'concierge-faq' }) %>
+  </div>
+</section>
+<% } %>
+
+<section class="section section--surface">
+  <div class="container">
+    <div class="cta-band">
+      <div>
+        <h2>Not ready to hand over the search?</h2>
+        <p class="mb-0">Browse the verified stock first. The concierge will still be here — and so will the retainer promise.</p>
+      </div>
+      <div class="btn-row">
+        <a class="btn btn--secondary" href="/cars">Browse <%= counters.carsLive %> cars</a>
+        <a class="btn btn--ghost" href="/services/concierge">About the service</a>
+      </div>
+    </div>
+  </div>
+</section>

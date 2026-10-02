@@ -1,0 +1,121 @@
+<%#
+  /shop — §6.8.
+  Categories: Trackers & Security · OBD2 & Diagnostics · Care Kits.
+  Parts are service-led → they route to /services/parts, never to checkout.
+  Guest checkout, delivery-fee rules by area, tracker install = booking.
+%>
+<section class="page-hero">
+  <div class="container">
+    <%- include('../partials/breadcrumbs', { crumbs: trail }) %>
+    <p class="eyebrow">Shop</p>
+    <h1>Things worth owning before something goes wrong</h1>
+    <p class="lead">
+      Trackers that actually get installed, a scanner that reads your own faults, and kits that make a PH
+      breakdown survivable. Guest checkout — no account to create.
+    </p>
+    <div class="hero__chips">
+      <span class="trust-chip"><%- helpers.icon('cog', { size: 16 }) %><strong>Installation</strong> included on trackers</span>
+      <span class="trust-chip"><%- helpers.icon('package', { size: 16 }) %><strong>Delivery</strong> across Port Harcourt</span>
+      <span class="trust-chip"><%- helpers.icon('shield', { size: 16 }) %><strong>Guest checkout</strong> — no account</span>
+    </div>
+  </div>
+</section>
+
+<section class="section">
+  <div class="container">
+    <nav class="chip-bar" aria-label="Shop categories">
+      <a class="chip" href="/shop" <%= !category ? 'aria-current="page"' : '' %>>Everything (<%= products.length %>)</a>
+      <% categories.forEach(function (entry) { %>
+        <a class="chip" href="/shop?category=<%= entry.key %>"
+           <%= category === entry.key ? 'aria-current="page"' : '' %>><%= entry.label %> (<%= entry.count %>)</a>
+      <% }); %>
+      <a class="chip" href="/services/parts">Spare parts — service-led →</a>
+    </nav>
+
+    <div class="grid grid--2 mt-2" style="align-items:center">
+      <p class="mb-0 page-hero__meta">
+        Showing <strong><%= products.length %></strong> product<%= products.length === 1 ? '' : 's' %>
+        <%= category ? `in ${categories.find(function (c) { return c.key === category; }).label}` : 'across all three categories' %>.
+      </p>
+      <p class="mb-0 page-hero__meta" style="text-align:right">
+        <a href="/cart">Your cart (<span data-cart-count>0</span>)</a>
+      </p>
+    </div>
+
+    <% if (products.length) { %>
+      <div class="product-grid mt-2">
+        <% products.forEach(function (product) { %>
+          <%- include('../partials/product-card', { product: product, helpers: helpers }) %>
+        <% }); %>
+      </div>
+    <% } else { %>
+      <div class="empty-state mt-3">
+        <h3>Nothing in this category right now</h3>
+        <p>Stock moves — check the other categories, or ask us to source it.</p>
+        <div class="btn-row mt-2" style="justify-content:center">
+          <a class="btn btn--primary" href="/shop">See all products</a>
+          <a class="btn btn--secondary" href="/services/parts">Source a part instead</a>
+        </div>
+      </div>
+    <% } %>
+  </div>
+</section>
+
+<section class="section section--surface">
+  <div class="container">
+    <div class="grid grid--2" style="align-items:start">
+      <div>
+        <h2>How buying works</h2>
+        <ol class="steps steps--compact">
+          <li class="step"><span class="step__num">1</span><div><strong>Add to cart, guest checkout</strong><p class="mb-0">Name, WhatsApp number and delivery area. No account, no password.</p></div></li>
+          <li class="step"><span class="step__num">2</span><div><strong>We confirm and take payment</strong><p class="mb-0">Card checkout (Paystack / Flutterwave) is not wired in this build — ops sends the payment link on WhatsApp and the order sits as pending until it clears.</p></div></li>
+          <li class="step"><span class="step__num">3</span><div><strong>Delivery or install</strong><p class="mb-0">Pickup at a PH meet-point, delivery to your area, or a booked install slot for trackers.</p></div></li>
+        </ol>
+      </div>
+
+      <div class="card card__body">
+        <h2 class="mb-1">Delivery fees by area</h2>
+        <p class="page-hero__meta">From the admin delivery table — the same numbers the checkout uses.</p>
+        <ul class="delivery-list">
+          <% delivery.forEach(function (area) { %>
+            <li>
+              <span>
+                <%= area.name %>
+                <% if (area.note) { %><br><span class="page-hero__meta"><%= area.note %></span><% } %>
+              </span>
+              <strong><%= area.feeKobo ? helpers.formatNaira(area.feeKobo) : 'Free' %></strong>
+            </li>
+          <% }); %>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="section">
+  <div class="container">
+    <div class="grid grid--3">
+      <div class="card card__body">
+        <h3>Trackers create a subscription</h3>
+        <p class="mb-0">Every tracker SKU opens a subscription record: device state, install date and the renewal date a year out. We remind you before it lapses.</p>
+      </div>
+      <div class="card card__body">
+        <h3>Parts are not self-checkout</h3>
+        <p class="mb-0">A part has to match your chassis. Send the VIN on the <a href="/services/parts">parts page</a> and we quote it properly, with escrow-protected milestones.</p>
+      </div>
+      <div class="card card__body">
+        <h3>Warranty and returns</h3>
+        <p class="mb-0">Device warranties run from the manufacturer; the care kits are covered for 30 days. Faulty on arrival? We replace it — see <a href="/refunds">refunds</a>.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<% if (faqs.length) { %>
+<section class="section section--surface">
+  <div class="container container--narrow">
+    <div class="section-head"><h2>Shop questions</h2></div>
+    <%- include('../partials/accordion', { faqs: faqs, idPrefix: 'shop-faq' }) %>
+  </div>
+</section>
+<% } %>

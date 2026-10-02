@@ -1,0 +1,443 @@
+<%#
+  /admin/payments — §7.3 “Orders & Payments”.
+  Three things on one screen, because they are one question (“where is the
+  money?”): PSP/manual transactions with their statuses and receipts, the
+  refund path, and the per-dealer payout/commission ledger with statements.
+  Locals: rows, totals, filters, availability, providerLabels, activeProvider,
+          ledger, statement, dealerId, dealers, unpaidOrders, unpaidBookings,
+          canApprove
+%>
+<div class="admin-grid admin-grid--5">
+  <div class="kpi kpi--sm">
+    <span class="kpi__label">Net collected</span>
+    <strong class="kpi__value tabular"><%= helpers.formatNairaCompact(totals.netKobo) %></strong>
+    <span class="kpi__foot"><%= totals.paidCount %> paid payment<%= totals.paidCount === 1 ? '' : 's' %></span>
+  </div>
+  <div class="kpi kpi--sm">
+    <span class="kpi__label">Awaiting money</span>
+    <strong class="kpi__value tabular"><%= totals.pendingCount %></strong>
+    <span class="kpi__foot">pending, not written off</span>
+  </div>
+  <div class="kpi kpi--sm">
+    <span class="kpi__label">Refunded</span>
+    <strong class="kpi__value tabular"><%= helpers.formatNairaCompact(totals.refundedKobo) %></strong>
+    <span class="kpi__foot">returned to customers</span>
+  </div>
+  <div class="kpi kpi--sm">
+    <span class="kpi__label">Failed / abandoned</span>
+    <strong class="kpi__value tabular"><%= totals.failedCount %></strong>
+    <span class="kpi__foot">retry or ask again</span>
+  </div>
+  <div class="kpi kpi--sm">
+    <span class="kpi__label">Escrow held</span>
+    <strong class="kpi__value tabular"><%= helpers.formatNairaCompact(escrowKobo) %></strong>
+    <span class="kpi__foot">not yet released</span>
+  </div>
+</div>
+
+<% if (!availability.paystack || !availability.flutterwave) { %>
+  <p class="flash flash--note" role="note">
+    <%- helpers.icon('info', { size: 18 }) %>
+    <span>
+      Card checkout is not live: no Paystack or Flutterwave keys are configured, so the site takes bank transfers
+      and cash and records them here. Hosted checkout refuses honestly rather than pretending to redirect.
+      Active provider: <strong><%= providerLabels[activeProvider] || activeProvider %></strong>.
+    </span>
+  </p>
+<% } %>
+
+<section class="panel">
+  <div class="panel__head">
+    <div>
+      <h2 class="panel__title">Transactions</h2>
+      <p class="note-inline mb-0">Card data never touches this site — the PSP hosts the fields, we keep the reference.</p>
+    </div>
+    <form class="admin-filters" method="get" action="/admin/payments">
+      <label class="visually-hidden" for="pay-status">Status</label>
+      <select class="select select--compact" id="pay-status" name="status" data-auto-submit>
+        <option value="all" <%= status === 'all' ? 'selected' : '' %>>Any status</option>
+        <% statuses.forEach(function (value) { %>
+          <option value="<%= value %>" <%= status === value ? 'selected' : '' %>><%= value.replace(/_/g, ' ') %></option>
+        <% }); %>
+      </select>
+      <label class="visually-hidden" for="pay-purpose">Purpose</label>
+      <select class="select select--compact" id="pay-purpose" name="purpose" data-auto-submit>
+        <option value="all" <%= purpose === 'all' ? 'selected' : '' %>>Any purpose</option>
+        <% purposes.forEach(function (value) { %>
+          <option value="<%= value %>" <%= purpose === value ? 'selected' : '' %>><%= value %></option>
+        <% }); %>
+      </select>
+      <label class="visually-hidden" for="pay-provider">Provider</label>
+      <select class="select select--compact" id="pay-provider" name="provider" data-auto-submit>
+        <option value="all" <%= provider === 'all' ? 'selected' : '' %>>Any provider</option>
+        <% providers.forEach(function (value) { %>
+          <option value="<%= value %>" <%= provider === value ? 'selected' : '' %>><%= providerLabels[value] || value %></option>
+        <% }); %>
+      </select>
+      <label class="visually-hidden" for="pay-q">Search</label>
+      <input class="input input--compact" id="pay-q" name="q" type="search" value="<%= q || '' %>" placeholder="HC-PAY…, HC-ORD…, name">
+      <button class="btn btn--secondary btn--sm" type="submit">Filter</button>
+      <% if (status !== 'all' || purpose !== 'all' || provider !== 'all' || q) { %>
+        <a class="btn btn--ghost btn--sm" href="/admin/payments">Clear</a>
+      <% } %>
+    </form>
+  </div>
+
+  <% if (!rows.length) { %>
+    <p class="empty-line">No payments match. Requests made in the bookings module land here as pending rows.</p>
+  <% } else { %>
+    <div class="table-scroll">
+      <table class="table">
+        <thead>
+          <tr>
+            <th scope="col">Reference</th>
+            <th scope="col">Customer</th>
+            <th scope="col">For</th>
+            <th scope="col">Amount</th>
+            <th scope="col">Status</th>
+            <th scope="col">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% rows.forEach(function (row) { %>
+            <tr>
+              <th scope="row">
+                <span class="tabular"><%= row.reference %></span>
+                <br><span class="muted"><%= providerLabels[row.provider] || row.provider %> · <%= helpers.relativeDays(row.createdAt) %></span>
+                <% if (row.refundReason) { %><br><span class="muted">“<%= row.refundReason %>”</span><% } %>
+              </th>
+              <td>
+                <%= row.customerName %><br>
+                <span class="muted tabular"><%= row.maskedPhone || 'no phone on file' %></span>
+              </td>
+              <td>
+                <span class="chip"><%= row.purpose %></span>
+                <% if (row.orderNo) { %><br><a class="tabular" href="/order/<%= row.orderNo %>" target="_blank" rel="noopener"><%= row.orderNo %></a><% } %>
+                <% if (row.bookingReference) { %><br><a class="tabular" href="/admin/bookings"><%= row.bookingReference %></a><% } %>
+                <% if (row.requestTrackingId) { %><br><span class="tabular"><%= row.requestTrackingId %></span><% } %>
+              </td>
+              <td class="tabular">
+                <%= helpers.formatNaira(row.amountKobo) %>
+                <% if (row.refundKobo) { %>
+                  <br><span class="warn tabular">−<%= helpers.formatNaira(row.refundKobo) %> refunded</span>
+                  <br><span class="muted tabular"><%= helpers.formatNaira(row.refundableKobo) %> left</span>
+                <% } %>
+              </td>
+              <td><span class="badge badge--<%= row.status %>"><%= row.status.replace(/_/g, ' ') %></span></td>
+              <td>
+                <% if (row.status === 'pending' && canApprove) { %>
+                  <form method="post" action="/admin/payments/<%= row.id %>/confirm" class="inline-form">
+                    <label class="visually-hidden" for="pay-note-<%= row.id %>">Note for <%= row.reference %></label>
+                    <input class="input input--compact" id="pay-note-<%= row.id %>" name="note" type="text" placeholder="Transfer seen 2 Oct" maxlength="160">
+                    <button class="btn btn--primary btn--sm" type="submit">Confirm received</button>
+                  </form>
+                <% } %>
+                <% if (row.refundableKobo > 0 && canApprove && row.status !== 'pending') { %>
+                  <form method="post" action="/admin/payments/<%= row.id %>/refund" class="inline-form">
+                    <label class="visually-hidden" for="refund-amount-<%= row.id %>">Refund amount for <%= row.reference %></label>
+                    <input class="input input--compact" id="refund-amount-<%= row.id %>" name="amount" type="text" placeholder="₦<%= (row.refundableKobo / 100).toLocaleString('en-NG') %>" required>
+                    <label class="visually-hidden" for="refund-reason-<%= row.id %>">Reason</label>
+                    <input class="input input--compact" id="refund-reason-<%= row.id %>" name="reason" type="text" placeholder="Why" maxlength="200" required>
+                    <button class="btn btn--secondary btn--sm" type="submit">Refund</button>
+                  </form>
+                <% } %>
+                <% if (row.status !== 'pending' && (!canApprove || row.refundableKobo === 0)) { %>
+                  <span class="muted">settled</span>
+                <% } %>
+              </td>
+            </tr>
+          <% }); %>
+        </tbody>
+      </table>
+    </div>
+  <% } %>
+</section>
+
+<% if (canApprove) { %>
+  <section class="panel">
+    <div class="panel__head">
+      <div>
+        <h2 class="panel__title">Record money that arrived outside a card</h2>
+        <p class="note-inline mb-0">A transfer on the bank statement, or cash at the lot. This writes the payment, the event trail and the audit row in one step.</p>
+      </div>
+    </div>
+    <form method="post" action="/admin/payments/manual" class="form-grid form-grid--3">
+      <label class="field">
+        <span class="field__label">Amount (₦)</span>
+        <input class="input" name="amount" type="text" inputmode="numeric" placeholder="₦45,000" required>
+      </label>
+      <label class="field">
+        <span class="field__label">For</span>
+        <select class="select" name="purpose" required>
+          <% purposes.forEach(function (value) { %><option value="<%= value %>"><%= value %></option><% }); %>
+        </select>
+      </label>
+      <label class="field">
+        <span class="field__label">How it arrived</span>
+        <select class="select" name="provider">
+          <option value="bank_transfer">Bank transfer</option>
+          <option value="cash">Cash at the lot</option>
+          <option value="manual">Other (explain in the note)</option>
+        </select>
+      </label>
+      <label class="field">
+        <span class="field__label">Order (optional)</span>
+        <input class="input" name="order_no" type="text" placeholder="HC-ORD-0001" list="unpaid-orders">
+        <datalist id="unpaid-orders">
+          <% unpaidOrders.forEach(function (order) { %><option value="<%= order.orderNo %>"><%= order.name %> — <%= helpers.formatNaira(order.totalKobo) %></option><% }); %>
+        </datalist>
+      </label>
+      <label class="field">
+        <span class="field__label">Booking (optional)</span>
+        <input class="input" name="booking_reference" type="text" placeholder="HC-BK-0001" list="unpaid-bookings">
+        <datalist id="unpaid-bookings">
+          <% unpaidBookings.forEach(function (booking) { %><option value="<%= booking.reference %>"><%= booking.name %></option><% }); %>
+        </datalist>
+      </label>
+      <label class="field">
+        <span class="field__label">Customer (optional)</span>
+        <input class="input" name="customer_name" type="text" placeholder="Name on the transfer">
+      </label>
+      <label class="field">
+        <span class="field__label">Phone (optional)</span>
+        <input class="input" name="customer_phone" type="tel" placeholder="+234…">
+      </label>
+      <label class="field field--full">
+        <span class="field__label">Note for the audit log</span>
+        <input class="input" name="note" type="text" maxlength="160" placeholder="GTBank alert 14:02, matched to the order">
+      </label>
+      <div class="field field--full">
+        <button class="btn btn--primary" type="submit">Record the payment</button>
+      </div>
+    </form>
+  </section>
+
+  <section class="panel">
+    <div class="panel__head">
+      <div>
+        <h2 class="panel__title">Ask a customer to pay</h2>
+        <p class="note-inline mb-0">Creates a pending payment and the message to send. Without PSP keys the customer gets bank-transfer instructions, never a fake card page.</p>
+      </div>
+    </div>
+    <form method="post" action="/admin/payments/request" class="form-grid form-grid--3">
+      <label class="field">
+        <span class="field__label">Amount (₦)</span>
+        <input class="input" name="amount" type="text" inputmode="numeric" placeholder="₦45,000" required>
+      </label>
+      <label class="field">
+        <span class="field__label">For</span>
+        <select class="select" name="purpose">
+          <% purposes.forEach(function (value) { %><option value="<%= value %>" <%= value === 'booking' ? 'selected' : '' %>><%= value %></option><% }); %>
+        </select>
+      </label>
+      <label class="field">
+        <span class="field__label">Provider</span>
+        <select class="select" name="provider">
+          <% providers.forEach(function (value) { %>
+            <option value="<%= value %>" <%= availability[value] ? '' : 'disabled' %>>
+              <%= providerLabels[value] || value %><%= availability[value] ? '' : ' — not configured' %>
+            </option>
+          <% }); %>
+        </select>
+      </label>
+      <label class="field">
+        <span class="field__label">Booking</span>
+        <input class="input" name="booking_reference" type="text" placeholder="HC-BK-0001" list="ask-bookings">
+        <datalist id="ask-bookings">
+          <% unpaidBookings.forEach(function (booking) { %><option value="<%= booking.reference %>"><%= booking.name %> — <%= helpers.formatNaira(booking.amountKobo) %></option><% }); %>
+        </datalist>
+      </label>
+      <label class="field">
+        <span class="field__label">Order</span>
+        <input class="input" name="order_no" type="text" placeholder="HC-ORD-0001" list="ask-orders">
+        <datalist id="ask-orders">
+          <% unpaidOrders.forEach(function (order) { %><option value="<%= order.orderNo %>"><%= order.name %> — <%= helpers.formatNaira(order.totalKobo) %></option><% }); %>
+        </datalist>
+      </label>
+      <label class="field">
+        <span class="field__label">Customer name</span>
+        <input class="input" name="customer_name" type="text" placeholder="Chidi Okafor">
+      </label>
+      <label class="field">
+        <span class="field__label">Phone</span>
+        <input class="input" name="customer_phone" type="tel" placeholder="+234…">
+      </label>
+      <div class="field field--full">
+        <button class="btn btn--primary" type="submit">Create the request</button>
+      </div>
+    </form>
+  </section>
+<% } %>
+
+<section class="panel">
+  <div class="panel__head">
+    <div>
+      <h2 class="panel__title">Dealer ledger</h2>
+      <p class="note-inline mb-0">
+        Positive is commission the dealer owes Honest Cars; negative is money we have paid out.
+        A correction is a new entry, never an edit — the same rule as the audit log.
+      </p>
+    </div>
+  </div>
+
+  <% if (!ledger.length) { %>
+    <p class="empty-line">No dealers on file yet.</p>
+  <% } else { %>
+    <div class="table-scroll">
+      <table class="table">
+        <thead>
+          <tr>
+            <th scope="col">Dealer</th>
+            <th scope="col">Live stock</th>
+            <th scope="col">Commission</th>
+            <th scope="col">Paid out</th>
+            <th scope="col">Corrections</th>
+            <th scope="col">Balance</th>
+            <th scope="col">Last entry</th>
+            <th scope="col">Statement</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% ledger.forEach(function (row) { %>
+            <tr <%= String(dealerId) === String(row.dealerId) ? 'class="is-selected"' : '' %>>
+              <th scope="row">
+                <%= row.name %>
+                <br><span class="muted"><%= row.city %></span>
+              </th>
+              <td class="tabular"><%= row.liveStock %></td>
+              <td class="tabular"><%= helpers.formatNaira(row.commissionKobo) %></td>
+              <td class="tabular"><%= helpers.formatNaira(row.paidOutKobo) %></td>
+              <td class="tabular"><%= row.corrections %></td>
+              <td class="tabular">
+                <strong><%= helpers.formatNaira(row.balanceKobo) %></strong>
+                <br><span class="muted"><%= row.balanceKobo > 0 ? 'owed to us' : row.balanceKobo < 0 ? 'we owe them' : 'square' %></span>
+              </td>
+              <td class="muted"><%= row.lastEntryAt ? helpers.relativeDays(row.lastEntryAt) : '—' %></td>
+              <td><a class="btn btn--ghost btn--sm" href="/admin/payments?dealer=<%= row.dealerId %>#statement">Open</a></td>
+            </tr>
+          <% }); %>
+        </tbody>
+      </table>
+    </div>
+  <% } %>
+</section>
+
+<% if (statement) { %>
+  <section class="panel" id="statement">
+    <div class="panel__head">
+      <div>
+        <h2 class="panel__title">Statement — <%= statement.dealer.name %></h2>
+        <p class="note-inline mb-0">
+          <% if (statement.from || statement.to) { %>
+            <%= statement.from || 'the beginning' %> → <%= statement.to || 'today' %> ·
+          <% } else { %>
+            All entries ·
+          <% } %>
+          opening <strong><%= helpers.formatNaira(statement.openingKobo) %></strong> ·
+          movement <strong><%= helpers.formatNaira(statement.movementKobo) %></strong> ·
+          closing <strong><%= helpers.formatNaira(statement.closingKobo) %></strong>
+        </p>
+      </div>
+      <form class="admin-filters" method="get" action="/admin/payments">
+        <input type="hidden" name="dealer" value="<%= statement.dealer.id %>">
+        <label class="visually-hidden" for="stmt-from">From</label>
+        <input class="input input--compact" id="stmt-from" name="from" type="date" value="<%= from || '' %>">
+        <label class="visually-hidden" for="stmt-to">To</label>
+        <input class="input input--compact" id="stmt-to" name="to" type="date" value="<%= to || '' %>">
+        <button class="btn btn--secondary btn--sm" type="submit">Window</button>
+        <a class="btn btn--ghost btn--sm" href="/admin/payments?dealer=<%= statement.dealer.id %>">All</a>
+      </form>
+    </div>
+
+    <% if (!statement.entries.length) { %>
+      <p class="empty-line">Nothing in this window.</p>
+    <% } else { %>
+      <div class="table-scroll">
+        <table class="table">
+          <thead>
+            <tr>
+              <th scope="col">When</th>
+              <th scope="col">Entry</th>
+              <th scope="col">Car / reference</th>
+              <th scope="col">Detail</th>
+              <th scope="col">By</th>
+              <th scope="col">Amount</th>
+            </tr>
+          </thead>
+          <tbody>
+            <% statement.entries.forEach(function (entry) { %>
+              <tr>
+                <td class="muted"><%= helpers.relativeDays(entry.createdAt) %></td>
+                <td><span class="badge badge--<%= entry.entryType %>"><%= entry.entryLabel %></span></td>
+                <td>
+                  <% if (entry.listingStockNo) { %><span class="tabular"><%= entry.listingStockNo %></span><br><% } %>
+                  <% if (entry.paymentReference) { %><span class="muted tabular"><%= entry.paymentReference %></span><br><% } %>
+                  <% if (entry.reference) { %><span class="muted"><%= entry.reference %></span><% } %>
+                </td>
+                <td><%= entry.detail || '—' %></td>
+                <td class="muted"><%= entry.actorName || 'system' %></td>
+                <td class="tabular <%= entry.amountKobo < 0 ? 'warn' : '' %>">
+                  <%= entry.amountKobo < 0 ? '−' : '' %><%= helpers.formatNaira(Math.abs(entry.amountKobo)) %>
+                </td>
+              </tr>
+            <% }); %>
+          </tbody>
+          <tfoot>
+            <tr>
+              <th scope="row" colspan="5">Closing balance</th>
+              <td class="tabular"><strong><%= helpers.formatNaira(statement.closingKobo) %></strong></td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+    <% } %>
+
+    <% if (canApprove) { %>
+      <form method="post" action="/admin/ledger" class="form-grid form-grid--3">
+        <input type="hidden" name="dealer_id" value="<%= statement.dealer.id %>">
+        <label class="field">
+          <span class="field__label">Entry type</span>
+          <select class="select" name="entry_type">
+            <option value="sale_commission">Commission on a sale</option>
+            <option value="payout">Payout to the dealer</option>
+            <option value="adjustment">Adjustment</option>
+            <option value="clawback">Clawback</option>
+          </select>
+        </label>
+        <label class="field">
+          <span class="field__label">Direction</span>
+          <select class="select" name="direction">
+            <option value="in">Dealer owes us (in)</option>
+            <option value="out">We paid the dealer (out)</option>
+          </select>
+        </label>
+        <label class="field">
+          <span class="field__label">Amount (₦)</span>
+          <input class="input" name="amount" type="text" inputmode="numeric" placeholder="₦250,000" required>
+        </label>
+        <label class="field">
+          <span class="field__label">Car (optional)</span>
+          <select class="select" name="listing_id">
+            <option value="0">—</option>
+            <% listings.forEach(function (listing) { %>
+              <option value="<%= listing.id %>"><%= listing.stock_no %> — <%= listing.year %> <%= listing.make %> <%= listing.model %></option>
+            <% }); %>
+          </select>
+        </label>
+        <label class="field">
+          <span class="field__label">Statement / payout ref</span>
+          <input class="input" name="reference" type="text" maxlength="40" placeholder="STMT-2026-10">
+        </label>
+        <label class="field field--full">
+          <span class="field__label">Detail</span>
+          <input class="input" name="detail" type="text" maxlength="200" placeholder="What this entry is for, in the dealer’s words">
+        </label>
+        <div class="field field--full">
+          <button class="btn btn--primary" type="submit">Add the entry</button>
+        </div>
+      </form>
+    <% } %>
+  </section>
+<% } else { %>
+  <p class="note-inline">Open a dealer’s statement to add a commission or payout entry.</p>
+<% } %>

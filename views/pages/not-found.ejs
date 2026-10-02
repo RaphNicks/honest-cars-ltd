@@ -1,0 +1,59 @@
+<%#
+  404. Two flavours:
+    · a route from the PRD that this slice has not ported yet → say so + show
+      the slice map, so “not built yet” never looks like “broken”.
+    · a genuinely wrong URL → three useful routes out (§Appendix D: every dead
+      end routes somewhere useful).
+  Status is 404 either way and robots is noindex.
+%>
+<section class="container section">
+  <% if (pending) { %>
+    <div class="facet-hero">
+      <span class="badge badge--ghost">Port backlog</span>
+      <h1 class="facet-hero__h1 mt-1"><%= pending.label %> isn’t built yet</h1>
+      <p class="facet-hero__intro">
+        You found a real route from the PRD — it just belongs to the next batch of work.
+        This build is the agreed vertical slice: the design system, the
+        <a href="/">homepage</a>, the <a href="/cars">listings catalogue</a> and the
+        vehicle detail pages behind it. Everything else on the sitemap is ported next,
+        on these same templates — so nothing below is a new design, only new copy.
+      </p>
+      <div class="btn-row mt-2">
+        <a class="btn btn--primary" href="/cars">Browse verified cars</a>
+        <a class="btn btn--secondary" href="/">Back to homepage</a>
+      </div>
+    </div>
+
+    <div class="grid grid--2 mt-3">
+      <div class="surface-panel">
+        <h2>Built and testable now</h2>
+        <ul>
+          <% built.forEach(function (item) { %>
+            <li><strong><%= item.path %></strong> — <%= item.label %></li>
+          <% }); %>
+        </ul>
+      </div>
+      <div class="surface-panel">
+        <h2>Next in the port</h2>
+        <ul>
+          <% backlog.filter(function (item) { return item.phase === 'next'; }).slice(0, 10).forEach(function (item) { %>
+            <li><strong><%= item.path %></strong> — <%= item.label %></li>
+          <% }); %>
+          <li class="note-inline">…and the legal pages, then the authenticated portals (phase 2).</li>
+        </ul>
+      </div>
+    </div>
+  <% } else { %>
+    <div class="empty-state">
+      <h1>We can’t find that page</h1>
+      <p>
+        The link may be old, or a car that sold more than 90 days ago — those redirect to live stock
+        by make. Either way, here is where to go next.
+      </p>
+      <div class="btn-row mt-2" style="justify-content:center">
+        <a class="btn btn--primary" href="/cars">Browse cars in Port Harcourt</a>
+        <a class="btn btn--secondary" href="/">Homepage</a>
+      </div>
+    </div>
+  <% } %>
+</section>

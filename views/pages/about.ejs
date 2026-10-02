@@ -1,0 +1,114 @@
+<%#
+  /about — §6.10: “story, mission, team, CAC details”, built on the CMS page
+  body so the copy is editable without a deploy.
+%>
+<section class="page-hero">
+  <div class="container">
+    <%- include('../partials/breadcrumbs', { crumbs: trail }) %>
+    <p class="eyebrow">About</p>
+    <h1><%= cmsPage ? cmsPage.h1 : 'We are not a car lot. That is the point.' %></h1>
+    <p class="lead">
+      <%= cmsPage && cmsPage.heroCopy ? cmsPage.heroCopy : 'HonestCars is the honest middle in a market that punishes buyers for not knowing what a car is worth — or what is wrong with it.' %>
+    </p>
+  </div>
+</section>
+
+<section class="section">
+  <div class="container">
+    <div class="stat-band">
+      <div class="stat"><span class="stat__value"><%= counters.carsLive %></span><span class="stat__label">cars in the network</span></div>
+      <div class="stat"><span class="stat__value"><%= counters.partnerDealers %></span><span class="stat__label">verified partner lots</span></div>
+      <div class="stat"><span class="stat__value"><%= counters.certified %></span><span class="stat__label">certified cars available</span></div>
+      <div class="stat"><span class="stat__value"><%= counters.carsSold90d %></span><span class="stat__label">deals closed in 90 days</span></div>
+    </div>
+  </div>
+</section>
+
+<section class="section section--surface">
+  <div class="container container--narrow">
+    <%- include('../partials/content-blocks', { blocks: cmsPage ? cmsPage.body : [], helpers: helpers }) %>
+  </div>
+</section>
+
+<section class="section">
+  <div class="container">
+    <div class="section-head">
+      <h2>Who you are dealing with</h2>
+      <p class="section-head__note mb-0">Small team, one city, no anonymous call centre.</p>
+    </div>
+    <div class="grid grid--3">
+      <% team.forEach(function (member) { %>
+        <div class="card card__body">
+          <h3 class="mb-1"><%= member.name %></h3>
+          <p class="text-green mb-1"><strong><%= member.role %></strong></p>
+          <p class="mb-0"><%= member.bio %></p>
+        </div>
+      <% }); %>
+    </div>
+  </div>
+</section>
+
+<section class="section section--surface">
+  <div class="container">
+    <div class="grid grid--2" style="align-items:center">
+      <div>
+        <h2>Registered, and easy to check</h2>
+        <p class="mb-2"><%= site.business.cacLine %></p>
+        <p class="mb-0">
+          We are a Port Harcourt company with a registered address and a real phone number. If anything on
+          this site ever feels like it does not add up, call it out — that is the whole idea.
+        </p>
+      </div>
+      <div class="card card__body">
+        <h3 class="mb-1">Company details</h3>
+        <dl class="summary-list">
+          <div class="summary-list__row"><dt>Legal name</dt><dd><%= site.business.legalName %></dd></div>
+          <div class="summary-list__row"><dt>Registered in</dt><dd>Port Harcourt, Rivers State, Nigeria</dd></div>
+          <div class="summary-list__row"><dt>Phone</dt><dd><a href="tel:<%= site.business.phone %>"><%= site.business.phone %></a></dd></div>
+          <div class="summary-list__row"><dt>Email</dt><dd><a href="mailto:<%= site.business.email %>"><%= site.business.email %></a></dd></div>
+        </dl>
+      </div>
+    </div>
+  </div>
+</section>
+
+<% if (testimonials.length) { %>
+<section class="section">
+  <div class="container">
+    <div class="section-head"><h2>What buyers and sellers say</h2></div>
+    <div class="grid grid--3">
+      <% testimonials.forEach(function (testimonial) { %>
+        <figure class="testimonial">
+          <span class="testimonial__stars" aria-label="<%= testimonial.rating %> out of 5">★★★★★</span>
+          <blockquote class="testimonial__quote">“<%= testimonial.quote %>”</blockquote>
+          <figcaption class="testimonial__meta"><%= testimonial.name %> · <%= testimonial.area %></figcaption>
+        </figure>
+      <% }); %>
+    </div>
+  </div>
+</section>
+<% } %>
+
+<% if (faqs.length) { %>
+<section class="section section--surface">
+  <div class="container container--narrow">
+    <div class="section-head"><h2>About HonestCars — questions</h2></div>
+    <%- include('../partials/accordion', { faqs: faqs, idPrefix: 'about-faq' }) %>
+  </div>
+</section>
+<% } %>
+
+<section class="section">
+  <div class="container">
+    <div class="cta-band">
+      <div>
+        <h2>Work with us, or ask us something hard</h2>
+        <p class="mb-0">Dealers, buyers, sellers and the merely curious all get the same answer: the truth about the car.</p>
+      </div>
+      <div class="btn-row">
+        <a class="btn btn--primary" href="/partner">Partner with us</a>
+        <a class="btn btn--secondary" href="/contact">Get in touch</a>
+      </div>
+    </div>
+  </div>
+</section>
