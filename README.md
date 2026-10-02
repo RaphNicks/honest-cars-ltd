@@ -262,6 +262,7 @@ lists them as the remaining backlog and `scripts/check-links.js` keeps them hone
 |---|---|
 | `npm start` | Run the server |
 | `npm run dev` | Same, with `node --watch` |
+| `npm run smoke` | Role smoke matrix: signs in as the four seeded staff accounts and every role checks every console module against §7.4 (exits non-zero on a violation) |
 | `npm run db:setup` | Create database, apply `db/schema.sql`, load `db/seed.sql` |
 | `npm run db:seed` | Regenerate the seed from `scripts/generate-seed.js`, then load it |
 | `npm run build:static` | Render stable pages + `sitemap.xml` + `robots.txt` into `dist/` |

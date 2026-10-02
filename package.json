@@ -2,7 +2,7 @@
   "name": "honest-cars-ltd",
   "version": "1.0.0",
   "private": true,
-  "description": "honestcarsltd.com — vanilla HTML/CSS/JS storefront on Node.js + Express + EJS + MySQL",
+  "description": "honestcarsltd.com \u2014 vanilla HTML/CSS/JS storefront on Node.js + Express + EJS + MySQL",
   "main": "src/server.js",
   "type": "commonjs",
   "scripts": {
@@ -21,7 +21,8 @@
     "lint": "npm run lint:type && npm run lint:js",
     "test": "node --test test/*.test.js",
     "artifacts": "node scripts/build-static.js && node scripts/lint-type-scale.js",
-    "check": "npm run lint && npm test"
+    "check": "npm run lint && npm test",
+    "smoke": "node scripts/smoke-roles.mjs"
   },
   "engines": {
     "node": ">=20"
