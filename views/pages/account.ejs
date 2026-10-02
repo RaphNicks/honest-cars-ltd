@@ -20,6 +20,9 @@
         </p>
       </div>
       <div class="btn-row btn-row--tight">
+        <% if (typeof consoleHome !== 'undefined' && consoleHome) { %>
+          <a class="btn btn--primary btn--sm" href="<%= consoleHome %>">Open the console</a>
+        <% } %>
         <a class="btn btn--secondary btn--sm" href="/cars">Browse cars</a>
         <button class="btn btn--ghost btn--sm" type="button" data-sign-out>Sign out</button>
       </div>

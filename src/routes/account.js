@@ -20,6 +20,7 @@ const express = require('express');
 const config = require('../config');
 const db = require('../db');
 const auth = require('../services/auth');
+const roles = require('../services/roles');
 const validate = require('../services/validate');
 const listingQuery = require('../services/listing-query');
 const { helpers } = require('../lib/locals');
@@ -104,6 +105,14 @@ async function buildAccountLocals(user) {
   dashboard.requests = dashboard.requests.filter((request) => request.type !== 'hire');
   const trail = [{ label: 'Account' }];
 
+  // Staff land here too. Point them at the bit of the console their role
+  // actually opens rather than at a module they will be refused (§7.4).
+  const consoleHome = roles.can(user.role, 'reports.view')
+    ? '/admin'
+    : roles.can(user.role, 'bookings.own_jobs')
+      ? '/admin/jobs'
+      : null;
+
   return {
     view: 'account',
     page: {
@@ -117,7 +126,7 @@ async function buildAccountLocals(user) {
       bodyClass: 'page-account',
       jsonLd: [],
     },
-    data: { ...dashboard, trail, user },
+    data: { ...dashboard, trail, user, consoleHome },
   };
 }
 

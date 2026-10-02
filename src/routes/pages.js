@@ -13,7 +13,8 @@
  *   GET /guide          evergreen shelf — start-here reading path
  *   GET /partner        B2B dealer recruitment + packages
  *   GET /terms /privacy /refunds /disclaimer   CMS-driven legal pages
- *   GET /dealer /admin                        phase-2 entry stubs, noindex
+ *   GET /dealer                               phase-2 entry stub, noindex
+ *   GET /admin                                §7.3 console — routes/admin.js
  *   GET /account /login                       §7.1 — served by routes/account.js
  */
 
@@ -481,19 +482,6 @@ const PORTALS = {
     ctaLabel: 'Talk to the ops desk',
     secondLabel: 'See dealer packages',
     secondHref: '/partner',
-  },
-  '/admin': {
-    view: 'portal-stub',
-    title: 'Admin console',
-    heading: 'The admin console is the phase-2 build',
-    copy:
-      'Inspection dispatch, the concierge pipeline (§7.3), document jobs, order management and the CMS are all specified in §7 — behind authentication, in phase 2. This build ships the public site and the data model they will run on.',
-    metaDescription:
-      'The admin console — inspection dispatch, the concierge pipeline, orders and the CMS — is the phase-2 build. This release ships the public site and its data model.',
-    icon: 'shield',
-    ctaLabel: 'Back to the site',
-    secondLabel: 'View verification page',
-    secondHref: '/verification',
   },
 };
 

@@ -61,8 +61,13 @@ CREATE TABLE IF NOT EXISTS vehicle_listings (
   dealer_id               INT UNSIGNED   NOT NULL,
   status                  ENUM('draft','in_review','live','reserved','sold','expired')
                                          NOT NULL DEFAULT 'draft',
+  moderated_by            INT UNSIGNED   NULL,                -- who let it live (§7.3)
+  moderated_at            DATETIME       NULL,
   verification_grade      ENUM('network_listed','field_checked','certified')
                                          NOT NULL DEFAULT 'network_listed',
+  grade_checklist         JSON           NULL,                -- evidence behind the grade
+  grade_set_by            INT UNSIGNED   NULL,
+  grade_set_at            DATETIME       NULL,
 
   -- Vehicle
   make                    VARCHAR(60)    NOT NULL,
@@ -111,6 +116,10 @@ CREATE TABLE IF NOT EXISTS vehicle_listings (
   -- Lifecycle — powers §6.2 sold state + §14.1 sold-archive 301 rule
   created_at              TIMESTAMP      NOT NULL DEFAULT CURRENT_TIMESTAMP,
   published_at            DATETIME       NULL,
+  refresh_requested_at    DATETIME       NULL,   -- 14-day stale → ask the dealer to refresh
+  stale_flagged_at        DATETIME       NULL,
+  refreshed_at            DATETIME       NULL,   -- dealer/ops confirmed it is still current
+  unlisted_at             DATETIME       NULL,   -- auto-unlisted on the second pass
   updated_at              TIMESTAMP      NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   expires_at              DATETIME       NULL,
   sold_at                 DATETIME       NULL,
@@ -121,6 +130,8 @@ CREATE TABLE IF NOT EXISTS vehicle_listings (
   UNIQUE KEY uq_listing_stock (stock_no),
   UNIQUE KEY uq_listing_slug (seo_slug),
   KEY idx_listing_dealer (dealer_id),
+  KEY idx_listing_moderation (status, created_at),
+  KEY idx_listing_stale (status, refreshed_at, updated_at),
   KEY idx_listing_browse (status, published_at),
   KEY idx_listing_facet_make (status, make, model),
   KEY idx_listing_facet_body (status, body_type, asking_price_kobo),
@@ -147,6 +158,96 @@ CREATE TABLE IF NOT EXISTS listing_media (
   PRIMARY KEY (id),
   KEY idx_media_listing (listing_id, position),
   CONSTRAINT fk_media_listing FOREIGN KEY (listing_id) REFERENCES vehicle_listings (id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ---------------------------------------------------------------------------
+-- users · auth_codes · sessions — phone-first accounts (§7.1)
+--
+-- OTP login: the code is stored HMAC-SHA256 hashed and single-use; sessions are
+-- server-side and revoked by hash lookup, so a stolen cookie can be killed from
+-- the database. Saved cars/searches hang off the user; dashboard reads (requests,
+-- bookings, orders, subscriptions) are keyed by phone — the account key.
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS `users` (
+  id               INT UNSIGNED  NOT NULL AUTO_INCREMENT,
+  phone            VARCHAR(40)   NOT NULL,              -- normalised +234…
+  name             VARCHAR(120)  NULL,
+  email            VARCHAR(160)  NULL,
+  marketing_opt_in TINYINT(1)    NOT NULL DEFAULT 0,    -- NDPA: explicit, revocable
+  status           ENUM('active','blocked','deleted') NOT NULL DEFAULT 'active',
+  role             ENUM('customer','dealer','ops','inspector','marketing','finance','admin')
+                                 NOT NULL DEFAULT 'customer',   -- §7.4 role matrix
+  watchlisted      TINYINT(1)    NOT NULL DEFAULT 0,            -- admin flag (§7.3)
+  referral_code    VARCHAR(16)   NULL,              -- the holder's personal link code
+  referred_by      INT UNSIGNED  NULL,              -- who brought them here (§7.1 referrals)
+  last_seen_at     DATETIME      NULL,
+  created_at       TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at       TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  UNIQUE KEY uq_user_phone (phone),
+  UNIQUE KEY uq_user_referral_code (referral_code),
+  KEY idx_user_role (role),
+  KEY idx_user_email (email),
+  KEY idx_user_referred_by (referred_by),
+  CONSTRAINT fk_user_referrer FOREIGN KEY (referred_by) REFERENCES `users` (id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `auth_codes` (
+  id           INT UNSIGNED  NOT NULL AUTO_INCREMENT,
+  phone        VARCHAR(40)   NOT NULL,
+  code_hash    CHAR(64)      NOT NULL,
+  channel      ENUM('whatsapp','sms','console') NOT NULL DEFAULT 'console',
+  attempts     TINYINT UNSIGNED NOT NULL DEFAULT 0,
+  max_attempts TINYINT UNSIGNED NOT NULL DEFAULT 5,
+  expires_at   DATETIME      NOT NULL,
+  consumed_at  DATETIME      NULL,
+  ip           VARCHAR(45)   NULL,
+  created_at   TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  KEY idx_code_phone (phone, created_at),
+  KEY idx_code_expiry (expires_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `sessions` (
+  id         INT UNSIGNED  NOT NULL AUTO_INCREMENT,
+  token_hash CHAR(64)      NOT NULL,
+  user_id    INT UNSIGNED  NOT NULL,
+  user_agent VARCHAR(200)  NULL,
+  ip         VARCHAR(45)   NULL,
+  expires_at DATETIME      NOT NULL,
+  revoked_at DATETIME      NULL,
+  created_at TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  UNIQUE KEY uq_session_token (token_hash),
+  KEY idx_session_user (user_id, expires_at),
+  CONSTRAINT fk_session_user FOREIGN KEY (user_id) REFERENCES `users` (id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `saved_cars` (
+  id         INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  user_id    INT UNSIGNED NOT NULL,
+  listing_id INT UNSIGNED NOT NULL,
+  note       VARCHAR(200) NULL,
+  created_at TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  UNIQUE KEY uq_saved_car (user_id, listing_id),
+  CONSTRAINT fk_saved_car_user FOREIGN KEY (user_id) REFERENCES `users` (id) ON DELETE CASCADE,
+  CONSTRAINT fk_saved_car_listing FOREIGN KEY (listing_id) REFERENCES vehicle_listings (id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `saved_searches` (
+  id              INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  user_id         INT UNSIGNED NOT NULL,
+  label           VARCHAR(120) NOT NULL,
+  query           TEXT         NOT NULL,
+  alerts_enabled  TINYINT(1)   NOT NULL DEFAULT 1,   -- master: any alert at all
+  alert_price_drop TINYINT(1)  NOT NULL DEFAULT 1,   -- §7.1 price-drop toggle
+  alert_new_match  TINYINT(1)  NOT NULL DEFAULT 1,   -- §7.1 new-match toggle
+  last_alerted_at DATETIME     NULL,
+  created_at      TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  KEY idx_saved_search_user (user_id, created_at),
+  CONSTRAINT fk_saved_search_user FOREIGN KEY (user_id) REFERENCES `users` (id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ---------------------------------------------------------------------------
@@ -189,11 +290,18 @@ CREATE TABLE IF NOT EXISTS leads (
   source_path   VARCHAR(200)  NOT NULL,                      -- attribution (§11 WhatsApp source tags)
   utm           JSON          NULL,
   status        ENUM('new','assigned','contacted','viewing','closed','lost') NOT NULL DEFAULT 'new',
+  assigned_to   INT UNSIGNED  NULL,                          -- CRM-lite owner (§7.3)
+  assigned_at   DATETIME      NULL,
+  last_contacted_at DATETIME  NULL,
+  lost_reason   VARCHAR(160)  NULL,
   created_at    TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at    TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (id),
   KEY idx_leads_pipeline (status, created_at),
   KEY idx_leads_listing (listing_id),
-  CONSTRAINT fk_leads_listing FOREIGN KEY (listing_id) REFERENCES vehicle_listings (id) ON DELETE SET NULL
+  KEY idx_leads_assignee (assigned_to, status),
+  CONSTRAINT fk_leads_listing FOREIGN KEY (listing_id) REFERENCES vehicle_listings (id) ON DELETE SET NULL,
+  CONSTRAINT fk_lead_assignee FOREIGN KEY (assigned_to) REFERENCES `users` (id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ---------------------------------------------------------------------------
@@ -464,92 +572,6 @@ CREATE TABLE IF NOT EXISTS subscriptions (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ---------------------------------------------------------------------------
--- users · auth_codes · sessions — phone-first accounts (§7.1)
---
--- OTP login: the code is stored HMAC-SHA256 hashed and single-use; sessions are
--- server-side and revoked by hash lookup, so a stolen cookie can be killed from
--- the database. Saved cars/searches hang off the user; dashboard reads (requests,
--- bookings, orders, subscriptions) are keyed by phone — the account key.
--- ---------------------------------------------------------------------------
-CREATE TABLE IF NOT EXISTS `users` (
-  id               INT UNSIGNED  NOT NULL AUTO_INCREMENT,
-  phone            VARCHAR(40)   NOT NULL,              -- normalised +234…
-  name             VARCHAR(120)  NULL,
-  email            VARCHAR(160)  NULL,
-  marketing_opt_in TINYINT(1)    NOT NULL DEFAULT 0,    -- NDPA: explicit, revocable
-  status           ENUM('active','blocked','deleted') NOT NULL DEFAULT 'active',
-  referral_code    VARCHAR(16)   NULL,              -- the holder's personal link code
-  referred_by      INT UNSIGNED  NULL,              -- who brought them here (§7.1 referrals)
-  last_seen_at     DATETIME      NULL,
-  created_at       TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  updated_at       TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  PRIMARY KEY (id),
-  UNIQUE KEY uq_user_phone (phone),
-  UNIQUE KEY uq_user_referral_code (referral_code),
-  KEY idx_user_email (email),
-  KEY idx_user_referred_by (referred_by),
-  CONSTRAINT fk_user_referrer FOREIGN KEY (referred_by) REFERENCES `users` (id) ON DELETE SET NULL
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
-CREATE TABLE IF NOT EXISTS `auth_codes` (
-  id           INT UNSIGNED  NOT NULL AUTO_INCREMENT,
-  phone        VARCHAR(40)   NOT NULL,
-  code_hash    CHAR(64)      NOT NULL,
-  channel      ENUM('whatsapp','sms','console') NOT NULL DEFAULT 'console',
-  attempts     TINYINT UNSIGNED NOT NULL DEFAULT 0,
-  max_attempts TINYINT UNSIGNED NOT NULL DEFAULT 5,
-  expires_at   DATETIME      NOT NULL,
-  consumed_at  DATETIME      NULL,
-  ip           VARCHAR(45)   NULL,
-  created_at   TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  PRIMARY KEY (id),
-  KEY idx_code_phone (phone, created_at),
-  KEY idx_code_expiry (expires_at)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
-CREATE TABLE IF NOT EXISTS `sessions` (
-  id         INT UNSIGNED  NOT NULL AUTO_INCREMENT,
-  token_hash CHAR(64)      NOT NULL,
-  user_id    INT UNSIGNED  NOT NULL,
-  user_agent VARCHAR(200)  NULL,
-  ip         VARCHAR(45)   NULL,
-  expires_at DATETIME      NOT NULL,
-  revoked_at DATETIME      NULL,
-  created_at TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  PRIMARY KEY (id),
-  UNIQUE KEY uq_session_token (token_hash),
-  KEY idx_session_user (user_id, expires_at),
-  CONSTRAINT fk_session_user FOREIGN KEY (user_id) REFERENCES `users` (id) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
-CREATE TABLE IF NOT EXISTS `saved_cars` (
-  id         INT UNSIGNED NOT NULL AUTO_INCREMENT,
-  user_id    INT UNSIGNED NOT NULL,
-  listing_id INT UNSIGNED NOT NULL,
-  note       VARCHAR(200) NULL,
-  created_at TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  PRIMARY KEY (id),
-  UNIQUE KEY uq_saved_car (user_id, listing_id),
-  CONSTRAINT fk_saved_car_user FOREIGN KEY (user_id) REFERENCES `users` (id) ON DELETE CASCADE,
-  CONSTRAINT fk_saved_car_listing FOREIGN KEY (listing_id) REFERENCES vehicle_listings (id) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
-CREATE TABLE IF NOT EXISTS `saved_searches` (
-  id              INT UNSIGNED NOT NULL AUTO_INCREMENT,
-  user_id         INT UNSIGNED NOT NULL,
-  label           VARCHAR(120) NOT NULL,
-  query           TEXT         NOT NULL,
-  alerts_enabled  TINYINT(1)   NOT NULL DEFAULT 1,   -- master: any alert at all
-  alert_price_drop TINYINT(1)  NOT NULL DEFAULT 1,   -- §7.1 price-drop toggle
-  alert_new_match  TINYINT(1)  NOT NULL DEFAULT 1,   -- §7.1 new-match toggle
-  last_alerted_at DATETIME     NULL,
-  created_at      TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  PRIMARY KEY (id),
-  KEY idx_saved_search_user (user_id, created_at),
-  CONSTRAINT fk_saved_search_user FOREIGN KEY (user_id) REFERENCES `users` (id) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
--- ---------------------------------------------------------------------------
 -- service_requests — §10.1: “User has many ServiceRequest (types: concierge,
 -- sell, swap, documents, research, parts, consultation)”. One table, a JSON
 -- brief, and a tracking id that the customer can watch at /concierge/{id}.
@@ -568,12 +590,18 @@ CREATE TABLE IF NOT EXISTS service_requests (
   sla_due_at    DATETIME      NULL,                     -- 48–72h for concierge (§6.5)
   source_path   VARCHAR(200)  NOT NULL,
   notes         VARCHAR(500)  NULL,
+  assigned_to   INT UNSIGNED  NULL,                     -- CRM owner (§7.3)
+  assigned_at   DATETIME      NULL,
+  last_contacted_at DATETIME  NULL,
+  lost_reason   VARCHAR(160)  NULL,
   created_at    TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at    TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (id),
   UNIQUE KEY uq_request_tracking (tracking_id),
   KEY idx_request_pipeline (type, status, created_at),
-  CONSTRAINT fk_request_listing FOREIGN KEY (listing_id) REFERENCES vehicle_listings (id) ON DELETE SET NULL
+  KEY idx_request_assignee (assigned_to, status),
+  CONSTRAINT fk_request_listing FOREIGN KEY (listing_id) REFERENCES vehicle_listings (id) ON DELETE SET NULL,
+  CONSTRAINT fk_request_assignee FOREIGN KEY (assigned_to) REFERENCES `users` (id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ---------------------------------------------------------------------------
@@ -595,11 +623,19 @@ CREATE TABLE IF NOT EXISTS bookings (
   status         ENUM('requested','confirmed','dispatched','completed','cancelled')
                                 NOT NULL DEFAULT 'requested',
   request_id     INT UNSIGNED  NULL,
+  inspector_id   INT UNSIGNED  NULL,                    -- assigned by dispatch (§7.3)
+  dispatched_at  DATETIME      NULL,
+  completed_at   DATETIME      NULL,
+  checklist      JSON          NULL,                    -- {obd2_codes, sections{}, photos[]}
+  verdict        ENUM('pass','pass_with_advisory','fail') NULL,
+  report_notes   TEXT          NULL,
   created_at     TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (id),
   UNIQUE KEY uq_booking_reference (reference),
   KEY idx_booking_dispatch (status, slot_at),
-  CONSTRAINT fk_booking_request FOREIGN KEY (request_id) REFERENCES service_requests (id) ON DELETE SET NULL
+  KEY idx_booking_inspector (inspector_id, slot_at),
+  CONSTRAINT fk_booking_request FOREIGN KEY (request_id) REFERENCES service_requests (id) ON DELETE SET NULL,
+  CONSTRAINT fk_booking_inspector FOREIGN KEY (inspector_id) REFERENCES `users` (id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ---------------------------------------------------------------------------
@@ -629,3 +665,41 @@ SELECT l.id, l.stock_no, l.seo_slug, l.make, l.model, l.sold_at, l.archive_redir
 FROM vehicle_listings l
 WHERE l.status = 'sold'
   AND l.sold_at <= DATE_SUB(UTC_TIMESTAMP(), INTERVAL 90 DAY);
+
+-- ---------------------------------------------------------------------------
+-- request_candidates — cars ops attached to a concierge request (§7.3 pipeline;
+-- the buyer's comparison is rendered from exactly these rows).
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS request_candidates (
+  id         INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  request_id INT UNSIGNED NOT NULL,
+  listing_id INT UNSIGNED NOT NULL,
+  note       VARCHAR(200) NULL,
+  rank_no    TINYINT UNSIGNED NOT NULL DEFAULT 0,
+  added_by   INT UNSIGNED NULL,
+  created_at TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  UNIQUE KEY uq_candidate (request_id, listing_id),
+  KEY idx_candidate_request (request_id, rank_no),
+  CONSTRAINT fk_candidate_request FOREIGN KEY (request_id) REFERENCES service_requests (id) ON DELETE CASCADE,
+  CONSTRAINT fk_candidate_listing FOREIGN KEY (listing_id) REFERENCES vehicle_listings (id) ON DELETE CASCADE,
+  CONSTRAINT fk_candidate_actor   FOREIGN KEY (added_by)   REFERENCES `users` (id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ---------------------------------------------------------------------------
+-- admin_audit — sensitive actions, with the actor (§7.3 “audit log of sensitive
+-- actions (price overrides, payment releases, grade changes)”).
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS admin_audit (
+  id         INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  actor_id   INT UNSIGNED NULL,
+  action     VARCHAR(60)  NOT NULL,
+  entity     VARCHAR(40)  NOT NULL,
+  entity_id  INT UNSIGNED NULL,
+  detail     JSON         NULL,
+  created_at TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  KEY idx_audit_entity (entity, entity_id, created_at),
+  KEY idx_audit_actor (actor_id, created_at),
+  CONSTRAINT fk_audit_actor FOREIGN KEY (actor_id) REFERENCES `users` (id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

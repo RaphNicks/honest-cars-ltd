@@ -25,6 +25,7 @@ const { router: shopRoutes } = require('./routes/shop');
 const { router: pageRoutes } = require('./routes/pages');
 const { router: authRoutes } = require('./routes/auth');
 const { router: accountRoutes } = require('./routes/account');
+const { router: adminRoutes } = require('./routes/admin');
 const auth = require('./services/auth');
 const og = require('./services/og');
 
@@ -118,6 +119,9 @@ function createApp() {
   // /api/account endpoints must win over the marketing-page routes below.
   app.use('/api/auth', authRoutes);
   app.use('/', accountRoutes);
+  // The console: /admin is gated by §7.4 and mounted before the public pages,
+  // so the old "phase 2" stub for /admin can never shadow it.
+  app.use('/admin', adminRoutes);
   app.use('/api', apiRoutes);
   app.use('/services', serviceRoutes);
   app.use('/', flowRoutes);

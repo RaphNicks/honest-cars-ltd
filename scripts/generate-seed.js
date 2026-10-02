@@ -292,7 +292,7 @@ function buildListing({ index, status, soldDaysAgo = null, upgraded = false, cat
   // are always in the future and the stale ones show the expiry behaviour.
   const expiresAt =
     status === 'live' || status === 'reserved'
-      ? new Date(Date.UTC(2026, 9, 1) + int(1, 14) * 86_400_000)
+      ? { sql: `DATE_ADD(UTC_TIMESTAMP(), INTERVAL ${int(3, 20)} DAY)` }
       : new Date(publishedAt.getTime() + 14 * 86_400_000);
   const soldAt = soldDaysAgo === null ? null : new Date(Date.UTC(2026, 8, 30) - soldDaysAgo * 86_400_000);
 
@@ -400,8 +400,15 @@ function mediaRows(listing) {
   }));
 }
 
+/**
+ * `{ sql: '…' }` writes the expression through untouched. Used for anything
+ * that must be relative to when the seed is loaded rather than when this
+ * generator ran — listing expiry, above all: a frozen date silently turns
+ * "live" stock into 404s the next day.
+ */
 function sqlValue(value) {
   if (value === null || value === undefined) return 'NULL';
+  if (typeof value === 'object' && !(value instanceof Date) && typeof value.sql === 'string') return value.sql;
   if (typeof value === 'number') return String(value);
   if (typeof value === 'boolean') return value ? '1' : '0';
   if (value instanceof Date) return `'${value.toISOString().slice(0, 19).replace('T', ' ')}'`;
@@ -553,61 +560,61 @@ DELETE FROM dealers;
     ['toyota', 'make', null, 'Toyota cars for sale in Port Harcourt',
       'Toyota for sale in Port Harcourt',
       'Toyota is the default PH buy for a reason: parts on every street, mechanics who know the platform, and resale value that holds. Every car here is graded honestly — you can see which ones our inspectors have physically checked.',
-      'Toyota Cars for Sale in Port Harcourt — Verified Stock | HonestCars',
+      'Toyota Cars for Sale in Port Harcourt | HonestCars',
       'Browse verified Toyota cars for sale in Port Harcourt — Camry, Corolla, RAV4, Highlander, Hilux. Honest prices, inspection grades, no dealer games.',
       { make: 'Toyota' }, '/cars/toyota', 1, 10],
     ['toyota/camry', 'model', 'toyota', 'Toyota Camry for sale in Port Harcourt',
       'Toyota Camry in Port Harcourt',
       'The Camry is the safest first buy in Port Harcourt: comfortable, cheap to service, and easy to resell. Below is live Camry stock with mileage, documents status and our verification grade on each one.',
-      'Toyota Camry for Sale in Port Harcourt — Prices & Verified Stock | HonestCars',
+      'Toyota Camry for Sale in Port Harcourt | HonestCars',
       'Live Toyota Camry listings in Port Harcourt with honest prices, verified mileage and inspection grades. Compare 2010–2018 Camry stock before you travel.',
       { make: 'Toyota', model: 'Camry' }, '/cars/toyota/camry', 1, 11],
     ['toyota/corolla', 'model', 'toyota', 'Toyota Corolla for sale in Port Harcourt',
       'Toyota Corolla in Port Harcourt',
       'Corolla money is safe money in PH. Fuel is light, parts are cheap, and a well-kept example will not embarrass you. We list the mileage as it is — verified where an inspector has seen the odometer.',
-      'Toyota Corolla for Sale in Port Harcourt — Verified Corolla Stock | HonestCars',
+      'Toyota Corolla for Sale in Port Harcourt | HonestCars',
       'Toyota Corolla listings in Port Harcourt with verified mileage, document status and honest condition notes. Prices from the live PH market.',
       { make: 'Toyota', model: 'Corolla' }, '/cars/toyota/corolla', 1, 12],
     ['honda', 'make', null, 'Honda cars for sale in Port Harcourt',
       'Honda for sale in Port Harcourt',
       'Hondas hold their value in Port Harcourt and the Accord and CR-V are the two we see most. Check the grade on each listing — Certified means we scanned it ourselves and wrote down what we found.',
-      'Honda Cars for Sale in Port Harcourt — Verified Accord & CR-V | HonestCars',
+      'Honda Cars for Sale in Port Harcourt | HonestCars',
       'Browse Honda cars for sale in Port Harcourt — Accord, CR-V, Civic, Pilot. Verified grades, real mileage, honest condition notes.',
       { make: 'Honda' }, '/cars/honda', 1, 20],
     ['honda/accord', 'model', 'honda', 'Honda Accord for sale in Port Harcourt',
       'Honda Accord in Port Harcourt',
       'The Accord gives you Camry comfort with a bit more presence. Service costs are close, parts are available around Ikwerre Road and Rumuokoro. Ask us for the history on any car below.',
-      'Honda Accord for Sale in Port Harcourt — Prices & Grades | HonestCars',
+      'Honda Accord for Sale in Port Harcourt | HonestCars',
       'Honda Accord listings in Port Harcourt with honest prices, mileage and verification grades. Compare before you call.',
       { make: 'Honda', model: 'Accord' }, '/cars/honda/accord', 1, 21],
     ['lexus', 'make', null, 'Lexus cars for sale in Port Harcourt',
       'Lexus for sale in Port Harcourt',
       'Lexus money buys you Toyota reliability with a quieter cabin. Fuel and suspension parts cost more than a Camry, so we flag anything the inspector found before you commit.',
-      'Lexus Cars for Sale in Port Harcourt — RX, ES & GX Stock | HonestCars',
+      'Lexus Cars for Sale in Port Harcourt | HonestCars',
       'Verified Lexus listings in Port Harcourt — RX 350, ES 350, GX 460. Real prices, inspection grades and document status on every car.',
       { make: 'Lexus' }, '/cars/lexus', 1, 30],
     ['suv-under-15m', 'body_budget', null, 'SUVs under ₦15m in Port Harcourt',
       'SUVs under ₦15m in Port Harcourt',
       'Family height and Abuja-road confidence do not have to start at ₦20m. Everything here is under ₦15,000,000 and every price is the price — what you see is what the dealer is asking.',
-      'SUVs Under ₦15m in Port Harcourt — Verified Listings | HonestCars',
+      'SUVs Under ₦15m in Port Harcourt | HonestCars',
       'SUVs under ₦15 million in Port Harcourt — RAV4, CR-V, Sportage, X-Trail and more, with mileage, documents and verification grades.',
       { body_type: 'suv', max_price_kobo: 1_500_000_000 }, '/cars/suv-under-15m', 1, 40],
     ['suv-under-25m', 'body_budget', null, 'SUVs under ₦25m in Port Harcourt',
       'SUVs under ₦25m in Port Harcourt',
       'This is the sweet spot for a PH family: newer RAV4, Highlander and Santa Fe money. Compare the certified ones first — the inspection report tells you what the photos will not.',
-      'SUVs Under ₦25m in Port Harcourt — Verified Stock | HonestCars',
+      'SUVs Under ₦25m in Port Harcourt | HonestCars',
       'SUVs under ₦25 million in Port Harcourt with verified mileage, inspection grades and honest condition notes.',
       { body_type: 'suv', max_price_kobo: 2_500_000_000 }, '/cars/suv-under-25m', 1, 41],
     ['sedan-under-10m', 'body_budget', null, 'Sedans under ₦10m in Port Harcourt',
       'Sedans under ₦10m in Port Harcourt',
       'Clean, sensible saloon cars under ₦10m — mostly Camry, Corolla, Elantra and Altima. Good for a first car, better for a daily commute through Rumuokoro.',
-      'Sedans Under ₦10m in Port Harcourt — Verified Listings | HonestCars',
+      'Sedans Under ₦10m in Port Harcourt | HonestCars',
       'Sedans under ₦10 million in Port Harcourt — Camry, Corolla, Elantra, Altima. Honest prices, grades and mileage.',
       { body_type: 'sedan', max_price_kobo: 1_000_000_000 }, '/cars/sedan-under-10m', 1, 42],
     ['certified', 'tag', null, 'HonestCars-Certified cars in Port Harcourt',
       'HonestCars-Certified cars in Port Harcourt',
       'These are the cars our inspectors have scanned, driven and photographed themselves — with an honest condition note on each listing that names the faults instead of hiding them.',
-      'HonestCars-Certified Cars in Port Harcourt — Full Inspection | HonestCars',
+      'HonestCars-Certified Cars in Port Harcourt | HonestCars',
       'Every HonestCars-Certified car in Port Harcourt: OBD2 scan, documents sighted, road test, honest condition note. Browse the fully inspected stock.',
       { grade: 'certified' }, '/cars/certified', 1, 50],
   ];
@@ -746,7 +753,194 @@ DELETE FROM dealers;
   out.push(insert('redirects', ['from_path', 'to_path', 'status_code', 'reason'],
     expired.map((l) => [`/cars/${l.slug}`, `/cars/${slugify(l.make)}`, 301, 'sold_archive_90_days'])));
 
+  // -------------------------------------------------------------------------
+  // §7.3 console: staff accounts, then the operational day the console opens
+  // onto — a moderation queue, a CRM-lite pipeline with an SLA that has
+  // already been missed, a concierge request with cars attached to it, and a
+  // dispatch sheet with jobs for the inspector. Timestamps are relative to
+  // now, so the console looks alive whenever the seed is loaded.
+  // -------------------------------------------------------------------------
   out.push(`
+-- Staff accounts for the pilot (§7.4). Sign in at /login with the number,
+-- then open /admin. Nothing here is a password: access is by OTP.
+INSERT INTO \`users\` (phone, name, role, referral_code, status) VALUES
+  ('+2348000000001', 'Admin — Honest Cars', 'admin',     'HCADMN', 'active'),
+  ('+2348000000002', 'Ops Desk',            'ops',       'HCSTFF', 'active'),
+  ('+2348000000003', 'Field Inspector',     'inspector', 'HCINSP', 'active')
+ON DUPLICATE KEY UPDATE role = VALUES(role), name = VALUES(name), status = 'active';
+
+-- The CRM-lite inbox (§7.3): every one of these came in through a real form.
+INSERT INTO leads (type, listing_id, name, phone, message, preferred_day, source_path, status,
+                   assigned_to, assigned_at, last_contacted_at, lost_reason, created_at) VALUES
+  ('viewing', (SELECT id FROM vehicle_listings WHERE stock_no = 'HC-PH-0018' LIMIT 1),
+    'Chidi Okafor', '+2348031110001', 'Please can I see the Prado this Saturday? I am in Woji.',
+    DATE_ADD(UTC_DATE(), INTERVAL 3 DAY), '/cars/2016-toyota-prado-tx-hc-ph-0018', 'new',
+    NULL, NULL, NULL, NULL, DATE_SUB(UTC_TIMESTAMP(), INTERVAL 4 HOUR)),
+  ('viewing', (SELECT id FROM vehicle_listings WHERE stock_no = 'HC-PH-0032' LIMIT 1),
+    'Blessing Etim', '+2348031110002', 'Is the Camry still available? What is the lowest price you will take?',
+    DATE_ADD(UTC_DATE(), INTERVAL 1 DAY), '/cars/2010-toyota-camry-le-hc-ph-0032', 'contacted',
+    (SELECT id FROM \`users\` WHERE phone = '+2348000000002' LIMIT 1), DATE_SUB(UTC_TIMESTAMP(), INTERVAL 20 HOUR),
+    DATE_SUB(UTC_TIMESTAMP(), INTERVAL 6 HOUR), NULL, DATE_SUB(UTC_TIMESTAMP(), INTERVAL 26 HOUR)),
+  ('concierge', NULL, 'Ngozi Ibe', '+2348031110003',
+    'Looking for an automatic SUV under ₦20m for a family of five. Must have working AC.',
+    NULL, '/find-my-car', 'viewing',
+    (SELECT id FROM \`users\` WHERE phone = '+2348000000002' LIMIT 1), DATE_SUB(UTC_TIMESTAMP(), INTERVAL 3 DAY),
+    DATE_SUB(UTC_TIMESTAMP(), INTERVAL 1 DAY), NULL, DATE_SUB(UTC_TIMESTAMP(), INTERVAL 3 DAY)),
+  ('b2b', NULL, 'Fleet officer, oil & gas firm', '+2348031110004',
+    'We need four hire vehicles for a two-week rotation. Please quote with proper invoices and tracking.',
+    NULL, '/hire', 'assigned',
+    (SELECT id FROM \`users\` WHERE phone = '+2348000000002' LIMIT 1), DATE_SUB(UTC_TIMESTAMP(), INTERVAL 2 DAY),
+    NULL, NULL, DATE_SUB(UTC_TIMESTAMP(), INTERVAL 2 DAY)),
+  ('service', NULL, 'Mrs. Amadi', '+2348031110007', 'Do you sell the OBD2 scanner on its own?',
+    NULL, '/shop', 'new', NULL, NULL, NULL, NULL, DATE_SUB(UTC_TIMESTAMP(), INTERVAL 30 HOUR)),
+  ('parts', NULL, 'Emeka Nwosu', '+2348031110005', 'Pre-purchase inspection for a car in Owerri — do you travel?',
+    NULL, '/services/inspection', 'closed',
+    (SELECT id FROM \`users\` WHERE phone = '+2348000000002' LIMIT 1), DATE_SUB(UTC_TIMESTAMP(), INTERVAL 6 DAY),
+    DATE_SUB(UTC_TIMESTAMP(), INTERVAL 5 DAY), NULL, DATE_SUB(UTC_TIMESTAMP(), INTERVAL 6 DAY)),
+  ('viewing', (SELECT id FROM vehicle_listings WHERE stock_no = 'HC-PH-0018' LIMIT 1),
+    'Tunde Adeyemi', '+2348031110006', 'I want to swap my Corolla for something bigger.',
+    NULL, '/sell-swap', 'lost',
+    (SELECT id FROM \`users\` WHERE phone = '+2348000000002' LIMIT 1), DATE_SUB(UTC_TIMESTAMP(), INTERVAL 8 DAY),
+    DATE_SUB(UTC_TIMESTAMP(), INTERVAL 7 DAY), 'Bought elsewhere — price', DATE_SUB(UTC_TIMESTAMP(), INTERVAL 8 DAY)),
+  ('deal_alert', NULL, 'Ifeoma Chukwu', '+2348031110008',
+    'Please alert me when a 2017 or newer CR-V under ₦18m comes in.',
+    NULL, '/cars', 'assigned',
+    (SELECT id FROM \`users\` WHERE phone = '+2348000000002' LIMIT 1), DATE_SUB(UTC_TIMESTAMP(), INTERVAL 5 DAY),
+    NULL, NULL, DATE_SUB(UTC_TIMESTAMP(), INTERVAL 5 DAY));
+
+-- Service requests across the pipeline. HC-2482 is deliberately past its SLA.
+INSERT INTO service_requests (tracking_id, type, status, name, phone, brief, sla_due_at, source_path,
+                              notes, assigned_to, assigned_at, last_contacted_at) VALUES
+  ('HC-2482', 'hire', 'new', 'Fleet officer, oil & gas firm', '+2348031110004',
+    '{"class":"suv","vehicles":4,"days":14,"with_driver":true,"airport_pickup":true,"corporate":true}',
+    DATE_SUB(UTC_TIMESTAMP(), INTERVAL 5 HOUR), '/hire', 'Corporate rotation — needs an invoice.',
+    NULL, NULL, NULL),
+  ('HC-2483', 'sell', 'new', 'Uche Nnamdi', '+2348031110009',
+    '{"make":"Honda","model":"Accord EX","year":2014,"mileage_km":148000,"condition":"nigerian_used","timeline":"asap"}',
+    DATE_ADD(UTC_TIMESTAMP(), INTERVAL 18 HOUR), '/sell-swap', 'Wants a valuation inside 24 hours.',
+    (SELECT id FROM \`users\` WHERE phone = '+2348000000002' LIMIT 1), DATE_SUB(UTC_TIMESTAMP(), INTERVAL 2 HOUR), NULL),
+  ('HC-2484', 'documents', 'searching', 'Tunde Adeyemi', '+2348031110006',
+    '{"service":"customs_verification","vehicle":"Toyota Prado 2016","has_papers":true}',
+    DATE_ADD(UTC_TIMESTAMP(), INTERVAL 30 HOUR), '/services/documents', NULL,
+    (SELECT id FROM \`users\` WHERE phone = '+2348000000002' LIMIT 1), DATE_SUB(UTC_TIMESTAMP(), INTERVAL 1 DAY),
+    DATE_SUB(UTC_TIMESTAMP(), INTERVAL 4 HOUR)),
+  ('HC-2485', 'tracking', 'options_ready', 'Emeka Nwosu', '+2348031110005',
+    '{"product":"tracker-standard","vehicle":"Toyota Corolla 2015","install_area":"Rumuokoro"}',
+    DATE_ADD(UTC_TIMESTAMP(), INTERVAL 40 HOUR), '/services/tracking', 'Quoted standard unit + install.',
+    (SELECT id FROM \`users\` WHERE phone = '+2348000000002' LIMIT 1), DATE_SUB(UTC_TIMESTAMP(), INTERVAL 2 DAY),
+    DATE_SUB(UTC_TIMESTAMP(), INTERVAL 1 DAY)),
+  ('HC-2486', 'consultation', 'closed', 'Mrs. Amadi', '+2348031110007',
+    '{"topic":"first_car_buying","budget_min":6000000,"budget_max":9000000}', NULL, '/services/consultation',
+    'Call held, brief sent afterwards.',
+    (SELECT id FROM \`users\` WHERE phone = '+2348000000002' LIMIT 1), DATE_SUB(UTC_TIMESTAMP(), INTERVAL 9 DAY),
+    DATE_SUB(UTC_TIMESTAMP(), INTERVAL 8 DAY)),
+  ('HC-2487', 'concierge', 'new', 'Boma George', '+2348031110010',
+    '{"budget_min":15000000,"budget_max":22000000,"makes":["Toyota","Lexus"],"body_types":["suv"],"transmission":"automatic","must_haves":["reverse camera","service history"],"intended_use":"family","timeline":"one_month","financing":"no"}',
+    DATE_ADD(UTC_TIMESTAMP(), INTERVAL 46 HOUR), '/find-my-car', NULL, NULL, NULL, NULL),
+  ('HC-2488', 'concierge', 'viewings', 'Halima Yusuf', '+2348031110011',
+    '{"budget_min":5000000,"budget_max":8000000,"makes":["Toyota","Honda"],"body_types":["sedan"],"transmission":"automatic","must_haves":["cold AC","clean papers"],"intended_use":"commute","timeline":"two_weeks","financing":"no"}',
+    DATE_ADD(UTC_TIMESTAMP(), INTERVAL 12 HOUR), '/find-my-car', 'Two viewings booked for Thursday.',
+    (SELECT id FROM \`users\` WHERE phone = '+2348000000002' LIMIT 1), DATE_SUB(UTC_TIMESTAMP(), INTERVAL 2 DAY),
+    DATE_SUB(UTC_TIMESTAMP(), INTERVAL 5 HOUR));
+
+-- The cars attached to the demo request: exactly what the buyer's comparison reads.
+INSERT INTO request_candidates (request_id, listing_id, note, rank_no, added_by) VALUES
+  ((SELECT id FROM service_requests WHERE tracking_id = 'HC-2481' LIMIT 1),
+   (SELECT id FROM vehicle_listings WHERE stock_no = 'HC-PH-0032' LIMIT 1),
+   'Cleanest papers of the three; two panels resprayed and priced in.', 1,
+   (SELECT id FROM \`users\` WHERE phone = '+2348000000002' LIMIT 1)),
+  ((SELECT id FROM service_requests WHERE tracking_id = 'HC-2481' LIMIT 1),
+   (SELECT id FROM vehicle_listings WHERE stock_no = 'HC-PH-0045' LIMIT 1),
+   'Higher mileage but the service book is complete.', 2,
+   (SELECT id FROM \`users\` WHERE phone = '+2348000000002' LIMIT 1));
+
+-- Dispatch sheet (§7.3): one job unassigned, one dispatched to our inspector
+-- for 2pm today, one install booked, one consultation already filed.
+INSERT INTO bookings (reference, type, service_slug, slot_at, location, vehicle, name, phone,
+                      amount_kobo, payment_status, status, inspector_id, dispatched_at,
+                      completed_at, checklist, verdict, report_notes, created_at) VALUES
+  ('HC-BK-0001', 'inspection', 'inspection', DATE_ADD(UTC_DATE(), INTERVAL 1 DAY) + INTERVAL 10 HOUR,
+    'Dealer lot, Trans-Amadi, Port Harcourt',
+    '{"make":"Toyota","model":"Prado TX","year":2016,"mileage_km":96000}',
+    'Chidi Okafor', '+2348031110001', 4500000, 'unpaid', 'requested', NULL, NULL, NULL, NULL, NULL, NULL,
+    DATE_SUB(UTC_TIMESTAMP(), INTERVAL 5 HOUR)),
+  ('HC-BK-0002', 'inspection', 'inspection', UTC_DATE() + INTERVAL 14 HOUR,
+    'Customer compound, Woji, Port Harcourt',
+    '{"make":"Toyota","model":"Camry LE","year":2010,"mileage_km":132000}',
+    'Blessing Etim', '+2348031110002', 4500000, 'paid', 'dispatched',
+    (SELECT id FROM \`users\` WHERE phone = '+2348000000003' LIMIT 1), DATE_SUB(UTC_TIMESTAMP(), INTERVAL 3 HOUR),
+    NULL, NULL, NULL, NULL, DATE_SUB(UTC_TIMESTAMP(), INTERVAL 1 DAY)),
+  ('HC-BK-0003', 'install', 'tracker', DATE_ADD(UTC_DATE(), INTERVAL 3 DAY) + INTERVAL 11 HOUR,
+    'Honest Cars workshop, GRA Phase 2', '{"make":"Toyota","model":"Corolla","year":2015}',
+    'Emeka Nwosu', '+2348031110005', 4500000, 'pending', 'confirmed', NULL, NULL, NULL, NULL, NULL, NULL,
+    DATE_SUB(UTC_TIMESTAMP(), INTERVAL 2 DAY)),
+  ('HC-BK-0004', 'consultation', 'consultation', DATE_SUB(UTC_DATE(), INTERVAL 8 DAY) + INTERVAL 16 HOUR,
+    'Phone call', NULL, 'Mrs. Amadi', '+2348031110007', 1000000, 'paid', 'completed',
+    (SELECT id FROM \`users\` WHERE phone = '+2348000000003' LIMIT 1), DATE_SUB(UTC_TIMESTAMP(), INTERVAL 9 DAY),
+    DATE_SUB(UTC_TIMESTAMP(), INTERVAL 8 DAY),
+    '{"sections":{"engine":"ok","transmission":"ok","suspension":"attention","brakes":"ok","electricals":"ok","body":"ok","documents":"ok"},"obd2_codes":"none stored","checked_on":"2026-09-24"}',
+    'pass_with_advisory', 'Rear bushings due within the year; everything else sound. Client briefed on first-car running costs.',
+    DATE_SUB(UTC_TIMESTAMP(), INTERVAL 10 DAY)),
+  ('HC-BK-0005', 'inspection', 'inspection', DATE_SUB(UTC_DATE(), INTERVAL 2 DAY) + INTERVAL 9 HOUR,
+    'Dealer lot, Aba Road', '{"make":"Honda","model":"Accord EX","year":2014}',
+    'Uche Nnamdi', '+2348031110009', 4500000, 'refunded', 'cancelled', NULL, NULL, NULL, NULL, NULL,
+    'Customer rescheduled — car was sold before we arrived.', DATE_SUB(UTC_TIMESTAMP(), INTERVAL 3 DAY));
+
+-- Three sensitive actions already on file, so the audit page is not blank on
+-- first open. Everything the console does from here appends its own row.
+INSERT INTO admin_audit (actor_id, action, entity, entity_id, detail, created_at) VALUES
+  ((SELECT id FROM \`users\` WHERE phone = '+2348000000001' LIMIT 1), 'listing.grade', 'listing',
+   (SELECT id FROM vehicle_listings WHERE stock_no = 'HC-PH-0032' LIMIT 1),
+   '{"grade":"certified","note":"VIN, documents, OBD2 and road test all completed in person."}',
+   DATE_SUB(UTC_TIMESTAMP(), INTERVAL 2 DAY)),
+  ((SELECT id FROM \`users\` WHERE phone = '+2348000000001' LIMIT 1), 'listing.price', 'listing',
+   (SELECT id FROM vehicle_listings WHERE stock_no = 'HC-PH-0045' LIMIT 1),
+   '{"note":"Dealer dropped ₦250k after the inspection found rear bushings due."}',
+   DATE_SUB(UTC_TIMESTAMP(), INTERVAL 1 DAY)),
+  ((SELECT id FROM \`users\` WHERE phone = '+2348000000001' LIMIT 1), 'listing.publish', 'listing',
+   (SELECT id FROM vehicle_listings WHERE stock_no = 'HC-PH-0018' LIMIT 1),
+   '{"grade":"certified"}', DATE_SUB(UTC_TIMESTAMP(), INTERVAL 4 HOUR));
+
+-- ---------------------------------------------------------------------------
+-- The demo customer (§7.1). Ada can sign in on 08031234567 — in development
+-- the code is printed to the server log — and see a populated dashboard.
+-- This block belongs to the seed on purpose: \`db:setup\` truncates these
+-- tables, so anything created by hand disappears on the next reseed.
+-- ---------------------------------------------------------------------------
+INSERT INTO \`users\` (phone, name, role, referral_code, status, marketing_opt_in) VALUES
+  ('+2348031234567', 'Ada Okafor', 'customer', 'HCADA2', 'active', 1)
+ON DUPLICATE KEY UPDATE name = VALUES(name), role = 'customer', status = 'active';
+
+INSERT INTO saved_cars (user_id, listing_id, note) VALUES
+  ((SELECT id FROM \`users\` WHERE phone = '+2348031234567' LIMIT 1),
+   (SELECT id FROM vehicle_listings WHERE stock_no = 'HC-PH-0020' LIMIT 1),
+   'Watching this one — asking about the service history');
+
+INSERT INTO saved_searches (user_id, label, query, alerts_enabled, alert_price_drop, alert_new_match) VALUES
+  ((SELECT id FROM \`users\` WHERE phone = '+2348031234567' LIMIT 1),
+   'Toyota SUVs under ₦15m', 'make=toyota&body=suv&max_price=15000000', 1, 1, 1);
+
+INSERT INTO service_requests (tracking_id, type, status, name, phone, brief, sla_due_at, source_path, notes) VALUES
+  ('HC-2490', 'hire', 'options_ready', 'Ada Okafor', '+2348031234567',
+   '{"class":"suv","pickup":"2026-10-10","dropoff":"2026-10-13","days":3,"with_driver":false,"pickup_point":"airport","addons":["tracking"]}',
+   DATE_ADD(UTC_TIMESTAMP(), INTERVAL 20 HOUR), '/hire', 'Three days with an SUV, airport pickup Friday.');
+
+INSERT INTO orders (order_no, name, phone, delivery_area, delivery_fee_kobo, subtotal_kobo, total_kobo, status, payment_ref, notes) VALUES
+  ('HC-ORD-0001', 'Ada Okafor', '+2348031234567', 'GRA Phase 2', 0, 4500000, 4500000, 'paid', 'SEED-DEMO-0001',
+   'Seeded demo order: tracker plus installation, with the receipt on her dashboard.');
+
+INSERT INTO order_items (order_id, product_id, name, qty, unit_price_kobo, install_requested) VALUES
+  ((SELECT id FROM orders WHERE order_no = 'HC-ORD-0001' LIMIT 1),
+   (SELECT id FROM products WHERE slug = 'tracker-standard' LIMIT 1),
+   'Tracker — Standard', 1, 4500000, 1);
+
+INSERT INTO subscriptions (order_id, product_id, customer_name, customer_phone, device_state, installed_at, activated_at, renewal_at) VALUES
+  ((SELECT id FROM orders WHERE order_no = 'HC-ORD-0001' LIMIT 1),
+   (SELECT id FROM products WHERE slug = 'tracker-standard' LIMIT 1),
+   'Ada Okafor', '+2348031234567', 'activated',
+   DATE_SUB(UTC_TIMESTAMP(), INTERVAL 10 DAY), DATE_SUB(UTC_TIMESTAMP(), INTERVAL 10 DAY),
+   DATE_ADD(UTC_TIMESTAMP(), INTERVAL 355 DAY));
+
 -- ---------------------------------------------------------------------------
 -- Post-seed sanity: the 90-day sold hand-off row on vehicle_listings so ops
 -- can see the intended target without joining redirects.

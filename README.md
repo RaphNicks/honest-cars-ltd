@@ -167,6 +167,61 @@ How it is put together:
 
 ---
 
+## The operations console (PRD §7.3, gated by §7.4)
+
+`/admin` is the working console, not a stub. Every module in the §7.3 table is
+runnable without leaving it, every mutation is a plain form POST (so it works
+with JavaScript off), and every sensitive action lands in `admin_audit` with
+the actor on it. `src/services/roles.js` holds the §7.4 matrix as data — the
+routes, the navigation and the matrix table on `/admin/staff` all read the same
+object, so the screen cannot drift from what is enforced.
+
+| Module | Route | What ops actually does there |
+|---|---|---|
+| KPI home | `/admin` | Today’s leads, bookings and order value; pending verification; stock due a refresh; 14-day trend, 30-day lead funnel, revenue by service line; **one-click daily summary** (copy or send to WhatsApp) |
+| Listings | `/admin/listings` | Moderation queue; publish with a verification grade; grade setter with the VIN / documents / OBD2 / road-test checklist; price override; lifecycle status; **freshness sweep** (14 days idle → refresh request, +7 → auto-unlist), dry-run first |
+| Leads | `/admin/leads` | One inbox for listing enquiries *and* service requests; owner assignment (manual + round-robin); pipeline status; lost reason; WhatsApp reply templates |
+| Concierge | `/admin/concierge` | Pipeline board (new → searching → options ready → viewings → closed) with the SLA clock on every card; request brief; attach/remove the cars that render the buyer’s comparison |
+| Dispatch | `/admin/bookings` | Day sheet; assign an inspector (which *is* the dispatch); booking status; payment state; filed verdict |
+| My jobs | `/admin/jobs` | Inspector mobile view: today’s jobs, tap-sized seven-section checklist, OBD2 codes, photos, verdict, client notes |
+| Staff & roles | `/admin/staff` | Staff list, role setter, watchlist, customer count, and the capability matrix as enforced |
+| Audit log | `/admin/audit` | Publishes, grade changes, price overrides, dispatch, report filings, role changes — filterable by entity |
+
+### Signing in
+
+Staff use the same phone + code flow as customers (`/login`); there are no
+passwords in this build. The seed creates three accounts:
+
+| Number | Role | Opens |
+|---|---|---|
+| `+2348000000001` | admin | everything, including Staff & roles and the audit log |
+| `+2348000000002` | ops | KPI home, listings, leads, concierge, dispatch |
+| `+2348000000003` | inspector | My jobs only |
+
+In development the code is printed to the server log (`[auth] OTP for … → 123456`)
+and returned as `devCode`, so the console can be driven without a phone. A role
+you do not hold returns an honest 403 page naming your role — never a blank
+response and never a redirect loop. The whole console is `noindex, nofollow`
+and `Cache-Control: private, no-store`.
+
+### The demo day in the seed
+
+`npm run db:seed` also loads a working day, so the console opens onto something
+real: eight leads across the pipeline (one lost with a reason), eight service
+requests across every stage (one deliberately past its SLA), two cars attached
+to the demo concierge request, five bookings including a dispatched job for the
+inspector and a completed one with a verdict, three sensitive actions already
+in the audit log, and Ada (`+2348031234567`) with a populated §7.1 dashboard.
+
+### What is deliberately not here yet
+
+The payments seam (PSP transactions, refunds, milestone releases), the order
+manager, the CMS workflow and the generated inspection-report PDF. The screens
+say so in place rather than showing fake numbers; `src/services/slice.js` lists
+them as the remaining backlog and `scripts/check-links.js` keeps them honest.
+
+---
+
 ## Scripts
 
 | Command | What it does |
@@ -180,13 +235,20 @@ How it is put together:
 | `npm run images:check` | Fail if any photo still needs preparing (CI gate) |
 | `npm run lint:type` | Six-step type-scale audit (fails the build on a violation) |
 | `npm run lint:js` | ES-module parse check + every event name against the §15.1 plan |
-| `npm test` | 90 tests: routes, sold-archive windows, facet rules, SEO schemas, filter safety, form validation, concierge/SLA rules, shop commerce, OTP auth, referrals and the account dashboard |
+| `npm test` | 128 tests: routes, sold-archive windows, facet rules, SEO schemas, filter safety, form validation, concierge/SLA rules, shop commerce, OTP auth, referrals, the account dashboard, and the console (§7.3 modules end-to-end against the real database) |
 | `npm run check` | lint + test |
 | `npm run artifacts` | Build the static pages and re-run the type audit |
 
-`node scripts/check-links.js` walks the built slice, follows every internal
-link, and fails if a built route breaks or a backlog route stops returning its
-honest 404.
+Three checks run against a live server:
+
+* `npm run check-links` — walks the built slice and fails if a built route
+  breaks or a backlog route stops returning its honest 404.
+* `npm run crawl` — crawls every internal link from the homepage plus every URL
+  in `sitemap.xml` and reports the status of each (147 URLs today, 0 broken).
+* `npm run audit:pages` — one `<h1>` per page, titles and meta descriptions
+  inside the §14.3 budgets, a canonical on every indexable page, parseable
+  JSON-LD, alt text on every image, no unrendered EJS, no `undefined` in the
+  markup (125 pages today, 0 findings).
 
 ---
 
@@ -202,18 +264,20 @@ honest 404.
 | Content | `/blog`, `/blog/{slug}`, `/blog/rss.xml`, `/guide` |
 | Shop | `/shop`, `/shop/{slug}`, `/cart`, `/checkout`, `/order/{orderNo}` (guest checkout, tracker SKUs create a subscription row) |
 | Trust & company | `/verification`, `/how-it-works`, `/about`, `/faq`, `/contact`, `/partner` |
-| Accounts (§7.1) | `/login` (OTP), `/account` (dashboard), `/account/export`, `/api/auth/*`, `/api/account/*` — dealer and admin remain phase-2 entry pages |
+| Accounts (§7.1) | `/login` (OTP), `/account` (dashboard), `/account/export`, `/api/auth/*`, `/api/account/*` |
+| Console (§7.3/§7.4) | `/admin` (KPIs + daily summary), `/admin/listings`, `/admin/leads`, `/admin/concierge`, `/admin/bookings`, `/admin/jobs`, `/admin/staff`, `/admin/audit` |
 | Legal | `/terms`, `/privacy`, `/refunds`, `/disclaimer` (placeholder wording, flagged in the DB) |
 | Machine | `/sitemap.xml`, `/robots.txt`, `/api/listings`, `/api/posts`, `/api/leads`, `/api/events`, `/api/orders`, `/api/bookings`, `/api/service-requests`, `/api/contact`, `/api/og/listing/{slug}.png`, `/api/health` |
 
-**Phase 2 — the back office** (§7.2–§7.4: dealer portal, admin console, plus the
-payments and notification integrations the customer account already has seams
-for). The public site already writes every record
-these screens read — `service_requests`, `bookings`, `orders`, `subscriptions`,
-`leads`, `analytics_events` — so this is UI, auth and workflow only. Until a
-route is ported it returns a 404 that says so, shows the slice map and links
-back into live stock — `src/services/slice.js` holds that list, so "not built
-yet" never looks like a broken link.
+**Still to come** (§7.2–§7.4 and the integration seams): the dealer portal, the
+order manager with the payments/PSP seam, refunds and milestone releases, the
+CMS workflow, market-intel reports, the generated inspection-report PDF, live
+OTP-SMS/email delivery, Turnstile and GA4. The public site already writes every
+record these screens read — `service_requests`, `bookings`, `orders`,
+`subscriptions`, `leads`, `analytics_events` — so what remains is UI, policy and
+provider wiring. Until a route is ported it returns a 404 that says so, shows
+the slice map and links back into live stock — `src/services/slice.js` holds
+that list, so "not built yet" never looks like a broken link.
 
 ---
 
@@ -222,19 +286,20 @@ yet" never looks like a broken link.
 ```
 db/                 schema.sql · seed.sql (generated) · README.md
 docs/               PRD-extracted.txt · PORTING.md
-scripts/            db-setup · generate-seed · build-static · lint-type-scale · lint-js · check-links
+scripts/            db-setup · migrate · generate-seed · build-static · lint-type-scale ·
+                    lint-js · check-links · crawl.mjs · audit-pages.mjs
 src/
   config.js         every env var in one place
   app.js            Express wiring, CSP, static assets, redirect map
   server.js         entry point
   db/               THE data-access layer: pool, listings, facets, content,
                     requests, commerce, users, ids, leads, analytics, redirects,
-                    static-pages
+                    static-pages, admin
   lib/              render (hybrid HTML pipeline) · locals · respond · rate-limit · phone
   services/         seo · og · icons · nav · events · sitemap · listing-query ·
-                    validate · concierge · auth · slice
+                    validate · concierge · auth · roles (§7.4) · slice
   routes/           public · services · flow · blog · shop · pages · auth ·
-                    account · api · registry (static build)
+                    account · admin · api · registry (static build)
 views/
   layouts/base      partials/ (header, drawer, footer, cards, filters, forms, …)
   pages/            home · cars · facet · vdp · sold-archive · services · service ·

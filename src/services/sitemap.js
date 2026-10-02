@@ -120,15 +120,20 @@ async function buildSitemap(db, { siteUrl = config.siteUrl } = {}) {
     );
   }
 
-  // Listings — live and reserved index their VDP; sold ≤90 days index the archive.
+  // Listings. A sold car keeps its live URL for the first few days (§6.2), so
+  // the sitemap must point there — advertising /cars/sold/{slug} while the
+  // archive page does not exist yet would send crawlers to a 404. Only inside
+  // the archive window does the sold URL exist.
+  const visibleMs = config.soldArchive.visibleDays * 86_400_000;
   for (const listing of listings) {
-    const sold = listing.status === 'sold';
+    const soldAt = listing.sold_at ? new Date(listing.sold_at).getTime() : null;
+    const archived = listing.status === 'sold' && soldAt !== null && Date.now() - soldAt > visibleMs;
     entries.push(
       urlEntry({
-        loc: sold ? `${siteUrl}/cars/sold/${listing.seo_slug}` : `${siteUrl}/cars/${listing.seo_slug}`,
+        loc: `${siteUrl}/cars/${archived ? 'sold/' : ''}${listing.seo_slug}`,
         lastmod: listing.updated_at || listing.published_at,
-        changefreq: sold ? 'monthly' : 'daily',
-        priority: sold ? '0.4' : '0.7',
+        changefreq: listing.status === 'sold' ? 'monthly' : 'daily',
+        priority: listing.status === 'sold' ? '0.4' : '0.7',
       }),
     );
   }

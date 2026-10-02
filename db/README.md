@@ -49,6 +49,8 @@ after the first deploy lands in `db/migrations/NNN-name.sql` and is recorded in
 | `006-accounts.sql` | `users`, `auth_codes`, `sessions`, `saved_cars`, `saved_searches` (§7.1) |
 | `007-referrals-and-alert-switches.sql` | `users.referral_code` / `users.referred_by`; `saved_searches.alert_price_drop` / `alert_new_match` |
 | `008-referral-code-backfill.sql` | `HC0001`-shaped codes for accounts that predate 007 |
+| `009-admin-console.sql` | `users.role` / `watchlisted`; `leads` owner + lost reason; `bookings` inspector, dispatch stamps, checklist, verdict; `vehicle_listings` moderation stamps, `verification_grade` evidence, `refresh_requested_at` / `stale_flagged_at` / `refreshed_at` / `unlisted_at`; new `request_candidates` and `admin_audit` (§7.3) |
+| `010-request-crm-fields.sql` | `service_requests.assigned_to` / `assigned_at` / `last_contacted_at` / `lost_reason`, so concierge requests sit in the same CRM-lite pipeline as leads |
 
 ---
 
@@ -80,6 +82,18 @@ and `leads` are anonymised in place (`name` → `Deleted account`, `phone` →
 * Statuses: `draft → in_review → live → reserved → sold → expired`.
   Ops moderation and expiry automation move listings between them; only
   `live` and `reserved` are publicly browsable (plus sold within 7 days).
+* Verification grades are the only three the product claims:
+  `network_listed → field_checked → certified`. A `certified` grade is only
+  written with the VIN / documents / OBD2 / road-test checklist attached, and
+  every grade change records who set it and when.
+* **Freshness.** A live listing nobody has touched for 14 days is flagged for
+  the dealer to confirm; seven days later, still unconfirmed, it is
+  auto-unlisted to `expired`. The sweep is idempotent and dry-runnable, and it
+  writes one audit row per car it touches.
+* **Staff roles** live on `users.role` (`customer`, `dealer`, `ops`,
+  `inspector`, `marketing`, `finance`, `admin`). The capability matrix is code
+  (`src/services/roles.js`), not data — roles are stored, capabilities are
+  enforced. `watchlisted` marks an account for review without blocking it.
 
 ---
 
@@ -109,6 +123,8 @@ and `leads` are anonymised in place (`name` → `Deleted account`, `phone` →
 | `analytics_events` | Server-side mirror of the §15.1 event plan. Purchase-adjacent events are server-only. |
 | `redirects` | 301 map: the 90-day sold hand-off and any legacy URL. |
 | `static_pages` | Build bookkeeping — which stable pages were written to disk, when, and from which view. |
+| `request_candidates` | The cars ops attached to a concierge request (`rank_no`, `note`, who added them). The buyer's comparison page is rendered from exactly these rows — attaching or removing one is what changes what a customer sees. |
+| `admin_audit` | Append-only log of sensitive actions: who did what to which row, with a JSON `detail`. Written by `src/db/admin.js` for publishes, grade changes, price overrides, dispatch, filed reports, stale sweeps and role changes. |
 | `schema_migrations` | Which files under `db/migrations/` have been applied, so `npm run db:setup` is safe to re-run. |
 
 ## Views
@@ -141,6 +157,23 @@ Harcourt listings across 12 partner lots — including deliberate edge cases:
 | Sold 7–90 days | 4 | The archive page + 301 from the old VDP URL |
 | Sold >90 days | 3 | The 301-to-facet hand-off |
 | Draft / in review / expired | 3 | Never public |
+
+The seed also loads a working day for the console (§7.3) and the §7.1 demo
+account, because `db:setup` truncates the tables those screens read:
+
+| Records | Detail |
+|---|---|
+| Staff | `+2348000000001` admin · `…002` ops · `…003` inspector |
+| Leads | 8 across `new → assigned → contacted → viewing → closed`, one `lost` with a reason |
+| Service requests | 8 across every stage including one deliberately past its SLA, one with two `request_candidates` attached |
+| Bookings | 5 — requested, dispatched to the inspector, confirmed install, completed with a verdict, and one cancelled |
+| Audit | 3 sensitive actions already on file |
+| Demo customer | Ada (`+2348031234567`): 1 saved car, 1 saved search, a 3-day hire request, paid order `HC-ORD-0001` and an active tracker subscription |
+
+Timestamps are relative to load time (`DATE_ADD(UTC_TIMESTAMP(), …)`), so the
+console always opens onto a plausible day rather than a stale one. Listing
+expiry is written the same way for the same reason — a fixed date in the seed
+would silently turn live stock into 404s the next morning.
 
 `listing_media` rows point at prepared photographs in `public/img/cars/` and
 `public/img/details/` (resolved per listing by `scripts/seed-media.js`). Every

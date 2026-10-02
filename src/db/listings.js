@@ -630,11 +630,16 @@ async function recordView(listingId) {
 }
 
 /** Sitemap + static build input: every listing URL that should exist. */
+/**
+ * Slugs for sitemap.xml. Must mirror the browse query exactly: a listing whose
+ * expiry has passed is not served any more, so advertising it in the sitemap
+ * would point crawlers at a 404.
+ */
 async function allIndexableSlugs() {
   return query(
     `SELECT seo_slug, updated_at, published_at, status, sold_at
        FROM vehicle_listings
-      WHERE status IN ('live','reserved')
+      WHERE (status IN ('live','reserved') AND (expires_at IS NULL OR expires_at > UTC_TIMESTAMP()))
          OR (status = 'sold' AND sold_at > DATE_SUB(UTC_TIMESTAMP(), INTERVAL 90 DAY))
       ORDER BY updated_at DESC`,
   );

@@ -19,6 +19,7 @@ const crypto = require('node:crypto');
 const config = require('../config');
 const db = require('../db');
 const phones = require('../lib/phone');
+const roles = require('./roles');
 
 const SESSION_COOKIE = 'hc_session';
 const OTP_CHANNELS = ['whatsapp', 'sms', 'console'];
@@ -285,6 +286,45 @@ function requireUser(req, res, next) {
 }
 
 /**
+ * Rendered rather than a bare status code: a member of staff who opens a
+ * module they do not hold, and a signed-in customer who guesses /admin, both
+ * get a page that says which role they hold — never a blank response.
+ */
+function forbidden(req, res) {
+  const respond = require('../lib/respond');
+  return respond.sendPage(req, res, {
+    view: 'error',
+    status: 403,
+    cache: 'no-store',
+    page: {
+      title: 'No access',
+      metaTitle: 'No access | HonestCars',
+      canonical: '/admin',
+      robots: 'noindex,nofollow',
+    },
+    data: { reason: 'forbidden', role: (req.user && req.user.role) || 'customer' },
+  });
+}
+
+/**
+ * §7.4 — the console gate. Two steps: someone with a staff role, then someone
+ * who holds the capability this screen or action needs. A signed-in customer
+ * gets the honest 403 page, not a redirect loop.
+ */
+function requireStaff(options = {}) {
+  const capability = typeof options === 'string' ? options : options.capability || null;
+  return (req, res, next) => {
+    if (!req.user) {
+      const target = encodeURIComponent(req.originalUrl || '/admin');
+      return res.redirect(302, `/login?next=${target}`);
+    }
+    if (!roles.isStaff(req.user.role)) return forbidden(req, res);
+    if (capability && !roles.can(req.user.role, capability)) return forbidden(req, res);
+    return next();
+  };
+}
+
+/**
  * CSRF defence for state-changing requests: SameSite=Lax cookies plus a
  * same-origin check on the Origin/Sec-Fetch-Site headers (§12.2).
  */
@@ -329,6 +369,7 @@ function logout(req, res) {
 }
 
 module.exports = {
+  requireStaff,
   SESSION_COOKIE,
   OTP_CHANNELS,
   normalisePhone,

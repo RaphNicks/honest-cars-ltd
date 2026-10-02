@@ -25,6 +25,9 @@ function shapeUser(row) {
     email: row.email || null,
     marketingOptIn: Boolean(row.marketing_opt_in),
     status: row.status,
+    // §7.4 — 'customer' unless a staff role was granted in the console.
+    role: row.role || 'customer',
+    watchlisted: Boolean(row.watchlisted),
     referralCode: row.referral_code || null,
     referredBy: row.referred_by || null,
     lastSeenAt: row.last_seen_at,

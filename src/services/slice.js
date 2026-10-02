@@ -3,15 +3,17 @@
 /**
  * Slice map.
  *
- * This build ships the whole public storefront: design system, homepage,
- * /cars, the VDP, the service suite, both funnels (concierge + sell/swap),
- * hire, the blog, the shop and every trust/company/legal page. What remains is
- * the authenticated back office — the customer account interior, the dealer
- * portal and the admin console (§7.1–§7.4), which the PRD itself marks as
- * later-phase work.
+ * This build ships the whole public storefront (design system, homepage,
+ * /cars, the VDP, the service suite, both funnels, hire, the blog, the shop,
+ * every trust/company/legal page), the customer account interior (§7.1) and
+ * the operations console (§7.3/§7.4). What remains is the dealer portal
+ * (§7.2), the order manager and the CMS workflow — the modules that need the
+ * payments seam and the audit trail they will write into.
  *
- * When a route is ported, remove it from PENDING; check-links.js will start
- * requiring a 200 for it.
+ * The console paths listed here are protected: an anonymous request to them
+ * redirects to /login, so check-links only follows the ones it can reach
+ * signed out. When a route is ported, remove it from PENDING and check-links
+ * starts requiring a 200 for it.
  */
 
 const BUILT = [
@@ -56,9 +58,8 @@ const BUILT = [
   { path: '/privacy', label: 'Privacy (NDPA-aligned, placeholder wording)' },
   { path: '/refunds', label: 'Refunds (placeholder wording)' },
   { path: '/disclaimer', label: 'Disclaimer (placeholder wording)' },
-  { path: '/account', label: 'Account entry page (interior is phase 2)' },
+  { path: '/account', label: 'Account dashboard + login (§7.1)' },
   { path: '/dealer', label: 'Dealer portal entry page (interior is phase 2)' },
-  { path: '/admin', label: 'Admin entry page (interior is phase 2)' },
   { path: '/sitemap.xml', label: 'Sitemap' },
   { path: '/robots.txt', label: 'robots.txt' },
 ];
@@ -69,15 +70,14 @@ const BUILT = [
  * orders, subscriptions, leads, analytics_events).
  */
 const PENDING = [
-  { path: '/account/dashboard', label: 'Customer account dashboard (§7.1)', phase: 'phase-2' },
   { path: '/dealer/dashboard', label: 'Dealer portal: dashboard (§7.2)', phase: 'phase-2' },
   { path: '/dealer/listings', label: 'Dealer portal: my listings (§7.2)', phase: 'phase-2' },
   { path: '/dealer/listings/new', label: 'Dealer portal: add listing wizard (§7.2)', phase: 'phase-2' },
   { path: '/dealer/leads', label: 'Dealer portal: leads & viewings (§7.2)', phase: 'phase-2' },
-  { path: '/admin/requests', label: 'Admin: concierge pipeline (§7.3)', phase: 'phase-2' },
-  { path: '/admin/bookings', label: 'Admin: inspection dispatch (§7.3)', phase: 'phase-2' },
-  { path: '/admin/orders', label: 'Admin: order manager (§7.3)', phase: 'phase-2' },
+  { path: '/admin/orders', label: 'Admin: order manager + payments (§7.3)', phase: 'phase-2' },
   { path: '/admin/cms', label: 'Admin: content workflow (§7.4)', phase: 'phase-2' },
+  { path: '/admin/intel', label: 'Admin: market intel + reports (§7.3)', phase: 'phase-2' },
+  { path: '/admin/inspections', label: 'Admin: inspection report PDF (§7.3)', phase: 'phase-2' },
 ];
 
 /** Does this request path correspond to a route we have promised but not built? */
@@ -95,7 +95,7 @@ function pendingRouteFor(pathname) {
 
   // Dynamic prefixes the public site owns get their own routers; anything else
   // under them is a phase-2 screen.
-  for (const prefix of ['/account/', '/dealer/', '/admin/']) {
+  for (const prefix of ['/dealer/', '/admin/']) {
     if (clean.startsWith(prefix) && clean.length > prefix.length) {
       const match = PENDING.find((r) => r.path.startsWith(prefix));
       if (match) return match;

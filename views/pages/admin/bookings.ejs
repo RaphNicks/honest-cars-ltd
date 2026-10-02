@@ -1,0 +1,142 @@
+<%#
+  /admin/bookings — dispatch (§7.3).
+  The calendar list of inspections, consultations and installs: assign an
+  inspector, move the job through requested → confirmed → dispatched →
+  completed, and see the verdict once the checklist comes back.
+  Locals: rows, counts, inspectors, filters, statuses
+%>
+<div class="admin-grid admin-grid--5">
+  <div class="kpi kpi--sm">
+    <span class="kpi__label">Requested</span>
+    <strong class="kpi__value tabular"><%= counts.requested %></strong>
+    <span class="kpi__foot">needs a decision</span>
+  </div>
+  <div class="kpi kpi--sm">
+    <span class="kpi__label">Confirmed</span>
+    <strong class="kpi__value tabular"><%= counts.confirmed %></strong>
+    <span class="kpi__foot">not yet dispatched</span>
+  </div>
+  <div class="kpi kpi--sm">
+    <span class="kpi__label">Dispatched</span>
+    <strong class="kpi__value tabular"><%= counts.dispatched %></strong>
+    <span class="kpi__foot">with an inspector</span>
+  </div>
+  <div class="kpi kpi--sm">
+    <span class="kpi__label">Completed</span>
+    <strong class="kpi__value tabular"><%= counts.completed %></strong>
+    <span class="kpi__foot">report on file</span>
+  </div>
+  <div class="kpi kpi--sm">
+    <span class="kpi__label">Unscheduled</span>
+    <strong class="kpi__value tabular"><%= counts.unscheduled %></strong>
+    <span class="kpi__foot">no slot yet</span>
+  </div>
+</div>
+
+<section class="panel">
+  <div class="panel__head">
+    <h2 class="panel__title">The day sheet</h2>
+    <form class="admin-filters" method="get" action="/admin/bookings">
+      <label class="visually-hidden" for="book-date">Date</label>
+      <input class="input input--compact" id="book-date" name="date" type="date" value="<%= filters.date || '' %>">
+      <label class="visually-hidden" for="book-status">Status</label>
+      <select class="select select--compact" id="book-status" name="status" data-auto-submit>
+        <option value="">Any status</option>
+        <% statuses.forEach(function (value) { %>
+          <option value="<%= value %>" <%= filters.status === value ? 'selected' : '' %>><%= value %></option>
+        <% }); %>
+      </select>
+      <button class="btn btn--secondary btn--sm" type="submit">Filter</button>
+      <% if (filters.date || filters.status) { %>
+        <a class="btn btn--ghost btn--sm" href="/admin/bookings">Clear</a>
+      <% } %>
+    </form>
+  </div>
+
+  <% if (!rows.length) { %>
+    <p class="empty-line">No bookings match. They arrive from the service pages, the VDP and /hire.</p>
+  <% } else { %>
+    <table class="table table--stack">
+      <thead>
+        <tr>
+          <th scope="col">Ref</th>
+          <th scope="col">When</th>
+          <th scope="col">Customer</th>
+          <th scope="col">Job</th>
+          <th scope="col">Pay</th>
+          <th scope="col">Inspector</th>
+          <th scope="col">Status</th>
+          <th scope="col">Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        <% rows.forEach(function (row) { %>
+          <tr>
+            <th scope="row" class="tabular"><%= row.reference %></th>
+            <td>
+              <% if (row.slotAt) { %>
+                <%= new Date(row.slotAt).toLocaleString('en-NG', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) %>
+              <% } else { %>
+                <span class="warn">no slot</span>
+              <% } %>
+              <% if (row.location) { %><br><span class="muted"><%= row.location %></span><% } %>
+            </td>
+            <td>
+              <%= row.name %><br>
+              <span class="muted tabular"><%= row.maskedPhone %></span>
+            </td>
+            <td>
+              <span class="chip"><%= row.type %></span>
+              <% if (row.vehicle && row.vehicle.make) { %>
+                <br><span class="muted"><%= row.vehicle.year %> <%= row.vehicle.make %> <%= row.vehicle.model %></span>
+              <% } %>
+            </td>
+            <td>
+              <span class="badge badge--<%= row.paymentStatus %>"><%= row.paymentStatus %></span>
+              <% if (row.amountKobo) { %><br><span class="tabular"><%= helpers.formatNaira(row.amountKobo) %></span><% } %>
+            </td>
+            <td>
+              <form method="post" action="/admin/bookings/<%= row.id %>/dispatch" class="inline-form">
+                <label class="visually-hidden" for="inspector-<%= row.id %>">Inspector</label>
+                <select class="select select--compact" id="inspector-<%= row.id %>" name="inspector_id">
+                  <option value="0">Unassigned</option>
+                  <% inspectors.forEach(function (person) { %>
+                    <option value="<%= person.id %>" <%= String(row.inspectorId) === String(person.id) ? 'selected' : '' %>><%= person.name %></option>
+                  <% }); %>
+                </select>
+                <button class="btn btn--secondary btn--sm" type="submit">Set</button>
+              </form>
+            </td>
+            <td>
+              <span class="badge badge--<%= row.status %>"><%= row.status %></span>
+              <% if (row.verdict) { %>
+                <br><span class="badge badge--<%= row.verdict %>"><%= row.verdict.replace(/_/g, ' ') %></span>
+              <% } %>
+              <% if (row.completedAt) { %><br><span class="muted"><%= helpers.relativeDays(row.completedAt) %></span><% } %>
+            </td>
+            <td>
+              <form method="post" action="/admin/bookings/<%= row.id %>/status" class="inline-form">
+                <label class="visually-hidden" for="booking-status-<%= row.id %>">Status</label>
+                <select class="select select--compact" id="booking-status-<%= row.id %>" name="status">
+                  <% statuses.forEach(function (value) { %>
+                    <option value="<%= value %>" <%= row.status === value ? 'selected' : '' %>><%= value %></option>
+                  <% }); %>
+                </select>
+                <button class="btn btn--secondary btn--sm" type="submit">Move</button>
+              </form>
+              <% if (row.reportNotes) { %>
+                <p class="note-inline mb-0"><%= row.reportNotes.slice(0, 140) %></p>
+              <% } %>
+            </td>
+          </tr>
+        <% }); %>
+      </tbody>
+    </table>
+  <% } %>
+</section>
+
+<p class="note-inline">
+  Slot capacity settings and the auto-generated client report PDF are the remaining pieces of this module (§7.3):
+  the calendar, the assignment and the checklist are live, and the inspector’s mobile view is at
+  <a href="/admin/jobs">/admin/jobs</a>.
+</p>
