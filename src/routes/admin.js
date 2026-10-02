@@ -9,6 +9,10 @@
  *   GET  /admin/concierge           pipeline board, candidates, SLA
  *   GET  /admin/bookings            dispatch calendar
  *   GET  /admin/jobs                inspector mobile view + checklist
+ *   GET  /admin/jobs/:id/report     the client-facing inspection report (FR-07)
+ *   GET  /admin/orders              shop orders + fulfilment
+ *   GET  /admin/payments            transactions, receipts, refunds, dealer ledger
+ *   GET  /admin/milestones          protected-purchase & parts escrow tracker
  *   GET  /admin/staff               staff, roles, watchlist
  *   GET  /admin/audit               sensitive-action log
  *
@@ -24,6 +28,9 @@ const db = require('../db');
 const auth = require('../services/auth');
 const roles = require('../services/roles');
 const validate = require('../services/validate');
+const paymentService = require('../services/payments');
+const money = require('../lib/money');
+const report = require('../services/report');
 const { sendPage, CACHE } = require('../lib/respond');
 
 const router = express.Router();
@@ -36,6 +43,9 @@ const PATHS = {
   concierge: `${HOME}/concierge`,
   bookings: `${HOME}/bookings`,
   jobs: `${HOME}/jobs`,
+  orders: `${HOME}/orders`,
+  payments: `${HOME}/payments`,
+  milestones: `${HOME}/milestones`,
   staff: `${HOME}/staff`,
   audit: `${HOME}/audit`,
 };
@@ -48,6 +58,9 @@ const NAV = [
   { href: PATHS.concierge, label: 'Concierge', icon: 'search', capability: 'concierge.manage' },
   { href: PATHS.bookings, label: 'Dispatch', icon: 'calendar', capability: 'bookings.dispatch' },
   { href: PATHS.jobs, label: 'My jobs', icon: 'check', capability: 'bookings.own_jobs' },
+  { href: PATHS.orders, label: 'Orders', icon: 'package', capability: 'payments.view' },
+  { href: PATHS.payments, label: 'Money', icon: 'chart', capability: 'payments.view' },
+  { href: PATHS.milestones, label: 'Escrow', icon: 'shield', capability: 'payments.view' },
   { href: PATHS.staff, label: 'Staff & roles', icon: 'account', capability: 'users.manage' },
   { href: PATHS.audit, label: 'Audit log', icon: 'shield', capability: 'users.manage' },
 ];
@@ -582,6 +595,386 @@ router.post('/jobs/:id/report', auth.requireStaff('bookings.own_jobs'), auth.sam
     return result.ok
       ? done(res, PATHS.jobs, 'Report saved. The client-facing PDF is generated in the dispatch module.')
       : done(res, PATHS.jobs, result.error, { error: true });
+  } catch (error) {
+    return next(error);
+  }
+});
+
+// ---------------------------------------------------------------------------
+// Orders (§7.3 “Orders & Payments”) — what was bought and where it has got to
+// ---------------------------------------------------------------------------
+router.get('/orders', auth.requireStaff('payments.view'), async (req, res, next) => {
+  try {
+    const status = validate.oneOf(req.query.status, [...db.payments.ORDER_STATUSES, 'all'], 'all');
+    const q = validate.text(req.query.q, 60) || null;
+    const list = await db.payments.listOrders({ status: status === 'all' ? null : status, q, limit: 200 });
+    return await page(req, res, {
+      view: 'admin/orders',
+      active: PATHS.orders,
+      title: 'Orders',
+      description: 'Shop orders, what is in them, and where each one has got to.',
+      data: {
+        rows: list.rows,
+        counts: list.counts,
+        statuses: db.payments.ORDER_STATUSES,
+        status,
+        q,
+        canApprove: roles.can(req.user.role, 'payments.approve'),
+      },
+    });
+  } catch (error) {
+    return next(error);
+  }
+});
+
+router.post('/orders/:id/status', auth.requireStaff('payments.approve'), auth.sameOriginOnly, async (req, res, next) => {
+  try {
+    const id = validate.integer(req.params.id, { min: 1, fallback: 0 });
+    const status = validate.oneOf(req.body.status, db.payments.ORDER_STATUSES, null);
+    if (!status) return done(res, PATHS.orders, 'Unknown order status.', { error: true });
+    const result = await db.payments.setOrderStatus(id, status, { actorId: req.user.id });
+    return result.ok
+      ? done(res, PATHS.orders, `Order moved to ${status.replace(/_/g, ' ')}.`)
+      : done(res, PATHS.orders, result.error, { error: true });
+  } catch (error) {
+    return next(error);
+  }
+});
+
+// ---------------------------------------------------------------------------
+// Payments, receipts and the dealer ledger (§7.3, §7.2)
+// ---------------------------------------------------------------------------
+router.get('/payments', auth.requireStaff('payments.view'), async (req, res, next) => {
+  try {
+    const status = validate.oneOf(req.query.status, [...db.payments.PAYMENT_STATUSES, 'all'], 'all');
+    const purpose = validate.oneOf(req.query.purpose, [...db.payments.PURPOSES, 'all'], 'all');
+    const provider = validate.oneOf(req.query.provider, [...db.payments.PROVIDERS, 'all'], 'all');
+    const q = validate.text(req.query.q, 60) || null;
+    const dealerId = validate.integer(req.query.dealer, { min: 1, fallback: 0 }) || null;
+    const from = validate.text(req.query.from, 10) || null;
+    const to = validate.text(req.query.to, 10) || null;
+
+    const [list, ledger, statement, dealers, unpaidOrders, unpaidBookings, escrow, listings] = await Promise.all([
+      db.payments.listPayments({
+        status: status === 'all' ? null : status,
+        purpose: purpose === 'all' ? null : purpose,
+        provider: provider === 'all' ? null : provider,
+        q,
+        limit: 200,
+      }),
+      db.payments.ledgerSummary(),
+      dealerId ? db.payments.ledgerFor(dealerId, { from, to }) : null,
+      db.query('SELECT id, name, city FROM dealers ORDER BY name'),
+      db.payments.listOrders({ status: 'pending_payment', limit: 50 }),
+      db.query(
+        `SELECT b.id, b.reference, b.name, b.amount_kobo, b.payment_status, b.slot_at
+           FROM bookings b
+          WHERE b.payment_status IN ('unpaid','pending') AND b.status NOT IN ('cancelled','completed')
+          ORDER BY b.slot_at LIMIT 50`,
+      ),
+      db.payments.listMilestones({ limit: 1 }),
+      db.query("SELECT id, stock_no, make, model, year FROM vehicle_listings ORDER BY stock_no LIMIT 300"),
+    ]);
+
+    return await page(req, res, {
+      view: 'admin/payments',
+      active: PATHS.payments,
+      title: 'Money',
+      description: 'Every payment in and out: statuses, receipts, refunds, and the dealer ledger.',
+      data: {
+        rows: list.rows,
+        totals: list.totals,
+        status,
+        purpose,
+        provider,
+        q,
+        statuses: db.payments.PAYMENT_STATUSES,
+        purposes: db.payments.PURPOSES,
+        providers: db.payments.PROVIDERS,
+        availability: paymentService.availability(),
+        providerLabels: paymentService.PROVIDER_LABELS,
+        activeProvider: paymentService.activeProvider(),
+        ledger,
+        statement,
+        dealerId,
+        from,
+        to,
+        dealers,
+        unpaidOrders: unpaidOrders.rows,
+        unpaidBookings,
+        escrowKobo: escrow.counts.heldKobo,
+        listings,
+        canApprove: roles.can(req.user.role, 'payments.approve'),
+      },
+    });
+  } catch (error) {
+    return next(error);
+  }
+});
+
+router.post('/payments/:id/confirm', auth.requireStaff('payments.approve'), auth.sameOriginOnly, async (req, res, next) => {
+  try {
+    const id = validate.integer(req.params.id, { min: 1, fallback: 0 });
+    const note = validate.text(req.body.note, 160) || null;
+    const result = await paymentService.confirmManually(id, { actorId: req.user.id, note });
+    if (!result.ok) return done(res, PATHS.payments, result.error, { error: true });
+    if (result.already) return done(res, PATHS.payments, 'That payment was already marked paid.');
+    return done(res, PATHS.payments, `${result.payment.reference} marked paid and a receipt queued for the customer.`);
+  } catch (error) {
+    return next(error);
+  }
+});
+
+router.post('/payments/:id/refund', auth.requireStaff('payments.approve'), auth.sameOriginOnly, async (req, res, next) => {
+  try {
+    const id = validate.integer(req.params.id, { min: 1, fallback: 0 });
+    const amountKobo = money.nairaToKobo(req.body.amount);
+    const reason = validate.text(req.body.reason, 200);
+    if (!amountKobo) return done(res, PATHS.payments, 'Enter the refund amount in naira, e.g. ₦45,000.', { error: true });
+    if (!reason) return done(res, PATHS.payments, 'A refund needs a reason — it goes on the audit log.', { error: true });
+    const result = await paymentService.refund(id, { amountKobo, reason, actorId: req.user.id });
+    if (!result.ok) return done(res, PATHS.payments, result.error, { error: true });
+    return done(res, PATHS.payments, `Refunded ${money.formatNaira(amountKobo)} against payment ${id}.`);
+  } catch (error) {
+    return next(error);
+  }
+});
+
+/** Money that arrived outside a PSP: a transfer on the statement, cash at the lot. */
+router.post('/payments/manual', auth.requireStaff('payments.approve'), auth.sameOriginOnly, async (req, res, next) => {
+  try {
+    const amountKobo = money.nairaToKobo(req.body.amount);
+    const purpose = validate.oneOf(req.body.purpose, db.payments.PURPOSES, null);
+    const provider = validate.oneOf(req.body.provider, ['bank_transfer', 'cash', 'manual'], 'bank_transfer');
+    if (!amountKobo) return done(res, PATHS.payments, 'Enter the amount in naira, e.g. ₦45,000.', { error: true });
+    if (!purpose) return done(res, PATHS.payments, 'Choose what the money was for.', { error: true });
+
+    const orderNo = validate.text(req.body.order_no, 40) || null;
+    const bookingRef = validate.text(req.body.booking_reference, 40) || null;
+    const order = orderNo ? await db.queryOne('SELECT id, order_no, name, phone, total_kobo FROM orders WHERE order_no = ? LIMIT 1', [orderNo]) : null;
+    const booking = bookingRef ? await db.queryOne('SELECT id, reference, name, phone FROM bookings WHERE reference = ? LIMIT 1', [bookingRef]) : null;
+    if (orderNo && !order) return done(res, PATHS.payments, `There is no order ${orderNo}.`, { error: true });
+    if (bookingRef && !booking) return done(res, PATHS.payments, `There is no booking ${bookingRef}.`, { error: true });
+
+    const result = await db.payments.recordManualPayment({
+      purpose,
+      amountKobo,
+      provider,
+      orderId: order ? order.id : null,
+      bookingId: booking ? booking.id : null,
+      customerName: validate.name(req.body.customer_name) || (order ? order.name : booking ? booking.name : null),
+      customerPhone: validate.text(req.body.customer_phone, 20) || (order ? order.phone : booking ? booking.phone : null),
+      note: validate.text(req.body.note, 160) || null,
+      actorId: req.user.id,
+    });
+    if (!result.ok) return done(res, PATHS.payments, result.error, { error: true });
+
+    // Whatever the money was for follows the money — but only once it is covered.
+    if (booking) {
+      await db.query("UPDATE bookings SET payment_status = 'paid' WHERE id = ?", [booking.id]);
+    }
+    if (order) {
+      const paid = await db.queryOne(
+        "SELECT COALESCE(SUM(amount_kobo - refund_kobo), 0) AS kobo FROM payments WHERE order_id = ? AND status IN ('paid','partially_refunded')",
+        [order.id],
+      );
+      if (Number(paid.kobo || 0) >= Number(order.total_kobo || 0)) {
+        await db.payments.setOrderStatus(order.id, 'paid', { actorId: req.user.id });
+      }
+    }
+    return done(res, PATHS.payments, `Recorded ${money.formatNaira(amountKobo)} as ${result.reference}.`);
+  } catch (error) {
+    return next(error);
+  }
+});
+
+/** Ask a customer for money: a pending payment plus a copyable bank instruction. */
+router.post('/payments/request', auth.requireStaff('payments.approve'), auth.sameOriginOnly, async (req, res, next) => {
+  try {
+    const amountKobo = money.nairaToKobo(req.body.amount);
+    const purpose = validate.oneOf(req.body.purpose, db.payments.PURPOSES, 'booking');
+    if (!amountKobo) return done(res, PATHS.payments, 'Enter the amount to request, e.g. ₦45,000.', { error: true });
+    const bookingRef = validate.text(req.body.booking_reference, 40) || null;
+    const orderNo = validate.text(req.body.order_no, 40) || null;
+    const booking = bookingRef ? await db.queryOne('SELECT id, name, phone FROM bookings WHERE reference = ? LIMIT 1', [bookingRef]) : null;
+    const order = orderNo ? await db.queryOne('SELECT id, name, phone FROM orders WHERE order_no = ? LIMIT 1', [orderNo]) : null;
+    const name = validate.name(req.body.customer_name) || (booking ? booking.name : order ? order.name : null);
+    const phone = validate.text(req.body.customer_phone, 20) || (booking ? booking.phone : order ? order.phone : null);
+    if (!name || !phone) return done(res, PATHS.payments, 'A payment request needs a customer name and phone.', { error: true });
+
+    const result = await paymentService.initiate({
+      provider: validate.oneOf(req.body.provider, db.payments.PROVIDERS, null),
+      purpose,
+      amountKobo,
+      bookingId: booking ? booking.id : null,
+      orderId: order ? order.id : null,
+      customerName: name,
+      customerPhone: phone,
+      actorId: req.user.id,
+    });
+    if (!result.ok) return done(res, PATHS.payments, result.error, { error: true });
+    return done(res, PATHS.payments, `${result.reference} is ready for ${name} — the request message is on the message log.`);
+  } catch (error) {
+    return next(error);
+  }
+});
+
+/** Append to the dealer ledger. Corrections are new rows, never edits. */
+router.post('/ledger', auth.requireStaff('payments.approve'), auth.sameOriginOnly, async (req, res, next) => {
+  try {
+    const dealerId = validate.integer(req.body.dealer_id, { min: 1, fallback: 0 });
+    const entryType = validate.oneOf(req.body.entry_type, db.payments.LEDGER_ENTRY_TYPES, null);
+    const magnitude = money.nairaToKobo(req.body.amount);
+    if (!dealerId) return done(res, PATHS.payments, 'Choose the dealer this entry belongs to.', { error: true });
+    if (!entryType) return done(res, PATHS.payments, 'Choose the entry type.', { error: true });
+    if (!magnitude) return done(res, PATHS.payments, 'Enter the amount in naira, e.g. ₦250,000.', { error: true });
+    const signed = String(req.body.direction || 'in') === 'out' ? -magnitude : magnitude;
+
+    const result = await db.payments.addLedgerEntry({
+      dealerId,
+      entryType,
+      amountKobo: signed,
+      listingId: validate.integer(req.body.listing_id, { min: 1, fallback: 0 }) || null,
+      reference: validate.text(req.body.reference, 40) || null,
+      detail: validate.text(req.body.detail, 200) || null,
+      actorId: req.user.id,
+    });
+    return result.ok
+      ? done(res, `${PATHS.payments}?dealer=${dealerId}`, `Ledger entry added: ${money.formatNaira(magnitude)} ${signed < 0 ? 'paid out' : 'recorded'}.`)
+      : done(res, PATHS.payments, result.error, { error: true });
+  } catch (error) {
+    return next(error);
+  }
+});
+
+// ---------------------------------------------------------------------------
+// Milestone tracker (§7.3 escrow: funds → inspection → documents → released)
+// ---------------------------------------------------------------------------
+router.get('/milestones', auth.requireStaff('payments.view'), async (req, res, next) => {
+  try {
+    const stage = validate.oneOf(req.query.stage, [...db.payments.MILESTONE_STAGES, 'cancelled'], null);
+    const [list, listings, bookings] = await Promise.all([
+      db.payments.listMilestones({ stage, limit: 200 }),
+      db.query("SELECT id, stock_no, make, model, year FROM vehicle_listings WHERE status IN ('live','reserved','sold') ORDER BY stock_no LIMIT 200"),
+      db.query("SELECT id, reference, name, phone, slot_at FROM bookings WHERE status <> 'cancelled' ORDER BY slot_at DESC LIMIT 60"),
+    ]);
+    return await page(req, res, {
+      view: 'admin/milestones',
+      active: PATHS.milestones,
+      title: 'Escrow',
+      description: 'Protected purchases and parts escrow — one stage at a time, with a human on every release.',
+      data: {
+        rows: list.rows,
+        counts: list.counts,
+        stages: db.payments.MILESTONE_STAGES,
+        kinds: db.payments.MILESTONE_KINDS,
+        stage,
+        listings,
+        bookings,
+        canApprove: roles.can(req.user.role, 'payments.approve'),
+      },
+    });
+  } catch (error) {
+    return next(error);
+  }
+});
+
+router.post('/milestones', auth.requireStaff('payments.approve'), auth.sameOriginOnly, async (req, res, next) => {
+  try {
+    const amountKobo = money.nairaToKobo(req.body.amount);
+    const kind = validate.oneOf(req.body.kind, db.payments.MILESTONE_KINDS, 'protected_purchase');
+    if (!amountKobo) return done(res, PATHS.milestones, 'Enter the amount held, e.g. ₦500,000.', { error: true });
+    const result = await db.payments.createMilestone({
+      kind,
+      subject: validate.text(req.body.subject, 200),
+      listingId: validate.integer(req.body.listing_id, { min: 1, fallback: 0 }) || null,
+      bookingId: validate.integer(req.body.booking_id, { min: 1, fallback: 0 }) || null,
+      customerName: validate.name(req.body.customer_name),
+      customerPhone: validate.text(req.body.customer_phone, 20),
+      amountKobo,
+      actorId: req.user.id,
+    });
+    return result.ok
+      ? done(res, PATHS.milestones, `${result.reference} is tracking ${money.formatNaira(amountKobo)}.`)
+      : done(res, PATHS.milestones, result.error, { error: true });
+  } catch (error) {
+    return next(error);
+  }
+});
+
+router.post('/milestones/:id/stage', auth.requireStaff('payments.approve'), auth.sameOriginOnly, async (req, res, next) => {
+  try {
+    const id = validate.integer(req.params.id, { min: 1, fallback: 0 });
+    const to = validate.oneOf(req.body.to, [...db.payments.MILESTONE_STAGES, 'cancelled'], null);
+    const note = validate.text(req.body.note, 200) || null;
+    if (!to) return done(res, PATHS.milestones, 'Choose the stage to move to.', { error: true });
+    const result = await db.payments.advanceMilestone(id, { to, note, actorId: req.user.id });
+    if (!result.ok) return done(res, PATHS.milestones, result.error, { error: true });
+    await paymentService.notifyMilestone(result.milestone, { actorId: req.user.id }).catch(() => {});
+    const verb = to === 'released' ? 'released to the seller' : `moved to ${to.replace(/_/g, ' ')}`;
+    return done(res, PATHS.milestones, `${result.milestone.reference} ${verb}.`);
+  } catch (error) {
+    return next(error);
+  }
+});
+
+// ---------------------------------------------------------------------------
+// The inspection report (FR-07) — staff print view and the client PDF
+// ---------------------------------------------------------------------------
+/** Shared gate: the assigned inspector, or anyone who may dispatch work. */
+async function reportAccess(req, bookingId) {
+  const booking = await db.queryOne('SELECT id, reference, inspector_id FROM bookings WHERE id = ? LIMIT 1', [bookingId]);
+  if (!booking) return { ok: false, status: 404, error: 'That job no longer exists.' };
+  const isOwner = Number(booking.inspector_id) === Number(req.user.id);
+  if (!isOwner && !roles.can(req.user.role, 'bookings.dispatch')) {
+    return { ok: false, status: 403, error: 'That job is not assigned to you.' };
+  }
+  const built = await report.build(bookingId);
+  if (!built) return { ok: false, status: 404, error: 'That job no longer exists.' };
+  return { ok: true, report: built };
+}
+
+router.get('/jobs/:id/report', auth.requireAnyStaff(['bookings.own_jobs', 'bookings.dispatch']), async (req, res, next) => {
+  try {
+    const id = validate.integer(req.params.id, { min: 1, fallback: 0 });
+    const access = await reportAccess(req, id);
+    if (!access.ok) return done(res, PATHS.jobs, access.error, { error: true });
+
+    return await sendPage(req, res, {
+      routePath: req.path,
+      view: 'report-inspection',
+      cache: CACHE.private,
+      page: {
+        title: `Inspection report ${access.report.reference}`,
+        metaTitle: `Inspection report ${access.report.reference}`,
+        titleSuffix: false,
+        description: 'The client-facing pre-purchase inspection report.',
+        canonical: `/admin/jobs/${id}/report`,
+        robots: 'noindex,nofollow',
+        bodyClass: 'page-report',
+        jsonLd: [],
+      },
+      data: { report: access.report, pdfUrl: `/admin/jobs/${id}/report.pdf`, backHref: PATHS.jobs, backLabel: 'Back to my jobs' },
+    });
+  } catch (error) {
+    return next(error);
+  }
+});
+
+router.get('/jobs/:id/report.pdf', auth.requireAnyStaff(['bookings.own_jobs', 'bookings.dispatch']), async (req, res, next) => {
+  try {
+    const id = validate.integer(req.params.id, { min: 1, fallback: 0 });
+    const access = await reportAccess(req, id);
+    if (!access.ok) return res.status(access.status).json({ ok: false, error: access.error });
+    if (!access.report.ready) {
+      return res.status(409).json({ ok: false, error: 'The checklist has not been filed yet, so there is no report to print.' });
+    }
+    res.set({
+      'Content-Type': 'application/pdf',
+      'Content-Disposition': `inline; filename="${report.fileName(access.report)}"`,
+      'Cache-Control': 'private, no-store',
+    });
+    return report.pdf(access.report).pipe(res);
   } catch (error) {
     return next(error);
   }

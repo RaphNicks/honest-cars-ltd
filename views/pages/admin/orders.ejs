@@ -1,0 +1,125 @@
+<%#
+  /admin/orders — shop orders (§7.3 “Orders & Payments”).
+  What was bought, what was paid, and where the order has got to. The status
+  machine lives in src/db/payments.js: a fulfilled order cannot be reopened.
+  Locals: rows, counts, statuses, status, q, canApprove
+%>
+<div class="admin-grid admin-grid--5">
+  <div class="kpi kpi--sm">
+    <span class="kpi__label">Awaiting payment</span>
+    <strong class="kpi__value tabular"><%= counts.pending_payment %></strong>
+    <span class="kpi__foot">money not seen yet</span>
+  </div>
+  <div class="kpi kpi--sm">
+    <span class="kpi__label">Paid</span>
+    <strong class="kpi__value tabular"><%= counts.paid %></strong>
+    <span class="kpi__foot">ready to pick</span>
+  </div>
+  <div class="kpi kpi--sm">
+    <span class="kpi__label">Processing</span>
+    <strong class="kpi__value tabular"><%= counts.processing %></strong>
+    <span class="kpi__foot">being prepared</span>
+  </div>
+  <div class="kpi kpi--sm">
+    <span class="kpi__label">Fulfilled</span>
+    <strong class="kpi__value tabular"><%= counts.fulfilled %></strong>
+    <span class="kpi__foot">closed out</span>
+  </div>
+  <div class="kpi kpi--sm">
+    <span class="kpi__label">Value, live orders</span>
+    <strong class="kpi__value tabular"><%= helpers.formatNairaCompact(counts.valueKobo) %></strong>
+    <span class="kpi__foot">cancelled orders excluded</span>
+  </div>
+</div>
+
+<section class="panel">
+  <div class="panel__head">
+    <div>
+      <h2 class="panel__title">Orders</h2>
+      <p class="note-inline mb-0">Guest checkout — most customers have no account, so the phone number is the identity.</p>
+    </div>
+    <form class="admin-filters" method="get" action="/admin/orders">
+      <label class="visually-hidden" for="order-status">Status</label>
+      <select class="select select--compact" id="order-status" name="status" data-auto-submit>
+        <option value="all" <%= status === 'all' ? 'selected' : '' %>>Any status</option>
+        <% statuses.forEach(function (value) { %>
+          <option value="<%= value %>" <%= status === value ? 'selected' : '' %>><%= value.replace(/_/g, ' ') %></option>
+        <% }); %>
+      </select>
+      <label class="visually-hidden" for="order-q">Search</label>
+      <input class="input input--compact" id="order-q" name="q" type="search" value="<%= q || '' %>" placeholder="HC-ORD…, name, payment ref">
+      <button class="btn btn--secondary btn--sm" type="submit">Filter</button>
+      <% if (status !== 'all' || q) { %><a class="btn btn--ghost btn--sm" href="/admin/orders">Clear</a><% } %>
+    </form>
+  </div>
+
+  <% if (!rows.length) { %>
+    <p class="empty-line">No orders match. They arrive from the shop’s guest checkout.</p>
+  <% } else { %>
+    <div class="table-scroll">
+      <table class="table">
+        <thead>
+          <tr>
+            <th scope="col">Order</th>
+            <th scope="col">Customer</th>
+            <th scope="col">Total</th>
+            <th scope="col">Payment</th>
+            <th scope="col">Status</th>
+            <th scope="col">Placed</th>
+            <th scope="col">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% rows.forEach(function (row) { %>
+            <tr>
+              <th scope="row">
+                <a class="tabular" href="/order/<%= row.orderNo %>" target="_blank" rel="noopener"><%= row.orderNo %></a>
+                <br><span class="muted"><%= row.itemCount %> item<%= row.itemCount === 1 ? '' : 's' %><% if (row.deliveryArea) { %> · <%= row.deliveryArea %><% } %></span>
+              </th>
+              <td>
+                <%= row.name %><br>
+                <span class="muted tabular"><%= row.maskedPhone %></span>
+              </td>
+              <td class="tabular"><%= helpers.formatNaira(row.totalKobo) %></td>
+              <td>
+                <% if (row.payment) { %>
+                  <span class="badge badge--<%= row.payment.status %>"><%= row.payment.status.replace(/_/g, ' ') %></span>
+                  <br><span class="muted tabular"><%= row.payment.reference %></span>
+                  <br><span class="muted"><%= row.payment.provider.replace(/_/g, ' ') %></span>
+                  <% if (row.payment.refundKobo) { %>
+                    <br><span class="warn tabular">−<%= helpers.formatNaira(row.payment.refundKobo) %> refunded</span>
+                  <% } %>
+                <% } else { %>
+                  <span class="badge badge--pending">no payment row</span>
+                  <br><span class="muted">money not recorded yet</span>
+                <% } %>
+              </td>
+              <td><span class="badge badge--<%= row.status %>"><%= row.status.replace(/_/g, ' ') %></span></td>
+              <td class="muted"><%= helpers.relativeDays(row.createdAt) %></td>
+              <td>
+                <% if (canApprove) { %>
+                  <form method="post" action="/admin/orders/<%= row.id %>/status" class="inline-form">
+                    <label class="visually-hidden" for="order-move-<%= row.id %>">Move <%= row.orderNo %></label>
+                    <select class="select select--compact" id="order-move-<%= row.id %>" name="status">
+                      <% statuses.forEach(function (value) { %>
+                        <option value="<%= value %>" <%= row.status === value ? 'selected' : '' %>><%= value.replace(/_/g, ' ') %></option>
+                      <% }); %>
+                    </select>
+                    <button class="btn btn--secondary btn--sm" type="submit">Move</button>
+                  </form>
+                <% } else { %>
+                  <span class="muted">view only</span>
+                <% } %>
+              </td>
+            </tr>
+          <% }); %>
+        </tbody>
+      </table>
+    </div>
+  <% } %>
+</section>
+
+<p class="note-inline">
+  Recording money and refunding it lives in <a href="/admin/payments">Money</a>; tracker subscriptions created by these
+  orders appear on the customer’s dashboard and in the KPI home.
+</p>

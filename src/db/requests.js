@@ -154,6 +154,17 @@ function shapeBooking(row) {
     amountKobo: row.amount_kobo === null ? null : Number(row.amount_kobo),
     paymentStatus: row.payment_status,
     status: row.status,
+    // The report fields: a filed checklist is what makes the client PDF exist
+    // (FR-07), so the dashboard can offer it without a second query.
+    hasReport: Boolean(row.checklist),
+    checklist: parseJson(row.checklist, null),
+    verdict: row.verdict || null,
+    verdictLabel: row.verdict ? String(row.verdict).replace(/_/g, ' ') : null,
+    reportNotes: row.report_notes || null,
+    inspectorId: row.inspector_id || null,
+    dispatchedAt: row.dispatched_at,
+    completedAt: row.completed_at,
+    updatedAt: row.updated_at,
     createdAt: row.created_at,
   };
 }

@@ -53,6 +53,10 @@ const config = {
     cacLine: 'Honest Cars LTD — RC 0000000 · Port Harcourt, Rivers State, Nigeria',
     latitude: Number.parseFloat(process.env.BUSINESS_LAT || '4.8156'),
     longitude: Number.parseFloat(process.env.BUSINESS_LNG || '7.0498'),
+    // The account customers transfer to while no card processor is live (§18).
+    bankName: process.env.BUSINESS_BANK_NAME || 'GTBank',
+    bankAccount: process.env.BUSINESS_BANK_ACCOUNT || '0123456789',
+    bankAccountName: process.env.BUSINESS_BANK_ACCOUNT_NAME || 'Honest Cars Ltd',
   },
 
   // Sold-archive rule (§6.2 + §14.1): visible 7 days → archive page → 301 at 90.
@@ -84,6 +88,42 @@ const config = {
     // driven without a phone. Forced off when NODE_ENV=production.
     get showCodeInResponse() {
       return !config.isProduction && bool(process.env.AUTH_SHOW_CODE, true);
+    },
+  },
+
+  // Payments (§11, FR-08). The merchant accounts do not exist yet, so the
+  // default provider is `manual`: finance records the transfer that arrived and
+  // the console marks it paid. Drop in a secret key and the hosted adapter
+  // starts returning a real checkout URL instead — no other change.
+  payments: {
+    get defaultProvider() {
+      return process.env.PAYMENT_PROVIDER || 'manual';
+    },
+    paystackSecret: process.env.PAYSTACK_SECRET_KEY || '',
+    flutterwaveSecret: process.env.FLUTTERWAVE_SECRET_KEY || '',
+    // Flutterwave verifies webhooks with a shared hash, not an HMAC.
+    flutterwaveSecretHash: process.env.FLUTTERWAVE_SECRET_HASH || '',
+    get hostedAvailable() {
+      return Boolean(config.payments.paystackSecret || config.payments.flutterwaveSecret);
+    },
+  },
+
+  // Notifications (§11). WhatsApp first in production; `console` records and
+  // prints in development. Channels are per template so a receipt can go to
+  // WhatsApp while a report link goes by email.
+  notifications: {
+    get defaultChannel() {
+      return process.env.NOTIFY_CHANNEL || 'console';
+    },
+    channels: {
+      payment_request: process.env.NOTIFY_CHANNEL_PAYMENT || process.env.NOTIFY_CHANNEL || 'console',
+      payment_receipt: process.env.NOTIFY_CHANNEL_PAYMENT || process.env.NOTIFY_CHANNEL || 'console',
+      payment_refunded: process.env.NOTIFY_CHANNEL_PAYMENT || process.env.NOTIFY_CHANNEL || 'console',
+      booking_dispatched: process.env.NOTIFY_CHANNEL || 'console',
+      booking_completed: process.env.NOTIFY_CHANNEL || 'console',
+      request_options_ready: process.env.NOTIFY_CHANNEL || 'console',
+      milestone_stage: process.env.NOTIFY_CHANNEL_PAYMENT || process.env.NOTIFY_CHANNEL || 'console',
+      booking_reminder: process.env.NOTIFY_CHANNEL || 'console',
     },
   },
 

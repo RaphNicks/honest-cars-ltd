@@ -5,10 +5,11 @@
  *
  * This build ships the whole public storefront (design system, homepage,
  * /cars, the VDP, the service suite, both funnels, hire, the blog, the shop,
- * every trust/company/legal page), the customer account interior (§7.1) and
- * the operations console (§7.3/§7.4). What remains is the dealer portal
- * (§7.2), the order manager and the CMS workflow — the modules that need the
- * payments seam and the audit trail they will write into.
+ * every trust/company/legal page), the customer account interior (§7.1), the
+ * operations console (§7.3/§7.4) and the money seam — orders, payments,
+ * receipts, refunds, the dealer ledger, escrow milestones and the inspection
+ * report PDF. What remains is the dealer portal (§7.2) and the admin CMS and
+ * market-intel screens.
  *
  * The console paths listed here are protected: an anonymous request to them
  * redirects to /login, so check-links only follows the ones it can reach
@@ -59,6 +60,8 @@ const BUILT = [
   { path: '/refunds', label: 'Refunds (placeholder wording)' },
   { path: '/disclaimer', label: 'Disclaimer (placeholder wording)' },
   { path: '/account', label: 'Account dashboard + login (§7.1)' },
+  { path: '/account/receipts/{reference}', label: 'Payment receipt (§7.3)' },
+  { path: '/account/reports/{reference}', label: 'Inspection report (FR-07)' },
   { path: '/dealer', label: 'Dealer portal entry page (interior is phase 2)' },
   { path: '/sitemap.xml', label: 'Sitemap' },
   { path: '/robots.txt', label: 'robots.txt' },
@@ -74,10 +77,8 @@ const PENDING = [
   { path: '/dealer/listings', label: 'Dealer portal: my listings (§7.2)', phase: 'phase-2' },
   { path: '/dealer/listings/new', label: 'Dealer portal: add listing wizard (§7.2)', phase: 'phase-2' },
   { path: '/dealer/leads', label: 'Dealer portal: leads & viewings (§7.2)', phase: 'phase-2' },
-  { path: '/admin/orders', label: 'Admin: order manager + payments (§7.3)', phase: 'phase-2' },
   { path: '/admin/cms', label: 'Admin: content workflow (§7.4)', phase: 'phase-2' },
   { path: '/admin/intel', label: 'Admin: market intel + reports (§7.3)', phase: 'phase-2' },
-  { path: '/admin/inspections', label: 'Admin: inspection report PDF (§7.3)', phase: 'phase-2' },
 ];
 
 /** Does this request path correspond to a route we have promised but not built? */
@@ -93,9 +94,9 @@ function pendingRouteFor(pathname) {
     if (clean === route.path) return route;
   }
 
-  // Dynamic prefixes the public site owns get their own routers; anything else
-  // under them is a phase-2 screen.
-  for (const prefix of ['/dealer/', '/admin/']) {
+  // The money screens are built and capability-gated, so an unknown path under
+  // /admin is now a genuine 404 rather than a promised-but-missing screen.
+  for (const prefix of ['/dealer/']) {
     if (clean.startsWith(prefix) && clean.length > prefix.length) {
       const match = PENDING.find((r) => r.path.startsWith(prefix));
       if (match) return match;

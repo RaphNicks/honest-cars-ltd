@@ -8,6 +8,9 @@
  *                            receipts, tracker subscriptions, saved cars,
  *                            saved searches, referrals
  *   GET  /account/export     NDPA right of access — one JSON file
+ *   GET  /account/receipts/:reference      a receipt for money paid (§7.3)
+ *   GET  /account/reports/:reference       the inspection report (FR-07)
+ *   GET  /account/reports/:reference.pdf   the same report as a PDF
  *   POST /api/account/saved-cars      save / unsave a car
  *   POST /api/account/saved-searches  save / delete a search, toggle alerts
  *   POST /api/account/profile         name, email, marketing opt-in
@@ -23,6 +26,7 @@ const auth = require('../services/auth');
 const roles = require('../services/roles');
 const validate = require('../services/validate');
 const listingQuery = require('../services/listing-query');
+const reportService = require('../services/report');
 const { helpers } = require('../lib/locals');
 const { sendPage, sendJson, CACHE } = require('../lib/respond');
 
@@ -143,6 +147,110 @@ router.get('/account', async (req, res, next) => {
       // Personalised: never cached, never served from the static bundle.
       cache: CACHE.private,
     });
+  } catch (error) {
+    return next(error);
+  }
+});
+
+/**
+ * A receipt, owned by the phone number that paid. Anyone can type a reference
+ * into the URL bar; only the phone it belongs to gets the page.
+ */
+router.get('/account/receipts/:reference', auth.requireUser, async (req, res, next) => {
+  try {
+    const reference = String(req.params.reference || '').toUpperCase().slice(0, 32);
+    if (!/^HC-PAY-\d{6}$/.test(reference)) return next();
+    const receipt = await db.payments.receiptForPhone(reference, req.user.phone);
+    if (!receipt) {
+      return await sendPage(req, res, {
+        view: 'error',
+        status: 404,
+        cache: CACHE.private,
+        page: {
+          title: 'Receipt not found',
+          metaTitle: 'Receipt not found',
+          canonical: `/account/receipts/${reference}`,
+          robots: 'noindex,nofollow',
+          bodyClass: 'page-error',
+          jsonLd: [],
+        },
+        data: { reason: 'not-found', detail: 'That reference is not on this account.' },
+      });
+    }
+    return await sendPage(req, res, {
+      routePath: `/account/receipts/${reference}`,
+      view: 'receipt',
+      cache: CACHE.private,
+      page: {
+        title: `Receipt ${reference}`,
+        metaTitle: `Receipt ${reference}`,
+        titleSuffix: false,
+        description: 'A receipt for a payment made to Honest Cars Ltd.',
+        canonical: `/account/receipts/${reference}`,
+        robots: 'noindex,nofollow',
+        breadcrumbs: [{ label: 'Account', href: '/account' }, { label: reference }],
+        bodyClass: 'page-receipt',
+        jsonLd: [],
+      },
+      data: { receipt, trail: [{ label: 'Account', href: '/account' }, { label: reference }] },
+    });
+  } catch (error) {
+    return next(error);
+  }
+});
+
+/** The inspection report behind one of this customer's bookings (FR-07). */
+async function ownedReport(user, reference) {
+  const booking = await db.queryOne('SELECT id, reference, phone FROM bookings WHERE reference = ? LIMIT 1', [String(reference || '').toUpperCase().slice(0, 32)]);
+  if (!booking) return null;
+  const shapes = require('../lib/phone').variants(user.phone);
+  const stored = booking.phone ? require('../lib/phone').canonical(booking.phone) : null;
+  if (!stored || !shapes.includes(stored)) return null;
+  return reportService.build(booking.id);
+}
+
+router.get('/account/reports/:reference', auth.requireUser, async (req, res, next) => {
+  try {
+    const built = await ownedReport(req.user, req.params.reference);
+    if (!built) return next();
+    return await sendPage(req, res, {
+      routePath: `/account/reports/${built.reference}`,
+      view: 'report-inspection',
+      cache: CACHE.private,
+      page: {
+        title: `Inspection report ${built.reference}`,
+        metaTitle: `Inspection report ${built.reference}`,
+        titleSuffix: false,
+        description: 'The pre-purchase inspection report for your booking.',
+        canonical: `/account/reports/${built.reference}`,
+        robots: 'noindex,nofollow',
+        breadcrumbs: [{ label: 'Account', href: '/account' }, { label: built.reference }],
+        bodyClass: 'page-report',
+        jsonLd: [],
+      },
+      data: {
+        report: built,
+        pdfUrl: built.ready ? `/account/reports/${built.reference}.pdf` : null,
+        backHref: '/account',
+        backLabel: 'Back to your account',
+      },
+    });
+  } catch (error) {
+    return next(error);
+  }
+});
+
+router.get('/account/reports/:reference.pdf', auth.requireUser, async (req, res, next) => {
+  try {
+    const built = await ownedReport(req.user, req.params.reference);
+    if (!built) return res.status(404).json({ ok: false, error: 'Not found' });
+    if (!built.ready) return res.status(409).json({ ok: false, error: 'The checklist has not been filed yet.' });
+    res.set({
+      'Content-Type': 'application/pdf',
+      'Content-Disposition': `inline; filename="${reportService.fileName(built)}"`,
+      'Cache-Control': 'private, no-store',
+    });
+    return reportService.pdf(built).pipe(res);
   } catch (error) {
     return next(error);
   }

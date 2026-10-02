@@ -51,6 +51,8 @@ after the first deploy lands in `db/migrations/NNN-name.sql` and is recorded in
 | `008-referral-code-backfill.sql` | `HC0001`-shaped codes for accounts that predate 007 |
 | `009-admin-console.sql` | `users.role` / `watchlisted`; `leads` owner + lost reason; `bookings` inspector, dispatch stamps, checklist, verdict; `vehicle_listings` moderation stamps, `verification_grade` evidence, `refresh_requested_at` / `stale_flagged_at` / `refreshed_at` / `unlisted_at`; new `request_candidates` and `admin_audit` (§7.3) |
 | `010-request-crm-fields.sql` | `service_requests.assigned_to` / `assigned_at` / `last_contacted_at` / `lost_reason`, so concierge requests sit in the same CRM-lite pipeline as leads |
+| `011-payments-and-notifications.sql` | `payments` (reference `HC-PAY-…`, provider enum, purpose, kobo amounts, refunds, checkout URL — never card data), `payment_events` (unique `(provider, event_id)` = webhook idempotency, `signature_ok`), `payment_milestones` (escrow ladder), `notifications` (§11 message log) |
+| `012-dealer-ledger.sql` | `dealer_ledger` — append-only commission and payout entries with signed kobo amounts (§7.2/§7.3) |
 
 ---
 
@@ -163,7 +165,7 @@ account, because `db:setup` truncates the tables those screens read:
 
 | Records | Detail |
 |---|---|
-| Staff | `+2348000000001` admin · `…002` ops · `…003` inspector |
+| Staff | `+2348000000001` admin · `…002` ops · `…003` inspector · `…004` finance |
 | Leads | 8 across `new → assigned → contacted → viewing → closed`, one `lost` with a reason |
 | Service requests | 8 across every stage including one deliberately past its SLA, one with two `request_candidates` attached |
 | Bookings | 5 — requested, dispatched to the inspector, confirmed install, completed with a verdict, and one cancelled |

@@ -367,7 +367,7 @@ async function deleteSavedSearch(userId, id) {
 // ---------------------------------------------------------------------------
 async function dashboard(user) {
   const phone = user.phone;
-  const [requests, bookings, orders, subscriptions, savedCarList, searches, referral] = await Promise.all([
+  const [requests, bookings, orders, subscriptions, savedCarList, searches, referral, paymentRows, escrow] = await Promise.all([
     require('./requests').listRequestsForPhone(phone),
     require('./requests').listBookingsForPhone(phone),
     require('./commerce').listForPhone(phone),
@@ -375,23 +375,41 @@ async function dashboard(user) {
     savedCars(user.id),
     savedSearches(user.id),
     referralStats(user),
+    require('./payments').listForPhone(phone, { limit: 20 }),
+    require('./payments').milestonesForPhone(phone),
   ]);
 
   // §7.1 lists hire separately from the other requests, and the briefing
   // fields are what a customer with a booking actually wants to see.
   const hireRequests = requests.filter((request) => request.type === 'hire');
 
-  // “Documents” is receipts today; inspection report PDFs arrive with the
-  // dispatch module (§7.3), and the card says so rather than pretending.
-  const documents = orders.map((order) => ({
-    id: `order-${order.id}`,
+  // §7.1 “Documents” — the two things a customer actually keeps: the receipt
+  // for money paid (payments, not orders, so a refund shows the refunded
+  // amount) and the inspection report PDF once the checklist is filed.
+  const receipts = paymentRows.map((payment) => ({
+    id: `payment-${payment.id}`,
     kind: 'Receipt',
-    title: `${order.orderNo} — ${order.itemCount} item${order.itemCount === 1 ? '' : 's'}`,
-    amountKobo: order.totalKobo,
-    status: order.status,
-    createdAt: order.createdAt,
-    url: `/order/${order.orderNo}`,
+    title: `${payment.reference} — ${payment.purpose}${payment.orderNo ? ` · ${payment.orderNo}` : payment.bookingReference ? ` · ${payment.bookingReference}` : ''}`,
+    amountKobo: payment.amountKobo,
+    refundKobo: payment.refundKobo,
+    status: payment.status,
+    createdAt: payment.paidAt || payment.createdAt,
+    url: `/account/receipts/${payment.reference}`,
   }));
+
+  const reports = bookings
+    .filter((booking) => booking.hasReport)
+    .map((booking) => ({
+      id: `report-${booking.id}`,
+      kind: 'Inspection report',
+      title: `${booking.reference} — ${booking.vehicle && booking.vehicle.make ? `${booking.vehicle.year} ${booking.vehicle.make} ${booking.vehicle.model}` : 'pre-purchase inspection'}`,
+      amountKobo: booking.amountKobo,
+      status: booking.verdictLabel || booking.verdict || booking.status,
+      createdAt: booking.completedAt || booking.updatedAt || booking.slotAt,
+      url: `/account/reports/${booking.reference}`,
+    }));
+
+  const documents = [...reports, ...receipts].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
 
   return {
     requests,
@@ -399,6 +417,10 @@ async function dashboard(user) {
     bookings,
     orders,
     subscriptions,
+    payments: paymentRows,
+    escrow,
+    receipts,
+    reports,
     documents,
     savedCars: savedCarList,
     savedSearches: searches,
@@ -413,6 +435,9 @@ async function dashboard(user) {
       savedCars: savedCarList.length,
       savedSearches: searches.length,
       documents: documents.length,
+      receipts: receipts.length,
+      reports: reports.length,
+      escrow: escrow.length,
     },
   };
 }

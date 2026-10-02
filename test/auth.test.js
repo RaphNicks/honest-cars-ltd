@@ -112,10 +112,15 @@ test.after(async () => {
       const { variants } = require('../src/lib/phone');
       const shapes = [...new Set([...createdPhones].flatMap((number) => variants(number)))];
       const marks = shapes.map(() => '?').join(',');
+      // Payment rows point at orders (ON DELETE SET NULL) and hold the customer
+      // phone themselves, so they are removed first — otherwise a test run
+      // leaves orphaned money in the demo console.
+      await db.query(`DELETE FROM payments WHERE customer_phone IN (${marks})`, shapes);
       for (const table of ['service_requests', 'bookings', 'leads', 'orders', 'subscriptions']) {
         const column = table === 'subscriptions' ? 'customer_phone' : 'phone';
         await db.query(`DELETE FROM ${table} WHERE ${column} IN (${marks})`, shapes);
       }
+      await db.query(`DELETE FROM notifications WHERE recipient IN (${marks})`, shapes);
       await db.query(`DELETE FROM auth_codes WHERE phone IN (${marks})`, shapes);
       await db.query(`DELETE FROM \`users\` WHERE phone IN (${marks})`, shapes);
     }
@@ -397,10 +402,29 @@ maybe('shop receipts land in Documents', async () => {
   });
   assert.equal(order.json.ok, true);
 
+  // Documents now files the *payment* receipt (§7.3) rather than the order, so
+  // a refunded or partially-refunded order shows what actually happened.
+  assert.equal(order.json.payment.reference.startsWith('HC-PAY-'), true, 'checkout opened a payment row');
+
   const page = await client.request('/account');
   const documents = page.text.slice(page.text.indexOf('id="documents"'));
-  assert.match(documents, new RegExp(order.json.orderNo), 'the receipt is filed');
-  assert.match(documents, /1 item/);
+  assert.match(documents, new RegExp(order.json.orderNo), 'the order number is on the receipt');
+  assert.match(documents, new RegExp(`/account/receipts/${order.json.payment.reference}`), 'the receipt opens');
+
+  const receipt = await client.request(`/account/receipts/${order.json.payment.reference}`);
+  assert.equal(receipt.status, 200);
+  assert.match(receipt.text, /obd2/i, 'the receipt lists what was bought');
+  assert.match(receipt.text, /pending/i, 'and its honest status');
+
+  // Someone else’s reference is not theirs to read.
+  const other = await client.request('/account/receipts/HC-PAY-000001');
+  assert.equal(other.status, 404, 'a receipt that is not on this account is not shown');
+
+  // And the order page turns the pending payment into transfer instructions.
+  const orderPage = await client.request(`/order/${order.json.orderNo}`);
+  assert.equal(orderPage.status, 200);
+  assert.match(orderPage.text, new RegExp(order.json.payment.reference));
+  assert.match(orderPage.text, /Account number/);
 });
 
 maybe('price-drop and new-match are separate switches, and the master derives from them', async () => {

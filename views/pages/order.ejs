@@ -48,6 +48,42 @@
           <div class="summary-list__row"><dt>Total</dt><dd><strong><%= helpers.formatNaira(order.totalKobo) %></strong></dd></div>
         </dl>
 
+        <% if (pendingPayment) { %>
+          <div class="panel panel--pay mt-3">
+            <h2 class="panel__title">How to pay <%= helpers.formatNaira(order.totalKobo) %></h2>
+            <p class="mb-2">
+              Transfer to the account below and use the payment reference as the narration. Your order stays
+              <em>pending payment</em> until the money lands — nothing was charged on this page.
+            </p>
+            <dl class="summary-list">
+              <div class="summary-list__row"><dt>Account name</dt><dd><%= bank.name %></dd></div>
+              <div class="summary-list__row"><dt>Bank</dt><dd><%= bank.bank %></dd></div>
+              <div class="summary-list__row"><dt>Account number</dt><dd class="tabular"><strong><%= bank.account %></strong></dd></div>
+              <div class="summary-list__row"><dt>Amount</dt><dd class="tabular"><strong><%= helpers.formatNaira(pendingPayment.amountKobo) %></strong></dd></div>
+              <div class="summary-list__row"><dt>Payment reference</dt><dd class="tabular"><strong><%= pendingPayment.reference %></strong></dd></div>
+            </dl>
+            <p class="field__hint mb-0"><%= bank.note %></p>
+          </div>
+        <% } else if (payments.length && payments[0].status === 'paid') { %>
+          <div class="panel panel--paid mt-3">
+            <h2 class="panel__title">Paid in full — thank you</h2>
+            <p class="mb-0">
+              <%= helpers.formatNaira(payments[0].amountKobo) %> received against
+              <span class="tabular"><%= payments[0].reference %></span>. A receipt lives on your account page
+              (<a href="/account">sign in with this phone number</a>), and we will confirm the delivery or install slot on
+              WhatsApp.
+            </p>
+          </div>
+        <% } else if (payments.length && payments[0].refundKobo) { %>
+          <div class="panel mt-3">
+            <h2 class="panel__title">Refunded</h2>
+            <p class="mb-0">
+              <%= helpers.formatNaira(payments[0].refundKobo) %> went back to you against
+              <span class="tabular"><%= payments[0].reference %></span><%= payments[0].refundReason ? ` — ${payments[0].refundReason}` : '' %>.
+            </p>
+          </div>
+        <% } %>
+
         <% if (order.notes) { %>
           <p class="field__hint mt-2 mb-0">Your note: “<%= order.notes %>”</p>
         <% } %>

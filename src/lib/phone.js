@@ -41,4 +41,15 @@ function canonical(raw, { fallback = null } = {}) {
   return normalise(raw) || (String(raw || '').trim() ? String(raw).trim().slice(0, 40) : fallback);
 }
 
-module.exports = { normalise, variants, canonical };
+/**
+ * The only safe way to put a number on a screen or in a log line: `+234 803 ••• 4567`.
+ * Staff who need the real number to send a WhatsApp message read it from the
+ * record, not from a formatted string (§12.2 minimal PII).
+ */
+function mask(raw) {
+  const digits = String(raw || '').replace(/\D/g, '');
+  if (digits.length < 7) return '•••';
+  return `+${digits.slice(0, 3)} ${digits.slice(3, 6)} ••• ${digits.slice(-4)}`;
+}
+
+module.exports = { normalise, variants, canonical, mask };

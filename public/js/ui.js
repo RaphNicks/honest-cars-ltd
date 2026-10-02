@@ -94,6 +94,17 @@ export function toast(message, { variant = '', duration = 4000 } = {}) {
   }, duration);
 }
 
+/* ------------------------------------------------------------- print */
+/**
+ * Print buttons on receipts and inspection reports. A real print stylesheet
+ * does the work; this only saves the customer from hunting the browser menu.
+ */
+export function initPrintButtons(root = document) {
+  root.querySelectorAll('[data-print]').forEach((button) => {
+    button.addEventListener('click', () => window.print());
+  });
+}
+
 /* --------------------------------------------------------- copy-link */
 export function initCopyLink(root = document) {
   root.querySelectorAll('[data-copy-link]').forEach((button) => {

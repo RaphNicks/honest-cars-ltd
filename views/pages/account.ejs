@@ -1,7 +1,7 @@
 <%#
   /account — §7.1 dashboard, card for card:
     Requests · Hire bookings · Bookings · Orders + tracker subscriptions ·
-    Documents (receipts) · Saved cars · Saved searches (price-drop and
+    Documents (receipts + inspection reports) · Escrow · Saved cars · Saved searches (price-drop and
     new-match switches) · Your details · Referrals
   Every card reads a record the public site already wrote, matched by phone.
   Locals: user, requests, hireRequests, bookings, orders, subscriptions,
@@ -128,6 +128,30 @@
             the driver's details on the day.
           </p>
         <% } %>
+
+        <% if (escrow && escrow.length) { %>
+          <div class="escrow-list" id="escrow">
+            <h3 class="mb-1">Money we are holding for you</h3>
+            <% escrow.forEach(function (item) { %>
+              <div class="escrow-item">
+                <p class="mb-0">
+                  <strong class="tabular"><%= item.reference %></strong> ·
+                  <%= helpers.formatNaira(item.amountKobo) %> · <%= item.subject %>
+                </p>
+                <ol class="ms-ladder" aria-label="Stages for <%= item.reference %>">
+                  <% ['funds_received','inspection_passed','documents_verified','released'].forEach(function (stage, index) { %>
+                    <li class="ms-ladder__step <%= item.stageIndex > index ? 'is-done' : item.stageIndex === index ? 'is-current' : '' %>">
+                      <span class="ms-ladder__dot" aria-hidden="true"><%= item.stageIndex > index ? '✓' : index + 1 %></span>
+                      <span class="ms-ladder__label"><%= stage.replace(/_/g, ' ') %></span>
+                    </li>
+                  <% }); %>
+                </ol>
+                <% if (item.stageNote) { %><p class="note-inline mb-0">Latest note: <%= item.stageNote %></p><% } %>
+                <p class="note-inline mb-0">Nothing is released without your confirmation.</p>
+              </div>
+            <% }); %>
+          </div>
+        <% } %>
       </div>
 
       <%# ---------------------------------------------------- Bookings %>
@@ -230,8 +254,8 @@
         <% if (!documents.length) { %>
           <div class="empty-state">
             <p class="mb-1">
-              Nothing to file yet. Shop receipts land here the moment an order is placed, and inspection report PDFs
-              arrive with the dispatch module (§7.3).
+              Nothing to file yet. Shop receipts appear here the moment a payment is confirmed, and an inspection
+              report appears the moment the inspector files it — with its PDF.
             </p>
           </div>
         <% } else { %>
@@ -254,7 +278,12 @@
             <% }); %>
           </ul>
           <p class="note-inline mb-0">
-            Inspection reports, valuation memos and NDPA export copies land in this list as they are produced.
+            <% if (counts.receipts && counts.reports) { %>
+              <%= counts.receipts %> receipt<%= counts.receipts === 1 ? '' : 's' %> and <%= counts.reports %>
+              inspection report<%= counts.reports === 1 ? '' : 's' %> on file.
+            <% } %>
+            Receipts open as a printable page; reports open as the same document the inspector filed, with its PDF.
+            NDPA export copies are under <a href="/account#your-details">your details</a>.
           </p>
         <% } %>
       </div>

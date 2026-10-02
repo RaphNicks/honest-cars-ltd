@@ -183,7 +183,10 @@ object, so the screen cannot drift from what is enforced.
 | Leads | `/admin/leads` | One inbox for listing enquiries *and* service requests; owner assignment (manual + round-robin); pipeline status; lost reason; WhatsApp reply templates |
 | Concierge | `/admin/concierge` | Pipeline board (new → searching → options ready → viewings → closed) with the SLA clock on every card; request brief; attach/remove the cars that render the buyer’s comparison |
 | Dispatch | `/admin/bookings` | Day sheet; assign an inspector (which *is* the dispatch); booking status; payment state; filed verdict |
-| My jobs | `/admin/jobs` | Inspector mobile view: today’s jobs, tap-sized seven-section checklist, OBD2 codes, photos, verdict, client notes |
+| My jobs | `/admin/jobs` | Inspector mobile view: today’s jobs, tap-sized seven-section checklist, OBD2 codes, photos, verdict, client notes — saving produces the **client inspection report** (FR-07) as a page and a real A4 PDF |
+| Orders | `/admin/orders` | Shop orders with their items, payment state and the status machine (a fulfilled order cannot be reopened) |
+| Money | `/admin/payments` | Transactions with statuses (paid / pending / refunded / partially refunded), provider and reference, one-click confirm of a transfer that landed, refunds with a reason, receipt links, the **dealer commission & payout ledger** with per-dealer statements, and the message log — plus copyable bank instructions for requesting money |
+| Escrow | `/admin/milestones` | Protected purchases and parts escrow walking one ladder: funds received → inspection passed → documents verified → released, one stage per approval, with the human recorded on the release |
 | Staff & roles | `/admin/staff` | Staff list, role setter, watchlist, customer count, and the capability matrix as enforced |
 | Audit log | `/admin/audit` | Publishes, grade changes, price overrides, dispatch, report filings, role changes — filterable by entity |
 
@@ -197,6 +200,7 @@ passwords in this build. The seed creates three accounts:
 | `+2348000000001` | admin | everything, including Staff & roles and the audit log |
 | `+2348000000002` | ops | KPI home, listings, leads, concierge, dispatch |
 | `+2348000000003` | inspector | My jobs only |
+| `+2348000000004` | finance | Orders, Money, Escrow and the KPI home — approvals, refunds, ledger |
 
 In development the code is printed to the server log (`[auth] OTP for … → 123456`)
 and returned as `devCode`, so the console can be driven without a phone. A role
@@ -210,15 +214,45 @@ and `Cache-Control: private, no-store`.
 real: eight leads across the pipeline (one lost with a reason), eight service
 requests across every stage (one deliberately past its SLA), two cars attached
 to the demo concierge request, five bookings including a dispatched job for the
-inspector and a completed one with a verdict, three sensitive actions already
-in the audit log, and Ada (`+2348031234567`) with a populated §7.1 dashboard.
+inspector and a completed one with a verdict (and a real car on it, so the report PDF has a
+subject), five payments across paid / pending / refunded, ten webhook-style
+event rows, three escrow milestones at different stages, three notification
+rows and three dealer-ledger entries with a running balance, three sensitive
+actions already in the audit log, and Ada (`+2348031234567`) with a populated
+§7.1 dashboard (receipt `HC-PAY-000001` and a live escrow ladder).
+
+### Money, escrow and the inspection report
+
+Three seams, all honest about their limits:
+
+* **Payments (FR-08 / §7.3).** Every order opens a payment row
+  (`HC-PAY-000123`), so the confirmation page can show real instructions and
+  finance has something to match. Paystack and Flutterwave adapters exist and
+  verify their webhooks properly — HMAC-SHA512 for Paystack, the shared hash for
+  Flutterwave — with the event id unique per provider, so a PSP retry is a no-op
+  rather than a second payment. **No keys are configured** (the merchant account
+  is a §18 launch prerequisite), so hosted checkout refuses honestly, the site
+  takes bank transfers and cash, and `/api/payments/methods` says what is
+  actually live. An unsigned webhook is answered 401 *and recorded* with
+  `signature_ok = 0`, so an incident can be read back from the database.
+* **The dealer ledger (§7.2 / §7.3).** Append-only, signed amounts — positive is
+  commission the dealer owes us, negative is money paid out — so a balance is
+  `SUM(amount_kobo)`, a statement is the rows in a date window, and a correction
+  is a new row, never an edit.
+* **Notifications (§11)** record every message to the `notifications` table with
+  the channel and its fate. Unconfigured channels are `skipped` (not dropped),
+  and each message has a WhatsApp deep link so ops can send it by hand.
+* **The inspection report (FR-07)** is one object (`src/services/report.js`)
+  rendered three ways: the console page, a print stylesheet and a real A4 PDF
+  with Inter embedded (the only way the naira sign reaches the page). The
+  customer whose phone matches the booking can open the same report — page and
+  PDF — from their dashboard.
 
 ### What is deliberately not here yet
 
-The payments seam (PSP transactions, refunds, milestone releases), the order
-manager, the CMS workflow and the generated inspection-report PDF. The screens
-say so in place rather than showing fake numbers; `src/services/slice.js` lists
-them as the remaining backlog and `scripts/check-links.js` keeps them honest.
+The dealer portal interior (§7.2) and the CMS / market-intel screens (§7.3).
+The screens say so in place rather than showing fake numbers; `src/services/slice.js`
+lists them as the remaining backlog and `scripts/check-links.js` keeps them honest.
 
 ---
 

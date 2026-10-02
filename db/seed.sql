@@ -13,6 +13,13 @@ SET time_zone = '+00:00';
 SET @NOW = UTC_TIMESTAMP();
 
 DELETE FROM analytics_events;
+-- Payments first: payment_events and dealer_ledger point at orders, bookings,
+-- requests and listings, so they must go before any of those.
+DELETE FROM payment_events;
+DELETE FROM dealer_ledger;
+DELETE FROM payments;
+DELETE FROM payment_milestones;
+DELETE FROM notifications;
 DELETE FROM leads;
 DELETE FROM listing_media;
 DELETE FROM subscriptions;
@@ -510,7 +517,8 @@ INSERT INTO redirects (`from_path`, `to_path`, `status_code`, `reason`) VALUES
 INSERT INTO `users` (phone, name, role, referral_code, status) VALUES
   ('+2348000000001', 'Admin — Honest Cars', 'admin',     'HCADMN', 'active'),
   ('+2348000000002', 'Ops Desk',            'ops',       'HCSTFF', 'active'),
-  ('+2348000000003', 'Field Inspector',     'inspector', 'HCINSP', 'active')
+  ('+2348000000003', 'Field Inspector',     'inspector', 'HCINSP', 'active'),
+  ('+2348000000004', 'Finance Desk',        'finance',   'HCFINC', 'active')
 ON DUPLICATE KEY UPDATE role = VALUES(role), name = VALUES(name), status = 'active';
 
 -- The CRM-lite inbox (§7.3): every one of these came in through a real form.
@@ -618,17 +626,140 @@ INSERT INTO bookings (reference, type, service_slug, slot_at, location, vehicle,
     'Honest Cars workshop, GRA Phase 2', '{"make":"Toyota","model":"Corolla","year":2015}',
     'Emeka Nwosu', '+2348031110005', 4500000, 'pending', 'confirmed', NULL, NULL, NULL, NULL, NULL, NULL,
     DATE_SUB(UTC_TIMESTAMP(), INTERVAL 2 DAY)),
-  ('HC-BK-0004', 'consultation', 'consultation', DATE_SUB(UTC_DATE(), INTERVAL 8 DAY) + INTERVAL 16 HOUR,
-    'Phone call', NULL, 'Mrs. Amadi', '+2348031110007', 1000000, 'paid', 'completed',
+  ('HC-BK-0004', 'inspection', 'inspection', DATE_SUB(UTC_DATE(), INTERVAL 8 DAY) + INTERVAL 16 HOUR,
+    'Dealer lot, Trans-Amadi, Port Harcourt',
+    '{"make":"Toyota","model":"Prado TX","year":2016,"mileage_km":96000,"vin":"JTEHT05J402015882"}',
+    'Mrs. Amadi', '+2348031110007', 4500000, 'paid', 'completed',
     (SELECT id FROM `users` WHERE phone = '+2348000000003' LIMIT 1), DATE_SUB(UTC_TIMESTAMP(), INTERVAL 9 DAY),
     DATE_SUB(UTC_TIMESTAMP(), INTERVAL 8 DAY),
-    '{"sections":{"engine":"ok","transmission":"ok","suspension":"attention","brakes":"ok","electricals":"ok","body":"ok","documents":"ok"},"obd2_codes":"none stored","checked_on":"2026-09-24"}',
-    'pass_with_advisory', 'Rear bushings due within the year; everything else sound. Client briefed on first-car running costs.',
+    CONCAT('{"sections":{"engine":"ok","transmission":"ok","suspension":"attention","brakes":"ok","electricals":"ok","body":"ok","documents":"ok"}',
+      ',"obd2_codes":"none stored — no stored faults on the reader, battery healthy","photos":"11 photos filed against VIN JTEHT05J402015882"',
+      ',"checked_on":"', DATE_FORMAT(DATE_SUB(UTC_DATE(), INTERVAL 8 DAY), '%Y-%m-%d'), '"}'),
+    'pass_with_advisory',
+    'Straight body, no accident repair found, and the VIN plate matches the documents. Rear suspension bushings are due within the year — budget about ₦180,000 — and the second key is missing. Everything else checked out; the client was briefed on running costs before deciding.',
     DATE_SUB(UTC_TIMESTAMP(), INTERVAL 10 DAY)),
   ('HC-BK-0005', 'inspection', 'inspection', DATE_SUB(UTC_DATE(), INTERVAL 2 DAY) + INTERVAL 9 HOUR,
     'Dealer lot, Aba Road', '{"make":"Honda","model":"Accord EX","year":2014}',
     'Uche Nnamdi', '+2348031110009', 4500000, 'refunded', 'cancelled', NULL, NULL, NULL, NULL, NULL,
     'Customer rescheduled — car was sold before we arrived.', DATE_SUB(UTC_TIMESTAMP(), INTERVAL 3 DAY));
+
+-- ---------------------------------------------------------------------------
+-- Money (§7.3 Orders & Payments). Deliberately *not* PSP transactions: no
+-- Paystack/Flutterwave keys exist yet (merchant account is a §18 launch item),
+-- so every seeded payment is a bank transfer or a manual entry — the same
+-- records the console creates when a transfer lands on the statement.
+-- ---------------------------------------------------------------------------
+INSERT INTO payments (reference, provider, provider_ref, purpose, order_id, booking_id, request_id,
+                      customer_name, customer_phone, amount_kobo, status, paid_at, refunded_at,
+                      refund_kobo, refund_reason, created_by, created_at) VALUES
+  ('HC-PAY-000001', 'manual', 'SEED-MANUAL-0001', 'order',
+   (SELECT id FROM orders WHERE order_no = 'HC-ORD-0001' LIMIT 1), NULL, NULL,
+   'Ada Okafor', '+2348031234567', 4500000, 'paid', DATE_SUB(UTC_TIMESTAMP(), INTERVAL 10 DAY), NULL,
+   0, NULL, (SELECT id FROM `users` WHERE phone = '+2348000000002' LIMIT 1),
+   DATE_SUB(UTC_TIMESTAMP(), INTERVAL 10 DAY)),
+  ('HC-PAY-000002', 'bank_transfer', 'SEED-BT-0002', 'booking', NULL,
+   (SELECT id FROM bookings WHERE reference = 'HC-BK-0002' LIMIT 1), NULL,
+   'Blessing Etim', '+2348031110002', 4500000, 'paid', DATE_SUB(UTC_TIMESTAMP(), INTERVAL 3 DAY), NULL,
+   0, NULL, (SELECT id FROM `users` WHERE phone = '+2348000000002' LIMIT 1),
+   DATE_SUB(UTC_TIMESTAMP(), INTERVAL 3 DAY)),
+  ('HC-PAY-000003', 'manual', NULL, 'booking', NULL,
+   (SELECT id FROM bookings WHERE reference = 'HC-BK-0001' LIMIT 1), NULL,
+   'Chidi Okafor', '+2348031110001', 4500000, 'pending', NULL, NULL,
+   0, NULL, (SELECT id FROM `users` WHERE phone = '+2348000000002' LIMIT 1),
+   DATE_SUB(UTC_TIMESTAMP(), INTERVAL 5 HOUR)),
+  ('HC-PAY-000004', 'bank_transfer', 'SEED-BT-0004', 'booking', NULL,
+   (SELECT id FROM bookings WHERE reference = 'HC-BK-0005' LIMIT 1), NULL,
+   'Uche Nnamdi', '+2348031110009', 4500000, 'refunded', DATE_SUB(UTC_TIMESTAMP(), INTERVAL 6 DAY),
+   DATE_SUB(UTC_TIMESTAMP(), INTERVAL 2 DAY), 4500000,
+   'Car was sold before we arrived — inspection fee returned in full.',
+   (SELECT id FROM `users` WHERE phone = '+2348000000001' LIMIT 1), DATE_SUB(UTC_TIMESTAMP(), INTERVAL 6 DAY)),
+  ('HC-PAY-000005', 'bank_transfer', 'SEED-BT-0005', 'retainer', NULL, NULL,
+   (SELECT id FROM service_requests WHERE tracking_id = 'HC-2481' LIMIT 1),
+   'Demo buyer (seeded record)', '+2348030000000', 5000000, 'paid',
+   DATE_SUB(UTC_TIMESTAMP(), INTERVAL 4 DAY), NULL, 0, NULL,
+   (SELECT id FROM `users` WHERE phone = '+2348000000001' LIMIT 1), DATE_SUB(UTC_TIMESTAMP(), INTERVAL 4 DAY));
+
+INSERT INTO payment_events (payment_id, provider, event_id, type, signature_ok, payload, created_at) VALUES
+  ((SELECT id FROM payments WHERE reference = 'HC-PAY-000001' LIMIT 1), 'manual', 'created:HC-PAY-000001', 'payment.created', NULL,
+   '{"purpose":"order","amountKobo":4500000,"provider":"manual"}', DATE_SUB(UTC_TIMESTAMP(), INTERVAL 10 DAY)),
+  ((SELECT id FROM payments WHERE reference = 'HC-PAY-000001' LIMIT 1), 'manual', 'manual:HC-PAY-000001', 'manual.paid', NULL,
+   '{"note":"Transfer seen on the GTBank statement, matched to HC-ORD-0001"}', DATE_SUB(UTC_TIMESTAMP(), INTERVAL 10 DAY)),
+  ((SELECT id FROM payments WHERE reference = 'HC-PAY-000002' LIMIT 1), 'bank_transfer', 'created:HC-PAY-000002', 'payment.created', NULL,
+   '{"purpose":"booking","amountKobo":4500000,"provider":"bank_transfer"}', DATE_SUB(UTC_TIMESTAMP(), INTERVAL 3 DAY)),
+  ((SELECT id FROM payments WHERE reference = 'HC-PAY-000002' LIMIT 1), 'bank_transfer', 'manual:HC-PAY-000002', 'bank_transfer.paid', NULL,
+   '{"note":"Payment confirmed by ops before the inspector was dispatched"}', DATE_SUB(UTC_TIMESTAMP(), INTERVAL 3 DAY)),
+  ((SELECT id FROM payments WHERE reference = 'HC-PAY-000003' LIMIT 1), 'manual', 'created:HC-PAY-000003', 'payment.created', NULL,
+   '{"purpose":"booking","amountKobo":4500000,"provider":"manual"}', DATE_SUB(UTC_TIMESTAMP(), INTERVAL 5 HOUR)),
+  ((SELECT id FROM payments WHERE reference = 'HC-PAY-000004' LIMIT 1), 'bank_transfer', 'created:HC-PAY-000004', 'payment.created', NULL,
+   '{"purpose":"booking","amountKobo":4500000,"provider":"bank_transfer"}', DATE_SUB(UTC_TIMESTAMP(), INTERVAL 6 DAY)),
+  ((SELECT id FROM payments WHERE reference = 'HC-PAY-000004' LIMIT 1), 'bank_transfer', 'manual:HC-PAY-000004', 'bank_transfer.paid', NULL,
+   '{"note":"Transfer matched"}', DATE_SUB(UTC_TIMESTAMP(), INTERVAL 6 DAY)),
+  ((SELECT id FROM payments WHERE reference = 'HC-PAY-000004' LIMIT 1), 'bank_transfer', 'refund:HC-PAY-000004', 'payment.refunded', NULL,
+   '{"amountKobo":4500000,"reason":"Car was sold before we arrived"}', DATE_SUB(UTC_TIMESTAMP(), INTERVAL 2 DAY)),
+  ((SELECT id FROM payments WHERE reference = 'HC-PAY-000005' LIMIT 1), 'bank_transfer', 'created:HC-PAY-000005', 'payment.created', NULL,
+   '{"purpose":"retainer","amountKobo":5000000,"provider":"bank_transfer"}', DATE_SUB(UTC_TIMESTAMP(), INTERVAL 4 DAY)),
+  ((SELECT id FROM payments WHERE reference = 'HC-PAY-000005' LIMIT 1), 'bank_transfer', 'manual:HC-PAY-000005', 'bank_transfer.paid', NULL,
+   '{"note":"Concierge retainer for HC-2481, receipted to the buyer"}', DATE_SUB(UTC_TIMESTAMP(), INTERVAL 4 DAY));
+
+-- Escrow: one protected purchase waiting on documents, one already inspected,
+-- one parts escrow that has only just received funds — the whole ladder.
+INSERT INTO payment_milestones (reference, kind, subject, listing_id, booking_id, customer_name,
+                                customer_phone, amount_kobo, stage, stage_note, released_by, released_at,
+                                created_by, created_at) VALUES
+  ('HC-ML-000001', 'protected_purchase', '2010 Toyota Camry LE — protected purchase deposit',
+   (SELECT id FROM vehicle_listings WHERE stock_no = 'HC-PH-0032' LIMIT 1),
+   (SELECT id FROM bookings WHERE reference = 'HC-BK-0004' LIMIT 1),
+   'Blessing Etim', '+2348031110002', 50000000, 'inspection_passed',
+   'Inspection passed 8 days ago with rear bushings noted — dealer re-quoted inside the band.',
+   NULL, NULL, (SELECT id FROM `users` WHERE phone = '+2348000000002' LIMIT 1),
+   DATE_SUB(UTC_TIMESTAMP(), INTERVAL 12 DAY)),
+  ('HC-ML-000002', 'protected_purchase', '2018 Infiniti QX60 — protected purchase deposit',
+   (SELECT id FROM vehicle_listings WHERE stock_no = 'HC-PH-0045' LIMIT 1), NULL,
+   'Uche Nnamdi', '+2348031110009', 75000000, 'documents_verified',
+   'Customs and registration papers sighted and copied to the file — waiting on the buyer to confirm the pickup date.',
+   NULL, NULL, (SELECT id FROM `users` WHERE phone = '+2348000000002' LIMIT 1),
+   DATE_SUB(UTC_TIMESTAMP(), INTERVAL 20 DAY)),
+  ('HC-ML-000003', 'parts_escrow', 'Tracker + installation kit — HC-ORD-0001',
+   NULL, NULL, 'Ada Okafor', '+2348031234567', 4500000, 'funds_received',
+   'Funds received with the order — installation books a slot once the kit lands.',
+   NULL, NULL, (SELECT id FROM `users` WHERE phone = '+2348000000002' LIMIT 1),
+   DATE_SUB(UTC_TIMESTAMP(), INTERVAL 10 DAY));
+
+-- Messages (§11). WhatsApp and email have no provider configured in the demo,
+-- so those rows are honestly 'skipped'; the console rows really were delivered.
+INSERT INTO notifications (channel, template, recipient, subject, body, status, entity, entity_id, created_by, created_at) VALUES
+  ('console', 'payment_receipt', '+2348031234567', NULL,
+   'Payment received — thank you. ₦45,000 against HC-PAY-000001 (HC-ORD-0001). Your receipt is on your dashboard.',
+   'sent', 'payment', (SELECT id FROM payments WHERE reference = 'HC-PAY-000001' LIMIT 1),
+   (SELECT id FROM `users` WHERE phone = '+2348000000002' LIMIT 1), DATE_SUB(UTC_TIMESTAMP(), INTERVAL 10 DAY)),
+  ('whatsapp', 'payment_request', '+2348031110001', NULL,
+   'Hello Chidi Okafor — your inspection is booked for tomorrow morning. Please send ₦45,000 to Honest Cars Ltd, 0123456789 (GTBank), using reference HC-PAY-000003 so we can match it.',
+   'skipped', 'payment', (SELECT id FROM payments WHERE reference = 'HC-PAY-000003' LIMIT 1),
+   (SELECT id FROM `users` WHERE phone = '+2348000000002' LIMIT 1), DATE_SUB(UTC_TIMESTAMP(), INTERVAL 5 HOUR)),
+  ('console', 'milestone_stage', '+2348031110002', NULL,
+   'Escrow update — HC-ML-000001 moved to “inspection passed”. The deposit stays with us until the documents are verified and you release it.',
+   'sent', 'milestone', (SELECT id FROM payment_milestones WHERE reference = 'HC-ML-000001' LIMIT 1),
+   (SELECT id FROM `users` WHERE phone = '+2348000000002' LIMIT 1), DATE_SUB(UTC_TIMESTAMP(), INTERVAL 8 DAY));
+
+-- Dealer ledger (§7.2/§7.3). Signed amounts: positive is commission the dealer
+-- owes us, negative is money we have paid out. Balances are never recomputed
+-- away — a correction is another row.
+INSERT INTO dealer_ledger (dealer_id, listing_id, payment_id, entry_type, amount_kobo, reference, detail, created_by, created_at) VALUES
+  ((SELECT id FROM dealers WHERE name = 'Trans-Amadi Motors' LIMIT 1),
+   (SELECT id FROM vehicle_listings WHERE stock_no = 'HC-PH-0045' LIMIT 1),
+   (SELECT id FROM payments WHERE reference = 'HC-PAY-000002' LIMIT 1),
+   'sale_commission', 25000000, 'STMT-2026-09',
+   'Commission on the QX60 sale — agreed rate on the signed terms, statement STMT-2026-09.',
+   (SELECT id FROM `users` WHERE phone = '+2348000000001' LIMIT 1), DATE_SUB(UTC_TIMESTAMP(), INTERVAL 9 DAY)),
+  ((SELECT id FROM dealers WHERE name = 'Trans-Amadi Motors' LIMIT 1), NULL, NULL,
+   'payout', -15000000, 'PO-2026-09-14',
+   'Payout sent by transfer — balance carried to October.',
+   (SELECT id FROM `users` WHERE phone = '+2348000000001' LIMIT 1), DATE_SUB(UTC_TIMESTAMP(), INTERVAL 5 DAY)),
+  ((SELECT id FROM dealers WHERE name = 'GRA Premium Motors' LIMIT 1),
+   (SELECT id FROM vehicle_listings WHERE stock_no = 'HC-PH-0018' LIMIT 1), NULL,
+   'sale_commission', 12000000, 'STMT-2026-09',
+   'Commission on the Santa Fe sale, plus the two add-on installs.',
+   (SELECT id FROM `users` WHERE phone = '+2348000000001' LIMIT 1), DATE_SUB(UTC_TIMESTAMP(), INTERVAL 3 DAY));
 
 -- Three sensitive actions already on file, so the audit page is not blank on
 -- first open. Everything the console does from here appends its own row.

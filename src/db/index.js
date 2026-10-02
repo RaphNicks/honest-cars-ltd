@@ -22,6 +22,7 @@ const requests = require('./requests');
 const commerce = require('./commerce');
 const users = require('./users');
 const admin = require('./admin');
+const payments = require('./payments');
 const leads = require('./leads');
 const analytics = require('./analytics');
 const redirects = require('./redirects');
@@ -42,6 +43,7 @@ module.exports = {
   commerce,
   users,
   admin,
+  payments,
   leads,
   analytics,
   redirects,

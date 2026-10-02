@@ -10,6 +10,7 @@ import {
   initAccordions,
   initInfoTips,
   initCopyLink,
+  initPrintButtons,
   initWhatsappFloat,
   initGallery,
   initCompare,
@@ -32,6 +33,7 @@ function boot() {
   initAccordions();
   initInfoTips();
   initCopyLink();
+  initPrintButtons();
   initWhatsappFloat();
   initFilters();
   initViewingModal();

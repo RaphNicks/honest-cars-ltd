@@ -124,6 +124,10 @@
                 </select>
                 <button class="btn btn--secondary btn--sm" type="submit">Move</button>
               </form>
+              <% if (row.completedAt || row.verdict) { %>
+                <a class="btn btn--ghost btn--sm" href="/admin/jobs/<%= row.id %>/report">Report</a>
+                <a class="btn btn--ghost btn--sm" href="/admin/jobs/<%= row.id %>/report.pdf">PDF</a>
+              <% } %>
               <% if (row.reportNotes) { %>
                 <p class="note-inline mb-0"><%= row.reportNotes.slice(0, 140) %></p>
               <% } %>
@@ -136,7 +140,6 @@
 </section>
 
 <p class="note-inline">
-  Slot capacity settings and the auto-generated client report PDF are the remaining pieces of this module (§7.3):
-  the calendar, the assignment and the checklist are live, and the inspector’s mobile view is at
-  <a href="/admin/jobs">/admin/jobs</a>.
+  The calendar, the assignment, the inspector’s checklist and the client report PDF are live
+  (<a href="/admin/jobs">/admin/jobs</a> produces the report). Slot capacity settings are still a launch item (§18).
 </p>

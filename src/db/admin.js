@@ -15,6 +15,7 @@
 const { query, queryOne, transaction } = require('./pool');
 const { parseJson } = require('./shape');
 const phones = require('../lib/phone');
+const { nairaToKobo, koboToNaira } = require('../lib/money');
 
 const LISTING_STATUSES = ['draft', 'in_review', 'live', 'reserved', 'sold', 'expired'];
 const GRADES = ['network_listed', 'field_checked', 'certified'];
@@ -34,22 +35,8 @@ function ints(row) {
   return out;
 }
 
-/**
- * ₦2,500,000 / 2500000 / ₦2500000.50 → kobo. Anything else — a negative, a
- * word, a blank — is refused rather than silently re-interpreted, because a
- * price override that quietly drops a minus sign is a money bug.
- */
-function nairaToKobo(naira) {
-  const raw = String(naira == null ? '' : naira).replace(/\s/g, '');
-  if (!/^(?:₦|NGN)?\d[\d,]*(?:\.\d{1,2})?$/i.test(raw)) return null;
-  const value = Number(raw.replace(/[^\d.]/g, ''));
-  if (!Number.isFinite(value) || value <= 0) return null;
-  return Math.round(value * 100);
-}
-
-function koboToNaira(kobo) {
-  return Number(kobo || 0) / 100;
-}
+// Money parsing lives in src/lib/money.js now that the payments module needs
+// it too. Re-exported below so existing callers keep working unchanged.
 
 // ---------------------------------------------------------------------------
 // Audit
@@ -88,16 +75,10 @@ async function auditLog({ limit = 100, entity = null, entityId = null } = {}) {
     entityId: row.entity_id,
     detail: parseJson(row.detail, null),
     createdAt: row.created_at,
-    actor: row.actor_name || (row.actor_phone ? phonesMask(row.actor_phone) : 'system'),
+    actor: row.actor_name || (row.actor_phone ? phones.mask(row.actor_phone) : 'system'),
     actorRole: row.actor_role || null,
     actorId: row.actor_id,
   }));
-}
-
-function phonesMask(phone) {
-  const digits = String(phone || '').replace(/\D/g, '');
-  if (digits.length < 7) return '•••';
-  return `+${digits.slice(0, 3)} ${digits.slice(3, 6)} ••• ${digits.slice(-4)}`;
 }
 
 // ---------------------------------------------------------------------------
@@ -461,7 +442,7 @@ function shapeLead(row) {
     status: row.status,
     name: row.name,
     phone: row.phone,
-    maskedPhone: phonesMask(row.phone),
+    maskedPhone: phones.mask(row.phone),
     message: row.message,
     preferredDay: row.preferred_day,
     listingId: row.listing_id,
@@ -485,7 +466,7 @@ function shapeRequestLead(row) {
     status: row.status,
     name: row.name,
     phone: row.phone,
-    maskedPhone: phonesMask(row.phone),
+    maskedPhone: phones.mask(row.phone),
     message: (parseJson(row.brief, {}) || {}).notes || null,
     brief: parseJson(row.brief, {}) || {},
     trackingId: row.tracking_id,
@@ -667,7 +648,7 @@ async function staffOptions() {
     id: row.id,
     name: row.name || 'Staff',
     role: row.role,
-    maskedPhone: phonesMask(row.phone),
+    maskedPhone: phones.mask(row.phone),
   }));
 }
 
@@ -682,7 +663,7 @@ function shapePipelineRequest(row) {
     type: row.type,
     status: row.status,
     name: row.name,
-    maskedPhone: phonesMask(row.phone),
+    maskedPhone: phones.mask(row.phone),
     brief,
     budget: brief.budget || brief.max_budget || null,
     notes: row.notes,
@@ -796,7 +777,7 @@ function shapeBooking(row) {
     vehicle: parseJson(row.vehicle, {}) || {},
     addons: parseJson(row.addons, null),
     name: row.name,
-    maskedPhone: phonesMask(row.phone),
+    maskedPhone: phones.mask(row.phone),
     phone: row.phone,
     amountKobo: row.amount_kobo === null ? null : Number(row.amount_kobo),
     paymentStatus: row.payment_status,
@@ -923,7 +904,7 @@ async function staffList() {
   return rows.map((row) => ({
     id: row.id,
     name: row.name || 'Unnamed',
-    maskedPhone: phonesMask(row.phone),
+    maskedPhone: phones.mask(row.phone),
     role: row.role,
     status: row.status,
     watchlisted: Boolean(row.watchlisted),
@@ -1002,4 +983,6 @@ module.exports = {
   setRole,
   setWatchlist,
   customerCount,
+  nairaToKobo,
+  koboToNaira,
 };

@@ -1515,3 +1515,62 @@ body[data-scroll-locked='true'] { overflow: hidden; }
 .mb-0 { margin-bottom: 0; }
 .pt-0 { padding-top: 0; }
 .full-width { width: 100%; }
+
+/* ------------------------------------------------------- escrow milestone
+   The ladder is the same object on the customer’s dashboard and in the
+   console, so one set of rules serves both (components.css loads on both). */
+/* Milestone ladder: one rung per stage, filled as the money moves. */
+.milestone__title {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  margin: 0;
+  font-size: var(--text-16);
+}
+
+.milestone__subject { margin: 6px 0 0; font-size: var(--text-16); }
+.milestone__meta { margin: 4px 0 0; font-size: var(--text-14); color: var(--colour-slate, #5B6B7C); }
+
+.ms-ladder {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px var(--space-2);
+  margin: var(--space-2) 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.ms-ladder__step {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: var(--text-12);
+  color: var(--colour-slate, #5B6B7C);
+  text-transform: capitalize;
+}
+
+.ms-ladder__dot {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 999px;
+  border: 1px solid var(--colour-line, #D8E0E8);
+  background: #FFF;
+  font-size: var(--text-12);
+  font-weight: 700;
+  color: var(--colour-slate, #5B6B7C);
+}
+
+.ms-ladder__step.is-done .ms-ladder__dot { background: #DFF5E7; border-color: #12A150; color: #0B6B33; }
+.ms-ladder__step.is-done { color: var(--colour-ink, #1D2733); }
+.ms-ladder__step.is-current .ms-ladder__dot {
+  background: var(--colour-navy, #0E2A47);
+  border-color: var(--colour-navy, #0E2A47);
+  color: #FFF;
+}
+.ms-ladder__step.is-current { color: var(--colour-navy, #0E2A47); font-weight: 600; }
+
+.milestone__actions { margin-top: var(--space-2); }

@@ -55,7 +55,13 @@
                 <p class="note-inline mb-0"><strong>Filed:</strong> <%= job.reportNotes.slice(0, 160) %></p>
               <% } %>
             </div>
-            <a class="btn btn--secondary btn--sm" href="tel:<%= job.phone %>">Call customer</a>
+            <div class="btn-row btn-row--tight">
+              <a class="btn btn--secondary btn--sm" href="tel:<%= job.phone %>">Call customer</a>
+              <% if (job.checklist) { %>
+                <a class="btn btn--primary btn--sm" href="/admin/jobs/<%= job.id %>/report">Open the report</a>
+                <a class="btn btn--ghost btn--sm" href="/admin/jobs/<%= job.id %>/report.pdf">PDF</a>
+              <% } %>
+            </div>
           </div>
 
           <form method="post" action="/admin/jobs/<%= job.id %>/report" class="job-form">
@@ -112,6 +118,15 @@
             </div>
 
             <button class="btn btn--primary btn--block" type="submit">Save the report</button>
+            <p class="note-inline mb-0">
+              Saving produces the client report: the seven sections, the OBD2 codes, your notes and the verdict.
+              <% if (job.checklist) { %>
+                It is ready now — <a href="/admin/jobs/<%= job.id %>/report">open it</a> or
+                <a href="/admin/jobs/<%= job.id %>/report.pdf">download the PDF</a>.
+              <% } else { %>
+                The PDF appears here the moment you save.
+              <% } %>
+            </p>
           </form>
         </article>
       <% }); %>

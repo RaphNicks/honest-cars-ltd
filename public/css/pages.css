@@ -218,3 +218,71 @@
 .page-body h3 { margin-top: var(--space-2); }
 .page-body ul { padding-left: var(--space-3); }
 .page-body li { margin-bottom: var(--space-1); }
+
+/* ---------------------------------------------------- the inspection report
+   FR-07: one document with three outputs — this page, the print stylesheet and
+   the A4 PDF — and all three read the same object (src/services/report.js). */
+.card__title {
+  margin: 0 0 var(--space-1);
+  font-size: var(--text-20);
+  line-height: 1.25;
+}
+
+.report { max-width: 820px; margin-inline: auto; }
+
+.report__head { margin-bottom: var(--space-2); }
+.report__title { margin: 4px 0 var(--space-1); font-size: var(--text-32); line-height: 1.15; }
+.report__lead { margin: 0 0 var(--space-2); font-size: var(--text-16); color: var(--color-text-muted); }
+.report__actions { display: flex; flex-wrap: wrap; gap: var(--space-1); }
+
+.report__verdict {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-2);
+  border: var(--border);
+  border-left: 6px solid var(--color-text-muted);
+  border-radius: var(--radius);
+  background: var(--color-surface-sunken, #F7FAFC);
+  margin-bottom: var(--space-2);
+}
+
+.report__verdict--pass { border-left-color: #12A150; }
+.report__verdict--pass_with_advisory { border-left-color: #E8A13D; }
+.report__verdict--fail { border-left-color: #C0392B; }
+.report__verdict-label { margin: 0; font-size: var(--text-12); letter-spacing: 0.06em; text-transform: uppercase; color: var(--color-text-muted); }
+.report__verdict-value { margin: 0; font-size: var(--text-24); font-weight: 700; }
+.report__verdict-counts { display: flex; flex-wrap: wrap; gap: var(--space-2); font-size: var(--text-14); color: var(--color-text-muted); }
+
+.report__facts {
+  display: grid;
+  gap: var(--space-2);
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  margin-bottom: var(--space-2);
+}
+
+.report__fact-label { margin: 0; font-size: var(--text-12); text-transform: uppercase; letter-spacing: 0.05em; color: var(--color-text-muted); }
+.report__fact-value { margin: 2px 0 0; font-size: var(--text-16); }
+.report__extra { display: grid; gap: 4px; margin: var(--space-2) 0 0; }
+.report__extra dt { font-size: var(--text-14); text-transform: uppercase; letter-spacing: 0.05em; color: var(--color-text-muted); }
+.report__extra dd { margin: 0 0 var(--space-1); font-size: var(--text-14); }
+.report__notes { margin: 0; font-size: var(--text-16); line-height: 1.7; white-space: pre-line; }
+.report__foot { margin-top: var(--space-3); border-top: var(--border); padding-top: var(--space-2); }
+.report__disclaimer { margin: 0; font-size: var(--text-14); color: var(--color-text-muted); line-height: 1.6; }
+.report__sign { margin: var(--space-1) 0 0; font-size: var(--text-14); }
+
+/* The paper version: white, no chrome, and the disclaimer stays with the last
+   section instead of floating onto a page of its own. */
+@media print {
+  .site-header, .site-footer, .sticky-cta, .report__actions, .skip-link, .breadcrumbs { display: none !important; }
+  .report { max-width: none; }
+  .report__verdict { break-inside: avoid; }
+  .card, .card__body { border: 0; padding: 0; }
+  .report__foot { break-inside: avoid; }
+}
+
+/* Receipts keep the event trail visible — it is the honest part of the page. */
+.receipt-trail { margin: 0; padding-left: var(--space-2); font-size: var(--text-14); }
+.receipt-trail li { margin-bottom: 6px; }

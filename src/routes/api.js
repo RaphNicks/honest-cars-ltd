@@ -20,6 +20,7 @@ const express = require('express');
 const rateLimit = require('../lib/rate-limit');
 const db = require('../db');
 const config = require('../config');
+const paymentService = require('../services/payments');
 const events = require('../services/events');
 const validate = require('../services/validate');
 const seo = require('../services/seo');
@@ -291,8 +292,23 @@ router.post('/orders', rateLimit({ windowMs: 60_000, max: 8 }), async (req, res,
       })
       .catch(() => {});
 
+    // The money seam: every order opens a payment row, so the confirmation page
+    // can show real instructions and finance has something to match. With no PSP
+    // keys the payment stays pending with bank-transfer wording — we never
+    // pretend a card page exists.
+    const payment = await paymentService
+      .initiate({
+        purpose: 'order',
+        amountKobo: order.totalKobo,
+        orderId: order.id,
+        customerName: name,
+        customerPhone: phone,
+      })
+      .catch(() => null);
+
     const opsText = encodeURIComponent(
-      `New shop order ${order.orderNo}\nName: ${name}\nPhone: ${phone}\nTotal: ₦${(order.totalKobo / 100).toLocaleString('en-NG')}`,
+      `New shop order ${order.orderNo}\nName: ${name}\nPhone: ${phone}\nTotal: ₦${(order.totalKobo / 100).toLocaleString('en-NG')}` +
+        (payment && payment.reference ? `\nPayment ref: ${payment.reference}` : ''),
     );
 
     return sendJson(res, {
@@ -300,6 +316,9 @@ router.post('/orders', rateLimit({ windowMs: 60_000, max: 8 }), async (req, res,
       orderNo: order.orderNo,
       totalKobo: order.totalKobo,
       url: order.url,
+      payment: payment && payment.ok
+        ? { reference: payment.reference, hosted: Boolean(payment.hosted), checkoutUrl: payment.checkoutUrl || null }
+        : null,
       whatsappUrl: `https://wa.me/${config.business.whatsapp}?text=${opsText}`,
     });
   } catch (error) {
@@ -467,6 +486,56 @@ router.get('/og/listing/:slug.png', async (req, res, next) => {
   } catch (error) {
     return next(error);
   }
+});
+
+// ---------------------------------------------------------------------------
+// PSP webhooks (§12.2). These two routes are the only places a payment can be
+// marked paid without a human, so they are deliberately paranoid:
+//   • the raw body is what the signature is computed over — express.json would
+//     have consumed it, so app.js gives these paths express.raw first
+//   • an unsigned or mis-signed call is logged with signature_ok = 0 and
+//     answered 401: never applied, never trusted
+//   • a repeated event_id is a no-op, because PSPs retry
+// ---------------------------------------------------------------------------
+function webhookHandler(provider) {
+  return async (req, res, next) => {
+    try {
+      const rawBody = Buffer.isBuffer(req.body) ? req.body.toString('utf8') : '';
+      let body = null;
+      try { body = rawBody ? JSON.parse(rawBody) : null; } catch { body = null; }
+
+      const result = await paymentService.handleWebhook({
+        provider,
+        headers: req.headers,
+        rawBody,
+        body,
+      });
+
+      if (!result.ok) {
+        return sendJson(res, { ok: false, error: result.error, verdict: result.verdict || null }, { status: result.status || 400 });
+      }
+      return sendJson(res, {
+        ok: true,
+        duplicate: Boolean(result.duplicate),
+        reference: result.payment ? result.payment.reference : null,
+        status: result.payment ? result.payment.status : null,
+      });
+    } catch (error) {
+      return next(error);
+    }
+  };
+}
+
+router.post('/payments/webhook/paystack', webhookHandler('paystack'));
+router.post('/payments/webhook/flutterwave', webhookHandler('flutterwave'));
+
+/** What the site can honestly say about payment methods right now (§18). */
+router.get('/payments/methods', async (req, res) => {
+  return sendJson(res, {
+    ok: true,
+    providers: paymentService.availability(),
+    active: paymentService.activeProvider(),
+  });
 });
 
 // ---------------------------------------------------------------------------

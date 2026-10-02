@@ -63,6 +63,14 @@ function wireSummary() {
   });
 }
 
+/** Print the inspection report from the console (the print sheet does the work). */
+function wirePrint() {
+  document.querySelectorAll('[data-print]').forEach((button) => {
+    button.addEventListener('click', () => window.print());
+  });
+}
+
 wireAutoSubmit();
 wireTemplates();
 wireSummary();
+wirePrint();

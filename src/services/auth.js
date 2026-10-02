@@ -325,6 +325,24 @@ function requireStaff(options = {}) {
 }
 
 /**
+ * Same gate, but for the screens two different roles legitimately share — the
+ * inspection report is opened by the inspector who filed it *and* by dispatch.
+ * Holds when the role has any one of the listed capabilities.
+ */
+function requireAnyStaff(capabilities) {
+  const list = (Array.isArray(capabilities) ? capabilities : [capabilities]).filter(Boolean);
+  return (req, res, next) => {
+    if (!req.user) {
+      const target = encodeURIComponent(req.originalUrl || '/admin');
+      return res.redirect(302, `/login?next=${target}`);
+    }
+    if (!roles.isStaff(req.user.role)) return forbidden(req, res);
+    if (list.length && !list.some((capability) => roles.can(req.user.role, capability))) return forbidden(req, res);
+    return next();
+  };
+}
+
+/**
  * CSRF defence for state-changing requests: SameSite=Lax cookies plus a
  * same-origin check on the Origin/Sec-Fetch-Site headers (§12.2).
  */
@@ -370,6 +388,7 @@ function logout(req, res) {
 
 module.exports = {
   requireStaff,
+  requireAnyStaff,
   SESSION_COOKIE,
   OTP_CHANNELS,
   normalisePhone,

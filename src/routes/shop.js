@@ -18,6 +18,7 @@
 
 const express = require('express');
 const db = require('../db');
+const config = require('../config');
 const seo = require('../services/seo');
 const { sendPrebuiltOrRender, sendPage, CACHE } = require('../lib/respond');
 
@@ -147,6 +148,11 @@ router.get('/order/:orderNo', async (req, res, next) => {
 
     const subscriptions = await db.commerce.subscriptionsForOrder(order.orderNo);
     const delivery = await db.commerce.deliveryAreas();
+    // The payment rows behind this order, newest first — the pending one is what
+    // the confirmation page turns into transfer instructions (no PSP keys yet).
+    const ledger = await db.payments.orderByNo(order.orderNo);
+    const payments = ledger ? ledger.payments : [];
+    const pendingPayment = payments.find((row) => row.status === 'pending') || null;
 
     return await sendPage(req, res, {
       routePath: `/order/${order.orderNo}`,
@@ -163,7 +169,21 @@ router.get('/order/:orderNo', async (req, res, next) => {
         bodyClass: 'page-order',
         jsonLd: [],
       },
-      data: { order, subscriptions, delivery, trail: [{ label: order.orderNo }] },
+      data: {
+        order,
+        subscriptions,
+        delivery,
+        payments,
+        pendingPayment,
+        bank: {
+          name: config.business.bankAccountName,
+          account: config.business.bankAccount,
+          bank: config.business.bankName,
+          note: 'Use the payment reference as the transfer narration so we can match it in seconds.',
+        },
+        paymentNotice: req.query.payment || null,
+        trail: [{ label: order.orderNo }],
+      },
     });
   } catch (error) {
     return next(error);
