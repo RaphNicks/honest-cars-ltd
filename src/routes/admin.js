@@ -61,6 +61,7 @@ const NAV = [
   { href: PATHS.orders, label: 'Orders', icon: 'package', capability: 'payments.view' },
   { href: PATHS.payments, label: 'Money', icon: 'chart', capability: 'payments.view' },
   { href: PATHS.milestones, label: 'Escrow', icon: 'shield', capability: 'payments.view' },
+  { href: `${HOME}/cms`, label: 'Content', icon: 'fileCheck', capability: 'cms.manage' },
   { href: PATHS.staff, label: 'Staff & roles', icon: 'account', capability: 'users.manage' },
   { href: PATHS.audit, label: 'Audit log', icon: 'shield', capability: 'users.manage' },
 ];

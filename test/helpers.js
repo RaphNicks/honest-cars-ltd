@@ -8,6 +8,12 @@
 const { execFileSync } = require('node:child_process');
 const path = require('node:path');
 
+// Tests must be deterministic, and a build on disk is not part of the source:
+// point the renderer at a directory with no manifest so every page is rendered
+// per request, exactly as it is on a fresh checkout. Set before anything
+// requires src/config.
+process.env.STATIC_DIR = process.env.TEST_STATIC_DIR || '.test-static';
+
 const ROOT = path.join(__dirname, '..');
 
 async function dbAvailable() {

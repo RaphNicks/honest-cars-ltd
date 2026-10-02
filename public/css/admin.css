@@ -678,3 +678,59 @@ body.admin {
    alone — the left rule carries it. */
 .table tr.is-selected { background: #F3F8FF; }
 .table tr.is-selected th[scope="row"] { box-shadow: inset 3px 0 0 var(--colour-navy, #0E2A47); }
+
+/* ---------------------------------------------------------------------------
+   CMS (§7.3) — workflow board, cards, the editor and the house-rule panel.
+   Console tokens only: navy/amber/green, one radius, the §3.3 type ladder.
+   --------------------------------------------------------------------------- */
+.cms-column {
+  background: var(--surface, #F7FAFC);
+  border: 1px solid var(--line, #D8E0E8);
+  border-radius: var(--radius, 12px);
+  padding: var(--space-2, 16px);
+}
+.cms-column__title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: var(--text-14);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--muted, #5B6B7C);
+  margin-bottom: var(--space-1, 8px);
+}
+.cms-column__count { color: var(--honest-navy, #0E2A47); }
+.cms-card {
+  background: #FFF;
+  border: 1px solid var(--line, #D8E0E8);
+  border-radius: var(--radius, 12px);
+  padding: var(--space-2, 16px);
+  margin-bottom: var(--space-1, 8px);
+}
+.cms-card__title { font-weight: 600; color: var(--honest-navy, #0E2A47); display: block; }
+.cms-card__meta { margin: 4px 0; font-size: var(--text-14); }
+.cms-card__rules { font-size: var(--text-14); margin: 4px 0; }
+.cms-card__foot { font-size: var(--text-12); margin: 0; }
+.cms-flag { color: #B42318; font-weight: 500; }
+.cms-list { list-style: none; padding: 0; margin: var(--space-1, 8px) 0 0; }
+.cms-list li { padding: 6px 0; border-bottom: 1px solid var(--line, #D8E0E8); font-size: var(--text-14); }
+.cms-layout { display: grid; gap: var(--space-3, 24px); grid-template-columns: 1fr; }
+@media (min-width: 1025px) {
+  .cms-layout { grid-template-columns: minmax(0, 1fr) 380px; align-items: start; }
+}
+.cms-body { min-height: 520px; font-size: var(--text-14); line-height: 1.7; }
+.cms-rules { list-style: none; padding: 0; margin: 0; font-size: var(--text-14); }
+.cms-rules li { padding: 6px 0; border-bottom: 1px solid var(--line, #D8E0E8); }
+.cms-rules li:last-child { border-bottom: 0; }
+.cms-check { display: flex; gap: 8px; align-items: flex-start; }
+.cms-check--ok { color: var(--honest-green, #12A150); }
+.cms-check--bad { color: #B42318; }
+.cms-preview {
+  border: 1px solid var(--line, #D8E0E8);
+  border-radius: var(--radius, 12px);
+  padding: var(--space-2, 16px);
+  background: #FFF;
+}
+.cms-preview h2, .cms-preview h3 { margin-top: var(--space-2, 16px); }
+.cms-strip { display: flex; flex-wrap: wrap; gap: var(--space-1, 8px); align-items: center; }
+.cms-hint { font-size: var(--text-12); color: var(--muted, #5B6B7C); }

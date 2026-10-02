@@ -63,6 +63,12 @@ const BUILT = [
   { path: '/account/receipts/{reference}', label: 'Payment receipt (§7.3)' },
   { path: '/account/reports/{reference}', label: 'Inspection report (FR-07)' },
   { path: '/dealer', label: 'Dealer portal entry page (interior is phase 2)' },
+  { path: '/admin/cms', label: 'Admin: content workflow + revisions (§7.3/§7.4)' },
+  { path: '/admin/cms/posts/{id}', label: 'Admin: post editor + workflow' },
+  { path: '/admin/cms/pages', label: 'Admin: CMS pages (§6.10)' },
+  { path: '/admin/cms/faqs', label: 'Admin: FAQs' },
+  { path: '/admin/cms/testimonials', label: 'Admin: testimonials' },
+  { path: '/admin/cms/modules', label: 'Admin: homepage modules' },
   { path: '/sitemap.xml', label: 'Sitemap' },
   { path: '/robots.txt', label: 'robots.txt' },
 ];
@@ -77,7 +83,6 @@ const PENDING = [
   { path: '/dealer/listings', label: 'Dealer portal: my listings (§7.2)', phase: 'phase-2' },
   { path: '/dealer/listings/new', label: 'Dealer portal: add listing wizard (§7.2)', phase: 'phase-2' },
   { path: '/dealer/leads', label: 'Dealer portal: leads & viewings (§7.2)', phase: 'phase-2' },
-  { path: '/admin/cms', label: 'Admin: content workflow (§7.4)', phase: 'phase-2' },
   { path: '/admin/intel', label: 'Admin: market intel + reports (§7.3)', phase: 'phase-2' },
 ];
 

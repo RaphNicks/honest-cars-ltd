@@ -404,6 +404,29 @@ async function byIds(ids = [], { limit = 24 } = {}) {
   return clean.map((id) => byId.get(id)).filter(Boolean);
 }
 
+/**
+ * Hand-picked listings by SEO slug — the CMS featured module (§7.3).
+ * Order is the editor's order, and only browsable cars come back: a module can
+ * never surface a sold, expired or hidden car.
+ */
+async function bySlugs(slugs = []) {
+  const clean = [...new Set((slugs || []).map((s) => String(s || '').trim()).filter(Boolean))].slice(0, 12);
+  if (!clean.length) return [];
+  const rows = await query(
+    `SELECT l.*, d.name AS dealer_name, d.lot_area AS dealer_area, d.verified AS dealer_verified
+       FROM vehicle_listings l
+       JOIN dealers d ON d.id = l.dealer_id
+      WHERE l.seo_slug IN (${clean.map(() => '?').join(',')})
+        AND l.status IN ('live','reserved')
+        AND (l.expires_at IS NULL OR l.expires_at > UTC_TIMESTAMP())`,
+    clean,
+  );
+  const listings = rows.map(shapeListing);
+  await attachMedia(listings);
+  const bySlug = new Map(listings.map((listing) => [listing.slug, { ...listing, runningCostKobo: runningCostEstimate(listing) }]));
+  return clean.map((slug) => bySlug.get(slug)).filter(Boolean);
+}
+
 async function findByIds(ids = []) {
   const clean = ids.map((id) => Number.parseInt(id, 10)).filter((id) => Number.isFinite(id)).slice(0, 3);
   if (!clean.length) return [];
@@ -657,6 +680,7 @@ module.exports = {
   findBySlug,
   findByIds,
   byIds,
+  bySlugs,
   runningCostEstimate,
   findArchivedSoldBySlug,
   findRedirectTarget,

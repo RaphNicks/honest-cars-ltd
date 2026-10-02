@@ -210,21 +210,31 @@ maybe('response headers carry the security baseline (§12.2)', async () => {
   assert.match(response.headers.get('cache-control') || '', /max-age/);
 });
 
-maybe('static pages are served from disk after a build, with a static marker', async () => {
+maybe('the hybrid renderer serves from disk after a build, and renders per request without one', async () => {
   const fs = require('node:fs');
   const path = require('node:path');
-  const manifestPath = path.join(require('./helpers').ROOT, 'dist', '.static-manifest.json');
-  if (!fs.existsSync(manifestPath)) {
-    // The build has not run in this environment; the dynamic path must still work.
-    const { response } = await getHtml(ctx.baseUrl, '/cars/toyota');
-    assert.equal(response.status, 200);
-    return;
-  }
-  const inner = await startTestServer();
+  const { runScript, ROOT } = require('./helpers');
+
+  // 1. No build on disk: the request-time renderer answers, and says so.
+  const manifestPath = path.join(ROOT, '.test-static', '.static-manifest.json');
+  assert.equal(fs.existsSync(manifestPath), false, 'test static dir should start empty');
+  const before = await fetch(`${ctx.baseUrl}/cars/toyota`);
+  assert.equal(before.status, 200);
+  assert.equal(before.headers.get('x-honestcars-render'), 'dynamic');
+
+  // 2. Build (into the test static dir), boot again, and the same URL now comes
+  //    from the file on disk — the §12.4 hybrid contract, end to end.
   try {
-    const response = await fetch(`${inner.baseUrl}/cars/toyota`);
-    assert.equal(response.headers.get('x-honestcars-render'), 'static');
+    runScript('scripts/build-static.js', ['--quiet']);
+    const inner = await startTestServer();
+    try {
+      const response = await fetch(`${inner.baseUrl}/cars/toyota`);
+      assert.equal(response.headers.get('x-honestcars-render'), 'static');
+      assert.equal(response.status, 200);
+    } finally {
+      await inner.close();
+    }
   } finally {
-    await inner.close();
+    fs.rmSync(path.join(ROOT, '.test-static'), { recursive: true, force: true });
   }
 });

@@ -37,6 +37,13 @@ async function buildHomeLocals() {
 
   const faqs = await db.content.faqsForScope('global');
 
+  // §7.3 — the CMS owns the homepage modules. Counters contribute labels only;
+  // the figures stay live so a published number can never be stale.
+  const modules = await db.cms.homepageModules();
+  const counterLabels = (modules.counters && modules.counters.labels) || {};
+  const picked = ((modules.featured && modules.featured.listing_slugs) || []).filter(Boolean).slice(0, 6);
+  const featured = picked.length ? await db.listings.bySlugs(picked) : [];
+
   return {
     view: 'home',
     page: {
@@ -54,7 +61,19 @@ async function buildHomeLocals() {
       breadcrumbs: null,
       bodyClass: 'page-home',
     },
-    data: { feed, testimonials, posts, services, facets, counters, faqs },
+    data: {
+      feed,
+      testimonials,
+      posts,
+      services,
+      facets,
+      counters,
+      faqs,
+      modules,
+      counterLabels,
+      featured: featured.filter(Boolean),
+      featuredModule: modules.featured || null,
+    },
   };
 }
 

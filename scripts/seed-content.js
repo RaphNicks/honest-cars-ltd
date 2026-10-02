@@ -717,9 +717,11 @@ const PAGES = {
 const POST_BODIES = {
   '2015-toyota-camry-honest-buyers-guide': {
     serviceCta: 'inspection',
+    metaTitle: 'The 2015 Toyota Camry: what ₦12m buys in Port Harcourt',
+    metaDescription: 'Three 2015 Camrys, the same week, the same checklist. What a clean one is worth, what the tired ones hide, and what to check before you pay.',
     authorBio: 'Raph Nicks leads HonestCars inspections in Port Harcourt. He has inspected more than 600 used cars and has talked more buyers out of bad ones than into them.',
     body: [
-      { type: 'paragraph', text: 'A 2015 Camry is the default sensible buy in Port Harcourt, and that is exactly why you should be suspicious of it. Popular models attract the most repair-and-flip activity, because there is always a buyer.' },
+      { type: 'paragraph', text: 'A 2015 Camry is the [default sensible buy in Port Harcourt](/cars?make=Toyota), and that is exactly why you should be suspicious of it. Popular models attract the most repair-and-flip activity, because there is always a buyer.' },
       { type: 'paragraph', text: 'We put three 2015 Camrys through the full checklist in the same week. Here is what ₦12m bought in each case, with the numbers.' },
       { type: 'heading', text: 'What ₦12m buys in this market' },
       { type: 'table', head: ['Car', 'Asking', 'Mileage', 'Grade', 'Notable finding'], rows: [
@@ -737,18 +739,20 @@ const POST_BODIES = {
         'Document status: customs verified and duty sighted, or a discount that reflects the missing papers.',
       ] },
       { type: 'heading', text: 'What we would pay' },
-      { type: 'paragraph', text: 'For a clean 2015 Camry with verified mileage, complete papers and everything working: ₦10.5m–₦12.5m depending on trim and km. Below ₦10m, start asking what is wrong, because something usually is.' },
+      { type: 'paragraph', text: 'For a clean 2015 Camry with verified mileage, complete papers and everything working: ₦10.5m–₦12.5m depending on trim and km — compare that against [the Camrys we have actually inspected](/cars?make=Toyota&model=Camry). Below ₦10m, start asking what is wrong, because something usually is.' },
       { type: 'quote', text: 'The cheapest Camry on the road is rarely the cheapest Camry to own.', attribution: 'Raph Nicks' },
       { type: 'heading', text: 'Before you pay for one' },
-      { type: 'paragraph', text: 'Book the inspection, not the car. Any inspection we do lands in writing, names the faults and stays attached to the listing — including the faults that cost the seller money.' },
+      { type: 'paragraph', text: 'Book the [inspection](/services/inspection), not the car. Any inspection we do lands in writing, names the faults and stays attached to the listing — including the faults that cost the seller money.' },
     ],
   },
 
   'tokunbo-vs-nigerian-used-ph': {
     serviceCta: 'consultation',
+    metaTitle: 'Tokunbo vs Nigerian-used: the honest maths for PH',
+    metaDescription: 'A cheaper import is not always cheaper. The five-year cost lines we actually add up for Port Harcourt buyers, and when each side wins.',
     authorBio: 'Ada George analyses the Port Harcourt market for HonestCars, building the price bands behind every listing.',
     body: [
-      { type: 'paragraph', text: 'The reflex is “tokunbo is better”. The maths is not that simple, especially once you add registration, clearing and the first six months of repairs.' },
+      { type: 'paragraph', text: 'The reflex is “tokunbo is better”. The maths is not that simple, especially once you add registration, clearing and the first six months of repairs. Worth saying up front: you can inspect [either kind of car](/cars) the same way, on the same checklist.' },
       { type: 'heading', text: 'The cost lines people forget' },
       { type: 'table', head: ['Cost', 'Tokunbo', 'Nigerian-used'], rows: [
         ['Duty and clearing', 'Landed in the asking price', 'Usually already paid and verified'],
@@ -761,22 +765,24 @@ const POST_BODIES = {
       { type: 'checklist', items: [
         'You want specific trim or options that rarely get ordered here.',
         'You want a platform with fewer miles on Nigerian roads, which matters for suspension.',
-        'You are buying a grade you can verify before shipping, not after.',
+        'You are buying a grade you can verify before shipping, not after — an [import inspection](/services/inspection) or a [research brief](/services/research) does that.',
       ] },
       { type: 'heading', text: 'Where Nigerian-used wins' },
       { type: 'checklist', items: [
         'Papers are already clean and registered in Nigeria.',
         'You can inspect the actual car in person, today, with its service history.',
-        'The seller is the long-term owner rather than a trader who has had it three weeks.',
+        'The seller is the long-term owner rather than a trader who has had it three weeks. Cars with the full [Customs verified](/verification) status are the ones to compare.',
       ] },
     ],
   },
 
   'odometer-fraud-check-yourself': {
     serviceCta: 'inspection',
+    metaTitle: 'How to check an odometer before you pay a deposit',
+    metaDescription: 'Seven checks anyone can do in ten minutes, the two tricks that survive them all, and the ₦1.5m–₦3m you are betting when you trust the dash.',
     authorBio: 'Raph Nicks leads HonestCars inspections in Port Harcourt and has written the checklist every inspector works to.',
     body: [
-      { type: 'paragraph', text: 'Odometer fraud is the most common lie in the used-car market, and the easiest to catch if you know where the car keeps its own records.' },
+      { type: 'paragraph', text: 'Odometer fraud is the most common lie in the used-car market, and the easiest to catch if you know where the car keeps its own records. If you would rather not do it yourself, every [HonestCars inspection](/services/inspection) includes an OBD2 read and an odometer verdict.' },
       { type: 'heading', text: 'Seven checks you can do in ten minutes' },
       { type: 'checklist', items: [
         'Service book: look for a chain of stamps whose km readings increase consistently with the dates.',
@@ -785,19 +791,21 @@ const POST_BODIES = {
         'Steering wheel and gear knob: shine and worn leather betray high mileage.',
         'Suspension bushings: at 150,000 km they have usually been replaced, and the receipts prove it.',
         'Windscreen: original glass with a manufacturer date before the car’s build year is a tell.',
-        'Tyre dates: four tyres stamped years apart suggest replacements driven by distance.',
+        'Tyre dates: four tyres stamped years apart suggest replacements driven by distance — the same quick read we do on every [field inspection](/services/inspection).',
       ] },
       { type: 'callout', tone: 'amber', title: 'The two tricks that survive all of the above', text: 'A worn interior can be swapped from a scrap car, and a service book can be forged entirely. If the numbers only come from the book and the interior, get an OBD2 read — the ECU keeps its own distance in most modern cars, and that is the number a seller cannot reach.' },
       { type: 'heading', text: 'What it costs you when you miss it' },
-      { type: 'paragraph', text: 'A 60,000 km car priced against a 140,000 km one typically carries a ₦1.5m–₦3m premium. That is the size of the bet you are making when you take the number on trust.' },
+      { type: 'paragraph', text: 'A 60,000 km car priced against a 140,000 km one typically carries a ₦1.5m–₦3m premium. That is the size of the bet you are making when you take the number on trust. Every [car in the listings](/cars) shows its grade openly, and the ones we have physically checked say so.' },
     ],
   },
 
   'customs-papers-explained': {
     serviceCta: 'documents',
+    metaTitle: 'Customs papers, explained without the jargon',
+    metaDescription: 'Duty paid, duty sighted, customs verified, registration complete — what each term really means, and the VIN check that decides whether you can register the car.',
     authorBio: 'Chinelo U. leads documentation at HonestCars, handling customs verification, registration and permits across Rivers State.',
     body: [
-      { type: 'paragraph', text: '“Duty paid” and “duty sighted” are not the same statement, and the difference is the difference between a car you can register and a car you cannot.' },
+      { type: 'paragraph', text: '“Duty paid” and “duty sighted” are not the same statement, and the difference is the difference between a car you can register and a car you cannot. Our [documentation service](/services/documents) exists because of how often that sentence comes back to bite people.' },
       { type: 'heading', text: 'The words, translated' },
       { type: 'table', head: ['Term', 'What it actually means'], rows: [
         ['Duty paid', 'Someone says the import duty was paid. There is no document in front of you.'],
@@ -810,8 +818,8 @@ const POST_BODIES = {
       { type: 'checklist', items: [
         'Get the missing-papers discount in writing before you commit to anything.',
         'Confirm the vehicle is not flagged before you spend on repairs.',
-        'Budget the document service and the timeline — 7 to 14 working days in a straightforward case.',
-        'Do not pay a seller in full while documents are unresolved; use milestones.',
+        'Budget [the document service](/services/documents) and the timeline — 7 to 14 working days in a straightforward case.',
+        'Do not pay a seller in full while documents are unresolved; [concierge purchases](/services/concierge) hold funds against milestones for exactly this.',
       ] },
       { type: 'heading', text: 'Red flags' },
       { type: 'checklist', items: [
@@ -824,9 +832,11 @@ const POST_BODIES = {
 
   'ph-fuel-cost-by-model': {
     serviceCta: 'research',
+    metaTitle: 'What 100km really costs in PH traffic, by model',
+    metaDescription: 'Observed consumption for Corolla, Camry, CR-V, RX 350 and Hilux on the same Port Harcourt run, converted into what a year of driving actually costs.',
     authorBio: 'Ada George runs market intelligence at HonestCars, including the fuel and running-cost data behind our TCO reports.',
     body: [
-      { type: 'paragraph', text: 'We tracked real consumption on the same Port Harcourt run for a week: GRA to Trans-Amadi and back, with the Aba Road stretch at peak. Here are the numbers owners reported, plus what they mean per year.' },
+      { type: 'paragraph', text: 'We tracked real consumption on the same Port Harcourt run for a week: GRA to Trans-Amadi and back, with the Aba Road stretch at peak. Here are the numbers owners reported, plus what they mean per year. The models below are the ones that move through [our listings](/cars) fastest, so the maths sticks.' },
       { type: 'table', head: ['Model', 'Observed', 'Per 100 km', 'Yearly (15,000 km)'], rows: [
         ['Corolla 1.8', '11.5 km/l', '8.7 L', '≈ ₦405,000'],
         ['Camry 2.5', '9.8 km/l', '10.2 L', '≈ ₦475,000'],
@@ -842,19 +852,23 @@ const POST_BODIES = {
         'AC: it is not free, but in Port Harcourt it is not optional either.',
         'Fuel quality: the cheaper pump is not always the cheaper tank.',
       ] },
+      { type: 'paragraph', text: 'If you are choosing between two cars and the ₦150,000 a year matters, ask for a [running-cost research brief](/services/research) — we model fuel, tyres, servicing and the model-specific repair bills before you commit, and it is credited against the car if you buy through us.' },
+      { type: 'paragraph', text: 'Every car we list carries its [full service price list](/services) so you can price the care as well as the car.' },
     ],
   },
 
   'tyres-you-should-walk-away-from': {
     serviceCta: 'inspection',
+    metaTitle: 'Three tyre conditions that should end your inspection',
+    metaDescription: 'Uneven wear, mismatched brands and cracked sidewalls: what each one tells you about the owner, and what replacement really costs in Port Harcourt.',
     authorBio: 'Raph Nicks leads HonestCars inspections, where tyre condition is the fastest read on how a car has been maintained.',
     body: [
-      { type: 'paragraph', text: 'Tyres tell you what the service history will not: how the car was driven, whether the owner noticed problems, and how much they were willing to spend on maintenance.' },
+      { type: 'paragraph', text: 'Tyres tell you what the service history will not: how the car was driven, whether the owner noticed problems, and how much they were willing to spend on maintenance. It is one of the first things checked in a [HonestCars inspection](/services/inspection), along with the wheel bearings and alignment.' },
       { type: 'heading', text: 'Three conditions that should end the inspection' },
       { type: 'checklist', items: [
         'Uneven wear across one tyre — alignment or suspension geometry is wrong, and the cause costs more than the tyre.',
         'Different brands on the same axle — the owner was solving problems one wheel at a time.',
-        'Cracking on sidewalls with plenty of tread left — a six-year-old tyre is finished regardless of the tread depth.',
+        'Cracking on sidewalls with plenty of tread left — a six-year-old tyre is finished regardless of the tread depth. Cars whose tyres and suspension have already been checked carry the HonestCars-Certified badge in [the listings](/cars).',
       ] },
       { type: 'callout', tone: 'amber', title: 'The cheap tell', text: 'Four new matched tyres on a car that is otherwise average usually means the seller was preparing it to be driven away, which is a good sign. Cheap part-worn tyres on a car with premium trim usually means the opposite.' },
       { type: 'heading', text: 'What replacement actually costs in PH' },
@@ -864,7 +878,7 @@ const POST_BODIES = {
         ['19" + (RX, Prado)', '₦650,000+', 'Budget for it before you buy the car'],
       ] },
       { type: 'heading', text: 'Do this before you agree a price' },
-      { type: 'paragraph', text: 'Walk the four corners yourself. If the tyres fail any of the three checks above, put the replacement cost on the negotiating table that day — it is the one repair every seller understands and cannot argue with.' },
+      { type: 'paragraph', text: 'Walk the four corners yourself, or let a [field inspection](/services/inspection) do it before you travel. If the tyres fail any of the three checks above, put the replacement cost on the negotiating table that day — it is the one repair every seller understands and cannot argue with.' },
     ],
   },
 };

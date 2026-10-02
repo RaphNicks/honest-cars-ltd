@@ -26,7 +26,9 @@ const { router: pageRoutes } = require('./routes/pages');
 const { router: authRoutes } = require('./routes/auth');
 const { router: accountRoutes } = require('./routes/account');
 const { router: adminRoutes } = require('./routes/admin');
+const { router: adminCmsRoutes } = require('./routes/admin-cms');
 const auth = require('./services/auth');
+const publish = require('./services/publish');
 const og = require('./services/og');
 
 function createApp() {
@@ -99,6 +101,9 @@ function createApp() {
     ? render.loadManifest(config.features.staticPath)
     : { routes: new Map() };
   app.locals.staticManifestPath = path.join(config.features.staticPath, '.static-manifest.json');
+  // Content saves revalidate the affected pages; publish.js refreshes this map
+  // so a newly published post is served from disk straight away.
+  publish.setApp(app);
 
   // --- Redirect map (§14.1 legacy + archived sold URLs) --------------------
   app.use(async (req, res, next) => {
@@ -124,6 +129,7 @@ function createApp() {
   app.use('/', accountRoutes);
   // The console: /admin is gated by §7.4 and mounted before the public pages,
   // so the old "phase 2" stub for /admin can never shadow it.
+  app.use('/admin/cms', adminCmsRoutes);
   app.use('/admin', adminRoutes);
   app.use('/api', apiRoutes);
   app.use('/services', serviceRoutes);

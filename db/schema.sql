@@ -371,10 +371,17 @@ CREATE TABLE IF NOT EXISTS blog_posts (
   body           JSON          NULL,                          -- block list: paragraph|heading|callout|checklist|table|quote|youtube|listing
   service_cta    VARCHAR(80)   NULL,                          -- contextual service footer (§6.9)
   author_bio     VARCHAR(300)  NULL,                          -- E-E-A-T author card
+  meta_title     VARCHAR(200)  NULL,                          -- §14.3 search-result title
+  meta_description VARCHAR(320) NULL,                          -- §14.3 search-result description
+  review_note    VARCHAR(300)  NULL,                          -- why it was sent back to draft
+  published_by   INT UNSIGNED  NULL,
+  updated_by     INT UNSIGNED  NULL,
   updated_at     TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (id),
   UNIQUE KEY uq_blog_slug (slug),
-  KEY idx_blog_publish (status, published_at)
+  KEY idx_blog_publish (status, published_at),
+  CONSTRAINT fk_blog_published_by FOREIGN KEY (published_by) REFERENCES `users` (id) ON DELETE SET NULL,
+  CONSTRAINT fk_blog_updated_by   FOREIGN KEY (updated_by)   REFERENCES `users` (id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ---------------------------------------------------------------------------
@@ -639,98 +646,6 @@ CREATE TABLE IF NOT EXISTS bookings (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ---------------------------------------------------------------------------
--- Convenience views
---   v_live_listings  : everything /cars shows — live + reserved + sold ≤ 7 days
---   v_archived_sold  : sold 7→90 days — the SEO sold-archive window
---   v_expired_sold   : sold > 90 days — must 301 to the listing's facet
--- ---------------------------------------------------------------------------
-
--- ---------------------------------------------------------------------------
--- dealer_ledger — append-only commission and payout ledger per dealer (012).
--- ---------------------------------------------------------------------------
-CREATE TABLE IF NOT EXISTS dealer_ledger (
-  id          INT UNSIGNED NOT NULL AUTO_INCREMENT,
-  dealer_id   INT UNSIGNED NOT NULL,
-  listing_id  INT UNSIGNED NULL,
-  payment_id  INT UNSIGNED NULL,
-  entry_type  ENUM('sale_commission','payout','adjustment','clawback') NOT NULL,
-  amount_kobo BIGINT       NOT NULL,                   -- signed, see header
-  currency    CHAR(3)      NOT NULL DEFAULT 'NGN',
-  reference   VARCHAR(40)  NULL,                       -- statement or payout ref
-  detail      VARCHAR(200) NULL,
-  created_by  INT UNSIGNED NULL,
-  created_at  TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  PRIMARY KEY (id),
-  KEY idx_ledger_dealer (dealer_id, created_at),
-  KEY idx_ledger_type (entry_type, created_at),
-  KEY idx_ledger_listing (listing_id),
-  CONSTRAINT fk_ledger_dealer  FOREIGN KEY (dealer_id)  REFERENCES dealers (id) ON DELETE CASCADE,
-  CONSTRAINT fk_ledger_listing FOREIGN KEY (listing_id) REFERENCES vehicle_listings (id) ON DELETE SET NULL,
-  CONSTRAINT fk_ledger_payment FOREIGN KEY (payment_id) REFERENCES payments (id) ON DELETE SET NULL,
-  CONSTRAINT fk_ledger_actor   FOREIGN KEY (created_by) REFERENCES `users` (id) ON DELETE SET NULL
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
-CREATE OR REPLACE VIEW v_live_listings AS
-SELECT l.*, d.name AS dealer_name, d.lot_area AS dealer_area, d.verified AS dealer_verified
-FROM vehicle_listings l
-JOIN dealers d ON d.id = l.dealer_id
-WHERE
-  (l.status IN ('live','reserved') AND (l.expires_at IS NULL OR l.expires_at > UTC_TIMESTAMP()))
-  OR (l.status = 'sold' AND l.sold_at IS NOT NULL AND l.sold_at > DATE_SUB(UTC_TIMESTAMP(), INTERVAL 7 DAY));
-
-CREATE OR REPLACE VIEW v_archived_sold AS
-SELECT l.*, d.name AS dealer_name
-FROM vehicle_listings l
-JOIN dealers d ON d.id = l.dealer_id
-WHERE l.status = 'sold'
-  AND l.sold_at <= DATE_SUB(UTC_TIMESTAMP(), INTERVAL 7 DAY)
-  AND l.sold_at >  DATE_SUB(UTC_TIMESTAMP(), INTERVAL 90 DAY);
-
-CREATE OR REPLACE VIEW v_expired_sold AS
-SELECT l.id, l.stock_no, l.seo_slug, l.make, l.model, l.sold_at, l.archive_redirect_path
-FROM vehicle_listings l
-WHERE l.status = 'sold'
-  AND l.sold_at <= DATE_SUB(UTC_TIMESTAMP(), INTERVAL 90 DAY);
-
--- ---------------------------------------------------------------------------
--- request_candidates — cars ops attached to a concierge request (§7.3 pipeline;
--- the buyer's comparison is rendered from exactly these rows).
--- ---------------------------------------------------------------------------
-CREATE TABLE IF NOT EXISTS request_candidates (
-  id         INT UNSIGNED NOT NULL AUTO_INCREMENT,
-  request_id INT UNSIGNED NOT NULL,
-  listing_id INT UNSIGNED NOT NULL,
-  note       VARCHAR(200) NULL,
-  rank_no    TINYINT UNSIGNED NOT NULL DEFAULT 0,
-  added_by   INT UNSIGNED NULL,
-  created_at TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  PRIMARY KEY (id),
-  UNIQUE KEY uq_candidate (request_id, listing_id),
-  KEY idx_candidate_request (request_id, rank_no),
-  CONSTRAINT fk_candidate_request FOREIGN KEY (request_id) REFERENCES service_requests (id) ON DELETE CASCADE,
-  CONSTRAINT fk_candidate_listing FOREIGN KEY (listing_id) REFERENCES vehicle_listings (id) ON DELETE CASCADE,
-  CONSTRAINT fk_candidate_actor   FOREIGN KEY (added_by)   REFERENCES `users` (id) ON DELETE SET NULL
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
--- ---------------------------------------------------------------------------
--- admin_audit — sensitive actions, with the actor (§7.3 “audit log of sensitive
--- actions (price overrides, payment releases, grade changes)”).
--- ---------------------------------------------------------------------------
-CREATE TABLE IF NOT EXISTS admin_audit (
-  id         INT UNSIGNED NOT NULL AUTO_INCREMENT,
-  actor_id   INT UNSIGNED NULL,
-  action     VARCHAR(60)  NOT NULL,
-  entity     VARCHAR(40)  NOT NULL,
-  entity_id  INT UNSIGNED NULL,
-  detail     JSON         NULL,
-  created_at TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  PRIMARY KEY (id),
-  KEY idx_audit_entity (entity, entity_id, created_at),
-  KEY idx_audit_actor (actor_id, created_at),
-  CONSTRAINT fk_audit_actor FOREIGN KEY (actor_id) REFERENCES `users` (id) ON DELETE SET NULL
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
--- ---------------------------------------------------------------------------
 -- payments + payment_events + payment_milestones + notifications — money and
 -- messages (§7.3 “Orders & Payments”, §10.1, §11, FR-08). Payments are
 -- polymorphic (order / booking / retainer / subscription / milestone) and
@@ -845,4 +760,132 @@ CREATE TABLE IF NOT EXISTS `notifications` (
   KEY idx_notification_entity (entity, entity_id, created_at),
   KEY idx_notification_status (status, created_at),
   CONSTRAINT fk_notification_actor FOREIGN KEY (created_by) REFERENCES `users` (id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ---------------------------------------------------------------------------
+-- dealer_ledger — append-only commission and payout ledger per dealer (012).
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS dealer_ledger (
+  id          INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  dealer_id   INT UNSIGNED NOT NULL,
+  listing_id  INT UNSIGNED NULL,
+  payment_id  INT UNSIGNED NULL,
+  entry_type  ENUM('sale_commission','payout','adjustment','clawback') NOT NULL,
+  amount_kobo BIGINT       NOT NULL,                   -- signed, see header
+  currency    CHAR(3)      NOT NULL DEFAULT 'NGN',
+  reference   VARCHAR(40)  NULL,                       -- statement or payout ref
+  detail      VARCHAR(200) NULL,
+  created_by  INT UNSIGNED NULL,
+  created_at  TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  KEY idx_ledger_dealer (dealer_id, created_at),
+  KEY idx_ledger_type (entry_type, created_at),
+  KEY idx_ledger_listing (listing_id),
+  CONSTRAINT fk_ledger_dealer  FOREIGN KEY (dealer_id)  REFERENCES dealers (id) ON DELETE CASCADE,
+  CONSTRAINT fk_ledger_listing FOREIGN KEY (listing_id) REFERENCES vehicle_listings (id) ON DELETE SET NULL,
+  CONSTRAINT fk_ledger_payment FOREIGN KEY (payment_id) REFERENCES payments (id) ON DELETE SET NULL,
+  CONSTRAINT fk_ledger_actor   FOREIGN KEY (created_by) REFERENCES `users` (id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ---------------------------------------------------------------------------
+-- CMS workflow (013): content_revisions + homepage_modules
+-- (the blog_posts columns from 013 are merged into its CREATE above)
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS content_revisions (
+  id         INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  entity     ENUM('post','page','faq','testimonial','homepage','service') NOT NULL,
+  entity_id  INT UNSIGNED NOT NULL,
+  slug       VARCHAR(200) NULL,                  -- as it was at that revision
+  title      VARCHAR(240) NULL,
+  status     VARCHAR(40)  NULL,                  -- workflow state at that revision
+  snapshot   JSON         NOT NULL,
+  note       VARCHAR(240) NULL,                  -- “requested changes: figure in para 3”
+  actor_id   INT UNSIGNED NULL,
+  created_at TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  KEY idx_revision_entity (entity, entity_id, id),
+  CONSTRAINT fk_revision_actor FOREIGN KEY (actor_id) REFERENCES `users` (id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS homepage_modules (
+  id         INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `key`      VARCHAR(40)  NOT NULL,              -- banner | trust_figures | featured_cars
+  title      VARCHAR(160) NULL,
+  payload    JSON         NULL,
+  is_active  TINYINT(1)   NOT NULL DEFAULT 1,
+  position   TINYINT      NOT NULL DEFAULT 0,
+  updated_by INT UNSIGNED NULL,
+  updated_at TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  UNIQUE KEY uq_module_key (`key`),
+  CONSTRAINT fk_module_actor FOREIGN KEY (updated_by) REFERENCES `users` (id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ---------------------------------------------------------------------------
+
+-- ---------------------------------------------------------------------------
+-- Convenience views
+--   v_live_listings  : everything /cars shows — live + reserved + sold ≤ 7 days
+--   v_archived_sold  : sold 7→90 days — the SEO sold-archive window
+--   v_expired_sold   : sold > 90 days — must 301 to the listing's facet
+-- ---------------------------------------------------------------------------
+
+CREATE OR REPLACE VIEW v_live_listings AS
+SELECT l.*, d.name AS dealer_name, d.lot_area AS dealer_area, d.verified AS dealer_verified
+FROM vehicle_listings l
+JOIN dealers d ON d.id = l.dealer_id
+WHERE
+  (l.status IN ('live','reserved') AND (l.expires_at IS NULL OR l.expires_at > UTC_TIMESTAMP()))
+  OR (l.status = 'sold' AND l.sold_at IS NOT NULL AND l.sold_at > DATE_SUB(UTC_TIMESTAMP(), INTERVAL 7 DAY));
+
+CREATE OR REPLACE VIEW v_archived_sold AS
+SELECT l.*, d.name AS dealer_name
+FROM vehicle_listings l
+JOIN dealers d ON d.id = l.dealer_id
+WHERE l.status = 'sold'
+  AND l.sold_at <= DATE_SUB(UTC_TIMESTAMP(), INTERVAL 7 DAY)
+  AND l.sold_at >  DATE_SUB(UTC_TIMESTAMP(), INTERVAL 90 DAY);
+
+CREATE OR REPLACE VIEW v_expired_sold AS
+SELECT l.id, l.stock_no, l.seo_slug, l.make, l.model, l.sold_at, l.archive_redirect_path
+FROM vehicle_listings l
+WHERE l.status = 'sold'
+  AND l.sold_at <= DATE_SUB(UTC_TIMESTAMP(), INTERVAL 90 DAY);
+
+-- ---------------------------------------------------------------------------
+-- request_candidates — cars ops attached to a concierge request (§7.3 pipeline;
+-- the buyer's comparison is rendered from exactly these rows).
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS request_candidates (
+  id         INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  request_id INT UNSIGNED NOT NULL,
+  listing_id INT UNSIGNED NOT NULL,
+  note       VARCHAR(200) NULL,
+  rank_no    TINYINT UNSIGNED NOT NULL DEFAULT 0,
+  added_by   INT UNSIGNED NULL,
+  created_at TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  UNIQUE KEY uq_candidate (request_id, listing_id),
+  KEY idx_candidate_request (request_id, rank_no),
+  CONSTRAINT fk_candidate_request FOREIGN KEY (request_id) REFERENCES service_requests (id) ON DELETE CASCADE,
+  CONSTRAINT fk_candidate_listing FOREIGN KEY (listing_id) REFERENCES vehicle_listings (id) ON DELETE CASCADE,
+  CONSTRAINT fk_candidate_actor   FOREIGN KEY (added_by)   REFERENCES `users` (id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ---------------------------------------------------------------------------
+-- admin_audit — sensitive actions, with the actor (§7.3 “audit log of sensitive
+-- actions (price overrides, payment releases, grade changes)”).
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS admin_audit (
+  id         INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  actor_id   INT UNSIGNED NULL,
+  action     VARCHAR(60)  NOT NULL,
+  entity     VARCHAR(40)  NOT NULL,
+  entity_id  INT UNSIGNED NULL,
+  detail     JSON         NULL,
+  created_at TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  KEY idx_audit_entity (entity, entity_id, created_at),
+  KEY idx_audit_actor (actor_id, created_at),
+  CONSTRAINT fk_audit_actor FOREIGN KEY (actor_id) REFERENCES `users` (id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

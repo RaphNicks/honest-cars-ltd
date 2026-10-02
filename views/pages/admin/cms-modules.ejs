@@ -1,0 +1,75 @@
+<%#
+  /admin/cms/modules — homepage modules (§7.3: featured cars, trust counters,
+  banners). The counters module deliberately holds labels, not numbers: the
+  figure always comes from the database, so nothing here can publish a stale
+  count.
+  Locals: modules, counts, suggestions
+%>
+<div class="admin-head">
+  <h1>Homepage modules</h1>
+  <p class="admin-head__lead">
+    What the homepage reads from the CMS. Every save rebuilds <code>/</code> — the change is live
+    when the console says it is.
+  </p>
+</div>
+
+<% modules.forEach(function (module) { %>
+  <section class="panel" style="margin-bottom: var(--space-2);">
+    <div class="panel__head">
+      <h2 class="panel__title"><%= module.title || module.key %> <span class="muted">(<%= module.key %>)</span></h2>
+      <span class="badge badge--<%= module.isActive ? 'active' : 'pending' %>"><%= module.isActive ? 'Live' : 'Off' %></span>
+    </div>
+
+    <form method="post" action="/admin/cms/modules/<%= module.id %>" data-module-key="<%= module.key %>">
+      <div class="field">
+        <label class="field__label" for="m-title-<%= module.id %>">Console title</label>
+        <input class="input" id="m-title-<%= module.id %>" name="title" type="text" maxlength="160" value="<%= module.title %>">
+      </div>
+
+      <% if (module.key === 'counters') { %>
+        <p class="cms-hint">
+          Counts come from the live database and cannot be typed over. Edit the wording only —
+          that is what keeps a published figure honest.
+        </p>
+        <div class="admin-grid admin-grid--2">
+          <% Object.entries(module.payload.labels || {}).forEach(function ([key, label]) { %>
+            <div class="field">
+              <label class="field__label" for="lbl-<%= key %>"><%= key %></label>
+              <input class="input" id="lbl-<%= key %>" name="label_<%= key %>" type="text" maxlength="80" value="<%= label %>">
+            </div>
+          <% }); %>
+        </div>
+      <% } else { %>
+        <% Object.entries(module.payload || {}).forEach(function ([key, value]) { %>
+          <div class="field">
+            <label class="field__label" for="p-<%= module.id %>-<%= key %>"><%= key.replace(/_/g, ' ') %></label>
+            <% if (Array.isArray(value) || (value && typeof value === 'object')) { %>
+              <input class="input" id="p-<%= module.id %>-<%= key %>" name="payload_<%= key %>" type="text" value="<%= JSON.stringify(value) %>">
+            <% } else { %>
+              <input class="input" id="p-<%= module.id %>-<%= key %>" name="payload_<%= key %>" type="text" value="<%= value == null ? '' : value %>">
+            <% } %>
+          </div>
+        <% }); %>
+        <p class="cms-hint">
+          Banners and the featured rail ship switched off, so turning one on is a deliberate act.
+        </p>
+      <% } %>
+
+      <div class="cms-strip mt-2">
+        <label class="cms-check"><input type="checkbox" name="is_active" value="1" <%= module.isActive ? 'checked' : '' %>> Live on the homepage</label>
+        <button class="btn btn--primary btn--sm" type="submit">Save module</button>
+      </div>
+    </form>
+
+    <% if (module.key === 'featured') { %>
+      <details class="mt-2">
+        <summary class="cms-hint">Handy: latest live cars — paste a slug into <code>listing_slugs</code></summary>
+        <ul class="cms-list">
+          <% suggestions.forEach(function (listing) { %>
+            <li><code><%= listing.slug %></code> <span class="muted"><%= listing.year %> <%= listing.make %> <%= listing.model %> · <%= helpers.formatNaira(listing.priceKobo) %></span></li>
+          <% }); %>
+        </ul>
+      </details>
+    <% } %>
+  </section>
+<% }); %>

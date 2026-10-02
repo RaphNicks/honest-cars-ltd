@@ -53,6 +53,8 @@ after the first deploy lands in `db/migrations/NNN-name.sql` and is recorded in
 | `010-request-crm-fields.sql` | `service_requests.assigned_to` / `assigned_at` / `last_contacted_at` / `lost_reason`, so concierge requests sit in the same CRM-lite pipeline as leads |
 | `011-payments-and-notifications.sql` | `payments` (reference `HC-PAY-…`, provider enum, purpose, kobo amounts, refunds, checkout URL — never card data), `payment_events` (unique `(provider, event_id)` = webhook idempotency, `signature_ok`), `payment_milestones` (escrow ladder), `notifications` (§11 message log) |
 | `012-dealer-ledger.sql` | `dealer_ledger` — append-only commission and payout entries with signed kobo amounts (§7.2/§7.3) |
+| `013-cms.sql` | `blog_posts` meta/review/actor columns, `content_revisions`, `homepage_modules` |
+| `014-cms-content.sql` | Meta backfill for the seeded posts, and the four homepage modules (banner, hero, counter labels, featured rail) |
 
 ---
 

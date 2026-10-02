@@ -515,6 +515,8 @@ DELETE FROM facets;
 DELETE FROM services;
 DELETE FROM testimonials;
 DELETE FROM blog_posts;
+DELETE FROM homepage_modules;
+DELETE FROM content_revisions;
 DELETE FROM faqs;
 DELETE FROM redirects;
 DELETE FROM dealers;
@@ -734,15 +736,37 @@ DELETE FROM dealers;
   ];
   out.push(insert('blog_posts',
     ['slug', 'title', 'category', 'excerpt', 'hero_image', 'hero_alt', 'author_name', 'author_role', 'read_minutes',
-      'status', 'published_at', 'is_featured', 'make_tags', 'body', 'service_cta', 'author_bio'],
+      'status', 'published_at', 'is_featured', 'make_tags', 'body', 'service_cta', 'author_bio',
+      'meta_title', 'meta_description'],
     posts.map((p, i) => {
       const content = CONTENT.POST_BODIES[p[0]] || {};
       const hero = seedMedia.photo('blog', p[0]) || '/img/seed/og-default.svg';
       return [p[0], p[1], p[2], p[3], hero, p[4], p[5], p[6], p[7], 'published',
         new Date(Date.UTC(2026, 8, 28) - i * 4 * 86_400_000), p[8],
         JSON.stringify(p[2] === 'market_intel' ? ['Toyota', 'Honda'] : ['Toyota']),
-        content.body || [], content.serviceCta || null, content.authorBio || null];
+        content.body || [], content.serviceCta || null, content.authorBio || null,
+        content.metaTitle || null, content.metaDescription || null];
     })));
+
+  // §7.3 CMS: the homepage modules the console owns. Counters hold labels,
+  // never numbers, so a published figure can never go stale.
+  out.push(`INSERT INTO homepage_modules (\`key\`, title, payload, is_active, position) VALUES
+  ('hero', 'Homepage hero', JSON_OBJECT('headline', NULL, 'subhead', NULL), 0, 10),
+  ('announcement', 'Marketing banner', JSON_OBJECT(
+     'text', 'Free inspection on any car over \u20a620m booked before the end of the month.',
+     'label', 'Book a slot', 'href', '/services/inspection'), 0, 20),
+  ('counters', 'Trust counter labels', JSON_OBJECT(
+     'note', 'Counts stay live from the database. Edit the wording only.',
+     'labels', JSON_OBJECT(
+       'carsLive', 'cars live in the network',
+       'partnerDealers', 'partner dealers in PH',
+       'certified', 'HonestCars-Certified cars',
+       'carsSold90d', 'deals closed in 90 days')), 1, 30),
+  ('featured', 'Featured rail', JSON_OBJECT(
+     'heading', 'Featured this week',
+     'subheading', 'Hand-picked by the ops desk. Every one of them has been inspected.',
+     'listing_slugs', JSON_ARRAY(), 'service_slugs', JSON_ARRAY()), 0, 40)
+ON DUPLICATE KEY UPDATE \`key\` = \`key\`;`);
 
   const faqRows = [];
   for (const [scope, items] of Object.entries({ ...FAQS, ...CONTENT.FAQS })) {
@@ -774,7 +798,8 @@ INSERT INTO \`users\` (phone, name, role, referral_code, status) VALUES
   ('+2348000000001', 'Admin — Honest Cars', 'admin',     'HCADMN', 'active'),
   ('+2348000000002', 'Ops Desk',            'ops',       'HCSTFF', 'active'),
   ('+2348000000003', 'Field Inspector',     'inspector', 'HCINSP', 'active'),
-  ('+2348000000004', 'Finance Desk',        'finance',   'HCFINC', 'active')
+  ('+2348000000004', 'Finance Desk',        'finance',   'HCFINC', 'active'),
+  ('+2348000000005', 'Content Desk',        'marketing', 'HCMKTG', 'active')
 ON DUPLICATE KEY UPDATE role = VALUES(role), name = VALUES(name), status = 'active';
 
 -- The CRM-lite inbox (§7.3): every one of these came in through a real form.

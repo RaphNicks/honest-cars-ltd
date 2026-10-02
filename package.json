@@ -9,6 +9,7 @@
     "start": "node src/server.js",
     "dev": "node --watch src/server.js",
     "db:setup": "node scripts/db-setup.js",
+    "db:migrate": "node scripts/migrate.js",
     "db:seed": "node scripts/generate-seed.js && node scripts/db-setup.js",
     "build:static": "node scripts/build-static.js",
     "check-links": "node scripts/check-links.js",
@@ -22,7 +23,8 @@
     "test": "node --test test/*.test.js",
     "artifacts": "node scripts/build-static.js && node scripts/lint-type-scale.js",
     "check": "npm run lint && npm test",
-    "smoke": "node scripts/smoke-roles.mjs"
+    "smoke": "node scripts/smoke-roles.mjs",
+    "smoke:cms": "node scripts/cms-smoke.mjs"
   },
   "engines": {
     "node": ">=20"

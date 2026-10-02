@@ -11,13 +11,26 @@
    10. Deal-alert opt-in
 %>
 
+<% if (modules.announcement && modules.announcement.text) { %>
+<%# §7.3 homepage module — marketing banner, off until marketing turns it on %>
+<section class="banner-strip" role="region" aria-label="Announcement">
+  <div class="container banner-strip__inner">
+    <span class="banner-strip__text"><%= modules.announcement.text %></span>
+    <% if (modules.announcement.href) { %>
+      <%# No data-event here on purpose: §15.1 has no banner event, and the
+          event plan is used verbatim — we do not invent names. %>
+      <a class="banner-strip__link" href="<%= modules.announcement.href %>"><%= modules.announcement.label || 'Find out more' %> →</a>
+    <% } %>
+  </div>
+</section>
+<% } %>
+
 <section class="hero">
   <div class="container hero__grid">
     <div>
-      <h1 class="hero__title">Every vehicle verified. Every price compared. Every deal honest.</h1>
+      <h1 class="hero__title"><%= (modules.hero && modules.hero.headline) || 'Every vehicle verified. Every price compared. Every deal honest.' %></h1>
       <p class="hero__sub">
-        Verified cars from 37+ trusted Port Harcourt lots — with inspections, documents and
-        negotiation handled for you.
+        <%= (modules.hero && modules.hero.subhead) || 'Verified cars from 37+ trusted Port Harcourt lots — with inspections, documents and negotiation handled for you.' %>
       </p>
 
       <%# §6.1 module 2 — instant search → /cars with filters applied %>
@@ -96,6 +109,26 @@
     <% }); %>
   </div>
 </section>
+
+<% if (featured.length) { %>
+<%# §7.3 homepage module — featured rail, hand-picked by the ops desk %>
+<section class="section" aria-labelledby="featured-heading">
+  <div class="container">
+    <div class="section-head">
+      <h2 id="featured-heading"><%= (featuredModule && featuredModule.heading) || 'Featured this week' %></h2>
+      <a class="section-head__link" href="/cars">All cars →</a>
+    </div>
+    <% if (featuredModule && featuredModule.subheading) { %>
+      <p class="section-head__sub"><%= featuredModule.subheading %></p>
+    <% } %>
+    <div class="grid grid--3">
+      <% featured.slice(0, 3).forEach(function (listing) { %>
+        <%- include('../partials/car-card', { listing: listing, helpers: helpers, eager: false }) %>
+      <% }); %>
+    </div>
+  </div>
+</section>
+<% } %>
 
 <%# ------------------------------------------------------- 4. How it works %>
 <section class="section" aria-labelledby="how-heading">
@@ -185,19 +218,19 @@
     <div class="counter-row">
       <div class="counter">
         <span class="counter__value"><%= site.counters.carsLive %></span>
-        <span class="counter__label">cars live in the network</span>
+        <span class="counter__label"><%= counterLabels.carsLive || 'cars live in the network' %></span>
       </div>
       <div class="counter">
         <span class="counter__value"><%= site.counters.partnerDealers %></span>
-        <span class="counter__label">partner dealers in PH</span>
+        <span class="counter__label"><%= counterLabels.partnerDealers || 'partner dealers in PH' %></span>
       </div>
       <div class="counter">
         <span class="counter__value"><%= site.counters.certified %></span>
-        <span class="counter__label">HonestCars-Certified cars</span>
+        <span class="counter__label"><%= counterLabels.certified || 'HonestCars-Certified cars' %></span>
       </div>
       <div class="counter">
         <span class="counter__value"><%= site.counters.carsSold90d %></span>
-        <span class="counter__label">deals closed in 90 days</span>
+        <span class="counter__label"><%= counterLabels.carsSold90d || 'deals closed in 90 days' %></span>
       </div>
     </div>
 

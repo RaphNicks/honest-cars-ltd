@@ -27,12 +27,22 @@ const ROLES = [
   { phone: '+2348000000002', role: 'ops', must: ['/admin', '/admin/listings', '/admin/leads', '/admin/concierge', '/admin/bookings'] },
   { phone: '+2348000000003', role: 'inspector', must: ['/admin/jobs'] },
   { phone: '+2348000000004', role: 'finance', must: ['/admin', '/admin/orders', '/admin/payments', '/admin/milestones'] },
+  { phone: '+2348000000005', role: 'marketing', must: ['/admin', '/admin/cms', '/admin/cms/pages', '/admin/cms/faqs', '/admin/cms/testimonials', '/admin/cms/modules'] },
 ];
 
 /** Pages probed for every role; the verdict comes from `must`. */
+/**
+ * Marketing's remit is content only: the money and staff screens must refuse it.
+ * Without this, a role that quietly gained `payments.view` would pass the smoke.
+ */
+const MUST_NOT = [
+  { phone: '+2348000000005', role: 'marketing', blocked: ['/admin/payments', '/admin/milestones', '/admin/staff', '/admin/audit'] },
+];
+
 const PAGES = [
   '/admin', '/admin/listings', '/admin/leads', '/admin/concierge', '/admin/bookings',
   '/admin/jobs', '/admin/orders', '/admin/payments', '/admin/milestones', '/admin/staff', '/admin/audit',
+  '/admin/cms', '/admin/cms/pages', '/admin/cms/faqs', '/admin/cms/testimonials', '/admin/cms/modules',
 ];
 
 const GREEN = '\u001b[32m';
@@ -113,7 +123,20 @@ for (const staff of ROLES) {
   }
 }
 
-// 3. A customer must never see a console page.
+// 3. Roles whose remit excludes a screen must be refused it.
+for (const entry of MUST_NOT) {
+  const client = await signIn(entry.phone);
+  let leaks = 0;
+  for (const path of entry.blocked) {
+    const response = await client.request(path);
+    const allowed = response.status === 200;
+    report(entry.role, path, response.status, false);
+    if (allowed) leaks += 1;
+  }
+  if (leaks) failures += 0; // report() already counted each violation
+}
+
+// 4. A customer must never see a console page.
 const customer = newClient();
 const otp = await customer.request('/api/auth/otp', { method: 'POST', body: { phone: '+2348031234567' } });
 if (otp.json && otp.json.devCode) {

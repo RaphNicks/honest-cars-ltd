@@ -9,7 +9,7 @@
 <div class="post-body">
   <% blocks.forEach(function (block, index) { %>
     <% if (block.type === 'paragraph') { %>
-      <p><%= block.text %></p>
+      <p><%- helpers.inlineText(block.text) %></p>
 
     <% } else if (block.type === 'heading') { %>
       <%
@@ -20,13 +20,13 @@
     <% } else if (block.type === 'callout') { %>
       <aside class="callout<%= block.tone === 'amber' ? ' callout--warn' : '' %>">
         <% if (block.title) { %><h3><%= block.title %></h3><% } %>
-        <p><%= block.text %></p>
+        <p><%- helpers.inlineText(block.text) %></p>
       </aside>
 
     <% } else if (block.type === 'checklist') { %>
       <ul class="checklist">
         <% block.items.forEach(function (item) { %>
-          <li><%- helpers.icon('check', { size: 16 }) %> <span><%= item %></span></li>
+          <li><%- helpers.icon('check', { size: 16 }) %> <span><%- helpers.inlineText(item) %></span></li>
         <% }); %>
       </ul>
 
@@ -41,7 +41,7 @@
           </thead>
           <tbody>
             <% block.rows.forEach(function (row) { %>
-              <tr><% row.forEach(function (cell) { %><td><%= cell %></td><% }); %></tr>
+              <tr><% row.forEach(function (cell) { %><td><%- helpers.inlineText(cell) %></td><% }); %></tr>
             <% }); %>
           </tbody>
         </table>
@@ -49,7 +49,7 @@
 
     <% } else if (block.type === 'quote') { %>
       <blockquote>
-        <p class="mb-1">“<%= block.text %>”</p>
+        <p class="mb-1">“<%- helpers.inlineText(block.text) %>”</p>
         <% if (block.attribution) { %><footer class="testimonial__meta"><%= block.attribution %></footer><% } %>
       </blockquote>
 

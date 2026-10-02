@@ -190,6 +190,47 @@ object, so the screen cannot drift from what is enforced.
 | Staff & roles | `/admin/staff` | Staff list, role setter, watchlist, customer count, and the capability matrix as enforced |
 | Audit log | `/admin/audit` | Publishes, grade changes, price overrides, dispatch, report filings, role changes — filterable by entity |
 
+### The CMS (PRD §7.3 content, governed by §6.9)
+
+`/admin/cms` is where content is made, and it is the same content the public
+site renders — not a separate copy. Everything the §7.3 table puts under “CMS”
+is there: blog posts and their media fields, the §6.10 pages, FAQs,
+testimonials, homepage modules, and the service price cards that live on
+`/services`.
+
+| Screen | Route | What it does |
+|---|---|---|
+| Hub | `/admin/cms` | The workflow board — draft → in review → scheduled → published — plus pages, FAQs, testimonials, modules and the last few revisions |
+| Post editor | `/admin/cms/posts/{id}` | Body, meta, author, tags, the service CTA, a rendered preview, the house-rule panel, the workflow buttons and the revision history with restore |
+| Pages | `/admin/cms/pages` | H1, hero copy, meta, body and the indexable flag; the counsel-review flag only an admin can clear |
+| FAQs | `/admin/cms/faqs` | Add, edit, reorder, switch off, delete — scoped to the pages that show them |
+| Testimonials | `/admin/cms/testimonials` | Published and hidden quotes; nothing is deleted to hide it |
+| Homepage | `/admin/cms/modules` | Banner, hero copy, trust-counter wording and the hand-picked featured rail |
+
+Three decisions worth knowing:
+
+* **The body is block markup, not HTML.** The editor writes
+  `## Heading`, `! Callout | text`, `- checklist`, `| table |`, `> quote` and
+  inline links like `[a car](/cars)`. `src/services/blocks.js` parses it into the
+  same JSON block list the public pages already render, never throws, and
+  reports bad lines back as line numbers. Nothing an editor types is ever
+  inserted as raw HTML — prose is escaped, and inline links may only point at
+  paths inside this site.
+* **Publishing is gated, and the gate is real.** §6.9 says a post links at least
+  three listing or service pages; §14.3 caps the meta title and description. A
+  post that breaks either cannot leave draft, and the refusal names the rule.
+  Approval is by role: `cms.manage` is held by admin and Content/Marketing, so
+  the operations and finance roles can read nothing here.
+* **Publishing revalidates the static build.** Stable pages are served from
+  `dist/` (§12.4), so `src/services/publish.js` re-renders exactly the routes a
+  change touches — a post rebuilds `/`, `/guide`, `/blog`, its own page and the
+  sitemap — refreshes the in-memory manifest, and reports the count back in the
+  console. A build failure is reported as a failure, never as a silent success.
+
+The seeded posts show the rules in action: each one links three listing or
+service pages and carries a meta title and description, so the workflow can walk
+them from in review to published without an exception.
+
 ### Signing in
 
 Staff use the same phone + code flow as customers (`/login`); there are no
@@ -201,6 +242,7 @@ passwords in this build. The seed creates three accounts:
 | `+2348000000002` | ops | KPI home, listings, leads, concierge, dispatch |
 | `+2348000000003` | inspector | My jobs only |
 | `+2348000000004` | finance | Orders, Money, Escrow and the KPI home — approvals, refunds, ledger |
+| `+2348000000005` | marketing | The CMS only — content, pages, FAQs, testimonials and homepage modules |
 
 In development the code is printed to the server log (`[auth] OTP for … → 123456`)
 and returned as `devCode`, so the console can be driven without a phone. A role
@@ -250,8 +292,8 @@ Three seams, all honest about their limits:
 
 ### What is deliberately not here yet
 
-The dealer portal interior (§7.2) and the CMS / market-intel screens (§7.3).
-The screens say so in place rather than showing fake numbers; `src/services/slice.js`
+The dealer portal interior (§7.2) and the market-intel screens (§7.3). The
+screens say so in place rather than showing fake numbers; `src/services/slice.js`
 lists them as the remaining backlog and `scripts/check-links.js` keeps them honest.
 
 ---
@@ -262,7 +304,9 @@ lists them as the remaining backlog and `scripts/check-links.js` keeps them hone
 |---|---|
 | `npm start` | Run the server |
 | `npm run dev` | Same, with `node --watch` |
-| `npm run smoke` | Role smoke matrix: signs in as the four seeded staff accounts and every role checks every console module against §7.4 (exits non-zero on a violation) |
+| `npm run smoke` | Role smoke matrix: signs in as each seeded staff account and every role checks every console module against §7.4 (exits non-zero on a violation) |
+| `npm run smoke:cms` | Content smoke: writes, reviews, publishes, restores and unpublishes a post through the real routes, edits a FAQ and toggles a homepage module, checking the public site each step |
+| `npm run db:migrate` | Apply pending migrations (`-- --list` shows what has been applied) |
 | `npm run db:setup` | Create database, apply `db/schema.sql`, load `db/seed.sql` |
 | `npm run db:seed` | Regenerate the seed from `scripts/generate-seed.js`, then load it |
 | `npm run build:static` | Render stable pages + `sitemap.xml` + `robots.txt` into `dist/` |
@@ -270,7 +314,7 @@ lists them as the remaining backlog and `scripts/check-links.js` keeps them hone
 | `npm run images:check` | Fail if any photo still needs preparing (CI gate) |
 | `npm run lint:type` | Six-step type-scale audit (fails the build on a violation) |
 | `npm run lint:js` | ES-module parse check + every event name against the §15.1 plan |
-| `npm test` | 128 tests: routes, sold-archive windows, facet rules, SEO schemas, filter safety, form validation, concierge/SLA rules, shop commerce, OTP auth, referrals, the account dashboard, and the console (§7.3 modules end-to-end against the real database) |
+| `npm test` | 164 tests: routes, sold-archive windows, facet rules, SEO schemas, filter safety, form validation, concierge/SLA rules, shop commerce, OTP auth, referrals, the account dashboard, the console (§7.3 modules end-to-end against the real database), and the content workflow (house-rule gate, revisions, restore, revalidation) |
 | `npm run check` | lint + test |
 | `npm run artifacts` | Build the static pages and re-run the type audit |
 
@@ -293,6 +337,7 @@ Three checks run against a live server:
 
 | Area | Routes |
 |---|---|
+| Console | `/admin`, `/admin/cms` + the CMS screens (§7.3, gated by §7.4) |
 | Find a car | `/`, `/cars`, 10 curated facet pages, the VDP, `/cars/sold/{slug}`, `/cars/compare` |
 | Services | `/services` + 9 service pages (`inspection`, `documents`, `concierge`, `tracking`, `research`, `consultation`, `parts`, `sell-swap`, `dealer-services`), `/hire` |
 | Funnels | `/find-my-car` (4-step concierge + `/concierge/{trackingId}` status), `/sell-swap` (3-step, free valuation < 24h) |
@@ -300,15 +345,15 @@ Three checks run against a live server:
 | Shop | `/shop`, `/shop/{slug}`, `/cart`, `/checkout`, `/order/{orderNo}` (guest checkout, tracker SKUs create a subscription row) |
 | Trust & company | `/verification`, `/how-it-works`, `/about`, `/faq`, `/contact`, `/partner` |
 | Accounts (§7.1) | `/login` (OTP), `/account` (dashboard), `/account/export`, `/api/auth/*`, `/api/account/*` |
-| Console (§7.3/§7.4) | `/admin` (KPIs + daily summary), `/admin/listings`, `/admin/leads`, `/admin/concierge`, `/admin/bookings`, `/admin/jobs`, `/admin/staff`, `/admin/audit` |
+| Console (§7.3/§7.4) | `/admin` (KPIs + daily summary), `/admin/listings`, `/admin/leads`, `/admin/concierge`, `/admin/bookings`, `/admin/jobs`, `/admin/orders`, `/admin/payments`, `/admin/milestones`, `/admin/staff`, `/admin/audit` |
+| CMS (§7.3/§6.9) | `/admin/cms` (workflow board), `/admin/cms/posts/{id}`, `/admin/cms/pages`, `/admin/cms/faqs`, `/admin/cms/testimonials`, `/admin/cms/modules` |
 | Legal | `/terms`, `/privacy`, `/refunds`, `/disclaimer` (placeholder wording, flagged in the DB) |
 | Machine | `/sitemap.xml`, `/robots.txt`, `/api/listings`, `/api/posts`, `/api/leads`, `/api/events`, `/api/orders`, `/api/bookings`, `/api/service-requests`, `/api/contact`, `/api/og/listing/{slug}.png`, `/api/health` |
 
-**Still to come** (§7.2–§7.4 and the integration seams): the dealer portal, the
-order manager with the payments/PSP seam, refunds and milestone releases, the
-CMS workflow, market-intel reports, the generated inspection-report PDF, live
-OTP-SMS/email delivery, Turnstile and GA4. The public site already writes every
-record these screens read — `service_requests`, `bookings`, `orders`,
+**Still to come** (§7.2–§7.4 and the integration seams): the dealer portal
+interior, market-intel reports, saved searches with price-drop alerts (FR-25),
+the concierge retainer (FR-05), live OTP-SMS/email delivery, Turnstile and GA4.
+The public site already writes every record these screens read — `service_requests`, `bookings`, `orders`,
 `subscriptions`, `leads`, `analytics_events` — so what remains is UI, policy and
 provider wiring. Until a route is ported it returns a 404 that says so, shows
 the slice map and links back into live stock — `src/services/slice.js` holds
@@ -363,33 +408,34 @@ assets/fonts/       Inter variable TTF, used only to render OG cards
    Appendix A wireframes and Appendix D microcopy. **If the Next.js build turns
    up, drop it somewhere I can read and I will diff the tokens and markup
    against it.**
-2. **Photography is real, but representative.** Listings carry real
-   photographs (`public/img/cars/`), each taken through the same preparation
-   step — 4:3, 1200×900, plus a 600×450 sibling for cards and thumbnails. The
-   resolver in `scripts/seed-media.js` matches a listing to a photo by model,
-   then body type, so a Camry listing leads with the Camry photo and an SUV with
-   an SUV photo. Two honest caveats: (a) a model we have no photo for borrows a
-   same-body-type photo — replace it by dropping the right file in
-   `public/img/cars/` and adding one line to `scripts/seed-media.js`; (b) the
-   dealer media pipeline (S3 + CDN + WebP/AVIF variants + per-listing upload,
-   §11) is still to build — the schema, `listing_media` shape and the
-   `-600` variant convention are ready for it. `public/img/seed/*.svg` remains
-   only as the fallback for a row with no photo at all.
+2. **Photography is placeholder artwork, not real photos.** Listing and content
+   images are the generated SVGs in `public/img/seed/` — the photo library this
+   project was meant to carry is not in this environment and image generation
+   was paused, so `public/img/{cars,details,blog,shop,hire}/` hold only what the
+   seed resolver could produce. What *is* finished is the pipeline around them:
+   `scripts/seed-media.js` resolves a listing to a photo by model, then body
+   type; `scripts/prepare-images.js` produces the 4:3 1200×900 file plus its
+   600×450 sibling and `npm run images:check` fails the build if any photo has
+   not been through it. Drop real files into `public/img/cars/` and the cards,
+   VDP gallery and `srcset` all pick them up. The dealer media pipeline (S3 +
+   CDN + WebP/AVIF variants + per-listing upload, §11) is still to build — the
+   schema, `listing_media` shape and the `-600` variant convention are ready.
 3. **Prices, phone number and legal copy are placeholders.** The business phone
    is `+2348000000000` and the CAC line is a stub — send me the real values
    (§19 open questions) and I will update `.env` and the copy.
-4. **The integrations are seams, not services.** Checkout writes a
-   `pending_payment` order with a `HC-ORD-` number and hands off to WhatsApp;
-   the PSP call, webhook and `payment_ref` column are stubbed (§11). The same is
-   true of the WhatsApp Cloud API, SMS and email: `AUTH_OTP_PROVIDER` selects
-   the delivery channel and the `console` provider is the development default.
-   Every record the real services will read already exists.
-5. **Referral rewards and report PDFs are the two honest blanks.** The referral
-   *link* and the counts behind it are real; the reward amount and payout are a
-   business decision, so the page states the counts and leaves the promise to
-   the ops desk. Inspection report PDFs are listed as documents only when they
-   exist — today that means shop receipts; the generator arrives with the
-   dispatch module (§7.3).
+4. **The integrations are seams, not services.** Checkout writes a real
+   `payments` row with a `HC-PAY-` reference; the Paystack and Flutterwave
+   adapters verify their webhooks properly, but **no merchant keys exist yet**
+   (a §18 launch prerequisite), so hosted checkout refuses honestly and the site
+   runs on bank transfer and cash. The same is true of WhatsApp, SMS and email:
+   `AUTH_OTP_PROVIDER` selects the delivery channel, the `console` provider is
+   the development default, and an unconfigured channel is recorded `skipped`
+   rather than dropped. Every record the real services will read already exists.
+5. **Referral rewards are the honest blank.** The referral *link* and the counts
+   behind it are real; the reward amount and payout are a business decision, so
+   the page states the counts and leaves the promise to the ops desk. *(Inspection
+   report PDFs are no longer a gap — `/admin/jobs/{id}/report` and the customer's
+   `/account/reports/{reference}` both generate a real A4 PDF.)*
 6. **No CI and no container.** The gates exist as scripts
    (`npm run check`, `check-links`, `images:check`) but nothing runs them on
    push yet; there is no Dockerfile or compose file (§17). Worth adding before
