@@ -10,6 +10,17 @@ const assert = require('node:assert/strict');
 
 const { dbAvailable, startTestServer, getHtml } = require('./helpers');
 
+/**
+ * The number this suite posts its public-form enquiry with.
+ *
+ * Run-scoped, and deliberately *not* a seeded number: the demo database holds a
+ * concierge enquiry from the seeded buyer's phone, so a fixed fixture number
+ * would sweep that seeded lead away on the way out — a test deleting demo data
+ * it never created. Run-scoped also means two copies of this file running at
+ * once cannot sweep each other's fixtures.
+ */
+const FIXTURE_PHONE = `0803${String((Number(process.pid) * 7919 + (Date.now() % 100000)) % 10_000_000).padStart(7, '0')}`;
+
 let available = false;
 let ctx;
 let slugs = {};
@@ -48,7 +59,7 @@ test.after(async () => {
     // the CRM inbox. It is a fixture, not a customer, so it goes back out again
     // rather than sitting in the console for the next person who opens it.
     const { variants } = require('../src/lib/phone');
-    const shapes = variants('08030000000');
+    const shapes = variants(FIXTURE_PHONE);
     const marks = shapes.map(() => '?').join(',');
     await db.query(`DELETE FROM leads WHERE phone IN (${marks})`, shapes);
     await db.query(`DELETE FROM notifications WHERE recipient IN (${marks})`, shapes);
@@ -173,7 +184,7 @@ maybe('POST /api/leads creates a lead and returns a WhatsApp hand-off', async ()
   const response = await fetch(`${ctx.baseUrl}/api/leads`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ type: 'concierge', name: 'Route Test', phone: '08030000000', sourcePath: '/find-my-car' }),
+    body: JSON.stringify({ type: 'concierge', name: 'Route Test', phone: FIXTURE_PHONE, sourcePath: '/find-my-car' }),
   });
   const body = await response.json();
   assert.equal(body.ok, true);

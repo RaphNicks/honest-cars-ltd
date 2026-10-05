@@ -29,6 +29,7 @@ const PAGES_ADMIN = [
   '/admin/alerts',
   '/admin/intel',
   '/admin/reports',
+  '/admin/marketing',
   '/admin/cms', '/admin/cms/pages', '/admin/cms/faqs', '/admin/cms/testimonials', '/admin/cms/modules',
 ];
 
@@ -42,10 +43,10 @@ const PAGES_ADMIN = [
  */
 const ROLES = [
   { phone: '+2348000000001', role: 'admin', must: PAGES_ADMIN },
-  { phone: '+2348000000002', role: 'ops', must: ['/admin', '/admin/listings', '/admin/leads', '/admin/concierge', '/admin/bookings', '/admin/alerts', '/admin/intel', '/admin/reports'] },
+  { phone: '+2348000000002', role: 'ops', must: ['/admin', '/admin/listings', '/admin/leads', '/admin/concierge', '/admin/bookings', '/admin/alerts', '/admin/intel', '/admin/reports', '/admin/marketing'] },
   { phone: '+2348000000003', role: 'inspector', must: ['/admin/jobs'] },
   { phone: '+2348000000004', role: 'finance', must: ['/admin', '/admin/orders', '/admin/payments', '/admin/milestones', '/admin/reports'] },
-  { phone: '+2348000000005', role: 'marketing', must: ['/admin', '/admin/cms', '/admin/cms/pages', '/admin/cms/faqs', '/admin/cms/testimonials', '/admin/cms/modules', '/admin/intel', '/admin/reports'] },
+  { phone: '+2348000000005', role: 'marketing', must: ['/admin', '/admin/cms', '/admin/cms/pages', '/admin/cms/faqs', '/admin/cms/testimonials', '/admin/cms/modules', '/admin/intel', '/admin/reports', '/admin/marketing'] },
 ];
 
 /** Pages probed for every role; the verdict comes from `must`. */
@@ -54,7 +55,10 @@ const ROLES = [
  * Without this, a role that quietly gained `payments.view` would pass the smoke.
  */
 const MUST_NOT = [
+  // Marketing runs the channel report but does not see the ledgers, and finance
+  // reads the money without seeing where the traffic came from (§7.4).
   { phone: '+2348000000005', role: 'marketing', blocked: ['/admin/payments', '/admin/milestones', '/admin/staff', '/admin/audit'] },
+  { phone: '+2348000000004', role: 'finance', blocked: ['/admin/marketing'] },
 ];
 
 const PAGES = [
@@ -63,6 +67,7 @@ const PAGES = [
   '/admin/alerts',
   '/admin/intel',
   '/admin/reports',
+  '/admin/marketing',
   '/admin/cms', '/admin/cms/pages', '/admin/cms/faqs', '/admin/cms/testimonials', '/admin/cms/modules',
 ];
 

@@ -138,6 +138,15 @@ const config = {
     serverSide: bool(process.env.ANALYTICS_SERVER_SIDE, true),
   },
 
+  // §15.2 CAC guardrails. Spend is entered by hand, conversions come from the
+  // data, and this is the line the marketing screen draws between "working" and
+  // "call someone": a channel whose cost per paid transaction sits above it is
+  // flagged, not hidden. Deliberately configuration, not a hard-coded number —
+  // what is expensive in October is not what is expensive in March.
+  marketing: {
+    cacGuardrailKobo: int(process.env.MARKETING_CAC_GUARDRAIL_KOBO, 3_500_000),
+  },
+
   features: {
     // Static pages are written to disk by `npm run build:static`; the server
     // serves them when present and falls back to request-time rendering.

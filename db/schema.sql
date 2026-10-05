@@ -889,6 +889,26 @@ CREATE TABLE IF NOT EXISTS request_candidates (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ---------------------------------------------------------------------------
+-- marketing_spend — §15.2: what the advertising cost, per channel and period.
+-- Filled in by hand (an invoice arrives from Meta/Google), divided by the
+-- conversions the site can attribute to get a cost per acquisition.
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS marketing_spend (
+  id           INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  channel      VARCHAR(80)  NOT NULL,
+  period_start DATE         NOT NULL,
+  period_end   DATE         NOT NULL,
+  amount_kobo  BIGINT       NOT NULL,
+  note         VARCHAR(200) NULL,
+  created_by   INT UNSIGNED NULL,
+  created_at   TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  KEY idx_spend_channel (channel, period_start),
+  KEY idx_spend_window (period_start, period_end),
+  CONSTRAINT fk_spend_actor FOREIGN KEY (created_by) REFERENCES `users` (id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ---------------------------------------------------------------------------
 -- admin_audit — sensitive actions, with the actor (§7.3 “audit log of sensitive
 -- actions (price overrides, payment releases, grade changes)”).
 -- ---------------------------------------------------------------------------

@@ -525,6 +525,7 @@ SET time_zone = '+00:00';
 SET @NOW = UTC_TIMESTAMP();
 
 DELETE FROM analytics_events;
+DELETE FROM marketing_spend;
 -- Payments first: payment_events and dealer_ledger point at orders, bookings,
 -- requests and listings, so they must go before any of those.
 DELETE FROM payment_events;
@@ -1169,7 +1170,23 @@ INSERT INTO leads (type, listing_id, name, phone, message, preferred_day, source
     (SELECT id FROM \`users\` WHERE phone = '+2348000000006' LIMIT 1),
     DATE_SUB(UTC_TIMESTAMP(), INTERVAL 6 DAY), DATE_SUB(UTC_TIMESTAMP(), INTERVAL 5 DAY),
     'AC not working — buyer walked away, told ops to fix before relisting.',
-    DATE_SUB(UTC_TIMESTAMP(), INTERVAL 6 DAY));
+    DATE_SUB(UTC_TIMESTAMP(), INTERVAL 6 DAY)),
+  -- The two customers who actually paid (§15.2): every payer has an enquiry
+  -- behind them, and the dashboard credits the channel that produced it. A
+  -- payment with no lead at all reads as "(unattributed)" — honest, but it is
+  -- not how this business works, so the demo shows the real shape.
+  ('concierge', NULL, 'Demo buyer (seeded record)', '+2348030000000',
+    'Wants a family SUV, budget ₦25m, prefers something with service history.',
+    NULL, '/find-my-car', 'closed',
+    (SELECT id FROM \`users\` WHERE phone = '+2348000000002' LIMIT 1),
+    DATE_SUB(UTC_TIMESTAMP(), INTERVAL 21 DAY), DATE_SUB(UTC_TIMESTAMP(), INTERVAL 19 DAY),
+    NULL, DATE_SUB(UTC_TIMESTAMP(), INTERVAL 21 DAY)),
+  ('viewing', (SELECT id FROM vehicle_listings WHERE stock_no = 'HC-PH-0029' LIMIT 1),
+    'Ada Okafor', '+2348031234567', 'Do you have a tracker for this one? I want it installed before delivery.',
+    NULL, '/cars/2015-toyota-corolla-hc-ph-0029', 'closed',
+    (SELECT id FROM \`users\` WHERE phone = '+2348000000006' LIMIT 1),
+    DATE_SUB(UTC_TIMESTAMP(), INTERVAL 14 DAY), DATE_SUB(UTC_TIMESTAMP(), INTERVAL 12 DAY),
+    NULL, DATE_SUB(UTC_TIMESTAMP(), INTERVAL 14 DAY));
 
 INSERT INTO saved_cars (user_id, listing_id, note, last_price_kobo) VALUES
   ((SELECT id FROM \`users\` WHERE phone = '+2348031234567' LIMIT 1),
@@ -1215,16 +1232,221 @@ UPDATE vehicle_listings SET archive_redirect_path = CONCAT('/cars/', LOWER(REPLA
  WHERE status = 'sold' AND sold_at <= DATE_SUB(UTC_TIMESTAMP(), INTERVAL 90 DAY);
 
 -- ---------------------------------------------------------------------------
--- §7.3 UTM report: the links the demo traffic actually arrived on. Keyed off
--- the lead id, so the same lead always reports the same campaign — a report
--- that reshuffles itself on every load is worse than no report. One bucket in
--- five stays NULL on purpose: "direct / none" is a real answer, and hiding it
--- would make the channel mix look tidier than it is.
+-- §7.3 UTM report / §15.2 channel report: the links the demo traffic arrived on.
+--
+-- Bucketed by each lead's *rank* (1st, 2nd, 3rd…), not by its id: ids drift as
+-- the table is reseeded, and an attribution that changes between two loads of
+-- the same database is worse than no attribution. One bucket in five stays NULL
+-- on purpose — "direct / none" is a real answer, and hiding it would make the
+-- channel mix look tidier than it is.
 -- ---------------------------------------------------------------------------
-UPDATE leads SET utm = JSON_OBJECT('source', 'instagram', 'medium', 'social', 'campaign', 'ph-suv-september') WHERE id % 5 = 0;
-UPDATE leads SET utm = JSON_OBJECT('source', 'google',    'medium', 'cpc',    'campaign', 'ph-inspection-search') WHERE id % 5 = 1;
-UPDATE leads SET utm = JSON_OBJECT('source', 'facebook',  'medium', 'social', 'campaign', 'ph-diesel-trucks') WHERE id % 5 = 2;
-UPDATE leads SET utm = JSON_OBJECT('source', 'whatsapp',  'medium', 'referral', 'campaign', 'dealer-referral') WHERE id % 5 = 3;
+UPDATE leads
+   SET utm = CASE (
+         SELECT COUNT(*) FROM (SELECT id FROM leads) AS ranked WHERE ranked.id <= leads.id
+       ) % 5
+         WHEN 0 THEN JSON_OBJECT('source', 'instagram', 'medium', 'social',   'campaign', 'ph-suv-september')
+         WHEN 1 THEN JSON_OBJECT('source', 'google',    'medium', 'cpc',      'campaign', 'ph-inspection-search')
+         WHEN 2 THEN JSON_OBJECT('source', 'facebook',  'medium', 'social',   'campaign', 'ph-diesel-trucks')
+         WHEN 3 THEN JSON_OBJECT('source', 'whatsapp',  'medium', 'referral', 'campaign', 'dealer-referral')
+         ELSE NULL
+       END;
+
+-- ...and the two paying customers explicitly, so the demo shows a full chain
+-- rather than the pattern landing them in the NULL bucket by accident.
+UPDATE leads SET utm = JSON_OBJECT('source', 'instagram', 'medium', 'social', 'campaign', 'ph-suv-september')
+ WHERE phone = '+2348030000000';
+UPDATE leads SET utm = JSON_OBJECT('source', 'google', 'medium', 'cpc', 'campaign', 'ph-inspection-search')
+ WHERE phone = '+2348031234567';
+
+-- ---------------------------------------------------------------------------
+-- §15.2 Marketing dashboard: thirty days of arrival traffic.
+--
+-- Events are only ever written by a real browser, so a fresh database has an
+-- empty analytics_events table and every channel reads zero — a dashboard that
+-- demoes as a wall of dashes. This seeds the month a business this size would
+-- actually have: six channels, hours spread through the day, and the funnel
+-- events each channel converts on.
+--
+-- Direct traffic carries no utm key at all, because that is what direct means;
+-- the dashboard must show it as "(direct / none)" rather than folding it into a
+-- channel it may not have come from.
+--
+-- Built by cross join (channel × day × session) rather than a thousand literal
+-- rows: the file stays small, and changing a channel's volume is one number.
+-- ---------------------------------------------------------------------------
+CREATE TEMPORARY TABLE seed_channel (
+  slot     VARCHAR(20) NOT NULL,
+  source   VARCHAR(40) NULL,
+  medium   VARCHAR(30) NULL,
+  campaign VARCHAR(60) NULL,
+  per_day  INT NOT NULL,   -- sessions a day
+  views    INT NOT NULL,   -- of those, how many open a listing
+  clicks   INT NOT NULL,   -- WhatsApp hand-offs
+  starts   INT NOT NULL,   -- concierge/booking/checkout started
+  retainer INT NOT NULL,   -- concierge retainers paid
+  buys     INT NOT NULL,   -- shop purchases
+  books    INT NOT NULL    -- hire/booking completed
+);
+
+INSERT INTO seed_channel (slot, source, medium, campaign, per_day, views, clicks, starts, retainer, buys, books) VALUES
+  ('google',    'google',    'cpc',      'ph-inspection-search', 9, 6, 2, 3, 1, 1, 0),
+  ('instagram', 'instagram', 'social',   'ph-suv-september',     7, 5, 2, 2, 1, 0, 1),
+  ('facebook',  'facebook',  'social',   'ph-diesel-trucks',     5, 3, 1, 1, 0, 0, 1),
+  ('whatsapp',  'whatsapp',  'referral', 'dealer-referral',      3, 2, 2, 1, 1, 1, 0),
+  ('direct',    NULL,        NULL,       NULL,                   6, 4, 1, 1, 0, 0, 0),
+  ('tiktok',    'tiktok',    'social',   'ph-first-car-october', 3, 2, 0, 1, 0, 0, 0);
+
+CREATE TEMPORARY TABLE seed_day (d INT NOT NULL);
+INSERT INTO seed_day (d) VALUES
+  (0),(1),(2),(3),(4),(5),(6),(7),(8),(9),(10),(11),(12),(13),(14),
+  (15),(16),(17),(18),(19),(20),(21),(22),(23),(24),(25),(26),(27),(28),(29);
+
+CREATE TEMPORARY TABLE seed_slot (n INT NOT NULL);
+INSERT INTO seed_slot (n) VALUES
+  (0),(1),(2),(3),(4),(5),(6),(7),(8),(9),(10),(11),(12),(13),(14),(15);
+
+-- One statement per event name, and the per-channel columns above decide which
+-- sessions emit it, so the volumes stay in one readable table and nothing is
+-- random (a seed that reshuffles on every load cannot be compared with itself).
+-- The session id is shared by every event of one visit, which is what makes
+-- "sessions" a count of people rather than of page views.
+INSERT INTO analytics_events (event_name, payload, source_path, session_id, created_at)
+SELECT 'listing_impression',
+       IF(ch.source IS NULL, NULL,
+          JSON_OBJECT('utm', JSON_OBJECT('source', ch.source, 'medium', ch.medium, 'campaign', ch.campaign),
+                      'result_count', 40 + (d.d % 20))),
+       '/cars',
+       CONCAT('seed-', ch.slot, '-', d.d, '-', s.n),
+       -- Midnight-anchored, and today's sessions stop at the current hour: a
+       -- seeded visit dated tomorrow would fall outside the very window the
+       -- dashboard opens on, and the traffic would read as less than it is.
+       DATE_ADD(DATE_ADD(DATE_SUB(UTC_DATE(), INTERVAL d.d DAY),
+                INTERVAL ((s.n * 5 + d.d * 7) % IF(d.d = 0, GREATEST(1, HOUR(UTC_TIMESTAMP())), 24)) HOUR),
+                INTERVAL ((s.n * 13 + d.d * 11) % 60) MINUTE)
+  FROM seed_channel ch, seed_day d, seed_slot s
+ WHERE s.n < ch.per_day;
+
+INSERT INTO analytics_events (event_name, payload, source_path, session_id, created_at)
+SELECT 'listing_view',
+       IF(ch.source IS NULL, NULL,
+          JSON_OBJECT('utm', JSON_OBJECT('source', ch.source, 'medium', ch.medium, 'campaign', ch.campaign),
+                      'listing_id', 1 + ((s.n * 7 + d.d) % 60), 'grade', ELT(1 + ((s.n + d.d) % 4), 'verified', 'inspected', 'listed', 'pending'),
+                      'price_position', ELT(1 + ((s.n + d.d) % 3), 'below', 'within', 'premium'))),
+       '/cars',
+       CONCAT('seed-', ch.slot, '-', d.d, '-', s.n),
+       -- Midnight-anchored, and today's sessions stop at the current hour: a
+       -- seeded visit dated tomorrow would fall outside the very window the
+       -- dashboard opens on, and the traffic would read as less than it is.
+       DATE_ADD(DATE_ADD(DATE_SUB(UTC_DATE(), INTERVAL d.d DAY),
+                INTERVAL ((s.n * 5 + d.d * 7) % IF(d.d = 0, GREATEST(1, HOUR(UTC_TIMESTAMP())), 24)) HOUR),
+                INTERVAL ((s.n * 13 + d.d * 11) % 60) MINUTE)
+  FROM seed_channel ch, seed_day d, seed_slot s
+ WHERE s.n < ch.views;
+
+INSERT INTO analytics_events (event_name, payload, source_path, session_id, created_at)
+SELECT 'whatsapp_click',
+       IF(ch.source IS NULL, NULL,
+          JSON_OBJECT('utm', JSON_OBJECT('source', ch.source, 'medium', ch.medium, 'campaign', ch.campaign),
+                      'source', 'vdp')),
+       '/cars',
+       CONCAT('seed-', ch.slot, '-', d.d, '-', s.n),
+       -- Midnight-anchored, and today's sessions stop at the current hour: a
+       -- seeded visit dated tomorrow would fall outside the very window the
+       -- dashboard opens on, and the traffic would read as less than it is.
+       DATE_ADD(DATE_ADD(DATE_SUB(UTC_DATE(), INTERVAL d.d DAY),
+                INTERVAL ((s.n * 5 + d.d * 7) % IF(d.d = 0, GREATEST(1, HOUR(UTC_TIMESTAMP())), 24)) HOUR),
+                INTERVAL ((s.n * 13 + d.d * 11) % 60) MINUTE)
+  FROM seed_channel ch, seed_day d, seed_slot s
+ WHERE s.n < ch.clicks;
+
+INSERT INTO analytics_events (event_name, payload, source_path, session_id, created_at)
+SELECT 'concierge_started',
+       IF(ch.source IS NULL, NULL,
+          JSON_OBJECT('utm', JSON_OBJECT('source', ch.source, 'medium', ch.medium, 'campaign', ch.campaign),
+                      'type', 'concierge')),
+       '/find-my-car',
+       CONCAT('seed-', ch.slot, '-', d.d, '-', s.n),
+       -- Midnight-anchored, and today's sessions stop at the current hour: a
+       -- seeded visit dated tomorrow would fall outside the very window the
+       -- dashboard opens on, and the traffic would read as less than it is.
+       DATE_ADD(DATE_ADD(DATE_SUB(UTC_DATE(), INTERVAL d.d DAY),
+                INTERVAL ((s.n * 5 + d.d * 7) % IF(d.d = 0, GREATEST(1, HOUR(UTC_TIMESTAMP())), 24)) HOUR),
+                INTERVAL ((s.n * 13 + d.d * 11) % 60) MINUTE)
+  FROM seed_channel ch, seed_day d, seed_slot s
+ WHERE s.n < ch.starts;
+
+INSERT INTO analytics_events (event_name, payload, source_path, session_id, created_at)
+SELECT 'concierge_retainer_paid',
+       IF(ch.source IS NULL, NULL,
+          JSON_OBJECT('utm', JSON_OBJECT('source', ch.source, 'medium', ch.medium, 'campaign', ch.campaign),
+                      'type', 'concierge', 'value', 50000, 'currency', 'NGN')),
+       '/find-my-car',
+       CONCAT('seed-', ch.slot, '-', d.d, '-', s.n),
+       -- Midnight-anchored, and today's sessions stop at the current hour: a
+       -- seeded visit dated tomorrow would fall outside the very window the
+       -- dashboard opens on, and the traffic would read as less than it is.
+       DATE_ADD(DATE_ADD(DATE_SUB(UTC_DATE(), INTERVAL d.d DAY),
+                INTERVAL ((s.n * 5 + d.d * 7) % IF(d.d = 0, GREATEST(1, HOUR(UTC_TIMESTAMP())), 24)) HOUR),
+                INTERVAL ((s.n * 13 + d.d * 11) % 60) MINUTE)
+  FROM seed_channel ch, seed_day d, seed_slot s
+ WHERE s.n < ch.retainer;
+
+INSERT INTO analytics_events (event_name, payload, source_path, session_id, created_at)
+SELECT 'purchase',
+       IF(ch.source IS NULL, NULL,
+          JSON_OBJECT('utm', JSON_OBJECT('source', ch.source, 'medium', ch.medium, 'campaign', ch.campaign),
+                      'type', 'order', 'value', 45000, 'currency', 'NGN')),
+       '/checkout',
+       CONCAT('seed-', ch.slot, '-', d.d, '-', s.n),
+       -- Midnight-anchored, and today's sessions stop at the current hour: a
+       -- seeded visit dated tomorrow would fall outside the very window the
+       -- dashboard opens on, and the traffic would read as less than it is.
+       DATE_ADD(DATE_ADD(DATE_SUB(UTC_DATE(), INTERVAL d.d DAY),
+                INTERVAL ((s.n * 5 + d.d * 7) % IF(d.d = 0, GREATEST(1, HOUR(UTC_TIMESTAMP())), 24)) HOUR),
+                INTERVAL ((s.n * 13 + d.d * 11) % 60) MINUTE)
+  FROM seed_channel ch, seed_day d, seed_slot s
+ WHERE s.n < ch.buys;
+
+INSERT INTO analytics_events (event_name, payload, source_path, session_id, created_at)
+SELECT 'booking_completed',
+       IF(ch.source IS NULL, NULL,
+          JSON_OBJECT('utm', JSON_OBJECT('source', ch.source, 'medium', ch.medium, 'campaign', ch.campaign),
+                      'type', 'hire', 'value', 45000, 'currency', 'NGN')),
+       '/hire',
+       CONCAT('seed-', ch.slot, '-', d.d, '-', s.n),
+       -- Midnight-anchored, and today's sessions stop at the current hour: a
+       -- seeded visit dated tomorrow would fall outside the very window the
+       -- dashboard opens on, and the traffic would read as less than it is.
+       DATE_ADD(DATE_ADD(DATE_SUB(UTC_DATE(), INTERVAL d.d DAY),
+                INTERVAL ((s.n * 5 + d.d * 7) % IF(d.d = 0, GREATEST(1, HOUR(UTC_TIMESTAMP())), 24)) HOUR),
+                INTERVAL ((s.n * 13 + d.d * 11) % 60) MINUTE)
+  FROM seed_channel ch, seed_day d, seed_slot s
+ WHERE s.n < ch.books;
+
+DROP TEMPORARY TABLE seed_channel;
+DROP TEMPORARY TABLE seed_day;
+DROP TEMPORARY TABLE seed_slot;
+
+-- ---------------------------------------------------------------------------
+-- §15.2 CAC guardrail: what the advertising cost.
+--
+-- An invoice arrives from Meta or Google after the month closes, so spend is
+-- entered by hand (admin → Marketing) rather than derived. Seeded here for the
+-- two 30-day blocks the dashboard's default window sits inside, so a reader can
+-- widen or shift the dates and see the window actually do something.
+--
+-- No row for direct (organic) or WhatsApp (referral): untracked cost is not
+-- zero cost, it is unknown, and the screen shows a dash rather than a
+-- flattering ₦0.
+-- ---------------------------------------------------------------------------
+INSERT INTO marketing_spend (channel, period_start, period_end, amount_kobo, note) VALUES
+  ('google',    DATE_SUB(UTC_DATE(), INTERVAL 29 DAY), UTC_DATE(), 7400000, 'Search — inspection and concierge terms (demo figure)'),
+  ('instagram', DATE_SUB(UTC_DATE(), INTERVAL 29 DAY), UTC_DATE(), 3950000, 'Reels + carousel, SUV pillar (demo figure)'),
+  ('facebook',  DATE_SUB(UTC_DATE(), INTERVAL 29 DAY), UTC_DATE(), 1500000, 'Marketplace audience retargeting (demo figure)'),
+  ('tiktok',    DATE_SUB(UTC_DATE(), INTERVAL 29 DAY), UTC_DATE(),  700000, 'First-car series, test spend (demo figure)'),
+  ('google',    DATE_SUB(UTC_DATE(), INTERVAL 60 DAY), DATE_SUB(UTC_DATE(), INTERVAL 31 DAY), 6800000, 'Search — previous month (demo figure)'),
+  ('instagram', DATE_SUB(UTC_DATE(), INTERVAL 60 DAY), DATE_SUB(UTC_DATE(), INTERVAL 31 DAY), 3600000, 'Reels — previous month (demo figure)'),
+  ('facebook',  DATE_SUB(UTC_DATE(), INTERVAL 60 DAY), DATE_SUB(UTC_DATE(), INTERVAL 31 DAY), 1200000, 'Retargeting — previous month (demo figure)');
 `);
   return out.join('\n');
 }

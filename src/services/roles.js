@@ -29,6 +29,11 @@ const MATRIX = {
   'pricing.manage': ['admin', 'ops'],
   'users.manage': ['admin'],                       // staff accounts, roles, audit log
   'reports.view': ['admin', 'ops', 'finance', 'marketing'],
+  // §15.2 marketing dashboard. Read is the CMS-and-marketing column of §7.4
+  // (admin, ops, marketing); entering spend is the marketing desk's own job, so
+  // it is narrower — finance reads the money, it does not enter ad invoices.
+  'marketing.view': ['admin', 'ops', 'marketing'],
+  'marketing.spend': ['admin', 'marketing'],
 };
 
 /** Roles that may open the console at all. */

@@ -54,6 +54,7 @@ const PATHS = {
   alerts: `${HOME}/alerts`,
   intel: `${HOME}/intel`,
   reports: `${HOME}/reports`,
+  marketing: `${HOME}/marketing`,
   staff: `${HOME}/staff`,
   audit: `${HOME}/audit`,
 };
@@ -72,6 +73,7 @@ const NAV = [
   { href: PATHS.alerts, label: 'Alerts', icon: 'bell', capability: 'intel.manage' },
   { href: PATHS.intel, label: 'Price intel', icon: 'gauge', capability: 'pricing.view' },
   { href: PATHS.reports, label: 'Reports', icon: 'fileCheck', capability: 'reports.view' },
+  { href: PATHS.marketing, label: 'Marketing', icon: 'chart', capability: 'marketing.view' },
   { href: `${HOME}/cms`, label: 'Content', icon: 'fileCheck', capability: 'cms.manage' },
   { href: PATHS.staff, label: 'Staff & roles', icon: 'account', capability: 'users.manage' },
   { href: PATHS.audit, label: 'Audit log', icon: 'shield', capability: 'users.manage' },
@@ -1341,6 +1343,102 @@ router.get('/audit', auth.requireStaff('users.manage'), async (req, res, next) =
       description: 'Every sensitive action: publishes, grade changes, price overrides, dispatch and roles.',
       data: { rows, entity },
     });
+  } catch (error) {
+    return next(error);
+  }
+});
+
+// ---------------------------------------------------------------------------
+// §15.2 Marketing dashboard — channel → lead → paid, and the CAC guardrail.
+//
+// The one screen that answers "did the advertising work": what each channel
+// cost, what it brought (sessions and leads) and what it actually paid. Four
+// sources, one row per channel — browser events for traffic, `leads.utm` for
+// enquiries, `payments` credited by first touch for money, and the hand-entered
+// invoices for cost.
+//
+// The rules the numbers follow are printed on the screen (see the view), because
+// a marketing report is easy to read as more certain than it is:
+//   · attribution is first touch, resolved from the campaign the visitor landed on;
+//   · a payment is credited to the channel of the first lead from that phone number;
+//   · money with no lead behind it reads "(unattributed)" rather than being
+//     folded into direct traffic it may not have come from;
+//   · cost per acquisition divides spend by *paid transactions*, nothing else.
+//
+// Entering spend writes a row, so it is narrower than reading: `marketing.spend`
+// (§7.4 puts the CMS and marketing modules with admin, ops and marketing; the
+// invoice entry itself is admin + marketing).
+// ---------------------------------------------------------------------------
+router.get('/marketing', auth.requireStaff('marketing.view'), async (req, res, next) => {
+  try {
+    const today = new Date().toISOString().slice(0, 10);
+    const from = validate.text(req.query.from, 10) || null;
+    const to = validate.text(req.query.to, 10) || null;
+    const window = {
+      from: from && /^\d{4}-\d{2}-\d{2}$/.test(from) ? from : null,
+      to: to && /^\d{4}-\d{2}-\d{2}$/.test(to) ? to : null,
+    };
+    const bounds = db.reports.windowBounds(window);
+    const summary = await db.analytics.marketingSummary(window);
+
+    return await page(req, res, {
+      view: 'admin/marketing',
+      active: PATHS.marketing,
+      title: 'Marketing',
+      description: 'Channel → lead → paid conversion, cost per acquisition and the guardrail.',
+      data: {
+        summary,
+        rows: summary.rows,
+        totals: summary.totals,
+        guardrailKobo: config.marketing.cacGuardrailKobo,
+        from: bounds.start.slice(0, 10),
+        to: window.to || today,
+        today,
+        naira: money.formatNaira,
+        canEnterSpend: roles.can(req.user.role, 'marketing.spend'),
+      },
+    });
+  } catch (error) {
+    return next(error);
+  }
+});
+
+/**
+ * Record what a channel cost for a period. Upserts on channel + period, so
+ * correcting a wrong invoice replaces it instead of double-counting it, and
+ * writes an audit row: a number that moves a CAC has to have a name on it.
+ */
+router.post('/marketing/spend', auth.requireStaff('marketing.spend'), auth.sameOriginOnly, async (req, res, next) => {
+  const back = PATHS.marketing;
+  try {
+    const channel = validate.text(req.body.channel, 80);
+    const periodStart = validate.text(req.body.period_start, 10);
+    const periodEnd = validate.text(req.body.period_end, 10);
+    const amountKobo = money.nairaToKobo(req.body.amount);
+    const isDate = (value) => /^\d{4}-\d{2}-\d{2}$/.test(String(value || ''));
+
+    if (!channel) return done(res, back, 'Which channel did the money go to?', { error: true });
+    if (!isDate(periodStart) || !isDate(periodEnd)) return done(res, back, 'Give the period as two dates.', { error: true });
+    if (periodEnd < periodStart) return done(res, back, 'The period ends before it starts.', { error: true });
+    if (amountKobo === null) return done(res, back, 'Amount must be a naira figure.', { error: true });
+
+    const saved = await db.analytics.recordSpend({
+      channel,
+      periodStart,
+      periodEnd,
+      amountKobo,
+      note: validate.text(req.body.note, 200) || null,
+      actorId: req.user.id,
+    });
+    await admin.recordAudit({
+      actorId: req.user.id,
+      action: saved.updated ? 'marketing.spend_updated' : 'marketing.spend_recorded',
+      entity: 'marketing_spend',
+      entityId: saved.id,
+      detail: `${channel} ${periodStart} → ${periodEnd}: ₦${(amountKobo / 100).toLocaleString('en-NG')}`,
+    });
+
+    return done(res, back, `${saved.updated ? 'Updated' : 'Recorded'} ${channel} spend for ${periodStart} → ${periodEnd}.`);
   } catch (error) {
     return next(error);
   }
