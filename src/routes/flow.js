@@ -73,6 +73,29 @@ router.get('/concierge/lookup', (req, res) => {
 });
 
 // ---------------------------------------------------------------------------
+// /concierge/{trackingId}/options.pdf — §7.3, the shortlist as a document the
+// buyer forwards to whoever is co-signing the decision. Registered before the
+// status route for the same reason /concierge/lookup is: a longer, more specific
+// path must not be swallowed by the id.
+router.get('/concierge/:trackingId/options.pdf', async (req, res, next) => {
+  try {
+    const request = await db.requests.findByTracking(req.params.trackingId);
+    if (!request) return next();
+    const shortlist = await concierge.shortlist(request);
+    if (!shortlist) return next();
+
+    res.set({
+      'Content-Type': 'application/pdf',
+      'Content-Disposition': `inline; filename="${concierge.fileName(request)}"`,
+      // Private by design: a buyer's shortlist is theirs, not a public document.
+      'Cache-Control': 'private, no-store',
+    });
+    return concierge.pdf({ request, shortlist }).pipe(res);
+  } catch (error) {
+    return next(error);
+  }
+});
+
 // /concierge/{trackingId} — §6.5 status page. Private: noindex, no caching.
 // ---------------------------------------------------------------------------
 router.get('/concierge/:trackingId', async (req, res, next) => {
@@ -89,6 +112,11 @@ router.get('/concierge/:trackingId', async (req, res, next) => {
     const retainer = payments.find((payment) => payment.purpose === 'retainer') || null;
     const retainerState = retainer ? db.payments.RETAINER_STATES[retainer.status] || null : null;
 
+    // §7.3: the shortlist ops curated, rendered from listing data. Absent until
+    // something is attached — the page shows the timeline alone rather than an
+    // empty "your options" shell.
+    const shortlist = await concierge.shortlist(request);
+
     return await sendPage(req, res, {
       routePath: `/concierge/${request.trackingId}`,
       view: 'concierge-status',
@@ -104,7 +132,7 @@ router.get('/concierge/:trackingId', async (req, res, next) => {
         bodyClass: 'page-concierge-status',
         jsonLd: [],
       },
-      data: { request, stages, trail, retainer, retainerState },
+      data: { request, stages, trail, retainer, retainerState, shortlist, shortlistPdf: shortlist ? `/concierge/${request.trackingId}/options.pdf` : null },
     });
   } catch (error) {
     next(error);

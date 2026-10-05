@@ -398,7 +398,7 @@ async function byIds(ids = [], { limit = 24 } = {}) {
       WHERE l.id IN (${clean.map(() => '?').join(',')})`,
     clean,
   );
-  const listings = rows.map(shapeListing);
+  const listings = await attachPricePositions(rows.map(shapeListing));
   await attachMedia(listings);
   const byId = new Map(listings.map((listing) => [listing.id, { ...listing, runningCostKobo: runningCostEstimate(listing) }]));
   return clean.map((id) => byId.get(id)).filter(Boolean);
@@ -445,7 +445,9 @@ async function findByIds(ids = [], { limit = 3 } = {}) {
              OR (l.status = 'sold' AND l.sold_at > DATE_SUB(UTC_TIMESTAMP(), INTERVAL 7 DAY)))`,
     clean,
   );
-  const listings = rows.map(shapeListing);
+  // Live bands, not the stored column: a band moved in /admin/intel changes the
+  // comparison on the same load it changes the VDP.
+  const listings = await attachPricePositions(rows.map(shapeListing));
   await attachMedia(listings);
   const byId = new Map(listings.map((listing) => [listing.id, { ...listing, runningCostKobo: runningCostEstimate(listing) }]));
   return clean.map((id) => byId.get(id)).filter(Boolean);
@@ -623,30 +625,94 @@ async function networkCounters() {
   };
 }
 
+/** Where a price sits against its band. One rule, used by every caller. */
+function bandPosition(priceKobo, band) {
+  if (!band) return null;
+  const price = Number(priceKobo);
+  const min = Number(band.band_min_kobo);
+  const max = Number(band.band_max_kobo);
+  return price < min ? 'below' : price > max ? 'premium' : 'within';
+}
+
+/**
+ * Which band applies to a listing: the exact condition beats the catch-all, and
+ * the year must fall inside the range. Shared shape for the single-row lookup
+ * below and the batch resolver under it — they must pick the same band or the
+ * VDP and the comparison would disagree about the same car.
+ */
+function pickBand(bands, listing) {
+  const candidates = bands.filter(
+    (band) => band.make === listing.make
+      && band.model === listing.model
+      && Number(listing.year) >= Number(band.year_from)
+      && Number(listing.year) <= Number(band.year_to)
+      && (band.condition === listing.condition || band.condition === 'any'),
+  );
+  if (!candidates.length) return null;
+  // Exact condition first; then the one with the most evidence behind it.
+  return candidates.sort((a, b) => {
+    const exact = Number(b.condition === listing.condition) - Number(a.condition === listing.condition);
+    if (exact) return exact;
+    return Number(b.sample_size) - Number(a.sample_size);
+  })[0];
+}
+
 /** Price band lookup that powers the price-position indicator (§3.5, §7.3). */
 async function findPriceBand(listing) {
   const row = await queryOne(
-    `SELECT band_min_kobo, band_max_kobo, sample_size, refreshed_at, \`condition\`
+    `SELECT make, model, year_from, year_to, band_min_kobo, band_max_kobo, sample_size, refreshed_at, \`condition\`
        FROM price_bands
       WHERE make = ? AND model = ?
         AND ? BETWEEN year_from AND year_to
-        AND (\`condition\` = ? OR \`condition\` = 'any')
-      ORDER BY (\`condition\` = ?) DESC
-      LIMIT 1`,
-    [listing.make, listing.model, listing.year, listing.condition, listing.condition],
+        AND (\`condition\` = ? OR \`condition\` = 'any')`,
+    [listing.make, listing.model, listing.year, listing.condition],
   );
-  if (!row) return null;
-  const min = Number(row.band_min_kobo);
-  const max = Number(row.band_max_kobo);
-  const price = listing.priceKobo;
-  const position = price < min ? 'below' : price > max ? 'premium' : 'within';
+  // The query already narrowed to the right rows; pickBand applies the same
+  // tie-break the batch path uses rather than trusting the row order.
+  const band = row ? pickBand([row], listing) : null;
+  if (!band) return null;
   return {
-    min,
-    max,
-    position,
-    sampleSize: Number(row.sample_size),
-    refreshedAt: row.refreshed_at,
+    min: Number(band.band_min_kobo),
+    max: Number(band.band_max_kobo),
+    position: bandPosition(listing.priceKobo, band),
+    sampleSize: Number(band.sample_size),
+    refreshedAt: band.refreshed_at,
   };
+}
+
+/**
+ * Resolve the live band for a set of listings, in one query.
+ *
+ * `vehicle_listings.price_position` is a denormalised column written at seed
+ * time. The VDP has always read the band itself, so a band moved in
+ * /admin/intel changes the VDP immediately — and without this, the compare
+ * table and the concierge shortlist would keep showing the stale column for the
+ * same car. Anything that shows a price position to a buyer comes through here.
+ */
+async function attachPricePositions(listings) {
+  if (!listings.length) return listings;
+  const makes = [...new Set(listings.map((listing) => listing.make))];
+  const bands = await query(
+    `SELECT make, model, year_from, year_to, band_min_kobo, band_max_kobo, sample_size, refreshed_at, \`condition\`
+       FROM price_bands WHERE make IN (${makes.map(() => '?').join(',')})`,
+    makes,
+  );
+  return listings.map((listing) => {
+    const band = pickBand(bands, listing);
+    const position = bandPosition(listing.priceKobo, band);
+    if (!position) return listing; // no band yet: the stored value stands, label says so
+    return {
+      ...listing,
+      pricePosition: position,
+      pricePositionLabel: (PRICE_POSITION[position] || PRICE_POSITION.no_data).label,
+      priceBand: {
+        min: Number(band.band_min_kobo),
+        max: Number(band.band_max_kobo),
+        sampleSize: Number(band.sample_size),
+        refreshedAt: band.refreshed_at,
+      },
+    };
+  });
 }
 
 /** Fire-and-forget metric bump (never blocks a page render). */
@@ -696,6 +762,8 @@ module.exports = {
   modelCounts,
   networkCounters,
   findPriceBand,
+  attachPricePositions,
+  pickBand,
   recordView,
   allIndexableSlugs,
   slugify,

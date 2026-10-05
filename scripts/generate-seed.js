@@ -931,8 +931,12 @@ INSERT INTO request_candidates (request_id, listing_id, note, rank_no, added_by)
    'Cleanest papers of the three; two panels resprayed and priced in.', 1,
    (SELECT id FROM \`users\` WHERE phone = '+2348000000002' LIMIT 1)),
   ((SELECT id FROM service_requests WHERE tracking_id = 'HC-2481' LIMIT 1),
-   (SELECT id FROM vehicle_listings WHERE stock_no = 'HC-PH-0045' LIMIT 1),
-   'Higher mileage but the service book is complete.', 2,
+   (SELECT id FROM vehicle_listings WHERE stock_no = 'HC-PH-0068' LIMIT 1),
+   'The SUV alternative: same budget, more room, and the papers are clean.', 2,
+   (SELECT id FROM \`users\` WHERE phone = '+2348000000002' LIMIT 1)),
+  ((SELECT id FROM service_requests WHERE tracking_id = 'HC-2481' LIMIT 1),
+   (SELECT id FROM vehicle_listings WHERE stock_no = 'HC-PH-0066' LIMIT 1),
+   'Newest of the three and still under the budget ceiling — worth the drive to see.', 3,
    (SELECT id FROM \`users\` WHERE phone = '+2348000000002' LIMIT 1));
 
 -- Dispatch sheet (§7.3): one job unassigned, one dispatched to our inspector

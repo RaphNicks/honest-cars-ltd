@@ -31,6 +31,7 @@ const roles = require('../services/roles');
 const validate = require('../services/validate');
 const paymentService = require('../services/payments');
 const alertsService = require('../services/alerts');
+const notify = require('../services/notify');
 const money = require('../lib/money');
 const report = require('../services/report');
 const reportExport = require('../services/report-export');
@@ -451,9 +452,33 @@ router.post('/concierge/:id/stage', auth.requireStaff('concierge.manage'), auth.
       actorId: req.user.id,
       lostReason: validate.text(req.body.lost_reason, 160),
     });
-    return result.ok
-      ? done(res, PATHS.concierge, `Stage moved to ${String(status).replace(/_/g, ' ')}.`, { params: `open=${id}` })
-      : done(res, PATHS.concierge, result.error, { error: true, params: `open=${id}` });
+    if (!result.ok) return done(res, PATHS.concierge, result.error, { error: true, params: `open=${id}` });
+
+    // Moving to "options ready" is the moment the buyer has been waiting for,
+    // so tell them — with the count, because "3 options" is the promise. The
+    // template and its channel were configured but never sent until now; an
+    // unconfigured channel records the text as skipped rather than losing it.
+    if (status === 'options_ready') {
+      const request = await db.queryOne('SELECT tracking_id, phone FROM service_requests WHERE id = ? LIMIT 1', [id]);
+      const attached = await admin.candidatesFor(id);
+      if (request && attached.length) {
+        await notify.send({
+          template: 'request_options_ready',
+          values: { trackingId: request.tracking_id, count: attached.length },
+          recipient: request.phone,
+          entity: 'request',
+          entityId: id,
+          createdBy: req.user.id,
+        });
+      }
+    }
+
+    return done(
+      res,
+      PATHS.concierge,
+      `Stage moved to ${String(status).replace(/_/g, ' ')}.`,
+      { params: `open=${id}` },
+    );
   } catch (error) {
     return next(error);
   }
