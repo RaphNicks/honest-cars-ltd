@@ -292,7 +292,7 @@
       <div class="dash-card" id="saved">
         <div class="dash-card__head">
           <h2 class="mb-0">Saved cars</h2>
-          <span class="note-inline">Prices re-check against the market band on every visit</span>
+          <span class="note-inline">We watch the price on every one of these and tell you when one drops</span>
         </div>
 
         <% if (!savedCars.length) { %>
@@ -318,6 +318,15 @@
                     <%= listing.mileageKm ? helpers.formatMileage(listing.mileageKm) : 'Mileage TBC' %> ·
                     <%= listing.area %> · saved <%= helpers.relativeDays(listing.savedAt) %>
                   </span>
+                  <%# FR-25: the price watched, and a drop since you saved it %>
+                  <% if (listing.priceDropKobo > 0) { %>
+                    <span class="note-inline cms-check--ok">
+                      ↓ <%= helpers.formatNaira(listing.priceDropKobo) %> below the
+                      <%= helpers.formatNaira(listing.watchedKobo) %> you saw — we have told you
+                    </span>
+                  <% } else if (listing.watchedKobo !== null) { %>
+                    <span class="note-inline muted">Watching from <%= helpers.formatNaira(listing.watchedKobo) %></span>
+                  <% } %>
                   <div class="btn-row btn-row--tight">
                     <span class="badge <%= listing.status === 'sold' ? 'badge--sold' : 'badge--ghost' %>"><%= listing.status %></span>
                     <button class="btn btn--ghost btn--sm" type="button"
@@ -373,8 +382,8 @@
             <% }); %>
           </ul>
           <p class="note-inline mb-0">
-            The switches are recorded per search today; the sending side (WhatsApp or email, price drop and new
-            match) lands with the notification layer — nothing will be sent until then.
+            Price drops and new matches go out on the channel we message you on. We only ever move a saved
+            search forward — saving it does not send you the entire current inventory.
           </p>
         <% } %>
       </div>

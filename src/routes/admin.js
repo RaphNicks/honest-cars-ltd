@@ -13,6 +13,7 @@
  *   GET  /admin/orders              shop orders + fulfilment
  *   GET  /admin/payments            transactions, receipts, refunds, dealer ledger
  *   GET  /admin/milestones          protected-purchase & parts escrow tracker
+ *   GET  /admin/alerts              saved-car / saved-search deal alerts (FR-25)
  *   GET  /admin/staff               staff, roles, watchlist
  *   GET  /admin/audit               sensitive-action log
  *
@@ -29,12 +30,14 @@ const auth = require('../services/auth');
 const roles = require('../services/roles');
 const validate = require('../services/validate');
 const paymentService = require('../services/payments');
+const alertsService = require('../services/alerts');
 const money = require('../lib/money');
 const report = require('../services/report');
 const { sendPage, CACHE } = require('../lib/respond');
 
 const router = express.Router();
 const admin = db.admin;
+const dealers = db.dealers;
 
 const HOME = '/admin';
 const PATHS = {
@@ -46,6 +49,7 @@ const PATHS = {
   orders: `${HOME}/orders`,
   payments: `${HOME}/payments`,
   milestones: `${HOME}/milestones`,
+  alerts: `${HOME}/alerts`,
   staff: `${HOME}/staff`,
   audit: `${HOME}/audit`,
 };
@@ -61,6 +65,7 @@ const NAV = [
   { href: PATHS.orders, label: 'Orders', icon: 'package', capability: 'payments.view' },
   { href: PATHS.payments, label: 'Money', icon: 'chart', capability: 'payments.view' },
   { href: PATHS.milestones, label: 'Escrow', icon: 'shield', capability: 'payments.view' },
+  { href: PATHS.alerts, label: 'Alerts', icon: 'bell', capability: 'intel.manage' },
   { href: `${HOME}/cms`, label: 'Content', icon: 'fileCheck', capability: 'cms.manage' },
   { href: PATHS.staff, label: 'Staff & roles', icon: 'account', capability: 'users.manage' },
   { href: PATHS.audit, label: 'Audit log', icon: 'shield', capability: 'users.manage' },
@@ -986,15 +991,22 @@ router.get('/jobs/:id/report.pdf', auth.requireAnyStaff(['bookings.own_jobs', 'b
 // ---------------------------------------------------------------------------
 router.get('/staff', auth.requireStaff('users.manage'), async (req, res, next) => {
   try {
-    const [staff, customers] = await Promise.all([admin.staffList(), admin.customerCount()]);
+    const [staff, customers, dealerAccounts, unclaimedLots] = await Promise.all([
+      admin.staffList(),
+      admin.customerCount(),
+      dealers.dealerAccounts(),
+      dealers.unclaimed(50),
+    ]);
     return await page(req, res, {
       view: 'admin/staff',
       active: PATHS.staff,
       title: 'Staff & roles',
-      description: 'Who is staff, what they may do, and the watchlist.',
+      description: 'Who is staff, what they may do, the dealer onboarding list, and the watchlist.',
       data: {
         staff,
         customers,
+        dealerAccounts,
+        unclaimedLots,
         roleLabels: roles.ROLE_LABELS,
         matrix: roles.MATRIX,
         capabilitiesFor: roles.capabilitiesFor,
@@ -1022,11 +1034,96 @@ router.post('/staff/:id/role', auth.requireStaff('users.manage'), auth.sameOrigi
   }
 });
 
+/**
+ * §7.2 onboarding: link a dealer-role account to the lot it runs. One account
+ * owns one lot (`dealers.user_id` is unique), and the portal derives everything
+ * from that link — so this is the switch that turns a login into a portal.
+ */
+router.post('/staff/dealer-link', auth.requireStaff('users.manage'), auth.sameOriginOnly, async (req, res, next) => {
+  try {
+    const dealerId = validate.integer(req.body.dealer_id, { min: 1, fallback: 0 });
+    const userId = validate.integer(req.body.user_id, { min: 1, fallback: 0 });
+    const result = await dealers.linkUser(dealerId, userId);
+    if (!result.ok) return done(res, PATHS.staff, result.error, { error: true });
+    const lot = await dealers.byId(dealerId);
+    const account = (await dealers.dealerAccounts()).find((row) => row.id === userId);
+    await admin.recordAudit({
+      actorId: req.user.id,
+      action: 'dealer.account.linked',
+      entity: 'dealer',
+      entityId: dealerId,
+      detail: { lot: lot.name, accountId: userId, account: account ? account.name : null, phone: account ? account.phone : null },
+    });
+    return done(res, PATHS.staff, `${account ? account.name : 'The account'} now runs ${lot.name} — the dealer portal is open to them.`);
+  } catch (error) {
+    return next(error);
+  }
+});
+
+router.post('/staff/dealer-unlink', auth.requireStaff('users.manage'), auth.sameOriginOnly, async (req, res, next) => {
+  try {
+    const dealerId = validate.integer(req.body.dealer_id, { min: 1, fallback: 0 });
+    const lot = await dealers.byId(dealerId);
+    if (!lot) return done(res, PATHS.staff, 'That lot does not exist.', { error: true });
+    await dealers.unlinkUser(dealerId);
+    await admin.recordAudit({
+      actorId: req.user.id,
+      action: 'dealer.account.unlinked',
+      entity: 'dealer',
+      entityId: dealerId,
+      detail: { lot: lot.name, note: 'The portal closes for that login until a lot is linked again.' },
+    });
+    return done(res, PATHS.staff, `${lot.name} is no longer linked to a sign-in.`);
+  } catch (error) {
+    return next(error);
+  }
+});
+
 router.post('/staff/:id/watchlist', auth.requireStaff('users.manage'), auth.sameOriginOnly, async (req, res, next) => {
   try {
     const id = validate.integer(req.params.id, { min: 1, fallback: 0 });
     await admin.setWatchlist(id, String(req.body.watchlisted || '') === '1', { actorId: req.user.id });
     return done(res, PATHS.staff, 'Watchlist updated.');
+  } catch (error) {
+    return next(error);
+  }
+});
+
+// ---------------------------------------------------------------------------
+// Deal alerts — FR-25. The two switches on /account ("price drops", "new
+// matches") have a sending side, and this is where ops can see what it is
+// watching, run it by hand, and read every message it produced.
+// ---------------------------------------------------------------------------
+router.get('/alerts', auth.requireStaff('intel.manage'), async (req, res, next) => {
+  try {
+    const [watch, recent] = await Promise.all([
+      alertsService.watchList(),
+      alertsService.recentAlerts({ limit: 40 }),
+    ]);
+    return await page(req, res, {
+      view: 'admin/alerts',
+      active: PATHS.alerts,
+      title: 'Deal alerts',
+      description: 'Saved cars watching a price, saved searches watching new stock, and every alert sent.',
+      data: { watch, recent, maxPerRun: alertsService.MAX_ALERTS_PER_RUN },
+    });
+  } catch (error) {
+    return next(error);
+  }
+});
+
+router.post('/alerts/run', auth.requireStaff('intel.manage'), async (req, res, next) => {
+  try {
+    const dryRun = String(req.body.dry_run || '') === '1';
+    const report = await alertsService.runWatch({ dryRun, userId: validate.integer(req.body.user_id, { min: 1 }) || null });
+    const summary = [
+      `${report.checked.cars} saved car${report.checked.cars === 1 ? '' : 's'}, ${report.checked.searches} saved search${report.checked.searches === 1 ? '' : 'es'}`,
+      report.priceDrops.length ? `${report.priceDrops.length} price drop${report.priceDrops.length === 1 ? '' : 's'}` : null,
+      report.newMatches.length ? `${report.newMatches.length} new match${report.newMatches.length === 1 ? '' : 'es'}` : null,
+      report.skipped.length ? `${report.skipped.length} not delivered (recorded as skipped)` : null,
+      dryRun ? 'dry run — nothing sent or written' : null,
+    ].filter(Boolean).join(' · ');
+    return done(res, PATHS.alerts, `Watch run: ${summary}.`);
   } catch (error) {
     return next(error);
   }

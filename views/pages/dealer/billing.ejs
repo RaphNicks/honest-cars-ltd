@@ -1,0 +1,99 @@
+<%
+/**
+ * Commission & billing — §7.2 “Orders & Billing (commission statements per
+ * closed deal; pay for add-ons via PSP)”.
+ *
+ * The ledger is append-only: commission in, payouts out, adjustments named.
+ * The balance is the sum of the rows and nothing else, so a dealer can check
+ * the arithmetic themselves.
+ * Locals: statements, commission
+ */
+var TYPE_LABELS = {
+  sale_commission: 'Sale commission',
+  payout: 'Payout to the lot',
+  adjustment: 'Adjustment',
+  clawback: 'Clawback',
+};
+var TYPE_COPY = {
+  sale_commission: 'Earned on a car sold through HonestCars',
+  payout: 'Paid out to the lot',
+  adjustment: 'Correction agreed with the desk',
+  clawback: 'Reversed — a deal that did not complete',
+};
+%>
+
+<div class="admin-grid admin-grid--3">
+  <div class="kpi kpi--sm">
+    <span class="kpi__label">Balance owed</span>
+    <strong class="kpi__value tabular"><%= helpers.formatNaira(commission.balance_kobo) %></strong>
+    <span class="kpi__foot">commission minus payouts</span>
+  </div>
+  <div class="kpi kpi--sm">
+    <span class="kpi__label">Commission earned</span>
+    <strong class="kpi__value tabular"><%= helpers.formatNaira(commission.owed_kobo) %></strong>
+    <span class="kpi__foot">at <%= lot.commissionPct === null ? 'the agreed' : lot.commissionPct + '%' %> rate on closed deals</span>
+  </div>
+  <div class="kpi kpi--sm">
+    <span class="kpi__label">Paid to the lot</span>
+    <strong class="kpi__value tabular"><%= helpers.formatNaira(commission.paid_kobo) %></strong>
+    <span class="kpi__foot">by transfer, settled against statements</span>
+  </div>
+</div>
+
+<section class="panel mt-3">
+  <div class="panel__head">
+    <h2 class="panel__title">Statement</h2>
+    <span class="cms-hint">Newest first · every row names its reference</span>
+  </div>
+
+  <% if (!statements.length) { %>
+    <p class="empty-line">No entries yet. Commission appears the moment a deal closes and the payment clears.</p>
+    <p class="mb-0 muted">Payments for add-ons (inspection, detailing, tracking) run through the HonestCars payment provider — talk to the desk and they will raise it on this lot’s account.</p>
+  <% } else { %>
+    <div class="table-scroll">
+      <table class="table table--stack">
+        <caption class="visually-hidden">This lot’s commission ledger</caption>
+        <thead>
+          <tr>
+            <th scope="col">Entry</th>
+            <th scope="col">Car / reference</th>
+            <th scope="col">Detail</th>
+            <th scope="col">Amount</th>
+            <th scope="col">When</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% statements.forEach(function (row) { %>
+            <tr>
+              <th scope="row">
+                <span class="badge badge--<%= row.type %>"><%= TYPE_LABELS[row.type] || row.type %></span>
+                <span class="listing-row__meta"><%= TYPE_COPY[row.type] || '' %></span>
+              </th>
+              <td>
+                <% if (row.listing) { %>
+                  <a href="/cars/<%= row.listing.slug %>" target="_blank" rel="noopener"><%= row.listing.title %></a>
+                  <span class="listing-row__meta"><%= row.listing.stockNo %></span>
+                <% } else { %>
+                  <span class="muted">—</span>
+                <% } %>
+              </td>
+              <td class="muted">
+                <%= row.detail || '—' %>
+                <% if (row.reference) { %><br><span class="tabular"><%= row.reference %></span><% } %>
+                <% if (row.paymentReference) { %><br><span class="tabular">payment <%= row.paymentReference %></span><% } %>
+              </td>
+              <td class="tabular<%= row.amountKobo < 0 ? ' muted' : '' %>">
+                <%= helpers.formatNaira(row.amountKobo) %>
+              </td>
+              <td class="muted"><%= helpers.relativeDays(row.createdAt) %></td>
+            </tr>
+          <% }); %>
+        </tbody>
+      </table>
+    </div>
+    <p class="cms-hint mt-2">
+      Disagree with a row? <a href="<%= site.nav.whatsapp.general %>" target="_blank" rel="noopener">Message the desk</a>
+      with the reference. Nothing is edited silently — a correction is its own row, so the history stays readable.
+    </p>
+  <% } %>
+</section>

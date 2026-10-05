@@ -24,7 +24,8 @@
     "artifacts": "node scripts/build-static.js && node scripts/lint-type-scale.js",
     "check": "npm run lint && npm test",
     "smoke": "node scripts/smoke-roles.mjs",
-    "smoke:cms": "node scripts/cms-smoke.mjs"
+    "smoke:cms": "node scripts/cms-smoke.mjs",
+    "alerts": "node scripts/run-alerts.mjs"
   },
   "engines": {
     "node": ">=20"

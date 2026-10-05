@@ -96,7 +96,7 @@ const SHOT_LABELS = {
 };
 
 function exists(url) {
-  if (!url.startsWith('/img/')) return false;
+  if (typeof url !== 'string' || !url.startsWith('/img/')) return false;
   return fs.existsSync(path.join(IMG_DIR, url.replace('/img/', '')));
 }
 
@@ -160,6 +160,42 @@ function galleryFor(listing) {
   return shots;
 }
 
+/**
+ * Named slots that are honestly the same subject as a photo we already have.
+ *
+ * §6.7 hire classes name their examples, so "Sedan — Camry, Corolla, Accord"
+ * is a Camry photo, "Pickup — Hilux, Ranger" is the Hilux, and so on. This is
+ * not a placeholder: it is the right picture, and it is why the hire page has
+ * real photographs before the shoot for it has happened.
+ */
+const HIRE_PHOTOS = {
+  sedan: '/img/cars/toyota-camry-silver.jpg',
+  suv: '/img/hire/suv.jpg',
+  pickup: '/img/cars/toyota-hilux-silver.jpg',
+  luxury: '/img/cars/toyota-prado-white.jpg',
+  'executive-corporate': '/img/cars/mercedes-eclass-grey.jpg',
+  // `bus` has no honest match in the library yet, so it stays unset rather
+  // than putting a saloon on a 14-seater's card.
+};
+
+/**
+ * Blog hero fallbacks: an article about a specific car, or about a specific
+ * part of one, is illustrated by that car or that part.
+ */
+const BLOG_HEROES = {
+  '2015-toyota-camry-honest-buyers-guide': '/img/cars/toyota-camry-silver.jpg',
+};
+
+/** The hire-class photo: the dedicated one if it exists, else the honest match. */
+function hirePhoto(slug) {
+  return photo('hire', slug) || (exists(HIRE_PHOTOS[slug]) ? HIRE_PHOTOS[slug] : null);
+}
+
+/** The blog hero: the dedicated file if it exists, else the subject match. */
+function blogHero(slug) {
+  return photo('blog', slug) || (exists(BLOG_HEROES[slug]) ? BLOG_HEROES[slug] : null);
+}
+
 /** True when a listing has at least one real photograph. */
 function hasRealPhotos(listing) {
   return galleryFor(listing).length > 0;
@@ -177,6 +213,8 @@ function photo(group, name) {
 module.exports = {
   CAR_PHOTOS,
   DETAIL_PHOTOS,
+  HIRE_PHOTOS,
+  BLOG_HEROES,
   SHOT_KEYS,
   SHOT_LABELS,
   carPhotoFor,
@@ -184,5 +222,7 @@ module.exports = {
   galleryFor,
   hasRealPhotos,
   photo,
+  hirePhoto,
+  blogHero,
   exists,
 };

@@ -734,3 +734,291 @@ body.admin {
 .cms-preview h2, .cms-preview h3 { margin-top: var(--space-2, 16px); }
 .cms-strip { display: flex; flex-wrap: wrap; gap: var(--space-1, 8px); align-items: center; }
 .cms-hint { font-size: var(--text-12); color: var(--muted, #5B6B7C); }
+
+/* ==========================================================================
+   Dealer partner portal (§7.2)
+   Same console chrome, told from the lot's side of the desk. Everything here
+   is layout only — the tokens, type ladder and radius are the console's.
+   ========================================================================== */
+
+.dealer-todo {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: var(--space-2);
+}
+
+.dealer-todo__item {
+  display: flex;
+  gap: var(--space-1);
+  align-items: flex-start;
+}
+
+.dealer-todo__dot {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  margin-top: 6px;
+  border-radius: 50%;
+  background: var(--honest-amber, #E8A13D);
+}
+
+.dealer-todo__label {
+  font-weight: var(--weight-semibold, 600);
+}
+
+.dealer-todo__copy {
+  margin: 2px 0 0;
+  font-size: var(--text-14);
+  color: var(--muted, #5B6B7C);
+}
+
+/* Filter tiles that double as links. */
+.kpi--link {
+  display: block;
+  text-decoration: none;
+  color: inherit;
+}
+
+.kpi--link:hover,
+.kpi--link:focus-visible {
+  border-color: var(--honest-green, #12A150);
+}
+
+.kpi--link.is-current {
+  border-color: var(--honest-navy, #0E2A47);
+  box-shadow: inset 0 0 0 1px var(--honest-navy, #0E2A47);
+}
+
+/* --- Listings table: a table on a desk, cards on a phone ----------------- */
+.dealer-listing__car {
+  display: flex;
+  gap: var(--space-1);
+  align-items: flex-start;
+}
+
+.dealer-listing__media img {
+  width: 112px;
+  height: 84px;
+  object-fit: cover;
+  border-radius: 8px;
+  display: block;
+}
+
+.dealer-listing__blank {
+  width: 112px;
+  height: 84px;
+  border-radius: 8px;
+  border: 1px dashed var(--line, #D8E0E8);
+  display: grid;
+  place-items: center;
+  color: var(--muted, #5B6B7C);
+}
+
+.dealer-listing__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-05, 4px);
+  align-items: center;
+}
+
+.dealer-listing__actions form {
+  display: inline;
+  margin: 0;
+}
+
+/* --- Photo manager ------------------------------------------------------- */
+.dealer-photos__strip {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: var(--space-2);
+}
+
+.dealer-photos__item {
+  position: relative;
+  border: 1px solid var(--line, #D8E0E8);
+  border-radius: 12px;
+  overflow: hidden;
+  background: var(--white, #fff);
+}
+
+.dealer-photos__item img {
+  width: 100%;
+  height: 120px;
+  object-fit: cover;
+  display: block;
+}
+
+.dealer-photos__remove {
+  position: absolute;
+  top: var(--space-05, 4px);
+  right: var(--space-05, 4px);
+}
+
+.dealer-photos__remove .btn {
+  background: rgba(255, 255, 255, 0.92);
+}
+
+.dealer-photos__label {
+  display: block;
+  padding: var(--space-05, 4px) var(--space-1, 8px);
+  font-size: var(--text-12);
+  color: var(--muted, #5B6B7C);
+}
+
+/* --- Add-a-car wizard ---------------------------------------------------- */
+.wizard-steps {
+  list-style: none;
+  margin: 0 0 var(--space-2);
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+}
+
+.wizard-steps__step {
+  display: flex;
+  align-items: center;
+  gap: var(--space-05, 4px);
+  padding: var(--space-05, 4px) var(--space-1, 8px);
+  border: 1px solid var(--line, #D8E0E8);
+  border-radius: 999px;
+  font-size: var(--text-14);
+  color: var(--muted, #5B6B7C);
+  background: var(--white, #fff);
+}
+
+.wizard-steps__step[aria-current='true'] {
+  border-color: var(--honest-navy, #0E2A47);
+  color: var(--honest-navy, #0E2A47);
+  font-weight: var(--weight-semibold, 600);
+}
+
+.wizard-steps__num {
+  display: inline-grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--navy-08, #EEF2F7);
+  font-size: var(--text-12);
+  font-weight: var(--weight-semibold, 600);
+}
+
+.wizard-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+  margin-top: var(--space-3);
+}
+
+.wizard-autosave {
+  margin-top: var(--space-2);
+}
+
+/* The six photographs, in the order that sells a car. */
+.shot-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: var(--space-2);
+}
+
+@media (min-width: 900px) {
+  .shot-list { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+.shot-list__item {
+  padding: var(--space-2);
+  border: 1px solid var(--line, #D8E0E8);
+  border-radius: 12px;
+  background: var(--white, #fff);
+}
+
+.shot-list__head {
+  display: flex;
+  gap: var(--space-1);
+  align-items: flex-start;
+  margin-bottom: var(--space-1);
+}
+
+.shot-list__num {
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--honest-navy, #0E2A47);
+  color: var(--white, #fff);
+  font-size: var(--text-12);
+  font-weight: var(--weight-semibold, 600);
+}
+
+.shot-list__hint {
+  font-size: var(--text-14);
+  color: var(--muted, #5B6B7C);
+}
+
+.shot-reminder {
+  margin: var(--space-2) 0 0;
+  padding-left: 1.1em;
+  font-size: var(--text-14);
+  color: var(--muted, #5B6B7C);
+}
+
+.check-grid {
+  display: grid;
+  gap: var(--space-1);
+}
+
+@media (min-width: 700px) {
+  .check-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+/* --- Leads inbox --------------------------------------------------------- */
+.lead-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: var(--space-2);
+}
+
+.lead-row {
+  padding: var(--space-2);
+  border: 1px solid var(--line, #D8E0E8);
+  border-radius: 12px;
+  background: var(--white, #fff);
+}
+
+.lead-row__head {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+  align-items: flex-start;
+  justify-content: space-between;
+}
+
+.lead-row__message {
+  margin: var(--space-1) 0;
+  padding-left: var(--space-1);
+  border-left: 3px solid var(--line, #D8E0E8);
+}
+
+.lead-row__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+  align-items: center;
+  margin-top: var(--space-1);
+  padding-top: var(--space-1);
+  border-top: 1px solid var(--line, #D8E0E8);
+}
+
+.lead-row__actions .input { flex: 1 1 220px; }

@@ -258,9 +258,11 @@ async function savedCarIds(userId) {
   return rows.map((row) => Number(row.listing_id));
 }
 
+/** Saved cars with the price watched and the price now — FR-25. */
 async function savedCars(userId) {
   const rows = await query(
-    `SELECT s.listing_id, s.note, s.created_at AS saved_at
+    `SELECT s.listing_id, s.note, s.created_at AS saved_at,
+            s.last_price_kobo, s.last_alerted_at
        FROM saved_cars s
       WHERE s.user_id = ?
       ORDER BY s.created_at DESC`,
@@ -275,16 +277,33 @@ async function savedCars(userId) {
   return rows
     .map((row) => {
       const listing = byId.get(Number(row.listing_id));
-      return listing ? { ...listing, savedAt: row.saved_at, note: row.note || null } : null;
+      if (!listing) return null;
+      const watchedKobo = row.last_price_kobo === null || row.last_price_kobo === undefined
+        ? null
+        : Number(row.last_price_kobo);
+      return {
+        ...listing,
+        savedAt: row.saved_at,
+        note: row.note || null,
+        // FR-25: what the saver last saw, and whether it has moved since.
+        watchedKobo,
+        priceDropKobo: watchedKobo !== null && listing.priceKobo < watchedKobo ? watchedKobo - listing.priceKobo : 0,
+        alertSentAt: row.last_alerted_at,
+      };
     })
     .filter(Boolean);
 }
 
 async function addSavedCar(userId, listingId, note = null) {
+  // FR-25: record the price the saver is looking at. The alert sweep measures
+  // every future drop from here, so saving a car is never itself an alert.
   await query(
-    `INSERT INTO saved_cars (user_id, listing_id, note) VALUES (?, ?, ?)
-     ON DUPLICATE KEY UPDATE note = VALUES(note)`,
-    [userId, listingId, note ? String(note).slice(0, 200) : null],
+    `INSERT INTO saved_cars (user_id, listing_id, note, last_price_kobo)
+     VALUES (?, ?, ?, (SELECT asking_price_kobo FROM vehicle_listings WHERE id = ?))
+     ON DUPLICATE KEY UPDATE
+       note = VALUES(note),
+       last_price_kobo = COALESCE(last_price_kobo, VALUES(last_price_kobo))`,
+    [userId, listingId, note ? String(note).slice(0, 200) : null, listingId],
   );
   return savedCarIds(userId);
 }
@@ -329,9 +348,11 @@ async function addSavedSearch(userId, { label, query: queryString, alertsEnabled
     );
     return shapeSearch(await queryOne('SELECT * FROM saved_searches WHERE id = ?', [existing.id]));
   }
+  // FR-25: the watermark starts now, so saving a search does not immediately
+  // mail you the entire current inventory. From here on, "new" means new.
   const result = await query(
-    `INSERT INTO saved_searches (user_id, label, query, alerts_enabled, alert_price_drop, alert_new_match)
-     VALUES (?, ?, ?, ?, ?, ?)`,
+    `INSERT INTO saved_searches (user_id, label, query, alerts_enabled, alert_price_drop, alert_new_match, last_alerted_at)
+     VALUES (?, ?, ?, ?, ?, ?, UTC_TIMESTAMP())`,
     [userId, label, queryString, master ? 1 : 0, priceDrop ? 1 : 0, newMatch ? 1 : 0],
   );
   return shapeSearch(await queryOne('SELECT * FROM saved_searches WHERE id = ?', [result.insertId]));

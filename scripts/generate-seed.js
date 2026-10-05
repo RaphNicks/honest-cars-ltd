@@ -452,6 +452,16 @@ function build() {
   listings.push(buildListing({ index: id++, status: 'in_review' }));
   listings.push(buildListing({ index: id++, status: 'expired' }));
 
+  // §7.2: Woji Car Mart (the seeded dealer login) needs a draft it can actually
+  // submit, otherwise the portal's "send for review" path has nothing to show.
+  // It belongs to the lot, has documents sighted, and the media pass gives it
+  // photographs — so it clears the submission gate on the button.
+  const wojiDraft = listings.find((row) => row.status === 'draft' && row.dealer && row.dealer.name === 'Woji Car Mart')
+    || listings.find((row) => row.status === 'draft');
+  wojiDraft.dealer = DEALERS.find((d) => d.name === 'Woji Car Mart');
+  wojiDraft.documents = { ...wojiDraft.documents, registration: true, customs_verified: true };
+  wojiDraft.honestNote = wojiDraft.honestNote || HONEST_NOTES[0];
+
   // Guarantee curation depth: force a certified, sub-₦15m SUV block for the
   // /cars/suv-under-15m facet and a Camry/Corolla block for /cars/toyota/*.
   const guarantees = [
@@ -468,6 +478,30 @@ function build() {
   }
 
   const media = listings.flatMap(mediaRows);
+
+  // The Woji draft must clear its own submission gate (three photographs), or
+  // the portal's "send for review" path is a button that can only fail.
+  const draftMedia = media.filter((row) => row.listingId === wojiDraft.id);
+  if (draftMedia.length < 3) {
+    const used = new Set(draftMedia.map((row) => row.shotKey));
+    let position = draftMedia.length;
+    for (const shot of SHOTS) {
+      if (draftMedia.length >= 3) break;
+      if (used.has(shot.key)) continue;
+      media.push({
+        listingId: wojiDraft.id,
+        type: 'image',
+        shotKey: shot.key,
+        shotLabel: shot.label,
+        url: `/img/seed/${wojiDraft.body}-${shot.key}.svg`,
+        alt: `${wojiDraft.year} ${wojiDraft.make} ${wojiDraft.model} ${wojiDraft.trim} — ${shot.label.toLowerCase()} (${wojiDraft.area}, Port Harcourt)`,
+        position: position++,
+        width: 1200,
+        height: 900,
+      });
+      used.add(shot.key);
+    }
+  }
 
   return { listings, media };
 }
@@ -498,6 +532,8 @@ DELETE FROM dealer_ledger;
 DELETE FROM payments;
 DELETE FROM payment_milestones;
 DELETE FROM notifications;
+DELETE FROM saved_cars;
+DELETE FROM saved_searches;
 DELETE FROM leads;
 DELETE FROM listing_media;
 DELETE FROM subscriptions;
@@ -540,7 +576,12 @@ DELETE FROM dealers;
         l.body, l.transmission, l.fuel, l.engine, l.drivetrain, l.exterior, l.interior,
         l.condition, l.mileage, l.mileageVerified, l.features, l.price, chance(0.7),
         l.pricePosition, l.city, l.area, l.documents, l.floodCheck, l.accidentFlag, l.description,
-        l.honestNote, l.inspection, l.slug, int(40, 2400), int(0, 26), int(0, 180),
+        l.honestNote, l.inspection, l.slug,
+        // A draft the lot has not submitted yet has no traffic story to tell —
+        // seeded views on an unpublished car would read as a bug in the portal.
+        l.status === 'draft' ? 0 : int(40, 2400),
+        l.status === 'draft' ? 0 : int(0, 26),
+        l.status === 'draft' ? 0 : int(0, 180),
         l.publishedAt, l.expiresAt, l.soldAt, l.featured,
       ];
     })));
@@ -684,7 +725,7 @@ DELETE FROM dealers;
   // §6.7 /hire — vehicle classes.
   out.push(insert('hire_classes',
     ['slug', 'name', 'seats', 'examples', 'image', 'daily_rate_kobo', 'weekly_rate_kobo', 'with_driver_kobo', 'airport_pickup', 'corporate', 'position'],
-    CONTENT.HIRE_CLASSES.map((c) => [c.slug, c.name, c.seats, c.examples, seedMedia.photo('hire', c.slug), millions(c.daily / 1_000_000), c.weekly ? millions(c.weekly / 1_000_000) : null, c.driver ? millions(c.driver / 1_000_000) : null, c.airport, c.corporate, c.position])));
+    CONTENT.HIRE_CLASSES.map((c) => [c.slug, c.name, c.seats, c.examples, seedMedia.hirePhoto(c.slug), millions(c.daily / 1_000_000), c.weekly ? millions(c.weekly / 1_000_000) : null, c.driver ? millions(c.driver / 1_000_000) : null, c.airport, c.corporate, c.position])));
 
   // §6.8 — shop products.
   out.push(insert('products',
@@ -740,7 +781,7 @@ DELETE FROM dealers;
       'meta_title', 'meta_description'],
     posts.map((p, i) => {
       const content = CONTENT.POST_BODIES[p[0]] || {};
-      const hero = seedMedia.photo('blog', p[0]) || '/img/seed/og-default.svg';
+      const hero = seedMedia.blogHero(p[0]) || '/img/seed/og-default.svg';
       return [p[0], p[1], p[2], p[3], hero, p[4], p[5], p[6], p[7], 'published',
         new Date(Date.UTC(2026, 8, 28) - i * 4 * 86_400_000), p[8],
         JSON.stringify(p[2] === 'market_intel' ? ['Toyota', 'Honda'] : ['Toyota']),
@@ -799,7 +840,9 @@ INSERT INTO \`users\` (phone, name, role, referral_code, status) VALUES
   ('+2348000000002', 'Ops Desk',            'ops',       'HCSTFF', 'active'),
   ('+2348000000003', 'Field Inspector',     'inspector', 'HCINSP', 'active'),
   ('+2348000000004', 'Finance Desk',        'finance',   'HCFINC', 'active'),
-  ('+2348000000005', 'Content Desk',        'marketing', 'HCMKTG', 'active')
+  ('+2348000000005', 'Content Desk',        'marketing', 'HCMKTG', 'active'),
+  ('+2348000000006', 'Woji Car Mart',       'dealer',    'HCWOJI', 'active'),
+  ('+2348000000007', 'Aba Road Autos',      'dealer',    'HCABAR', 'active')
 ON DUPLICATE KEY UPDATE role = VALUES(role), name = VALUES(name), status = 'active';
 
 -- The CRM-lite inbox (§7.3): every one of these came in through a real form.
@@ -1036,6 +1079,16 @@ INSERT INTO dealer_ledger (dealer_id, listing_id, payment_id, entry_type, amount
    'payout', -15000000, 'PO-2026-09-14',
    'Payout sent by transfer — balance carried to October.',
    (SELECT id FROM \`users\` WHERE phone = '+2348000000001' LIMIT 1), DATE_SUB(UTC_TIMESTAMP(), INTERVAL 5 DAY)),
+  ((SELECT id FROM dealers WHERE name = 'Woji Car Mart' LIMIT 1),
+   (SELECT id FROM vehicle_listings WHERE stock_no = 'HC-PH-0038' LIMIT 1),
+   (SELECT id FROM payments WHERE reference = 'HC-PAY-000003' LIMIT 1),
+   'sale_commission', 18000000, 'STMT-2026-09',
+   'Commission on the GLE sale plus the tracking install — statement STMT-2026-09.',
+   (SELECT id FROM \`users\` WHERE phone = '+2348000000001' LIMIT 1), DATE_SUB(UTC_TIMESTAMP(), INTERVAL 8 DAY)),
+  ((SELECT id FROM dealers WHERE name = 'Woji Car Mart' LIMIT 1), NULL, NULL,
+   'payout', -10000000, 'PO-2026-09-20',
+   'Part settlement of the September statement, sent by transfer.',
+   (SELECT id FROM \`users\` WHERE phone = '+2348000000001' LIMIT 1), DATE_SUB(UTC_TIMESTAMP(), INTERVAL 4 DAY)),
   ((SELECT id FROM dealers WHERE name = 'GRA Premium Motors' LIMIT 1),
    (SELECT id FROM vehicle_listings WHERE stock_no = 'HC-PH-0018' LIMIT 1), NULL,
    'sale_commission', 12000000, 'STMT-2026-09',
@@ -1067,14 +1120,62 @@ INSERT INTO \`users\` (phone, name, role, referral_code, status, marketing_opt_i
   ('+2348031234567', 'Ada Okafor', 'customer', 'HCADA2', 'active', 1)
 ON DUPLICATE KEY UPDATE name = VALUES(name), role = 'customer', status = 'active';
 
-INSERT INTO saved_cars (user_id, listing_id, note) VALUES
+-- FR-25. Two saved cars: one watched at the price Ada saw (no pending alert),
+-- and one whose price has already moved down since she saved it — which is
+-- exactly what the sweep is for. Nothing here invents a price: the baseline on
+-- the second row is the honest "what it was when she looked".
+-- §7.2: link each dealer account to the lot it owns. One account, one lot —
+-- uq_dealer_user enforces it, so a mistake here fails loudly rather than
+-- letting two logins see the same stock.
+UPDATE dealers SET user_id = (SELECT id FROM \`users\` WHERE phone = '+2348000000006' LIMIT 1),
+                   agreement_ref = 'HCL-PA-2026-004', agreement_signed = '2026-03-14', commission_pct = 5.00
+ WHERE name = 'Woji Car Mart';
+UPDATE dealers SET user_id = (SELECT id FROM \`users\` WHERE phone = '+2348000000007' LIMIT 1),
+                   agreement_ref = 'HCL-PA-2026-007', agreement_signed = '2026-04-02', commission_pct = 5.00
+ WHERE name = 'Aba Road Autos';
+
+-- §7.2 leads inbox: enquiries on one lot's stock (Woji Car Mart), across the
+-- pipeline, so the dealer portal opens onto a working day rather than zeroes.
+INSERT INTO leads (type, listing_id, name, phone, message, preferred_day, source_path, status,
+                   assigned_to, assigned_at, last_contacted_at, lost_reason, created_at) VALUES
+  ('viewing', (SELECT id FROM vehicle_listings WHERE stock_no = 'HC-PH-0008' LIMIT 1),
+    'Emeka Ogbonna', '+2348032220001', 'Is the Pajero still available? I can come to Woji tomorrow morning.',
+    DATE_ADD(UTC_DATE(), INTERVAL 1 DAY), '/cars/2014-mitsubishi-pajero-hc-ph-0008', 'new',
+    NULL, NULL, NULL, NULL, DATE_SUB(UTC_TIMESTAMP(), INTERVAL 5 HOUR)),
+  ('viewing', (SELECT id FROM vehicle_listings WHERE stock_no = 'HC-PH-0025' LIMIT 1),
+    'Blessing Nwosu', '+2348032220002', 'What is the lowest you will take on the Elantra? I am paying cash.',
+    DATE_ADD(UTC_DATE(), INTERVAL 2 DAY), '/cars/2017-hyundai-elantra-hc-ph-0025', 'contacted',
+    (SELECT id FROM \`users\` WHERE phone = '+2348000000006' LIMIT 1),
+    DATE_SUB(UTC_TIMESTAMP(), INTERVAL 2 DAY), DATE_SUB(UTC_TIMESTAMP(), INTERVAL 3 HOUR), NULL,
+    DATE_SUB(UTC_TIMESTAMP(), INTERVAL 2 DAY)),
+  ('viewing', (SELECT id FROM vehicle_listings WHERE stock_no = 'HC-PH-0057' LIMIT 1),
+    'Tunde Alabi', '+2348032220003', 'Does the RAV4 have full service history? Any accident on it?',
+    NULL, '/cars/2014-toyota-rav4-hc-ph-0057', 'viewing',
+    (SELECT id FROM \`users\` WHERE phone = '+2348000000006' LIMIT 1),
+    DATE_SUB(UTC_TIMESTAMP(), INTERVAL 4 DAY), DATE_SUB(UTC_TIMESTAMP(), INTERVAL 1 DAY), NULL,
+    DATE_SUB(UTC_TIMESTAMP(), INTERVAL 4 DAY)),
+  ('viewing', (SELECT id FROM vehicle_listings WHERE stock_no = 'HC-PH-0064' LIMIT 1),
+    'Ify Chukwu', '+2348032220004', 'I came to see the Sportage but the AC was not blowing cold.',
+    NULL, '/cars/2017-kia-sportage-hc-ph-0064', 'lost',
+    (SELECT id FROM \`users\` WHERE phone = '+2348000000006' LIMIT 1),
+    DATE_SUB(UTC_TIMESTAMP(), INTERVAL 6 DAY), DATE_SUB(UTC_TIMESTAMP(), INTERVAL 5 DAY),
+    'AC not working — buyer walked away, told ops to fix before relisting.',
+    DATE_SUB(UTC_TIMESTAMP(), INTERVAL 6 DAY));
+
+INSERT INTO saved_cars (user_id, listing_id, note, last_price_kobo) VALUES
   ((SELECT id FROM \`users\` WHERE phone = '+2348031234567' LIMIT 1),
    (SELECT id FROM vehicle_listings WHERE stock_no = 'HC-PH-0020' LIMIT 1),
-   'Watching this one — asking about the service history');
-
-INSERT INTO saved_searches (user_id, label, query, alerts_enabled, alert_price_drop, alert_new_match) VALUES
+   'Watching this one — asking about the service history',
+   (SELECT asking_price_kobo FROM vehicle_listings WHERE stock_no = 'HC-PH-0020' LIMIT 1)),
   ((SELECT id FROM \`users\` WHERE phone = '+2348031234567' LIMIT 1),
-   'Toyota SUVs under ₦15m', 'make=toyota&body=suv&max_price=15000000', 1, 1, 1);
+   (SELECT id FROM vehicle_listings WHERE stock_no = 'HC-PH-0069' LIMIT 1),
+   'Missed this one at the old price — watching it now',
+   (SELECT asking_price_kobo FROM vehicle_listings WHERE stock_no = 'HC-PH-0069' LIMIT 1) + 20000000);
+
+INSERT INTO saved_searches (user_id, label, query, alerts_enabled, alert_price_drop, alert_new_match, last_alerted_at) VALUES
+  ((SELECT id FROM \`users\` WHERE phone = '+2348031234567' LIMIT 1),
+   'Toyota SUVs under ₦15m', 'make=toyota&body=suv&max_price=15000000', 1, 1, 1,
+   DATE_SUB(UTC_TIMESTAMP(), INTERVAL 3 DAY));
 
 INSERT INTO service_requests (tracking_id, type, status, name, phone, brief, sla_due_at, source_path, notes) VALUES
   ('HC-2490', 'hire', 'options_ready', 'Ada Okafor', '+2348031234567',

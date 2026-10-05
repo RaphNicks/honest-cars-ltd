@@ -1,0 +1,160 @@
+<%
+/**
+ * My Listings — §7.2 “table + card views, states Draft / In review / Live /
+ * Reserved / Sold / Expired, quick actions (mark sold, edit price, add photos,
+ * bulk CSV COULD)”.
+ *
+ * The table stacks into cards on a phone; every quick action is a real form
+ * POST so the page works without JavaScript.
+ * Locals: rows, status, counts, total
+ */
+var STATUS_ORDER = ['live', 'in_review', 'reserved', 'draft', 'expired', 'sold'];
+var LEAD_STATUS_LABELS = {
+  draft: 'Draft — not submitted',
+  in_review: 'In review — with HonestCars',
+  live: 'Live — buyers can see it',
+  reserved: 'Reserved — deposit taken',
+  sold: 'Sold',
+  expired: 'Expired — hidden from search',
+};
+var canSubmit = function (row) {
+  return row.status === 'draft' && row.photos >= 3 && (row.documents.customs_verified || row.documents.registration || row.documents.duty_sighted || row.documents.tinted_permit);
+};
+%>
+
+<div class="admin-grid admin-grid--5">
+  <% STATUS_ORDER.forEach(function (key) { %>
+    <a class="kpi kpi--sm kpi--link<%= status === key ? ' is-current' : '' %>" href="/dealer/listings<%= key === 'live' ? '' : '?status=' + key %>">
+      <span class="kpi__label"><%= LEAD_STATUS_LABELS[key].split(' —')[0] %></span>
+      <strong class="kpi__value tabular"><%= counts[key] || 0 %></strong>
+      <span class="kpi__foot">of <%= total %> cars</span>
+    </a>
+  <% }); %>
+</div>
+
+<section class="panel mt-3">
+  <div class="panel__head">
+    <h2 class="panel__title"><%= status ? LEAD_STATUS_LABELS[status].split(' —')[0] : 'All stock' %></h2>
+    <div class="btn-row">
+      <% if (status) { %><a class="btn btn--ghost btn--sm" href="/dealer/listings">Show everything</a><% } %>
+      <a class="btn btn--primary btn--sm" href="/dealer/listings/new">Add a car</a>
+    </div>
+  </div>
+
+  <% if (!rows.length) { %>
+    <p class="empty-line">
+      <%= status ? 'No ' + LEAD_STATUS_LABELS[status].split(' —')[0].toLowerCase() + ' cars right now.' : 'No stock on this lot yet.' %>
+    </p>
+    <p class="mb-0"><a class="btn btn--secondary btn--sm" href="/dealer/listings/new">Add the first car</a></p>
+  <% } else { %>
+    <div class="table-scroll">
+      <table class="table table--stack dealer-listings">
+        <caption class="visually-hidden">This lot's cars, newest first within each state</caption>
+        <thead>
+          <tr>
+            <th scope="col">Car</th>
+            <th scope="col">State</th>
+            <th scope="col">Price</th>
+            <th scope="col">Interest</th>
+            <th scope="col">Quick actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% rows.forEach(function (row) { %>
+            <tr>
+              <th scope="row" class="dealer-listing__car">
+                <div class="dealer-listing__media">
+                  <% if (row.primaryImage) { %>
+                    <img src="<%= row.primaryImage %>" width="112" height="84" loading="lazy" alt="">
+                  <% } else { %>
+                    <span class="dealer-listing__blank" aria-hidden="true"><%= helpers.icon('camera', { size: 20 }) %></span>
+                  <% } %>
+                </div>
+                <div>
+                  <a class="listing-row__title" href="/dealer/listings/<%= row.id %>"><%= row.title %></a>
+                  <span class="listing-row__meta">
+                    <%= row.stockNo %> · <%= row.photos %> photo<%= row.photos === 1 ? '' : 's' %>
+                    <% if (row.grade) { %> · <span class="badge badge--grade-<%= row.grade %>"><%= helpers.GRADE_LABELS[row.grade] || row.grade %></span><% } %>
+                  </span>
+                  <% if (row.status === 'live' && row.expiresAt) { %>
+                    <span class="listing-row__meta <%= row.stale ? 'warn' : '' %>">expires <%= helpers.relativeDays(row.expiresAt).replace(' ago', '') %> from its last refresh</span>
+                  <% } %>
+                </div>
+              </th>
+
+              <td>
+                <span class="badge badge--<%= row.status %>"><%= row.status.replace(/_/g, ' ') %></span>
+                <% if (row.leadsTotal) { %><span class="listing-row__meta"><%= row.leadsTotal %> enquir<%= row.leadsTotal === 1 ? 'y' : 'ies' %></span><% } %>
+              </td>
+
+              <td class="tabular"><%= helpers.formatNaira(row.priceKobo) %></td>
+
+              <td class="tabular muted">
+                <%= row.views.toLocaleString('en-NG') %> views<br>
+                <%= row.saves %> save<%= row.saves === 1 ? '' : 's' %>
+              </td>
+
+              <td class="dealer-listing__actions">
+                <a class="btn btn--ghost btn--sm" href="/dealer/listings/<%= row.id %>">Edit</a>
+
+                <% if (canSubmit(row)) { %>
+                  <form method="post" action="/dealer/listings/<%= row.id %>/status">
+                    <input type="hidden" name="status" value="in_review">
+                    <button class="btn btn--primary btn--sm" type="submit">Send for review</button>
+                  </form>
+                <% } else if (row.status === 'draft') { %>
+                  <a class="btn btn--secondary btn--sm" href="/dealer/listings/<%= row.id %>#photos">Add photos</a>
+                <% } %>
+
+                <% if (row.status === 'live') { %>
+                  <form method="post" action="/dealer/listings/<%= row.id %>/status">
+                    <input type="hidden" name="status" value="reserved">
+                    <button class="btn btn--secondary btn--sm" type="submit">Reserved</button>
+                  </form>
+                  <form method="post" action="/dealer/listings/<%= row.id %>/status"
+                        onsubmit="return confirm('Mark <%= row.stockNo %> sold? The page stays up for a week as a sold record.')">
+                    <input type="hidden" name="status" value="sold">
+                    <button class="btn btn--secondary btn--sm" type="submit">Mark sold</button>
+                  </form>
+                <% } %>
+
+                <% if (row.status === 'reserved') { %>
+                  <form method="post" action="/dealer/listings/<%= row.id %>/status">
+                    <input type="hidden" name="status" value="live">
+                    <button class="btn btn--secondary btn--sm" type="submit">Back on sale</button>
+                  </form>
+                  <form method="post" action="/dealer/listings/<%= row.id %>/status">
+                    <input type="hidden" name="status" value="sold">
+                    <button class="btn btn--secondary btn--sm" type="submit">Mark sold</button>
+                  </form>
+                <% } %>
+
+                <% if (row.status === 'expired') { %>
+                  <form method="post" action="/dealer/listings/<%= row.id %>/status">
+                    <input type="hidden" name="status" value="draft">
+                    <button class="btn btn--secondary btn--sm" type="submit">Reopen as draft</button>
+                  </form>
+                <% } %>
+
+                <% if (row.status === 'in_review') { %>
+                  <form method="post" action="/dealer/listings/<%= row.id %>/status">
+                    <input type="hidden" name="status" value="draft">
+                    <button class="btn btn--ghost btn--sm" type="submit">Withdraw</button>
+                  </form>
+                <% } %>
+
+                <a class="btn btn--ghost btn--sm" href="<%= row.url %>" target="_blank" rel="noopener">View page</a>
+              </td>
+            </tr>
+          <% }); %>
+        </tbody>
+      </table>
+    </div>
+
+    <p class="cms-hint mt-2">
+      A car goes live only after the HonestCars team reviews it — that review is the promise that
+      makes buyers trust the listing. Bulk CSV upload is on the roadmap (FR-05); until then, add cars
+      one at a time or <a href="<%= site.nav.whatsapp.general %>" target="_blank" rel="noopener">send the desk a spreadsheet</a>.
+    </p>
+  <% } %>
+</section>

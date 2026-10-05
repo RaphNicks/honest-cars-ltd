@@ -124,6 +124,10 @@ const config = {
       request_options_ready: process.env.NOTIFY_CHANNEL || 'console',
       milestone_stage: process.env.NOTIFY_CHANNEL_PAYMENT || process.env.NOTIFY_CHANNEL || 'console',
       booking_reminder: process.env.NOTIFY_CHANNEL || 'console',
+      // FR-25 deal alerts — a nudge, not a receipt, so they follow the general
+      // channel rather than the payment one.
+      price_drop: process.env.NOTIFY_CHANNEL || 'console',
+      new_match: process.env.NOTIFY_CHANNEL || 'console',
     },
   },
 

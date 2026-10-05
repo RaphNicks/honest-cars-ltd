@@ -19,12 +19,28 @@
  * is refused something it should hold, so it can be wired into CI as-is.
  */
 
+import { clearDevCodes } from './lib/dev-codes.mjs';
+
 const BASE = (process.argv[2] || process.env.SMOKE_BASE || 'http://127.0.0.1:3000').replace(/\/$/, '');
 
-/** Seeded accounts, and the one thing each must be able to open. */
+const PAGES_ADMIN = [
+  '/admin', '/admin/listings', '/admin/leads', '/admin/concierge', '/admin/bookings',
+  '/admin/orders', '/admin/payments', '/admin/milestones', '/admin/staff', '/admin/audit',
+  '/admin/alerts',
+  '/admin/cms', '/admin/cms/pages', '/admin/cms/faqs', '/admin/cms/testimonials', '/admin/cms/modules',
+];
+
+/**
+ * Seeded accounts, and every console page each one must be able to open.
+ *
+ * `must` is exhaustive, not a sample: anything not listed is required to be
+ * refused. That is deliberate — a role that quietly gained a capability fails
+ * here — so when a module adds a screen, every role that may open it belongs in
+ * this list. (Admin was missing the CMS paths for exactly that reason.)
+ */
 const ROLES = [
-  { phone: '+2348000000001', role: 'admin', must: ['/admin', '/admin/listings', '/admin/leads', '/admin/concierge', '/admin/bookings', '/admin/orders', '/admin/payments', '/admin/milestones', '/admin/staff', '/admin/audit'] },
-  { phone: '+2348000000002', role: 'ops', must: ['/admin', '/admin/listings', '/admin/leads', '/admin/concierge', '/admin/bookings'] },
+  { phone: '+2348000000001', role: 'admin', must: PAGES_ADMIN },
+  { phone: '+2348000000002', role: 'ops', must: ['/admin', '/admin/listings', '/admin/leads', '/admin/concierge', '/admin/bookings', '/admin/alerts'] },
   { phone: '+2348000000003', role: 'inspector', must: ['/admin/jobs'] },
   { phone: '+2348000000004', role: 'finance', must: ['/admin', '/admin/orders', '/admin/payments', '/admin/milestones'] },
   { phone: '+2348000000005', role: 'marketing', must: ['/admin', '/admin/cms', '/admin/cms/pages', '/admin/cms/faqs', '/admin/cms/testimonials', '/admin/cms/modules'] },
@@ -42,8 +58,20 @@ const MUST_NOT = [
 const PAGES = [
   '/admin', '/admin/listings', '/admin/leads', '/admin/concierge', '/admin/bookings',
   '/admin/jobs', '/admin/orders', '/admin/payments', '/admin/milestones', '/admin/staff', '/admin/audit',
+  '/admin/alerts',
   '/admin/cms', '/admin/cms/pages', '/admin/cms/faqs', '/admin/cms/testimonials', '/admin/cms/modules',
 ];
+
+/**
+ * §7.2 — the dealer portal is its own surface. A partner lot opens every screen
+ * of it and none of the console; a customer opens neither.
+ */
+const DEALER_PAGES = [
+  '/dealer/dashboard', '/dealer/listings', '/dealer/listings/new',
+  '/dealer/leads', '/dealer/performance', '/dealer/billing', '/dealer/profile',
+];
+const DEALER_PHONE = '+2348000000006';
+const CUSTOMER_PHONE = '+2348031234567';
 
 const GREEN = '\u001b[32m';
 const RED = '\u001b[31m';
@@ -83,7 +111,14 @@ async function signIn(phone) {
   const client = newClient();
   const otp = await client.request('/api/auth/otp', { method: 'POST', body: { phone } });
   if (!otp.json || !otp.json.devCode) {
-    throw new Error(`No devCode for ${phone} — is AUTH_SHOW_CODE on and the site running at ${BASE}? (${otp.status})`);
+    // Two independent limits can 429 a sign-in: the per-number hourly cap
+    // (rows in auth_codes, which we cleared above) and the in-process limiter
+    // on the request IP. The second one only resets with the server, so say
+    // which it is instead of leaving a bare 429.
+    const hint = otp.status === 429
+      ? 'the in-process rate limiter has tripped — restart the dev server (or wait 15 minutes); the per-number codes were already cleared for this run'
+      : 'is AUTH_SHOW_CODE on, and is the site running?';
+    throw new Error(`No devCode for ${phone} (HTTP ${otp.status}) — ${hint}`);
   }
   const verify = await client.request('/api/auth/verify', { method: 'POST', body: { phone, code: otp.json.devCode } });
   if (verify.status !== 200) throw new Error(`Sign-in failed for ${phone}: ${verify.status} ${verify.text.slice(0, 120)}`);
@@ -100,6 +135,10 @@ function report(role, path, status, expected) {
   const note = expected ? (status === 200 ? 'open' : 'REFUSED (should open)') : (status === 200 ? 'OPEN (should be refused)' : status === 302 ? 'redirect to login' : '403');
   console.log(`  ${mark} ${label}  ${path.padEnd(24)} ${DIM}${note}${OFF}`);
 }
+
+// The 5-codes-per-number-per-hour policy counts codes already sent, so a repeat
+// run would 429 mid-sign-in. Clear this run's own numbers' spent codes first.
+await clearDevCodes([...ROLES.map((entry) => entry.phone), DEALER_PHONE, CUSTOMER_PHONE], { label: 'role' });
 
 console.log(`Role smoke matrix — ${BASE}\n`);
 
@@ -136,18 +175,41 @@ for (const entry of MUST_NOT) {
   if (leaks) failures += 0; // report() already counted each violation
 }
 
-// 4. A customer must never see a console page.
+// 4. The dealer portal (§7.2): open to its own lot, closed to the console, and
+//    the console closed to it in turn.
+const dealer = await signIn(DEALER_PHONE);
+console.log(`\n${'dealer'.padEnd(10)} ${DIM}${DEALER_PHONE}${OFF}`);
+let dealerBad = 0;
+for (const path of DEALER_PAGES) {
+  const response = await dealer.request(path);
+  if (![200, 302].includes(response.status)) dealerBad += 1;
+  report('dealer', path, response.status === 302 ? 200 : response.status, true);
+}
+for (const path of PAGES) {
+  const response = await dealer.request(path);
+  if (response.status === 200) dealerBad += 1;
+  report('dealer', path, response.status, false);
+}
+failures += dealerBad;
+
+// 5. A customer must never see a console page, and never the dealer portal.
 const customer = newClient();
-const otp = await customer.request('/api/auth/otp', { method: 'POST', body: { phone: '+2348031234567' } });
+const otp = await customer.request('/api/auth/otp', { method: 'POST', body: { phone: CUSTOMER_PHONE } });
 if (otp.json && otp.json.devCode) {
-  await customer.request('/api/auth/verify', { method: 'POST', body: { phone: '+2348031234567', code: otp.json.devCode } });
+  await customer.request('/api/auth/verify', { method: 'POST', body: { phone: CUSTOMER_PHONE, code: otp.json.devCode } });
   let leaks = 0;
   for (const path of PAGES) {
     const response = await customer.request(path);
     if (response.status === 200) leaks += 1;
   }
+  for (const path of DEALER_PAGES) {
+    const response = await customer.request(path);
+    if (response.status === 200) leaks += 1;
+  }
   failures += leaks;
-  console.log(`\n${leaks ? `${RED}✗${OFF}` : `${GREEN}✓${OFF}`} customer   ${PAGES.length} console paths refused (${leaks} leaked)`);
+  console.log(
+    `\n${leaks ? `${RED}✗${OFF}` : `${GREEN}✓${OFF}`} customer   ${PAGES.length + DEALER_PAGES.length} console + portal paths refused (${leaks} leaked)`,
+  );
 }
 
 console.log(

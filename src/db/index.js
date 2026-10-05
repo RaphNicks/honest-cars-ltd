@@ -24,6 +24,7 @@ const users = require('./users');
 const admin = require('./admin');
 const payments = require('./payments');
 const cms = require('./cms');
+const dealers = require('./dealers');
 const leads = require('./leads');
 const analytics = require('./analytics');
 const redirects = require('./redirects');
@@ -46,6 +47,7 @@ module.exports = {
   admin,
   payments,
   cms,
+  dealers,
   leads,
   analytics,
   redirects,

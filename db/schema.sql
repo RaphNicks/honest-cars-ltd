@@ -14,6 +14,43 @@ SET NAMES utf8mb4;
 SET time_zone = '+00:00';
 
 -- ---------------------------------------------------------------------------
+-- users — created first on purpose: `dealers.user_id` (the one account that
+-- runs a lot, §7.2) carries a foreign key into this table, and MySQL will not
+-- add a constraint against a table that does not exist yet.
+-- ---------------------------------------------------------------------------
+-- ---------------------------------------------------------------------------
+-- users · auth_codes · sessions — phone-first accounts (§7.1)
+--
+-- OTP login: the code is stored HMAC-SHA256 hashed and single-use; sessions are
+-- server-side and revoked by hash lookup, so a stolen cookie can be killed from
+-- the database. Saved cars/searches hang off the user; dashboard reads (requests,
+-- bookings, orders, subscriptions) are keyed by phone — the account key.
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS `users` (
+  id               INT UNSIGNED  NOT NULL AUTO_INCREMENT,
+  phone            VARCHAR(40)   NOT NULL,              -- normalised +234…
+  name             VARCHAR(120)  NULL,
+  email            VARCHAR(160)  NULL,
+  marketing_opt_in TINYINT(1)    NOT NULL DEFAULT 0,    -- NDPA: explicit, revocable
+  status           ENUM('active','blocked','deleted') NOT NULL DEFAULT 'active',
+  role             ENUM('customer','dealer','ops','inspector','marketing','finance','admin')
+                                 NOT NULL DEFAULT 'customer',   -- §7.4 role matrix
+  watchlisted      TINYINT(1)    NOT NULL DEFAULT 0,            -- admin flag (§7.3)
+  referral_code    VARCHAR(16)   NULL,              -- the holder's personal link code
+  referred_by      INT UNSIGNED  NULL,              -- who brought them here (§7.1 referrals)
+  last_seen_at     DATETIME      NULL,
+  created_at       TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at       TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  UNIQUE KEY uq_user_phone (phone),
+  UNIQUE KEY uq_user_referral_code (referral_code),
+  KEY idx_user_role (role),
+  KEY idx_user_email (email),
+  KEY idx_user_referred_by (referred_by),
+  CONSTRAINT fk_user_referrer FOREIGN KEY (referred_by) REFERENCES `users` (id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ---------------------------------------------------------------------------
 -- dealers — partner lots. Contact details are NEVER rendered publicly (§6.3,
 -- §18.3 "Dealer contact info does not appear anywhere public").
 -- ---------------------------------------------------------------------------
@@ -25,11 +62,17 @@ CREATE TABLE IF NOT EXISTS dealers (
   city              VARCHAR(80)      NOT NULL DEFAULT 'Port Harcourt',
   tier              ENUM('pilot','standard','premium') NOT NULL DEFAULT 'standard',
   verified          TINYINT(1)       NOT NULL DEFAULT 0,
+  user_id           INT UNSIGNED     NULL,                  -- §7.2 the account that owns this lot
   agreement_signed  DATE             NULL,
+  agreement_ref     VARCHAR(80)      NULL,                  -- reference on the signed agreement
+  agreement_url     VARCHAR(300)     NULL,                  -- digital copy, if ops has one
+  commission_pct    DECIMAL(4,2)     NULL,                  -- the rate on the agreement
   created_at        TIMESTAMP        NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at        TIMESTAMP        NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (id),
-  UNIQUE KEY uq_dealers_slug (slug)
+  UNIQUE KEY uq_dealers_slug (slug),
+  UNIQUE KEY uq_dealer_user (user_id),
+  CONSTRAINT fk_dealer_user FOREIGN KEY (user_id) REFERENCES `users` (id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ---------------------------------------------------------------------------
@@ -160,37 +203,6 @@ CREATE TABLE IF NOT EXISTS listing_media (
   CONSTRAINT fk_media_listing FOREIGN KEY (listing_id) REFERENCES vehicle_listings (id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- ---------------------------------------------------------------------------
--- users · auth_codes · sessions — phone-first accounts (§7.1)
---
--- OTP login: the code is stored HMAC-SHA256 hashed and single-use; sessions are
--- server-side and revoked by hash lookup, so a stolen cookie can be killed from
--- the database. Saved cars/searches hang off the user; dashboard reads (requests,
--- bookings, orders, subscriptions) are keyed by phone — the account key.
--- ---------------------------------------------------------------------------
-CREATE TABLE IF NOT EXISTS `users` (
-  id               INT UNSIGNED  NOT NULL AUTO_INCREMENT,
-  phone            VARCHAR(40)   NOT NULL,              -- normalised +234…
-  name             VARCHAR(120)  NULL,
-  email            VARCHAR(160)  NULL,
-  marketing_opt_in TINYINT(1)    NOT NULL DEFAULT 0,    -- NDPA: explicit, revocable
-  status           ENUM('active','blocked','deleted') NOT NULL DEFAULT 'active',
-  role             ENUM('customer','dealer','ops','inspector','marketing','finance','admin')
-                                 NOT NULL DEFAULT 'customer',   -- §7.4 role matrix
-  watchlisted      TINYINT(1)    NOT NULL DEFAULT 0,            -- admin flag (§7.3)
-  referral_code    VARCHAR(16)   NULL,              -- the holder's personal link code
-  referred_by      INT UNSIGNED  NULL,              -- who brought them here (§7.1 referrals)
-  last_seen_at     DATETIME      NULL,
-  created_at       TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  updated_at       TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  PRIMARY KEY (id),
-  UNIQUE KEY uq_user_phone (phone),
-  UNIQUE KEY uq_user_referral_code (referral_code),
-  KEY idx_user_role (role),
-  KEY idx_user_email (email),
-  KEY idx_user_referred_by (referred_by),
-  CONSTRAINT fk_user_referrer FOREIGN KEY (referred_by) REFERENCES `users` (id) ON DELETE SET NULL
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS `auth_codes` (
   id           INT UNSIGNED  NOT NULL AUTO_INCREMENT,
@@ -224,11 +236,15 @@ CREATE TABLE IF NOT EXISTS `sessions` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS `saved_cars` (
-  id         INT UNSIGNED NOT NULL AUTO_INCREMENT,
-  user_id    INT UNSIGNED NOT NULL,
-  listing_id INT UNSIGNED NOT NULL,
-  note       VARCHAR(200) NULL,
-  created_at TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  id               INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  user_id          INT UNSIGNED NOT NULL,
+  listing_id       INT UNSIGNED NOT NULL,
+  note             VARCHAR(200) NULL,
+  -- FR-25: the price the saver last saw, so a sweep can tell a drop from a
+  -- rise, and alert once per price rather than once per run.
+  last_price_kobo  BIGINT       NULL,
+  last_alerted_at  DATETIME     NULL,
+  created_at       TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (id),
   UNIQUE KEY uq_saved_car (user_id, listing_id),
   CONSTRAINT fk_saved_car_user FOREIGN KEY (user_id) REFERENCES `users` (id) ON DELETE CASCADE,

@@ -1,0 +1,220 @@
+<%
+/**
+ * Add a car — §7.2 “mobile-first wizard: photograph first with a guided shot
+ * list (front ¾, rear, interior, dash, odometer, engine), then the spec form,
+ * documents checklist, submit for review. Draft autosaves.”
+ *
+ * Three steps. Without JavaScript every step is on one page and the form still
+ * posts; with JavaScript the wizard walks one step at a time and keeps a
+ * localStorage draft so a dealer who loses signal does not lose the typing.
+ * Locals: shots, form, step
+ */
+var value = function (name, fallback) { return form && form[name] !== undefined ? form[name] : (fallback || ''); };
+var shots = shots || [];
+%>
+
+<form class="dealer-wizard" method="post" action="/dealer/listings" data-dealer-wizard>
+  <input type="hidden" name="step" value="<%= step %>">
+
+  <ol class="wizard-steps" data-wizard-steps>
+    <li class="wizard-steps__step" data-step="1" aria-current="true"><span class="wizard-steps__num">1</span> Photographs</li>
+    <li class="wizard-steps__step" data-step="2"><span class="wizard-steps__num">2</span> Specification</li>
+    <li class="wizard-steps__step" data-step="3"><span class="wizard-steps__num">3</span> Documents</li>
+  </ol>
+
+  <section class="panel wizard-panel" data-wizard-panel="1">
+    <div class="panel__head">
+      <h2 class="panel__title">Photograph the car before you type anything</h2>
+      <span class="cms-hint">Buyers decide in the first two pictures. Six shots, in this order, works.</span>
+    </div>
+
+    <ol class="shot-list">
+      <% shots.forEach(function (shot, index) { %>
+        <li class="shot-list__item">
+          <div class="shot-list__head">
+            <span class="shot-list__num"><%= index + 1 %></span>
+            <div>
+              <strong><%= shot[1] %></strong>
+              <p class="shot-list__hint mb-0"><%= shot[2] %></p>
+            </div>
+          </div>
+          <label class="field">
+            <span class="field__label">Photo link for this shot (optional here)</span>
+            <input class="input" type="url" inputmode="url" name="photo_<%= shot[0] %>"
+                   value="<%= value('photo_' + shot[0]) %>"
+                   placeholder="https://… or send it to the ops desk on WhatsApp">
+          </label>
+        </li>
+      <% }); %>
+    </ol>
+
+    <p class="note-inline">
+      This build stores photos by link. Take the six shots on your phone, send them to the
+      <a href="<%= site.nav.whatsapp.general %>" target="_blank" rel="noopener">ops desk on WhatsApp</a>
+      with the stock number, or paste links you already host. Photos are reviewed before the car goes live.
+    </p>
+
+    <div class="wizard-nav">
+      <button class="btn btn--primary" type="button" data-wizard-next="2">Next: the specification</button>
+    </div>
+  </section>
+
+  <section class="panel wizard-panel" data-wizard-panel="2" hidden>
+    <div class="panel__head">
+      <h2 class="panel__title">The car itself</h2>
+      <span class="cms-hint">Everything here goes on the public page. Mileage and price are the two buyers filter on.</span>
+    </div>
+
+    <div class="form-grid">
+      <label class="field">
+        <span class="field__label">Year <span aria-hidden="true">*</span></span>
+        <input class="input" type="number" name="year" min="1990" max="2027" required
+               value="<%= value('year') %>" placeholder="2016">
+      </label>
+      <label class="field">
+        <span class="field__label">Make <span aria-hidden="true">*</span></span>
+        <input class="input" type="text" name="make" maxlength="60" required
+               value="<%= value('make') %>" placeholder="Toyota">
+      </label>
+      <label class="field">
+        <span class="field__label">Model <span aria-hidden="true">*</span></span>
+        <input class="input" type="text" name="model" maxlength="80" required
+               value="<%= value('model') %>" placeholder="Camry">
+      </label>
+      <label class="field">
+        <span class="field__label">Trim</span>
+        <input class="input" type="text" name="trim" maxlength="80"
+               value="<%= value('trim') %>" placeholder="LE">
+      </label>
+
+      <label class="field">
+        <span class="field__label">Body type</span>
+        <select class="select" name="body_type">
+          <% [['sedan', 'Sedan'], ['suv', 'SUV'], ['hatchback', 'Hatchback'], ['pickup', 'Pickup'], ['bus', 'Bus'], ['coupe', 'Coupe'], ['wagon', 'Wagon'], ['van', 'Van']].forEach(function (pair) { %>
+            <option value="<%= pair[0] %>" <%= value('body_type') === pair[0] ? 'selected' : '' %>><%= pair[1] %></option>
+          <% }); %>
+        </select>
+      </label>
+      <label class="field">
+        <span class="field__label">Transmission</span>
+        <select class="select" name="transmission">
+          <option value="automatic" <%= value('transmission') === 'automatic' ? 'selected' : '' %>>Automatic</option>
+          <option value="manual" <%= value('transmission') === 'manual' ? 'selected' : '' %>>Manual</option>
+        </select>
+      </label>
+      <label class="field">
+        <span class="field__label">Fuel</span>
+        <select class="select" name="fuel_type">
+          <% [['petrol', 'Petrol'], ['diesel', 'Diesel'], ['hybrid', 'Hybrid'], ['electric', 'Electric'], ['cng', 'CNG']].forEach(function (pair) { %>
+            <option value="<%= pair[0] %>" <%= value('fuel_type') === pair[0] ? 'selected' : '' %>><%= pair[1] %></option>
+          <% }); %>
+        </select>
+      </label>
+      <label class="field">
+        <span class="field__label">Drivetrain</span>
+        <select class="select" name="drivetrain">
+          <% [['fwd', 'Front wheel drive'], ['rwd', 'Rear wheel drive'], ['awd', 'All wheel drive'], ['4wd', '4 wheel drive']].forEach(function (pair) { %>
+            <option value="<%= pair[0] %>" <%= value('drivetrain') === pair[0] ? 'selected' : '' %>><%= pair[1] %></option>
+          <% }); %>
+        </select>
+      </label>
+      <label class="field">
+        <span class="field__label">Engine</span>
+        <input class="input" type="text" name="engine_size" maxlength="20"
+               value="<%= value('engine_size') %>" placeholder="2.5L 4-cylinder">
+      </label>
+      <label class="field">
+        <span class="field__label">Exterior colour</span>
+        <input class="input" type="text" name="ext_colour" maxlength="40"
+               value="<%= value('ext_colour') %>" placeholder="Silver">
+      </label>
+
+      <label class="field">
+        <span class="field__label">Condition</span>
+        <select class="select" name="condition">
+          <option value="nigerian_used" <%= value('condition') === 'nigerian_used' ? 'selected' : '' %>>Nigerian-used</option>
+          <option value="tokunbo" <%= value('condition') === 'tokunbo' ? 'selected' : '' %>>Tokunbo (foreign-used)</option>
+          <option value="new" <%= value('condition') === 'new' ? 'selected' : '' %>>New</option>
+        </select>
+      </label>
+      <label class="field">
+        <span class="field__label">Mileage (km)</span>
+        <input class="input" type="number" name="mileage_km" min="0" max="900000"
+               value="<%= value('mileage_km') %>" placeholder="98000">
+      </label>
+      <label class="field">
+        <span class="field__label">Area in Port Harcourt</span>
+        <input class="input" type="text" name="area" maxlength="80"
+               value="<%= value('area') || 'Port Harcourt' %>" placeholder="Woji">
+      </label>
+      <label class="field">
+        <span class="field__label">Asking price (₦) <span aria-hidden="true">*</span></span>
+        <input class="input" type="text" name="asking_price" inputmode="numeric" required
+               value="<%= value('asking_price') %>" placeholder="12,500,000">
+      </label>
+      <label class="checkbox-row field--full">
+        <input type="checkbox" name="negotiable" value="1" <%= value('negotiable') ? 'checked' : '' %>>
+        <span>Price is negotiable — buyers may make an offer through HonestCars</span>
+      </label>
+      <label class="field field--full">
+        <span class="field__label">Features (comma separated)</span>
+        <input class="input" type="text" name="features" maxlength="400"
+               value="<%= value('features') %>" placeholder="Reverse camera, Leather seats, Alloy wheels">
+      </label>
+      <label class="field field--full">
+        <span class="field__label">Description</span>
+        <textarea class="textarea" name="description" rows="4" maxlength="4000"
+                  placeholder="What the car is, what it has, and anything a buyer should know before they come."><%= value('description') %></textarea>
+      </label>
+      <label class="field field--full">
+        <span class="field__label">Honest note — the faults, stated plainly</span>
+        <textarea class="textarea" name="honest_note" rows="3" maxlength="1000"
+                  placeholder="Every car has something. Name it here: a scuff, a worn seat, a part replaced. It is the reason buyers trust this lot."><%= value('honest_note') %></textarea>
+      </label>
+    </div>
+
+    <div class="wizard-nav">
+      <button class="btn btn--ghost" type="button" data-wizard-prev="1">Back</button>
+      <button class="btn btn--primary" type="button" data-wizard-next="3">Next: documents</button>
+    </div>
+  </section>
+
+  <section class="panel wizard-panel" data-wizard-panel="3" hidden>
+    <div class="panel__head">
+      <h2 class="panel__title">Documents — tick what you have sighted</h2>
+      <span class="cms-hint">At least one tick is required before the car can go for review.</span>
+    </div>
+
+    <div class="check-grid">
+      <% [
+        ['customs_verified', 'Customs papers verified', 'Import duty paid — sighted, not promised'],
+        ['registration', 'Registration / plate', 'Current papers in the seller’s name'],
+        ['duty_sighted', 'Duty papers sighted', 'A copy is with the lot'],
+        ['tinted_permit', 'Tinted-glass permit', 'Where applicable'],
+      ].forEach(function (row) { %>
+        <label class="check-tap">
+          <input type="checkbox" name="<%= row[0] %>" value="1" <%= value(row[0]) ? 'checked' : '' %>>
+          <span>
+            <strong><%= row[1] %></strong>
+            <span class="muted"><%= row[2] %></span>
+          </span>
+        </label>
+      <% }); %>
+    </div>
+
+    <p class="note-inline">
+      The car is saved as a <strong>draft</strong> first. Send it for review from its own page once the
+      photographs are attached — the HonestCars team checks the listing, the photos and the documents
+      before it appears in search.
+    </p>
+
+    <div class="wizard-nav">
+      <button class="btn btn--ghost" type="button" data-wizard-prev="2">Back</button>
+      <button class="btn btn--primary" type="submit">Save the draft</button>
+    </div>
+  </section>
+
+  <p class="cms-hint wizard-autosave" data-autosave-note>
+    Draft saves on this device as you type. Nothing is sent to HonestCars until you press “Save the draft”.
+  </p>
+</form>

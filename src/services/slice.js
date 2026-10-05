@@ -6,10 +6,10 @@
  * This build ships the whole public storefront (design system, homepage,
  * /cars, the VDP, the service suite, both funnels, hire, the blog, the shop,
  * every trust/company/legal page), the customer account interior (§7.1), the
- * operations console (§7.3/§7.4) and the money seam — orders, payments,
- * receipts, refunds, the dealer ledger, escrow milestones and the inspection
- * report PDF. What remains is the dealer portal (§7.2) and the admin CMS and
- * market-intel screens.
+ * operations console (§7.3/§7.4), the dealer partner portal (§7.2) and the
+ * money seam — orders, payments, receipts, refunds, the dealer ledger, escrow
+ * milestones and the inspection report PDF. What remains is the market-intel
+ * screens (§7.3).
  *
  * The console paths listed here are protected: an anonymous request to them
  * redirects to /login, so check-links only follows the ones it can reach
@@ -62,7 +62,14 @@ const BUILT = [
   { path: '/account', label: 'Account dashboard + login (§7.1)' },
   { path: '/account/receipts/{reference}', label: 'Payment receipt (§7.3)' },
   { path: '/account/reports/{reference}', label: 'Inspection report (FR-07)' },
-  { path: '/dealer', label: 'Dealer portal entry page (interior is phase 2)' },
+  { path: '/dealer', label: 'Dealer portal entry (§7.2)' },
+  { path: '/dealer/dashboard', label: 'Dealer: dashboard (§7.2)' },
+  { path: '/dealer/listings', label: 'Dealer: my listings (§7.2)' },
+  { path: '/dealer/listings/new', label: 'Dealer: add a car wizard (§7.2)' },
+  { path: '/dealer/leads', label: 'Dealer: leads inbox (§7.2)' },
+  { path: '/dealer/performance', label: 'Dealer: performance (§7.2)' },
+  { path: '/dealer/billing', label: 'Dealer: commission & billing (§7.2)' },
+  { path: '/dealer/profile', label: 'Dealer: profile & agreement (§7.2)' },
   { path: '/admin/cms', label: 'Admin: content workflow + revisions (§7.3/§7.4)' },
   { path: '/admin/cms/posts/{id}', label: 'Admin: post editor + workflow' },
   { path: '/admin/cms/pages', label: 'Admin: CMS pages (§6.10)' },
@@ -79,10 +86,6 @@ const BUILT = [
  * orders, subscriptions, leads, analytics_events).
  */
 const PENDING = [
-  { path: '/dealer/dashboard', label: 'Dealer portal: dashboard (§7.2)', phase: 'phase-2' },
-  { path: '/dealer/listings', label: 'Dealer portal: my listings (§7.2)', phase: 'phase-2' },
-  { path: '/dealer/listings/new', label: 'Dealer portal: add listing wizard (§7.2)', phase: 'phase-2' },
-  { path: '/dealer/leads', label: 'Dealer portal: leads & viewings (§7.2)', phase: 'phase-2' },
   { path: '/admin/intel', label: 'Admin: market intel + reports (§7.3)', phase: 'phase-2' },
 ];
 
@@ -99,14 +102,9 @@ function pendingRouteFor(pathname) {
     if (clean === route.path) return route;
   }
 
-  // The money screens are built and capability-gated, so an unknown path under
-  // /admin is now a genuine 404 rather than a promised-but-missing screen.
-  for (const prefix of ['/dealer/']) {
-    if (clean.startsWith(prefix) && clean.length > prefix.length) {
-      const match = PENDING.find((r) => r.path.startsWith(prefix));
-      if (match) return match;
-    }
-  }
+  // Every /admin and /dealer screen is built and capability-gated, so an
+  // unknown path under either is now a genuine 404 rather than a promised-but-
+  // missing screen.
 
   return null;
 }

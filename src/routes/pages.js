@@ -13,7 +13,7 @@
  *   GET /guide          evergreen shelf — start-here reading path
  *   GET /partner        B2B dealer recruitment + packages
  *   GET /terms /privacy /refunds /disclaimer   CMS-driven legal pages
- *   GET /dealer                               phase-2 entry stub, noindex
+ *   GET /dealer                               §7.2 dealer portal — routes/dealer.js
  *   GET /admin                                §7.3 console — routes/admin.js
  *   GET /account /login                       §7.1 — served by routes/account.js
  */
@@ -467,49 +467,10 @@ for (const slug of LEGAL_SLUGS) {
 }
 
 // ---------------------------------------------------------------------------
-// Account / portal entry points — §7.1 and §7.2 interiors are phase 2.
+// Account / portal entry points — §7.1 lives in routes/account.js, the §7.2
+// dealer portal in routes/dealer.js, and the §7.3 console in routes/admin.js.
+// Nothing is stubbed here any more.
 // ---------------------------------------------------------------------------
-const PORTALS = {
-  '/dealer': {
-    view: 'portal-stub',
-    title: 'Dealer portal',
-    heading: 'The dealer portal is the phase-2 build',
-    copy:
-      'Live listings, lead routing, expiring-stock alerts and commission summaries are specified in §7.2 and land in phase 2. Until then, stock and leads are managed by the ops desk — message us and a human answers.',
-    metaDescription:
-      'The dealer portal — live listings, lead routing and commission summaries — is the phase-2 build. Until then the ops desk manages stock and leads by hand.',
-    icon: 'store',
-    ctaLabel: 'Talk to the ops desk',
-    secondLabel: 'See dealer packages',
-    secondHref: '/partner',
-  },
-};
-
-for (const [path, portal] of Object.entries(PORTALS)) {
-  router.get(path, async (req, res, next) => {
-    try {
-      return await sendPage(req, res, {
-        routePath: path,
-        view: portal.view,
-        cache: CACHE.private,
-        page: {
-          title: portal.title,
-          metaTitle: portal.title,
-          titleSuffix: true,
-          description: portal.metaDescription || portal.copy,
-          canonical: path,
-          robots: 'noindex,nofollow',
-          breadcrumbs: [{ label: portal.title }],
-          bodyClass: 'page-portal',
-          jsonLd: [],
-        },
-        data: { portal, trail: [{ label: portal.title }] },
-      });
-    } catch (error) {
-      return next(error);
-    }
-  });
-}
 
 module.exports = {
   router,

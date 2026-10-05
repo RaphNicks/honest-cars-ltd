@@ -1,0 +1,96 @@
+<%
+/**
+ * Leads inbox — §7.2 “enquiries on his listings, phone masked or full per
+ * policy, car ref, message, status must be updatable (contacted / viewing /
+ * sold / lost) — feeds the admin pipeline”.
+ *
+ * The number is shown in full to the lot the enquiry was about, because they
+ * have to be able to call the buyer back. Ops see the same lead in /admin/leads.
+ * Locals: rows, status, counts, statuses, total, shift
+ */
+var STAGE_LABELS = { new: 'New', contacted: 'Contacted', viewing: 'Viewing arranged', closed: 'Closed', lost: 'Lost' };
+var STAGE_COPY = {
+  new: 'Nobody has answered yet',
+  contacted: 'The buyer has heard from the lot',
+  viewing: 'A viewing is arranged',
+  closed: 'This one became a deal',
+  lost: 'Answered, but it did not go anywhere',
+};
+var STAGE_ORDER = ['new', 'contacted', 'viewing', 'closed', 'lost'];
+%>
+
+<div class="admin-grid admin-grid--5">
+  <% STAGE_ORDER.forEach(function (key) { %>
+    <a class="kpi kpi--sm kpi--link<%= status === key ? ' is-current' : '' %>" href="/dealer/leads<%= key === 'new' ? '' : '?status=' + key %>">
+      <span class="kpi__label"><%= STAGE_LABELS[key] %></span>
+      <strong class="kpi__value tabular"><%= counts[key] || 0 %></strong>
+      <span class="kpi__foot"><%= STAGE_COPY[key] %></span>
+    </a>
+  <% }); %>
+</div>
+
+<section class="panel mt-3">
+  <div class="panel__head">
+    <h2 class="panel__title"><%= status ? STAGE_LABELS[status] + ' enquiries' : 'Every enquiry' %></h2>
+    <div class="btn-row">
+      <% if (status) { %><a class="btn btn--ghost btn--sm" href="/dealer/leads">Show everything</a><% } %>
+      <span class="cms-hint"><%= total %> in total · answer inside <%= shift %> hours</span>
+    </div>
+  </div>
+
+  <% if (!rows.length) { %>
+    <p class="empty-line">
+      <%= status ? 'Nothing in ' + STAGE_LABELS[status].toLowerCase() + ' right now.' : 'No enquiries yet. They arrive here the moment a buyer sends one from a car page.' %>
+    </p>
+  <% } else { %>
+    <ul class="lead-list">
+      <% rows.forEach(function (row) { %>
+        <li class="lead-row">
+          <div class="lead-row__head">
+            <div>
+              <h3 class="lead-row__title"><%= row.name %></h3>
+              <p class="lead-row__meta mb-0">
+                <span class="badge badge--<%= row.status === 'viewing' ? 'viewings' : row.status %>"><%= STAGE_LABELS[row.status] || row.status %></span>
+                <%= helpers.relativeDays(row.createdAt) %>
+                <% if (row.listing) { %>
+                  · on <a href="/dealer/listings/<%= row.listing.id %>"><%= row.listing.title %></a>
+                  <span class="muted">(<%= row.listing.stockNo %>)</span>
+                <% } %>
+              </p>
+            </div>
+            <div class="lead-row__links">
+              <a class="btn btn--secondary btn--sm" href="tel:<%= row.phone %>">Call <%= row.phoneMasked %></a>
+              <a class="btn btn--ghost btn--sm" href="<%= helpers.whatsappLink('Hello ' + row.name + ', this is about ' + (row.listing ? row.listing.stockNo : 'your enquiry') + ' on honestcarsltd.com.', 'dealer_lead_' + row.id) %>"
+                 target="_blank" rel="noopener" data-event="whatsapp_click" data-source="dealer_leads">WhatsApp</a>
+            </div>
+          </div>
+
+          <p class="lead-row__message"><%= row.message %></p>
+
+          <% if (row.lostReason) { %>
+            <p class="note-inline">Lost: <%= row.lostReason %></p>
+          <% } %>
+
+          <form class="lead-row__actions" method="post" action="/dealer/leads/<%= row.id %>">
+            <label class="visually-hidden" for="lead-status-<%= row.id %>">Move this enquiry</label>
+            <select class="select select--compact" id="lead-status-<%= row.id %>" name="status">
+              <% statuses.forEach(function (value) { %>
+                <option value="<%= value %>" <%= row.status === value ? 'selected' : '' %>><%= STAGE_LABELS[value] || value %></option>
+              <% }); %>
+            </select>
+            <label class="visually-hidden" for="lead-reason-<%= row.id %>">Reason, if lost</label>
+            <input class="input" type="text" id="lead-reason-<%= row.id %>" name="lost_reason" maxlength="200"
+                   placeholder="If lost: why? (funding, price, went quiet)">
+            <button class="btn btn--primary btn--sm" type="submit">Update</button>
+          </form>
+        </li>
+      <% }); %>
+    </ul>
+  <% } %>
+</section>
+
+<p class="muted mt-3">
+  Every change here shows up in the HonestCars ops pipeline too, so the desk and the lot
+  never tell a buyer two different things. Marking a lead lost needs the reason — it is read,
+  and it is how the network learns.
+</p>

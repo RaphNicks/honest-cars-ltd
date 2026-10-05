@@ -18,9 +18,9 @@
 
   <header class="admin-bar">
     <div class="admin-bar__inner">
-      <a class="admin-bar__brand" href="/admin">
+      <a class="admin-bar__brand" href="<%= admin.brandHref || '/admin' %>">
         <span class="admin-bar__mark">HC</span>
-        <span class="admin-bar__name">Console</span>
+        <span class="admin-bar__name"><%= admin.brandName || 'Console' %></span>
       </a>
 
       <nav class="admin-bar__nav" aria-label="Console sections">
@@ -68,13 +68,24 @@
 
   <footer class="admin-foot">
     <div class="admin-main__inner">
-      <p class="mb-0">
-        Honest Cars console · §7.3 modules · every sensitive action is written to the
-        <a href="/admin/audit">audit log</a>. Customer pages are at <a href="/">honestcarsltd.com</a>.
-      </p>
+      <% if (admin.dealer) { %>
+        <p class="mb-0">
+          Honest Cars dealer portal · §7.2 · your stock, your enquiries and your statements.
+          A car goes live after the <a href="/verification">HonestCars team</a> reviews it.
+          Customer pages are at <a href="/">honestcarsltd.com</a>.
+        </p>
+      <% } else { %>
+        <p class="mb-0">
+          Honest Cars console · §7.3 modules · every sensitive action is written to the
+          <a href="/admin/audit">audit log</a>. Customer pages are at <a href="/">honestcarsltd.com</a>.
+        </p>
+      <% } %>
     </div>
   </footer>
 
   <script type="module" src="/js/admin.js"></script>
+  <% if ((page.bodyClass || '').includes('page-dealer')) { %>
+    <script type="module" src="/js/dealer.js"></script>
+  <% } %>
 </body>
 </html>

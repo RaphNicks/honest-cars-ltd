@@ -10,12 +10,20 @@
  * non-zero if any expectation fails.
  */
 
+import { clearDevCodes } from './lib/dev-codes.mjs';
+
 const BASE = process.argv[2] || process.env.SMOKE_BASE_URL || 'http://127.0.0.1:3000';
 
 const STAFF = {
   marketing: '+2348000000005',  // Content Desk (§7.4 → cms.manage)
   admin: '+2348000000001',
 };
+const OPS_PHONE = '+2348000000002';
+const CUSTOMER_PHONE = '+2348031234567';
+
+// Repeat runs would otherwise 429 on the 5-codes-per-number-per-hour policy and
+// look like a broken CMS. Clear this run's own spent codes first.
+await clearDevCodes([...Object.values(STAFF), OPS_PHONE, CUSTOMER_PHONE], { label: 'CMS' });
 
 let failures = 0;
 let checks = 0;
@@ -68,10 +76,14 @@ async function signIn(phone, cookies) {
   if (!code) {
     // Most often the OTP rate limit, which is the app doing its job — say so
     // rather than letting every later check fail as a mysterious 302.
-    throw new Error(
-      `could not sign in ${phone}: ${payload.error || JSON.stringify(payload).slice(0, 200)} ` +
-      '(if this is the OTP rate limit, wait a few minutes and run again)',
-    );
+    // Two independent limits can 429 a sign-in: the per-number hourly cap
+    // (rows in auth_codes, which we cleared above) and the in-process limiter
+    // on the request IP. The second one only resets with the server, so say
+    // which it is instead of leaving a bare 429.
+    const hint = otp.status === 429
+      ? 'the in-process rate limiter has tripped — restart the dev server (or wait 15 minutes); the per-number codes were already cleared for this run'
+      : 'is AUTH_SHOW_CODE on, and is the site running?';
+    throw new Error(`No devCode for ${phone} (HTTP ${otp.status}) — ${hint}`);
   }
   await request('/api/auth/verify', { method: 'POST', form: { phone, code }, cookies });
 }
@@ -89,9 +101,9 @@ async function main() {
   assert([302, 403].includes(anonRes.status), 'signed-out visitor cannot open the CMS', `HTTP ${anonRes.status}`);
 
   const customer = jar();
-  const otp = await request('/api/auth/otp', { method: 'POST', form: { phone: '+2348031234567' }, cookies: customer });
+  const otp = await request('/api/auth/otp', { method: 'POST', form: { phone: CUSTOMER_PHONE }, cookies: customer });
   const customerCode = (await otp.json()).devCode;
-  await request('/api/auth/verify', { method: 'POST', form: { phone: '+2348031234567', code: customerCode }, cookies: customer });
+  await request('/api/auth/verify', { method: 'POST', form: { phone: CUSTOMER_PHONE, code: customerCode }, cookies: customer });
   const customerRes = await request('/admin/cms', { cookies: customer });
   assert(customerRes.status === 403, 'signed-in customer gets the honest 403', `HTTP ${customerRes.status}`);
 
@@ -104,7 +116,7 @@ async function main() {
   assert(hubHtml.includes('In review') && hubHtml.includes('Scheduled'), 'all four workflow columns are present');
 
   const ops = jar();
-  await signIn('+2348000000002', ops);
+  await signIn(OPS_PHONE, ops);
   const opsRes = await request('/admin/cms', { cookies: ops });
   assert(opsRes.status === 403, 'ops role cannot open the CMS (role matrix holds)', `HTTP ${opsRes.status}`);
 

@@ -1,0 +1,158 @@
+<%#
+  /admin/alerts — FR-25 deal alerts.
+  What is being watched, what a run would say, and every message the watch has
+  produced. The run button is the same code path as `npm run alerts`, so ops can
+  either wire a cron or press the button — and the dry run exists so nobody has
+  to guess what a send would do.
+  Locals: watch, recent, maxPerRun
+%>
+<%
+  var pendingDrops = watch.cars.filter(function (car) { return car.pendingDrop > 0; });
+  var sent = recent.filter(function (row) { return row.status === 'sent'; }).length;
+  var skipped = recent.filter(function (row) { return row.status === 'skipped'; }).length;
+%>
+
+<div class="admin-grid admin-grid--4">
+  <div class="kpi kpi--sm">
+    <span class="kpi__label">Cars watched</span>
+    <strong class="kpi__value tabular"><%= watch.cars.length %></strong>
+    <span class="kpi__foot">saving a car records the price seen</span>
+  </div>
+  <div class="kpi kpi--sm">
+    <span class="kpi__label">Searches watched</span>
+    <strong class="kpi__value tabular"><%= watch.searches.filter(function (s) { return s.alertsEnabled && s.newMatch; }).length %></strong>
+    <span class="kpi__foot">of <%= watch.searches.length %> saved</span>
+  </div>
+  <div class="kpi kpi--sm">
+    <span class="kpi__label">Drops waiting</span>
+    <strong class="kpi__value tabular"><%= pendingDrops.length %></strong>
+    <span class="kpi__foot"><%= pendingDrops.length ? 'the next run will alert these' : 'nothing below its baseline' %></span>
+  </div>
+  <div class="kpi kpi--sm">
+    <span class="kpi__label">Alerts sent</span>
+    <strong class="kpi__value tabular"><%= sent %></strong>
+    <span class="kpi__foot"><%= skipped ? skipped + ' skipped — no provider for the channel' : 'last ' + recent.length + ' messages' %></span>
+  </div>
+</div>
+
+<section class="panel">
+  <div class="panel__head">
+    <h2 class="panel__title">Run the watch</h2>
+    <span class="cms-hint">Same code as <code>npm run alerts</code> — safe to run twice; a drop alerts once per price.</span>
+  </div>
+  <div class="admin-actions">
+    <form method="post" action="/admin/alerts/run" class="admin-actions__group">
+      <button class="btn btn--secondary" type="submit">Dry run</button>
+      <input type="hidden" name="dry_run" value="1">
+      <span class="muted">report only — writes nothing, sends nothing</span>
+    </form>
+    <form method="post" action="/admin/alerts/run" class="admin-actions__group"
+          onsubmit="return confirm('Send every alert this run finds. Continue?')">
+      <button class="btn btn--primary" type="submit">Run and send</button>
+      <span class="muted">up to <%= maxPerRun %> messages per run</span>
+    </form>
+  </div>
+</section>
+
+<div class="admin-grid admin-grid--2 mt-3">
+  <section class="panel">
+    <h2 class="panel__title">Saved cars watching a price</h2>
+    <% if (!watch.cars.length) { %>
+      <p class="empty-line">Nobody has saved a car yet.</p>
+    <% } else { %>
+      <table class="table table--stack">
+        <thead>
+          <tr><th scope="col">Customer</th><th scope="col">Car</th><th scope="col">Watching</th><th scope="col">Now</th></tr>
+        </thead>
+        <tbody>
+          <% watch.cars.forEach(function (car) { %>
+            <tr>
+              <th scope="row">
+                <%= car.userName || 'Customer' %>
+                <br><span class="muted tabular"><%= helpers.esc(String(car.phone || '').replace(/(\d{4})\d{3}(\d{4})/, '$1•••$2')) %></span>
+              </th>
+              <td>
+                <a href="<%= car.listing.url %>"><%= car.listing.title %></a>
+                <% if (!car.listing.live) { %><br><span class="badge badge--pending"><%= car.listing.status %></span><% } %>
+              </td>
+              <td class="tabular"><%= car.baselineKobo === null ? '—' : helpers.formatNaira(car.baselineKobo) %></td>
+              <td class="tabular">
+                <%= helpers.formatNaira(car.listing.priceKobo) %>
+                <% if (car.pendingDrop > 0) { %>
+                  <br><span class="cms-flag">↓ <%= helpers.formatNaira(car.pendingDrop) %> since</span>
+                <% } %>
+              </td>
+            </tr>
+          <% }); %>
+        </tbody>
+      </table>
+    <% } %>
+  </section>
+
+  <section class="panel">
+    <h2 class="panel__title">Saved searches watching new stock</h2>
+    <% if (!watch.searches.length) { %>
+      <p class="empty-line">Nobody has saved a search yet.</p>
+    <% } else { %>
+      <table class="table table--stack">
+        <thead>
+          <tr><th scope="col">Customer</th><th scope="col">Search</th><th scope="col">Switches</th><th scope="col">Alerted</th></tr>
+        </thead>
+        <tbody>
+          <% watch.searches.forEach(function (search) { %>
+            <tr>
+              <th scope="row"><%= search.userName || 'Customer' %></th>
+              <td>
+                <a href="<%= search.url %>"><%= search.label %></a>
+                <br><code class="cms-hint"><%= search.query %></code>
+              </td>
+              <td>
+                <span class="badge badge--<%= search.priceDrop ? 'active' : 'pending' %>">price</span>
+                <span class="badge badge--<%= search.newMatch ? 'active' : 'pending' %>">new</span>
+              </td>
+              <td class="muted tabular">
+                <%= search.lastAlertedAt ? new Date(search.lastAlertedAt).toLocaleString('en-NG', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : 'never' %>
+              </td>
+            </tr>
+          <% }); %>
+        </tbody>
+      </table>
+    <% } %>
+  </section>
+</div>
+
+<section class="panel" style="margin-top: var(--space-3);">
+  <h2 class="panel__title">Alert messages</h2>
+  <p class="cms-hint">
+    Alerts are ordinary notifications: recorded with their text whatever happens. A skipped one means no provider is
+    configured for that channel — the text is here to send by hand from the WhatsApp link.
+  </p>
+  <% if (!recent.length) { %>
+    <p class="empty-line">No alert has been sent yet.</p>
+  <% } else { %>
+    <table class="table table--stack">
+      <thead>
+        <tr><th scope="col">When</th><th scope="col">Template</th><th scope="col">To</th><th scope="col">Message</th><th scope="col">State</th></tr>
+      </thead>
+      <tbody>
+        <% recent.forEach(function (row) { %>
+          <tr>
+            <td class="tabular muted"><%= new Date(row.created_at).toLocaleString('en-NG', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) %></td>
+            <td><%= row.template %></td>
+            <td class="tabular"><%= helpers.esc(String(row.recipient || '').replace(/(\d{4})\d{3}(\d{4})/, '$1•••$2')) %></td>
+            <td>
+              <%= row.body %>
+              <% if (row.status === 'skipped' || row.status === 'failed') { %>
+                <br><a class="cms-hint" href="<%= helpers.whatsappLink(row.body, row.recipient) %>" target="_blank" rel="noopener">Send on WhatsApp →</a>
+              <% } %>
+            </td>
+            <td>
+              <span class="badge badge--<%= row.status === 'sent' ? 'active' : 'pending' %>"><%= row.status %></span>
+              <% if (row.error) { %><br><span class="cms-hint"><%= row.error %></span><% } %>
+            </td>
+          </tr>
+        <% }); %>
+      </tbody>
+    </table>
+  <% } %>
+</section>

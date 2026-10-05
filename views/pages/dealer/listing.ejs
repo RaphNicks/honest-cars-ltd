@@ -1,0 +1,191 @@
+<%
+/**
+ * One listing, from the dealer's side — §7.2 quick actions (mark sold, edit
+ * price, add photos), the documents checklist, and the review state.
+ *
+ * The state machine is `rules` (src/db/dealers.js DEALER_STATUS_RULES): a
+ * dealer submits, ops publishes, the dealer can mark reserved or sold. Nothing
+ * here can put a car live on its own.
+ * Locals: listing, shots, rules
+ */
+var moves = rules[listing.status] || null;
+var media = listing.media || [];
+var docs = listing.documents || {};
+var docRows = [
+  ['customs_verified', 'Customs papers verified'],
+  ['registration', 'Registration / plate'],
+  ['duty_sighted', 'Duty papers sighted'],
+  ['tinted_permit', 'Tinted-glass permit'],
+];
+var moveLabels = {
+  in_review: 'Send for review',
+  draft: 'Withdraw to draft',
+  reserved: 'Mark reserved',
+  sold: 'Mark sold',
+  live: 'Back on sale',
+};
+%>
+
+<section class="panel">
+  <div class="panel__head">
+    <div>
+      <h2 class="panel__title"><%= listing.title %></h2>
+      <p class="muted mb-0">
+        <span class="badge badge--<%= listing.status %>"><%= listing.status.replace(/_/g, ' ') %></span>
+        <%= listing.stockNo %> · <%= listing.area %> · <%= helpers.formatMileage(listing.mileageKm) %>
+        <% if (listing.grade) { %> · <span class="badge badge--grade-<%= listing.grade %>"><%= helpers.GRADE_LABELS[listing.grade] || listing.grade %></span><% } %>
+      </p>
+    </div>
+    <div class="btn-row">
+      <a class="btn btn--ghost btn--sm" href="<%= listing.url %>" target="_blank" rel="noopener">View public page</a>
+      <a class="btn btn--ghost btn--sm" href="/dealer/listings">All listings</a>
+    </div>
+  </div>
+
+  <div class="dealer-photos">
+    <% if (!media.length) { %>
+      <p class="empty-line">No photographs yet. A car cannot go for review without at least three — buyers will not bid on a car they cannot see.</p>
+    <% } else { %>
+      <ul class="dealer-photos__strip">
+        <% media.forEach(function (photo) { %>
+          <li class="dealer-photos__item">
+            <img src="<%= photo.url %>" width="160" height="120" loading="lazy" alt="<%= photo.alt_text || listing.title %>">
+            <form method="post" action="/dealer/listings/<%= listing.id %>/photos" class="dealer-photos__remove">
+              <input type="hidden" name="action" value="remove">
+              <input type="hidden" name="media_id" value="<%= photo.id %>">
+              <button class="btn btn--ghost btn--sm" type="submit"
+                      aria-label="Remove photo <%= photo.position + 1 %>">Remove</button>
+            </form>
+            <% if (photo.shot_label) { %><span class="dealer-photos__label"><%= photo.shot_label %></span><% } %>
+          </li>
+        <% }); %>
+      </ul>
+    <% } %>
+  </div>
+
+  <div class="admin-actions mt-2">
+    <% if (listing.status === 'live' || listing.status === 'reserved') { %>
+      <form method="post" action="/dealer/listings/<%= listing.id %>/fresh" class="admin-actions__group">
+        <button class="btn btn--secondary btn--sm" type="submit">Still available — confirm</button>
+        <span class="muted">restarts the freshness clock (<%= listing.refreshedAt ? 'last confirmed ' + helpers.relativeDays(listing.refreshedAt) : 'never confirmed' %>)</span>
+      </form>
+    <% } %>
+
+    <% if (moves) { Object.keys(moves).forEach(function (to) { %>
+      <form method="post" action="/dealer/listings/<%= listing.id %>/status" class="admin-actions__group"
+            <%= to === 'sold' ? 'onsubmit="return confirm(\'Mark this car sold?\')"' : '' %>>
+        <input type="hidden" name="status" value="<%= to %>">
+        <button class="btn <%= to === 'sold' ? 'btn--secondary' : 'btn--primary' %> btn--sm" type="submit"><%= moveLabels[to] || to %></button>
+      </form>
+    <% }); } %>
+  </div>
+
+  <% if (listing.status === 'in_review') { %>
+    <p class="note-inline">With the HonestCars team for review. Most listings clear the same working day — you will see the state change here.</p>
+  <% } %>
+  <% if (listing.moderateNote) { %>
+    <p class="note-inline warn">Note from the review: <%= listing.moderateNote %></p>
+  <% } %>
+  <% if (listing.status === 'expired') { %>
+    <p class="note-inline warn">This listing expired — buyers stopped seeing it. Reopen it as a draft, confirm the price and it can go back up.</p>
+  <% } %>
+</section>
+
+<div class="admin-grid admin-grid--2 mt-3">
+  <section class="panel">
+    <div class="panel__head">
+      <h2 class="panel__title">Price, mileage and copy</h2>
+      <span class="cms-hint">Saving a new price tells everyone watching this car, on the next alert run.</span>
+    </div>
+
+    <form method="post" action="/dealer/listings/<%= listing.id %>">
+      <div class="form-grid">
+        <label class="field">
+          <span class="field__label">Asking price (₦)</span>
+          <input class="input" type="text" name="asking_price" inputmode="numeric" required
+                 value="<%= helpers.koboToNaira(listing.priceKobo) %>">
+        </label>
+        <label class="field">
+          <span class="field__label">Mileage (km)</span>
+          <input class="input" type="number" name="mileage_km" min="0" max="900000" value="<%= listing.mileageKm %>">
+        </label>
+        <label class="field">
+          <span class="field__label">Area</span>
+          <input class="input" type="text" name="area" maxlength="80" value="<%= listing.area %>">
+        </label>
+        <label class="field">
+          <span class="field__label">Exterior colour</span>
+          <input class="input" type="text" name="ext_colour" maxlength="40" value="<%= listing.extColour %>">
+        </label>
+        <label class="checkbox-row field--full">
+          <input type="checkbox" name="negotiable" value="1" <%= listing.negotiable ? 'checked' : '' %>>
+          <span>Price is negotiable</span>
+        </label>
+        <label class="field field--full">
+          <span class="field__label">Description</span>
+          <textarea class="textarea" name="description" rows="4" maxlength="4000"><%= listing.description %></textarea>
+        </label>
+        <label class="field field--full">
+          <span class="field__label">Honest note</span>
+          <textarea class="textarea" name="honest_note" rows="3" maxlength="1000"><%= listing.honestNote %></textarea>
+        </label>
+
+        <fieldset class="field--full">
+          <legend class="field__label">Documents sighted</legend>
+          <div class="check-grid">
+            <% docRows.forEach(function (row) { %>
+              <label class="check-tap">
+                <input type="checkbox" name="<%= row[0] %>" value="1" <%= docs[row[0]] ? 'checked' : '' %>>
+                <span><%= row[1] %></span>
+              </label>
+            <% }); %>
+          </div>
+        </fieldset>
+      </div>
+
+      <button class="btn btn--primary mt-2" type="submit">Save changes</button>
+    </form>
+  </section>
+
+  <section class="panel" id="photos">
+    <div class="panel__head">
+      <h2 class="panel__title">Add a photograph</h2>
+      <span class="cms-hint"><%= media.length %> on this listing · at least 3 before review</span>
+    </div>
+
+    <form method="post" action="/dealer/listings/<%= listing.id %>/photos">
+      <input type="hidden" name="action" value="add">
+      <div class="form-grid">
+        <label class="field field--full">
+          <span class="field__label">Photo link</span>
+          <input class="input" type="text" name="url" required placeholder="https://… or /img/cars/…">
+        </label>
+        <label class="field">
+          <span class="field__label">Which shot is it?</span>
+          <select class="select" name="shot">
+            <option value="">Not sure</option>
+            <% shots.forEach(function (shot) { %>
+              <option value="<%= shot[1] %>"><%= shot[1] %></option>
+            <% }); %>
+          </select>
+        </label>
+        <label class="field">
+          <span class="field__label">Alt text (for screen readers)</span>
+          <input class="input" type="text" name="alt" maxlength="200" value="<%= listing.title %>">
+        </label>
+      </div>
+      <button class="btn btn--secondary btn--sm mt-2" type="submit">Add photo</button>
+    </form>
+
+    <ol class="shot-reminder">
+      <% shots.forEach(function (shot) { %>
+        <li><strong><%= shot[1] %></strong> — <%= shot[2] %></li>
+      <% }); %>
+    </ol>
+    <p class="cms-hint">
+      Photographs by link in this build. Snap the six shots on the phone and
+      <a href="<%= site.nav.whatsapp.general %>" target="_blank" rel="noopener">send them to the desk</a>
+      with <%= listing.stockNo %> if hosting them is the slow part.
+    </p>
+  </section>
+</div>

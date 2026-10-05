@@ -40,6 +40,10 @@ const TEMPLATES = {
     `${reference}: ${amount} moved to “${stage.replace(/_/g, ' ')}”. You can see the full stage list any time — nothing is released without your confirmation.`,
   booking_reminder: ({ reference, when }) =>
     `Reminder: inspection ${reference} is booked for ${when}. If that no longer works, reply here and we will move it.`,
+  // FR-25 — the alert composer builds the whole sentence (it has the old and new
+  // price, or the matched cars), and these templates carry it verbatim.
+  price_drop: ({ body }) => body,
+  new_match: ({ body }) => body,
 };
 
 function render(template, values = {}) {

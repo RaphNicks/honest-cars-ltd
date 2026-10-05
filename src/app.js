@@ -27,6 +27,7 @@ const { router: authRoutes } = require('./routes/auth');
 const { router: accountRoutes } = require('./routes/account');
 const { router: adminRoutes } = require('./routes/admin');
 const { router: adminCmsRoutes } = require('./routes/admin-cms');
+const { router: dealerRoutes } = require('./routes/dealer');
 const auth = require('./services/auth');
 const publish = require('./services/publish');
 const og = require('./services/og');
@@ -131,6 +132,9 @@ function createApp() {
   // so the old "phase 2" stub for /admin can never shadow it.
   app.use('/admin/cms', adminCmsRoutes);
   app.use('/admin', adminRoutes);
+  // §7.2 dealer portal. Mounted before the marketing pages so /dealer is the
+  // portal, not the phase-2 stub it used to be.
+  app.use('/dealer', dealerRoutes);
   app.use('/api', apiRoutes);
   app.use('/services', serviceRoutes);
   app.use('/', flowRoutes);
