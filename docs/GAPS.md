@@ -6,8 +6,8 @@ integrations §11, NFRs §12, sitemap §5.1, acceptance §18.3).
 Line references below point at the code that exists. Where an item is missing, the
 note says what "done" would mean, so the work can be scoped without re-reading the PRD.
 
-**Status at `8df6be9`:** FR-01 – FR-27 are built and verified except the five noted
-below. Everything remaining falls into three buckets: buildable here, blocked on a
+**Status at `406f87a`:** FR-19 is built (see the commit for what it renders). FR-01 –
+FR-27 are otherwise built and verified except the four noted below. Everything remaining falls into three buckets: buildable here, blocked on a
 third-party account, and infrastructure that has no home in this sandbox.
 
 ---
@@ -18,7 +18,6 @@ No external account needed. These are real gaps against the PRD.
 
 | ID | Requirement | What is actually there | What "done" means |
 |---|---|---|---|
-| FR-19 | Concierge options page — auto-rendered comparison from listing data (§7.3) | Ops attach ranked candidates with notes (`request_candidates`, `src/db/admin.js`), and the pipeline has an `options_ready` stage — but nothing renders them to the customer. `/concierge-status` shows the brief and the stage only. | A customer-facing options page/PDF at the status route: the attached cars as cards, side by side on the comparison rows, shareable link, WhatsApp hand-off. |
 | FR-20 | Tracking subscriptions — activation checklist, renewal reminders, online renewals (§7.3) | `subscriptions` rows are created from tracker orders and listed on `/account` with `renewal_at` (`views/pages/account.ejs`). | A renewal path: reminder notifications before `renewal_at`, a renew action that opens a payment, and an admin screen listing upcoming/overdue renewals. |
 | FR-22 | Hire management — pool registry, calendar, booking records (§7.3) | Public `/hire` quotes per class (`hire_classes`); a hire enquiry lands in the leads inbox. No pool, no availability, no hire-specific records. | Admin registry of hireable vehicles, an availability calendar, and hire bookings distinct from service requests. |
 | FR-28 | Referral module — links, attribution, reward status (§7.1) | `referral_code` + `referred_by` exist (`users`), a link and code render on `/account`, and sign-up records the referrer. | Attribution reporting (who came from whom) and a reward status per referral. |
