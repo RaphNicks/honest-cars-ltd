@@ -36,6 +36,9 @@ function nextPhone() {
 
 /** Accounts created by this run — removed again in test.after so the dev DB stays tidy. */
 const createdRequests = new Set();
+/** Leads opened while creating those requests. Their phone is anonymised with the
+ *  account, so they are remembered by id rather than swept by number. */
+const createdLeadIds = new Set();
 const createdPhones = new Set();
 
 /** Cookie-aware fetch: keeps hc_session between calls, manual redirects. */
@@ -125,6 +128,10 @@ test.after(async () => {
       if (createdRequests.size) {
         const requestMarks = [...createdRequests].map(() => '?').join(',');
         await db.query(`DELETE FROM service_requests WHERE tracking_id IN (${requestMarks})`, [...createdRequests]);
+      }
+      if (createdLeadIds.size) {
+        const leadMarks = [...createdLeadIds].map(() => '?').join(',');
+        await db.query(`DELETE FROM leads WHERE id IN (${leadMarks})`, [...createdLeadIds]);
       }
       await db.query(`DELETE FROM auth_codes WHERE phone IN (${marks})`, shapes);
       await db.query(`DELETE FROM \`users\` WHERE phone IN (${marks})`, shapes);
@@ -529,10 +536,12 @@ maybe('closing an account deletes the person and anonymises the paperwork', asyn
     method: 'POST',
     body: { type: 'concierge', name: 'Delete Me', phone, brief: { budget: '5-8m' } },
   });
-  // Closing the account rewrites this row's phone to DELETED-…, so the
-  // phone-keyed sweep in test.after can no longer match it. Remember it by
-  // tracking id and remove it there by name.
+  // Closing the account rewrites these rows' phones to DELETED-…, so the
+  // phone-keyed sweep in test.after can no longer match them. Remember both by
+  // identity — the request by tracking id, the lead it opened by id.
   createdRequests.add(request.json.trackingId);
+  const lead = await db.queryOne('SELECT id FROM leads WHERE phone = ? ORDER BY id DESC LIMIT 1', [normalised]);
+  if (lead) createdLeadIds.add(lead.id);
 
   const withoutConfirm = await client.request('/api/account/delete', { method: 'POST', body: { confirm: 'yes' } });
   assert.equal(withoutConfirm.json.ok, false, 'deletion needs the typed confirmation');

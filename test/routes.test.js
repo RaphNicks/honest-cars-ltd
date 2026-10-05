@@ -42,7 +42,18 @@ test.before(async () => {
 
 test.after(async () => {
   if (ctx) await ctx.close();
-  if (available) await require('../src/db').pool.end();
+  if (available) {
+    const db = require('../src/db');
+    // The suite posts one enquiry through the public form to prove it lands in
+    // the CRM inbox. It is a fixture, not a customer, so it goes back out again
+    // rather than sitting in the console for the next person who opens it.
+    const { variants } = require('../src/lib/phone');
+    const shapes = variants('08030000000');
+    const marks = shapes.map(() => '?').join(',');
+    await db.query(`DELETE FROM leads WHERE phone IN (${marks})`, shapes);
+    await db.query(`DELETE FROM notifications WHERE recipient IN (${marks})`, shapes);
+    await db.pool.end();
+  }
 });
 
 maybe('homepage renders the hero, the trust chips and the live feed', async () => {
