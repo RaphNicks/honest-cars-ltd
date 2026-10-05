@@ -57,6 +57,41 @@
           <p class="field__hint mb-0">Wrong on any line? Reply on WhatsApp and we update it before the search continues.</p>
         </div>
 
+        <% if (retainer) { %>
+          <div class="card card__body">
+            <h2 class="mb-1">Your retainer</h2>
+            <p class="reference-big mb-1"><%= helpers.formatNaira(retainer.amountKobo) %></p>
+            <p class="mb-2">
+              <span class="badge badge--<%= retainerState ? retainerState.tone : 'ghost' %>">
+                <span class="badge__dot" aria-hidden="true"></span><%= retainerState ? retainerState.label : retainer.status %>
+              </span>
+            </p>
+            <p class="mb-2"><%= retainerState ? retainerState.blurb : '' %></p>
+            <dl class="summary-list">
+              <div class="summary-list__row">
+                <dt>Reference</dt>
+                <dd><%= retainer.reference %></dd>
+              </div>
+              <div class="summary-list__row">
+                <dt>Raised</dt>
+                <dd><%= helpers.relativeDays(retainer.createdAt) %></dd>
+              </div>
+              <% if (retainer.refundKobo) { %>
+                <div class="summary-list__row">
+                  <dt>Refunded</dt>
+                  <dd><%= helpers.formatNaira(retainer.refundKobo) %><%= retainer.refundReason ? ' — ' + retainer.refundReason : '' %></dd>
+                </div>
+              <% } %>
+            </dl>
+            <% if (retainer.status === 'pending' || retainer.status === 'failed' || retainer.status === 'abandoned') { %>
+              <p class="field__hint mb-0">
+                Pay by bank transfer quoting <strong><%= retainer.reference %></strong>, then reply on WhatsApp with the
+                receipt. Ops confirms it by hand — and the search is already running.
+              </p>
+            <% } %>
+          </div>
+        <% } %>
+
         <div class="card card__body">
           <h2 class="mb-1">Talk to the team</h2>
           <p class="mb-2">Quote your tracking ID when you message — it saves you repeating the brief.</p>

@@ -241,6 +241,9 @@ export function initFlows(root = document) {
         name,
         phone,
         brief,
+        // The key, not the price: the server prices the retainer from its own
+        // SLA card (services/concierge.js), so the two can never disagree.
+        sla: slaInput ? slaInput.value : undefined,
         slaHours: slaInput ? Number(slaInput.dataset.slaHours) : undefined,
         sourcePath: location.pathname,
       });

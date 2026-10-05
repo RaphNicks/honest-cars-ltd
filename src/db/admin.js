@@ -670,6 +670,15 @@ function shapePipelineRequest(row) {
     assignedTo: row.assigned_to,
     assigneeName: row.assignee_name || null,
     candidateCount: Number(row.candidate_count || 0),
+    // §6.5: ops needs to see whether the retainer has landed before they spend
+    // a search on the brief, so the pipeline carries it on every card.
+    retainer: row.retainer_status
+      ? {
+          status: row.retainer_status,
+          amountKobo: Number(row.retainer_kobo || 0),
+          reference: row.retainer_reference || null,
+        }
+      : null,
     slaDueAt: row.sla_due_at,
     slaHoursLeft: row.sla_due_at ? Math.round((new Date(row.sla_due_at).getTime() - Date.now()) / 3_600_000) : null,
     createdAt: row.created_at,
@@ -681,7 +690,10 @@ function shapePipelineRequest(row) {
 async function pipelineBoard({ type = 'concierge' } = {}) {
   const rows = await query(
     `SELECT r.*, u.name AS assignee_name,
-            (SELECT COUNT(*) FROM request_candidates c WHERE c.request_id = r.id) AS candidate_count
+            (SELECT COUNT(*) FROM request_candidates c WHERE c.request_id = r.id) AS candidate_count,
+            (SELECT p.status FROM payments p WHERE p.request_id = r.id AND p.purpose = 'retainer' ORDER BY p.id DESC LIMIT 1) AS retainer_status,
+            (SELECT p.amount_kobo FROM payments p WHERE p.request_id = r.id AND p.purpose = 'retainer' ORDER BY p.id DESC LIMIT 1) AS retainer_kobo,
+            (SELECT p.reference FROM payments p WHERE p.request_id = r.id AND p.purpose = 'retainer' ORDER BY p.id DESC LIMIT 1) AS retainer_reference
        FROM service_requests r
        LEFT JOIN \`users\` u ON u.id = r.assigned_to
       WHERE (? IS NULL OR r.type = ?)
@@ -696,7 +708,10 @@ async function pipelineBoard({ type = 'concierge' } = {}) {
 async function requestById(id) {
   const row = await queryOne(
     `SELECT r.*, u.name AS assignee_name,
-            (SELECT COUNT(*) FROM request_candidates c WHERE c.request_id = r.id) AS candidate_count
+            (SELECT COUNT(*) FROM request_candidates c WHERE c.request_id = r.id) AS candidate_count,
+            (SELECT p.status FROM payments p WHERE p.request_id = r.id AND p.purpose = 'retainer' ORDER BY p.id DESC LIMIT 1) AS retainer_status,
+            (SELECT p.amount_kobo FROM payments p WHERE p.request_id = r.id AND p.purpose = 'retainer' ORDER BY p.id DESC LIMIT 1) AS retainer_kobo,
+            (SELECT p.reference FROM payments p WHERE p.request_id = r.id AND p.purpose = 'retainer' ORDER BY p.id DESC LIMIT 1) AS retainer_reference
        FROM service_requests r LEFT JOIN \`users\` u ON u.id = r.assigned_to WHERE r.id = ? LIMIT 1`,
     [id],
   );

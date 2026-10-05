@@ -83,6 +83,12 @@ router.get('/concierge/:trackingId', async (req, res, next) => {
     const stages = db.requests.STATUS_STAGES.filter((stage) => stage.key !== 'lost');
     const trail = [{ label: 'Find My Car', href: '/find-my-car' }, { label: request.trackingId }];
 
+    // §6.5 promises what happens to the retainer, so the page states where it
+    // actually stands rather than assuming it was paid.
+    const payments = await db.payments.paymentsForRequest(request.id);
+    const retainer = payments.find((payment) => payment.purpose === 'retainer') || null;
+    const retainerState = retainer ? db.payments.RETAINER_STATES[retainer.status] || null : null;
+
     return await sendPage(req, res, {
       routePath: `/concierge/${request.trackingId}`,
       view: 'concierge-status',
@@ -98,7 +104,7 @@ router.get('/concierge/:trackingId', async (req, res, next) => {
         bodyClass: 'page-concierge-status',
         jsonLd: [],
       },
-      data: { request, stages, trail },
+      data: { request, stages, trail, retainer, retainerState },
     });
   } catch (error) {
     next(error);

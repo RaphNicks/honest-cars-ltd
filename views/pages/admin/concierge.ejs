@@ -40,6 +40,12 @@
               <p class="board-card__meta">
                 <span class="chip"><%= row.type %></span>
                 <% if (row.candidateCount) { %><span class="chip"><%= row.candidateCount %> car<%= row.candidateCount === 1 ? '' : 's' %></span><% } %>
+                <%# §6.5: the retainer decides whether the search is funded — show it on the card. %>
+                <% if (row.retainer) { %>
+                  <span class="badge badge--<%= ({ paid: 'ok', refunded: 'draft', partially_refunded: 'draft', failed: 'lost', abandoned: 'lost' })[row.retainer.status] || 'pending' %>">
+                    retainer <%= row.retainer.status.replace(/_/g, ' ') %>
+                  </span>
+                <% } %>
               </p>
               <% if (row.budget) { %><p class="board-card__meta">Budget: <strong><%= row.budget %></strong></p><% } %>
               <p class="board-card__meta">
@@ -96,6 +102,9 @@
         </p>
       </div>
       <a class="btn btn--ghost btn--sm" href="/concierge/<%= focus.trackingId %>" target="_blank" rel="noopener">Buyer’s status page</a>
+      <% if (focus.retainer) { %>
+        <a class="btn btn--ghost btn--sm" href="/admin/payments?q=<%= focus.retainer.reference %>">Retainer <%= focus.retainer.status %></a>
+      <% } %>
     </div>
 
     <h3 class="mb-1">The brief</h3>

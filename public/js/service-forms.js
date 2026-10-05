@@ -14,6 +14,9 @@ import { track } from './events.js';
 
 const PHONE_RE = /^[+()\d\s-]{7,20}$/;
 
+/** Kobo → "₦50,000". Same shape as the other client modules' local formatter. */
+const naira = (kobo) => `₦${(Number(kobo || 0) / 100).toLocaleString('en-NG')}`;
+
 function readForm(form) {
   const values = Object.fromEntries(new FormData(form).entries());
   // Chip groups are buttons, not inputs — read them off their aria-pressed state.
@@ -204,6 +207,29 @@ export function renderSuccess(container, { kind, serviceSlug, result }) {
   const reference = result.trackingId || result.reference || null;
   const isRequest = Boolean(result.trackingId);
 
+  // §6.5 step 4: the retainer is raised with the brief, so the success screen
+  // shows what to pay against — a checkout link when a PSP is configured, bank
+  // transfer instructions when it is not. Never "we will send you a link".
+  const retainer = result.retainer || null;
+  const retainerBlock = retainer
+    ? `
+      <div class="card card__body mt-2">
+        <h4 class="mb-1">Your retainer</h4>
+        <p class="mb-1">
+          <strong>${naira(retainer.amountKobo)}</strong> — credited against the success fee if you buy
+          through us, refunded in full if we find nothing that meets your brief.
+        </p>
+        <p class="reference-chip">Pay against: <strong>${retainer.reference}</strong></p>
+        ${
+          retainer.hosted && retainer.checkoutUrl
+            ? `<a class="btn btn--primary" href="${retainer.checkoutUrl}" rel="noopener">Pay the retainer</a>`
+            : `<p class="field__hint mb-0">No card provider is connected in this build, so pay by bank transfer
+                 using the reference above and reply on WhatsApp with the receipt. Ops confirms it and the
+                 search starts immediately — nobody waits on the money.</p>`
+        }
+      </div>`
+    : '';
+
   if (kind === 'contact') {
     container.innerHTML = `
       <h3 class="mb-0">Message received</h3>
@@ -230,8 +256,11 @@ export function renderSuccess(container, { kind, serviceSlug, result }) {
     <ul class="tick-list">
       <li class="tick-list__yes">We reply on WhatsApp — usually within minutes</li>
       ${isRequest ? '<li class="tick-list__yes">Three verified options in 48–72 hours</li>' : '<li class="tick-list__yes">Inspector or rep details sent before the appointment</li>'}
-      <li class="tick-list__yes">No payment is taken here${isRequest ? ' — the retainer is settled after the brief is confirmed' : ''}</li>
+      ${retainer
+        ? '<li class="tick-list__yes">Retainer quoted up front — nothing hidden in the success fee</li>'
+        : `<li class="tick-list__yes">No payment is taken here${isRequest ? ' — the retainer is settled after the brief is confirmed' : ''}</li>`}
     </ul>
+    ${retainerBlock}
     <div class="btn-row">
       ${wa ? `<a class="btn btn--primary" href="${wa}" target="_blank" rel="noopener" data-event="whatsapp_click" data-source="form_success">Continue on WhatsApp</a>` : ''}
       ${isRequest && reference ? `<a class="btn btn--secondary" href="/concierge/${reference}">Track this request</a>` : ''}

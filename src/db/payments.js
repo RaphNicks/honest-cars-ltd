@@ -27,6 +27,45 @@ const phones = require('../lib/phone');
 const PROVIDERS = ['manual', 'paystack', 'flutterwave', 'bank_transfer', 'cash'];
 const PURPOSES = ['order', 'booking', 'retainer', 'subscription', 'milestone', 'other'];
 const PAYMENT_STATUSES = ['pending', 'paid', 'failed', 'abandoned', 'refunded', 'partially_refunded'];
+
+/**
+ * The retainer's status in the customer's words (§6.5). The status page shows
+ * this, never the database enum — "pending" tells a buyer nothing about
+ * whether their money is safe or what happens next.
+ */
+const RETAINER_STATES = {
+  pending: {
+    tone: 'reserved',
+    label: 'Awaiting payment',
+    blurb:
+      'Your brief is live and the reference below is ready. Send the transfer and reply on WhatsApp with the receipt — ops confirms it by hand. It is credited against the success fee when you buy through us, and refunded in full if we find nothing that meets the brief.',
+  },
+  paid: {
+    tone: 'certified',
+    label: 'Received',
+    blurb: 'Credited against the success fee when you buy through us, and refundable in full if we find nothing that meets your brief.',
+  },
+  failed: {
+    tone: 'ghost',
+    label: 'Payment failed',
+    blurb: 'Nothing was taken. You can pay again with the same reference, or ask ops to re-check it.',
+  },
+  abandoned: {
+    tone: 'ghost',
+    label: 'Checkout abandoned',
+    blurb: 'Nothing was taken. Pay with the same reference whenever you are ready — the search is not waiting on it.',
+  },
+  refunded: {
+    tone: 'network_listed',
+    label: 'Refunded in full',
+    blurb: 'Returned to you because we could not find options that met the brief, or because you asked us to stop.',
+  },
+  partially_refunded: {
+    tone: 'network_listed',
+    label: 'Partly refunded',
+    blurb: 'Part of the retainer has been returned — the refund line in your receipt says how much and why.',
+  },
+};
 const MILESTONE_STAGES = ['funds_received', 'inspection_passed', 'documents_verified', 'released'];
 const MILESTONE_KINDS = ['protected_purchase', 'parts_escrow'];
 const ORDER_STATUSES = ['pending_payment', 'paid', 'processing', 'fulfilled', 'cancelled'];
@@ -126,6 +165,18 @@ async function paymentById(id) {
     [id],
   );
   return shapePayment(row);
+}
+
+/**
+ * Payments raised against one service request — in practice the §6.5 retainer.
+ * The status page states what has actually happened to the money, so it reads
+ * the rows rather than assuming.
+ */
+async function paymentsForRequest(requestId) {
+  const id = Number(requestId);
+  if (!id) return [];
+  const rows = await query('SELECT * FROM `payments` WHERE request_id = ? ORDER BY created_at DESC, id DESC', [id]);
+  return rows.map(shapePayment);
 }
 
 async function paymentByReference(reference) {
@@ -877,6 +928,7 @@ async function recordAudit({ actorId = null, action, entity, entityId = null, de
 module.exports = {
   PROVIDERS,
   PURPOSES,
+  RETAINER_STATES,
   PAYMENT_STATUSES,
   PAYMENT_EVENT_TYPES: ['payment.created', 'payment.paid', 'payment.failed', 'payment.abandoned', 'payment.refunded'],
   MILESTONE_STAGES,
@@ -886,6 +938,7 @@ module.exports = {
   createPayment,
   paymentById,
   paymentByReference,
+  paymentsForRequest,
   receipt,
   listPayments,
   recordPaymentEvent,

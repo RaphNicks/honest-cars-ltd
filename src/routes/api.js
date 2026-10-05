@@ -21,6 +21,7 @@ const rateLimit = require('../lib/rate-limit');
 const db = require('../db');
 const config = require('../config');
 const paymentService = require('../services/payments');
+const concierge = require('../services/concierge');
 const events = require('../services/events');
 const validate = require('../services/validate');
 const seo = require('../services/seo');
@@ -149,14 +150,43 @@ router.post('/service-requests', rateLimit({ windowMs: 60_000, max: 10 }), async
     if (body.serviceSlug) brief.service = validate.text(body.serviceSlug, 80);
     if (body.notes) brief.notes = validate.text(body.notes, 400);
 
+    // §6.5: the concierge retainer comes from the published SLA card, never
+    // from the request body — a client cannot name its own price.
+    const sla = rule.type === 'concierge' ? concierge.slaOption(body.sla) : null;
+    if (sla) brief.sla = sla.key;
+
     const request = await db.requests.createRequest({
       type: rule.type,
       name,
       phone,
       brief,
       sourcePath: validate.text(body.sourcePath || req.get('referer') || '/', 200),
-      slaHours: validate.slaHours(body.slaHours, rule.slaHours),
+      slaHours: sla ? sla.hours : validate.slaHours(body.slaHours, rule.slaHours),
     });
+
+    // The retainer is raised with the brief, not after it: the customer leaves
+    // with a reference to pay against. Without PSP keys `initiate` returns
+    // hosted:false and the honest bank-transfer instructions instead of a
+    // checkout link — the same rule the rest of the money code follows.
+    let retainer = null;
+    if (sla) {
+      const raised = await paymentService.initiate({
+        purpose: 'retainer',
+        amountKobo: sla.retainerKobo,
+        requestId: request.id,
+        customerName: name,
+        customerPhone: phone,
+      });
+      if (raised.ok) {
+        retainer = {
+          reference: raised.reference,
+          amountKobo: sla.retainerKobo,
+          slaKey: sla.key,
+          hosted: Boolean(raised.hosted),
+          checkoutUrl: raised.checkoutUrl || null,
+        };
+      }
+    }
 
     await db.leads.createLead({
       type: rule.leadType,
@@ -183,6 +213,7 @@ router.post('/service-requests', rateLimit({ windowMs: 60_000, max: 10 }), async
       status: request.status,
       url: request.url,
       slaDueAt: request.slaDueAt,
+      retainer,
       whatsappUrl: `https://wa.me/${config.business.whatsapp}?text=${opsText}`,
     });
   } catch (error) {
