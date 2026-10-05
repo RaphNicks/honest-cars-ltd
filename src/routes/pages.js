@@ -49,19 +49,19 @@ const CATCHES = [
     tag: 'Flood',
     title: 'Clean outside, silt inside',
     copy: 'A 2018 SUV with gleaming paint. Seat rails and the spare-wheel well told the real story: water line marks and fine silt. Recorded, photographed and priced out of the deal.',
-    image: '/img/seed/suv-interior.svg',
+    image: '/img/site/catch-flood.jpg',
   },
   {
     tag: 'Odometer',
     title: '62,000 km on a ten-year-old car',
     copy: 'The service book stopped in 2019 at 96,000 km. Pedal rubbers, driver’s seat bolster and tyre dates all agreed with the book, not the dashboard.',
-    image: '/img/seed/sedan-dash.svg',
+    image: '/img/site/catch-odometer.jpg',
   },
   {
     tag: 'Documents',
     title: 'Duty paper that did not match the VIN',
     copy: 'Customs paperwork looked official. One character in the VIN did not match the chassis plate. The registration would have failed months later — with the buyer holding the loss.',
-    image: '/img/seed/van-dash.svg',
+    image: '/img/blog/customs-papers-explained.jpg',
   },
 ];
 

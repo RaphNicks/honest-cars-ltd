@@ -115,7 +115,8 @@
       <% catches.forEach(function (item) { %>
         <article class="catch-card">
           <div class="catch-card__media">
-            <img src="<%= item.image %>" alt="Placeholder for a condition photo: <%= helpers.esc(item.title) %>"
+            <img src="<%= item.image %>" alt="<%= helpers.esc(item.title) %> — illustrative condition photo"
+                 <% if (helpers.srcsetFor(item.image)) { %>srcset="<%= helpers.srcsetFor(item.image) %>" sizes="(min-width: 1024px) 380px, 92vw"<% } %>
                  width="1200" height="900" loading="lazy" decoding="async">
           </div>
           <span class="catch-card__tag"><%= item.tag %></span>
@@ -125,8 +126,8 @@
       <% }); %>
     </div>
     <p class="field__hint mt-2">
-      Photos are placeholders in this build. On the live site each catch links to the actual listing photos
-      with the fault circled.
+      Illustrative photography. On the live site each catch links to the actual listing photos with the
+      fault circled.
     </p>
   </div>
 </section>

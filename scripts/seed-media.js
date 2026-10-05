@@ -174,8 +174,7 @@ const HIRE_PHOTOS = {
   pickup: '/img/cars/toyota-hilux-silver.jpg',
   luxury: '/img/cars/toyota-prado-white.jpg',
   'executive-corporate': '/img/cars/mercedes-eclass-grey.jpg',
-  // `bus` has no honest match in the library yet, so it stays unset rather
-  // than putting a saloon on a 14-seater's card.
+  bus: '/img/hire/bus.jpg',
 };
 
 /**
