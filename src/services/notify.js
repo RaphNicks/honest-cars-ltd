@@ -24,12 +24,15 @@ const db = require('../db');
  * Wording is deliberately plain: it is read on a phone, in traffic.
  */
 const TEMPLATES = {
+  // The reference is what the customer quotes back at us, so it belongs in the
+  // sentence — but a missing one must never print as "null" at someone. Each of
+  // these drops the clause rather than the value.
   payment_request: ({ amount, reference }) =>
-    `To pay ${amount} for ${reference}: transfer to the Honest Cars account and send us the receipt, or ask for a card link. We will confirm the moment it lands.`,
+    `To pay ${amount}${reference ? ` for ${reference}` : ''}: transfer to the Honest Cars account and send us the receipt, or ask for a card link. We will confirm the moment it lands.`,
   payment_receipt: ({ amount, reference }) =>
-    `Payment received — thank you. ${amount} against ${reference}. Your receipt is in your account at honestcarsltd.com/account. Nothing else is owed on this.`,
+    `Payment received — thank you. ${amount}${reference ? ` against ${reference}` : ''}. Your receipt is in your account at honestcarsltd.com/account. Nothing else is owed on this.`,
   payment_refunded: ({ amount, reference, reason }) =>
-    `Refund processed: ${amount} on ${reference}${reason ? ` (${reason})` : ''}. It lands back on the same account you paid from, and can take up to 5 working days.`,
+    `Refund processed: ${amount}${reference ? ` on ${reference}` : ''}${reason ? ` (${reason})` : ''}. It lands back on the same account you paid from, and can take up to 5 working days.`,
   booking_dispatched: ({ reference, when, inspector }) =>
     `Your inspection ${reference} is booked for ${when}. ${inspector ? `${inspector} is your inspector. ` : ''}He will call before arriving.`,
   booking_completed: ({ reference }) =>

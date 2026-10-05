@@ -325,7 +325,9 @@ async function refund(paymentId, { amountKobo = null, reason, actorId }) {
     template: 'payment_refunded',
     entity: 'payment',
     entityId: paymentId,
-    values: { amountKobo: result.amountKobo, reason },
+    // The reference belongs in the message: "₦65,000 on undefined" is what a
+    // customer gets without it, and the refund is the one they will query.
+    values: { amountKobo: result.amountKobo, reference: result.payment ? result.payment.reference : null, reason },
     recipient: null,
     createdBy: actorId,
   });
