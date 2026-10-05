@@ -193,7 +193,12 @@ CREATE TABLE IF NOT EXISTS listing_media (
   listing_id    INT UNSIGNED  NOT NULL,
   type          ENUM('image','video','360') NOT NULL DEFAULT 'image',
   shot_label    VARCHAR(60)   NOT NULL,                      -- 'Front three-quarter'
+  -- Video only (§13.2): the tap-to-load label states what the tap costs, so
+  -- duration and size are stored rather than estimated at render time.
+  duration_seconds SMALLINT UNSIGNED NULL,
+  size_bytes       INT UNSIGNED      NULL,
   url           VARCHAR(400)  NOT NULL,
+  poster_url    VARCHAR(400)  NULL,                          -- video only: the still behind the play button
   alt_text      VARCHAR(300)  NOT NULL,                      -- auto-composed (§14.2), editable
   position      TINYINT       NOT NULL DEFAULT 0,
   width         SMALLINT      NULL,

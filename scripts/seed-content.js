@@ -767,6 +767,7 @@ const POST_BODIES = {
         'You want a platform with fewer miles on Nigerian roads, which matters for suspension.',
         'You are buying a grade you can verify before shipping, not after — an [import inspection](/services/inspection) or a [research brief](/services/research) does that.',
       ] },
+      { type: 'video', src: '/video/flood-damage-check.mp4', title: 'Spotting flood damage before you pay', caption: 'Where water leaves a mark on an imported car — and why sellers clean two of the three. 10 seconds, no sound.' },
       { type: 'heading', text: 'Where Nigerian-used wins' },
       { type: 'checklist', items: [
         'Papers are already clean and registered in Nigeria.',
@@ -793,6 +794,7 @@ const POST_BODIES = {
         'Windscreen: original glass with a manufacturer date before the car’s build year is a tell.',
         'Tyre dates: four tyres stamped years apart suggest replacements driven by distance — the same quick read we do on every [field inspection](/services/inspection).',
       ] },
+      { type: 'video', src: '/video/odometer-check.mp4', title: 'Two odometer checks anyone can do', caption: 'The wear test and the service-record cross-check, shown on a real Port Harcourt car. 10 seconds, no sound.' },
       { type: 'callout', tone: 'amber', title: 'The two tricks that survive all of the above', text: 'A worn interior can be swapped from a scrap car, and a service book can be forged entirely. If the numbers only come from the book and the interior, get an OBD2 read — the ECU keeps its own distance in most modern cars, and that is the number a seller cannot reach.' },
       { type: 'heading', text: 'What it costs you when you miss it' },
       { type: 'paragraph', text: 'A 60,000 km car priced against a 140,000 km one typically carries a ₦1.5m–₦3m premium. That is the size of the bet you are making when you take the number on trust. Every [car in the listings](/cars) shows its grade openly, and the ones we have physically checked say so.' },
@@ -857,6 +859,52 @@ const POST_BODIES = {
     ],
   },
 
+  'first-car-under-10m-port-harcourt': {
+    serviceCta: 'inspection',
+    metaTitle: 'Your first car under ₦10m in Port Harcourt',
+    metaDescription: 'What ₦6m–₦10m actually buys in PH right now, the four cars we would shortlist, and the three costs nobody puts on the windscreen.',
+    authorBio: 'Ada George is HonestCars’ market analyst. She prices every car we list against live Port Harcourt transactions.',
+    body: [
+      { type: 'paragraph', text: 'A first car in Port Harcourt is bought against three prices, not one: the car, the fuel, and the repairs the last owner deferred. Under ₦10m the third one decides whether you bought well. Here is what we see moving in that band — and you can [browse the sedans under ₦10m live](/cars/sedan-under-10m).' },
+      { type: 'heading', text: 'What ₦6m–₦10m buys this month' },
+      { type: 'table', head: ['Band', 'What it buys', 'What to expect'], rows: [
+        ['₦6m–₦7.5m', '2010–2013 Corolla, Civic, Elantra', 'Usually 150,000 km-plus. Budget ₦400k for suspension and tyres in year one.'],
+        ['₦7.5m–₦9m', '2013–2016 Camry, Corolla, Sonata', 'The sweet spot: still serviceable, parts everywhere on Aba Road.'],
+        ['₦9m–₦10m', '2014–2017 small SUVs, clean sedans', 'Check tyres and battery first — they are the usual reason the price is here.'],
+      ] },
+      { type: 'callout', tone: 'green', title: 'The four we would shortlist', text: 'Corolla 1.8, Camry 2.5, Elantra 1.8, and the CR-V 2.4 if you need the space. All four have parts on every street in PH and a mechanic who has seen a hundred of them.' },
+      { type: 'heading', text: 'The three costs nobody puts on the windscreen' },
+      { type: 'checklist', items: [
+        'Transfer and papers: ₦150k–₦300k if the customs documents are clean, and a refusal if they are not.',
+        'Insurance and tracker: ₦120k a year for comprehensive, plus installation if you want the tracker on day one.',
+        'The first service: whoever sold it did not do this for you. Assume filters, oil, plugs and a battery test.',
+      ] },
+      { type: 'heading', text: 'How to buy it without guessing' },
+      { type: 'paragraph', text: 'Book an [inspection](/services/inspection) before money moves. We read the ECU, check the papers against the chassis, and put a written verdict in your hands — the same one that decides whether the car appears in [our listings](/cars) at all.' },
+    ],
+  },
+
+  'inspection-walkaround-video': {
+    serviceCta: 'inspection',
+    metaTitle: 'Watch a HonestCars inspection, start to finish',
+    metaDescription: 'Twelve seconds of the 45-minute checklist every car goes through before it reaches you, plus what each step is looking for.',
+    authorBio: 'Raph Nicks leads HonestCars inspections in Port Harcourt and has written the checklist every inspector works to.',
+    body: [
+      { type: 'paragraph', text: 'Every car on this site has been through the same 45-minute checklist. This is the short version — no narration, no music, just the steps, in order, on a real Port Harcourt car.' },
+      { type: 'video', src: '/video/inspection-walkaround.mp4', title: 'The 45-minute inspection, in 12 seconds', caption: 'Silent clip, 12 seconds. Nothing loads until you press play.' },
+      { type: 'heading', text: 'What the inspector is doing at each step' },
+      { type: 'checklist', items: [
+        'Walkaround: panel gaps and paint depth, because filler shows up as a shadow before it shows up on a meter.',
+        'Cold start: what the engine does before it is warm is the honest version of it.',
+        'OBD2 read: stored fault codes and the ECU’s own distance figure.',
+        'Papers against metal: VIN on the chassis, VIN on the customs document, engine number.',
+        'Road test: brakes, gearbox under load, and the suspension on a real PH road rather than a smooth one.',
+      ] },
+      { type: 'callout', tone: 'blue', title: 'What you get for it', text: 'A written report with photos of every finding, a verdict, and a [price comparison](/cars) against the market band for that exact model and year. If the car is wrong, you find out before you have paid for it.' },
+      { type: 'paragraph', text: 'Book one on any car in Port Harcourt, from any seller — it does not have to be one of ours. [Request an inspection](/services/inspection) and we will route the nearest inspector.' },
+    ],
+  },
+
   'tyres-you-should-walk-away-from': {
     serviceCta: 'inspection',
     metaTitle: 'Three tyre conditions that should end your inspection',
@@ -870,6 +918,7 @@ const POST_BODIES = {
         'Different brands on the same axle — the owner was solving problems one wheel at a time.',
         'Cracking on sidewalls with plenty of tread left — a six-year-old tyre is finished regardless of the tread depth. Cars whose tyres and suspension have already been checked carry the HonestCars-Certified badge in [the listings](/cars).',
       ] },
+      { type: 'video', src: '/video/tyre-tread.mp4', title: 'What uneven tyre wear tells you', caption: 'Three wear patterns, filmed on a car we walked away from. 9 seconds, no sound.' },
       { type: 'callout', tone: 'amber', title: 'The cheap tell', text: 'Four new matched tyres on a car that is otherwise average usually means the seller was preparing it to be driven away, which is a good sign. Cheap part-worn tyres on a car with premium trim usually means the opposite.' },
       { type: 'heading', text: 'What replacement actually costs in PH' },
       { type: 'table', head: ['Size class', 'Set of four', 'Notes'], rows: [

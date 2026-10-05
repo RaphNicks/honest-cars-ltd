@@ -38,8 +38,9 @@
           </p>
           <a class="btn btn--primary" href="<%= featured.url %>">Read the guide</a>
         </div>
-        <div class="blog-hero__media">
-          <img src="<%= featured.heroImage %>" alt="<%= helpers.esc(featured.heroAlt) %>"
+        <% var featuredBlur = helpers.blurFor(featured.heroImage); %>
+        <div class="blog-hero__media media-blur"<% if (featuredBlur) { %> style="background-image:url('<%= featuredBlur %>')"<% } %>>
+          <img data-blur-img src="<%= helpers.photoSrc(featured.heroImage) %>" alt="<%= helpers.esc(featured.heroAlt) %>"
            <% if (helpers.srcsetFor(featured.heroImage)) { %>srcset="<%= helpers.srcsetFor(featured.heroImage) %>" sizes="(min-width: 1024px) 760px, 92vw"<% } %>
            width="1200" height="900" fetchpriority="high" decoding="async">
         </div>
@@ -116,7 +117,7 @@
         <h2>Get hot verified deals on WhatsApp</h2>
         <p class="mb-0">One message when a car matches your budget and grade — the same list our buyers are on.</p>
       </div>
-      <form class="alert-form" data-lead-form data-lead-type="deal_alert" novalidate>
+      <form class="alert-form" data-lead-form data-lead-type="deal_alert" data-draft="deal-alert" novalidate>
         <label class="visually-hidden" for="blog-alert-phone">WhatsApp number</label>
         <input class="input" id="blog-alert-phone" name="phone" type="tel" inputmode="numeric"
                placeholder="080 0000 0000" autocomplete="tel" required>

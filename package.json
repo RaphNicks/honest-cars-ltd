@@ -25,7 +25,9 @@
     "check": "npm run lint && npm test",
     "smoke": "node scripts/smoke-roles.mjs",
     "smoke:cms": "node scripts/cms-smoke.mjs",
-    "alerts": "node scripts/run-alerts.mjs"
+    "alerts": "node scripts/run-alerts.mjs",
+    "videos": "node scripts/generate-videos.js",
+    "videos:check": "node scripts/generate-videos.js --check"
   },
   "engines": {
     "node": ">=20"

@@ -1,0 +1,30 @@
+{
+  "/video/inspection-walkaround.mp4": {
+    "seconds": 12,
+    "bytes": 243775,
+    "poster": "/video/inspection-walkaround-poster.jpg",
+    "title": "The 45-minute inspection, in 12 seconds",
+    "caption": "What our inspector does before a car reaches you — the same checklist on every listing."
+  },
+  "/video/odometer-check.mp4": {
+    "seconds": 10,
+    "bytes": 106364,
+    "poster": "/video/odometer-check-poster.jpg",
+    "title": "Two odometer checks anyone can do",
+    "caption": "The wear test and the service-record cross-check, on a real PH car."
+  },
+  "/video/tyre-tread.mp4": {
+    "seconds": 9,
+    "bytes": 178091,
+    "poster": "/video/tyre-tread-poster.jpg",
+    "title": "What uneven tyre wear tells you",
+    "caption": "Three wear patterns that mean the car has a story the dealer is not telling."
+  },
+  "/video/flood-damage-check.mp4": {
+    "seconds": 10,
+    "bytes": 215501,
+    "poster": "/video/flood-damage-check-poster.jpg",
+    "title": "Spotting flood damage before you pay",
+    "caption": "The three places water leaves a mark — and why PH sellers know to clean two of them."
+  }
+}

@@ -365,3 +365,43 @@ body:has(.sticky-cta) main { padding-bottom: var(--space-8); }
 .steps--compact .step p { font-size: var(--text-14); }
 .radio-card--static { background: var(--green-08); border-color: var(--honest-green); }
 .radio-card--static input:disabled { opacity: 0.7; }
+
+/* ---------------------------------------------------------------------------
+   Video facade (§13.2 / §16) — tap-to-load, with the cost on the button.
+   The poster is the only thing loaded until the visitor presses play; the
+   duration and size come from the video manifest, so what the button promises
+   is what the tap actually costs.
+   --------------------------------------------------------------------------- */
+.video-facade { margin: var(--space-3) 0; }
+.video-facade__frame {
+  position: relative;
+  display: block;
+  aspect-ratio: 16 / 9;
+  border-radius: var(--radius);
+  overflow: hidden;
+  border: var(--border);
+  background: var(--honest-navy);
+}
+.video-facade__frame img { width: 100%; height: 100%; object-fit: cover; }
+.video-facade__scrim { position: absolute; inset: 0; background: rgb(14 42 71 / 45%); }
+.video-facade__play {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-05);
+  color: var(--white);
+  text-align: center;
+  padding: var(--space-2);
+}
+.video-facade__label { font-size: var(--text-16); font-weight: var(--weight-semibold); }
+.video-facade__cost { font-size: var(--text-14); color: var(--white); opacity: 0.85; }
+.video-facade__frame:hover .video-facade__scrim,
+.video-facade__frame:focus-visible .video-facade__scrim { background: rgb(14 42 71 / 32%); }
+.video-facade__caption { margin: var(--space-1) 0 0; font-size: var(--text-14); color: var(--color-text-muted); }
+
+/* Replaced by the real player once the visitor taps. */
+.video-facade video { width: 100%; height: 100%; display: block; background: #000; }
+.video-facade__frame--playing { border: 0; }

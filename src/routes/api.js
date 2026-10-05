@@ -28,7 +28,7 @@ const seo = require('../services/seo');
 const og = require('../services/og');
 const listingQuery = require('../services/listing-query');
 const render = require('../lib/render');
-const { sendJson, sendFragment, personalise } = require('../lib/respond');
+const { sendJson, sendFragment, personalise, wantsLessData } = require('../lib/respond');
 const { helpers } = require('../lib/locals');
 
 const router = express.Router();
@@ -445,7 +445,10 @@ router.get('/posts', rateLimit({ windowMs: 60_000, max: 60 }), async (req, res, 
 
     const html = await render.renderFragment('fragment-post-grid', {
       posts: feed.posts,
-      helpers: helpers(),
+      // §13.2: the fragment is fetched with the same headers as the page, so a
+      // Save-Data visitor gets small photos here too — otherwise "load more"
+      // would quietly undo what the page just did.
+      helpers: helpers({ saveData: wantsLessData(req) }),
       feed,
     });
     return sendFragment(res, html);
@@ -495,7 +498,7 @@ router.get('/listings', rateLimit({ windowMs: 60_000, max: 90 }), async (req, re
 
     const html = await render.renderFragment('fragment-listing-grid', personalise(req, {
       result,
-      helpers: helpers(),
+      helpers: helpers({ saveData: wantsLessData(req) }),
       facets,
     }));
     return sendFragment(res, html);

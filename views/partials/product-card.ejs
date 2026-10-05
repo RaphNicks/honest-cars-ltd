@@ -1,8 +1,10 @@
 <%# Product card — §6.8 shop grid. Photo, price, stock status, install note. %>
 <article class="product-card">
-  <a class="product-card__media" href="<%= product.url %>" aria-label="<%= helpers.esc(product.name) %>">
+  <% var productBlur = product.image ? helpers.blurFor(product.image) : null; %>
+  <a class="product-card__media media-blur" href="<%= product.url %>" aria-label="<%= helpers.esc(product.name) %>"
+     <% if (productBlur) { %>style="background-image:url('<%= productBlur %>')"<% } %>>
     <% if (product.image) { %>
-      <img src="<%= product.image %>" alt="<%= helpers.esc(product.name) %> — product image"
+      <img src="<%= helpers.photoSrc(product.image) %>" alt="<%= helpers.esc(product.name) %> — product image" data-blur-img
            <% if (helpers.srcsetFor(product.image)) { %>srcset="<%= helpers.srcsetFor(product.image) %>" sizes="(min-width: 1024px) 300px, (min-width: 640px) 45vw, 92vw"<% } %>
            width="1200" height="900" loading="lazy" decoding="async">
     <% } %>

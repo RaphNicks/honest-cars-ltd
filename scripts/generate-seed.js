@@ -362,6 +362,45 @@ function buildListing({ index, status, soldDaysAgo = null, upgraded = false, cat
 }
 
 /**
+ * The clips available to listings (FR-24), from the generated manifest.
+ *
+ * The manifest is written by scripts/generate-videos.js, so a listing's video
+ * label states the duration and size the file actually has.
+ */
+function videoManifest() {
+  if (!videoManifest.cache) videoManifest.cache = require('../src/lib/video-manifest.json');
+  return videoManifest.cache;
+}
+
+/**
+ * The listing video (FR-24), for the cars that have one.
+ *
+ * Positioned last so it lands at the end of the gallery strip and never becomes
+ * `primaryImage` — a card showing an <img> pointed at an .mp4 is exactly the bug
+ * that would otherwise appear the moment a listing has a video.
+ */
+function listingVideo(listing) {
+  const clip = { 'HC-PH-0032': '/video/inspection-walkaround.mp4', 'HC-PH-0068': '/video/flood-damage-check.mp4' }[listing.stockNo];
+  if (!clip) return null;
+  const info = videoManifest()[clip];
+  if (!info) return null;
+  return {
+    listingId: listing.id,
+    type: 'video',
+    shotKey: 'walkaround',
+    shotLabel: 'Walkaround video',
+    url: clip,
+    poster: info.poster,
+    seconds: info.seconds,
+    bytes: info.bytes,
+    alt: `${listing.year} ${listing.make} ${listing.model} walkaround — video, ${info.seconds} seconds`,
+    position: 99,
+    width: 960,
+    height: 540,
+  };
+}
+
+/**
  * Gallery rows. Real photographs come first (public/img/cars + public/img/details,
  * resolved by seed-media.js); listings we have no photo for still get the honest
  * placeholder rather than a broken image.
@@ -384,10 +423,11 @@ function mediaRows(listing) {
     };
   });
 
-  if (rows.length) return rows;
+  const clip = listingVideo(listing);
+  if (rows.length) return clip ? [...rows, clip] : rows;
 
   const shots = listing.verificationGrade === 'certified' ? SHOTS : sample(SHOTS, int(6, 8));
-  return shots.map((shot, i) => ({
+  const placeholders = shots.map((shot, i) => ({
     listingId: listing.id,
     type: 'image',
     shotKey: shot.key,
@@ -398,6 +438,7 @@ function mediaRows(listing) {
     width: 1200,
     height: 900,
   }));
+  return clip ? [...placeholders, clip] : placeholders;
 }
 
 /**
@@ -588,8 +629,12 @@ DELETE FROM dealers;
     })));
 
   out.push(insert('listing_media',
-    ['id', 'listing_id', 'type', 'shot_label', 'url', 'alt_text', 'position', 'width', 'height'],
-    media.map((m, i) => [i + 1, m.listingId, m.type, m.shotLabel, m.url, m.alt, m.position, m.width, m.height])));
+    ['id', 'listing_id', 'type', 'shot_label', 'duration_seconds', 'size_bytes', 'url', 'poster_url', 'alt_text', 'position', 'width', 'height'],
+    media.map((m, i) => [
+      i + 1, m.listingId, m.type, m.shotLabel,
+      m.seconds || null, m.bytes || null,
+      m.url, m.poster || null, m.alt, m.position, m.width, m.height,
+    ])));
 
   // Price bands: one per catalog entry per year bucket + condition 'any'
   const bands = [];
@@ -780,6 +825,15 @@ DELETE FROM dealers;
     ['tyres-you-should-walk-away-from', 'Three tyre conditions that should end your inspection', 'honest_buyers_guide',
       'Uneven wear tells you more about a car than the dealer ever will. What to look for and what it costs to fix.',
       'Tyres and tread depth check on a used car', 'Raph Nicks', 'Head of Inspections', 4, 0],
+    // §16 asks for 8 posts and 3 embedded videos. The clips live in the four
+    // posts above and this pair below; the last one is the video-first post
+    // FR-24 names (category `video`).
+    ['first-car-under-10m-port-harcourt', 'Your first car under ₦10m in Port Harcourt', 'honest_buyers_guide',
+      'What ₦6m–₦10m buys right now, the four cars we would shortlist, and the three costs nobody puts on the windscreen.',
+      'A first car parked on a Port Harcourt street', 'Ada George', 'Market Analyst', 6, 0],
+    ['inspection-walkaround-video', 'Watch a HonestCars inspection, start to finish', 'video',
+      'Twelve seconds of the 45-minute checklist every car goes through before it reaches you.',
+      'An inspector filming the walkaround on a silver sedan', 'Raph Nicks', 'Head of Inspections', 3, 0],
   ];
   out.push(insert('blog_posts',
     ['slug', 'title', 'category', 'excerpt', 'hero_image', 'hero_alt', 'author_name', 'author_role', 'read_minutes',

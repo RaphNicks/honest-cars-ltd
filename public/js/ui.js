@@ -148,18 +148,69 @@ export function initGallery(root = document) {
   if (!main || !thumbs.length) return;
 
   let engaged = false;
+  const videoThumb = gallery.querySelector('[data-gallery-video]');
+
+  const engage = () => {
+    if (engaged) return;
+    engaged = true;
+    track('gallery_engaged', { source: 'vdp_gallery', value: thumbs.length });
+  };
 
   const show = (thumb) => {
     main.src = thumb.dataset.src;
     main.alt = thumb.dataset.alt || main.alt;
+    main.parentElement.classList.remove('hc-blur');
+    main.style.removeProperty('display');
+    // A photo was picked after the video: put the picture back where it was.
+    gallery.querySelector('.video-facade')?.remove();
     thumbs.forEach((other) => other.setAttribute('aria-current', other === thumb ? 'true' : 'false'));
-    if (!engaged) {
-      engaged = true;
-      track('gallery_engaged', { source: 'vdp_gallery', value: thumbs.length });
-    }
+    if (videoThumb) videoThumb.setAttribute('aria-current', 'false');
+    engage();
   };
 
   thumbs.forEach((thumb) => thumb.addEventListener('click', () => show(thumb)));
+
+  /**
+   * FR-24 — the video in the gallery is tap-to-load like every other video
+   * (§13.2): nothing is fetched until this button is pressed, and the label in
+   * the accessible name states the duration and size first.
+   */
+  videoThumb?.addEventListener('click', () => {
+    const src = videoThumb.dataset.videoSrc;
+    if (!src) return;
+    thumbs.forEach((other) => other.setAttribute('aria-current', 'false'));
+    videoThumb.setAttribute('aria-current', 'true');
+    engage();
+    track('gallery_engaged', {
+      source: 'vdp_video',
+      value: 0,
+      video_duration: Number(videoThumb.dataset.videoSeconds) || undefined,
+      video_size: Number(videoThumb.dataset.videoBytes) || undefined,
+    });
+
+    const facade = document.createElement('div');
+    facade.className = 'video-facade';
+    facade.dataset.videoFacade = '';
+    const frame = document.createElement('div');
+    frame.className = 'video-facade__frame';
+    const video = document.createElement('video');
+    video.src = src;
+    video.controls = true;
+    video.autoplay = true;
+    video.playsInline = true;
+    video.preload = 'auto';
+    video.poster = videoThumb.dataset.videoPoster || '';
+    frame.appendChild(video);
+    facade.appendChild(frame);
+
+    // The video takes the main frame's place; the photo returns when a thumb is
+    // pressed, so nothing is lost by trying it.
+    main.style.display = 'none';
+    main.parentElement.after(facade);
+    video.play().catch(() => {
+      /* controls are visible; a blocked autoplay is not a failure */
+    });
+  });
 
   // Keyboard: left/right arrows move between photos.
   gallery.addEventListener('keydown', (event) => {

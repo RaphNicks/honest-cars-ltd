@@ -65,7 +65,7 @@ var canSubmit = function (row) {
               <th scope="row" class="dealer-listing__car">
                 <div class="dealer-listing__media">
                   <% if (row.primaryImage) { %>
-                    <img src="<%= row.primaryImage %>" width="112" height="84" loading="lazy" alt="">
+                    <img src="<%= helpers.smallSrc(row.primaryImage) || row.primaryImage %>" width="112" height="84" loading="lazy" alt="">
                   <% } else { %>
                     <span class="dealer-listing__blank" aria-hidden="true"><%= helpers.icon('camera', { size: 20 }) %></span>
                   <% } %>

@@ -7,6 +7,7 @@
  */
 
 import { track, utm } from './events.js';
+import { sendOrQueue, clearDraft } from './drafts.js';
 
 export function initViewingModal(root = document) {
   const modal = root.getElementById('viewing-modal');
@@ -87,11 +88,15 @@ export function initViewingModal(root = document) {
     if (!result.ok) {
       if (errorEl) {
         errorEl.textContent = result.error || 'That did not send. Check your number and try again.';
+        // A queued enquiry is not an error the visitor has to fix — it is
+        // waiting, and the draft stays so they can see it again.
+        errorEl.classList.toggle('form-error--queued', Boolean(result.queued));
         errorEl.classList.remove('hidden');
       }
       return;
     }
 
+    if (form) clearDraft(form);
     if (form) form.classList.add('hidden');
     if (success) success.classList.remove('hidden');
     window.dispatchEvent(new CustomEvent('hc:lead-created', { detail: result }));
@@ -150,16 +155,10 @@ async function postLead(payload) {
     return { ok: false, error: 'That phone number does not look right — please check it.' };
   }
 
-  try {
-    const response = await fetch(endpoint, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
-    });
-    const body = await response.json().catch(() => ({}));
-    if (!response.ok || !body.ok) return { ok: false, error: body.error };
-    return { ok: true, leadId: body.leadId, whatsappUrl: body.whatsappUrl };
-  } catch {
-    return { ok: false, error: 'Network problem — check your connection and try again.' };
-  }
+  // §13.2: a network failure queues the enquiry instead of losing it. The
+  // visitor is told it is waiting, because "sent" and "will send when you have
+  // signal" are different promises.
+  const result = await sendOrQueue(endpoint, payload);
+  if (!result.ok) return { ok: false, queued: Boolean(result.queued), error: result.error };
+  return { ok: true, leadId: result.leadId, whatsappUrl: result.whatsappUrl };
 }

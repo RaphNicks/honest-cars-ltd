@@ -33,7 +33,7 @@
 
 const BLOCK_TYPES = [
   'paragraph', 'heading', 'callout', 'checklist', 'table',
-  'quote', 'youtube', 'listings', 'stats',
+  'quote', 'youtube', 'video', 'listings', 'stats',
 ];
 
 const DIRECTIVES = new Set(['cars', 'listings']);
@@ -91,6 +91,17 @@ function canonical(blocks) {
         if (clean(block.title)) entry.title = clean(block.title);
         if (clean(block.duration)) entry.duration = clean(block.duration);
         if (clean(block.poster)) entry.poster = clean(block.poster);
+        out.push(entry);
+        break;
+      }
+      case 'video': {
+        // Our own clip (§16): the file is served from here, so duration and
+        // size come from the manifest rather than from whoever wrote the post.
+        const src = clean(block.src);
+        if (!src) break;
+        const entry = { type: 'video', src };
+        if (clean(block.title)) entry.title = clean(block.title);
+        if (clean(block.caption)) entry.caption = clean(block.caption);
         out.push(entry);
         break;
       }
@@ -267,6 +278,21 @@ function parse(text) {
         i += 1;
         continue;
       }
+      if (lower === 'clip') {
+        // [clip:odometer-check | Optional title | Optional caption]
+        const parts = (args.join(':') + (rest ? `|${rest}` : '')).split('|').map(clean);
+        const name = (parts.shift() || '').trim().replace(/^\/+/, '').replace(/\.mp4$/, '');
+        if (!name) {
+          errors.push({ line: i + 1, message: '[clip:…] needs a clip name — e.g. [clip:odometer-check | Two checks anyone can do]' });
+        } else {
+          const entry = { type: 'video', src: `/video/${name}.mp4` };
+          if (parts[0]) entry.title = parts[0];
+          if (parts[1]) entry.caption = parts[1];
+          blocks.push(entry);
+        }
+        i += 1;
+        continue;
+      }
       if (lower === 'video') {
         const parts = (args.join(':') + (rest ? `|${rest}` : '')).split('|').map(clean);
         const videoId = (parts.shift() || '').trim();
@@ -334,6 +360,9 @@ function toMarkup(blocks) {
         break;
       case 'youtube':
         push(`[video:${block.videoId}${block.title ? ` | ${block.title}` : ''}${block.duration ? ` | ${block.duration}` : ''}]`);
+        break;
+      case 'video':
+        push(`[clip:${block.src.replace(/^\/video\//, '').replace(/\.mp4$/, '')}${block.title ? ` | ${block.title}` : ''}${block.caption ? ` | ${block.caption}` : ''}]`);
         break;
       case 'listings':
         push('[cars]');

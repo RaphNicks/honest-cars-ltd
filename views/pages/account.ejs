@@ -306,7 +306,7 @@
               <div class="saved-car" data-saved-car="<%= listing.id %>">
                 <a class="saved-car__media" href="<%= listing.url %>">
                   <% if (listing.primaryImage) { %>
-                    <img src="<%= listing.primaryImage.url %>" alt="<%= helpers.esc(listing.primaryImage.alt) %>"
+                    <img src="<%= helpers.photoSrc(listing.primaryImage.url) %>" alt="<%= helpers.esc(listing.primaryImage.alt) %>"
                          <%= helpers.srcsetFor(listing.primaryImage.url) ? `srcset="${helpers.srcsetFor(listing.primaryImage.url)}" sizes="(min-width: 768px) 180px, 40vw"` : '' %>
                          width="1200" height="900" loading="lazy" decoding="async">
                   <% } %>

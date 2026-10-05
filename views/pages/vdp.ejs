@@ -33,26 +33,46 @@
         </div>
       </div>
 
-      <%# Gallery — main image + thumbs, swipe on mobile, pinch-zoom is native %>
+      <%# Gallery — main image + thumbs, swipe on mobile, pinch-zoom is native.
+          A video (FR-24) is one of the thumbs: pressing it replaces the frame
+          with the tap-to-load facade rather than fetching anything itself. %>
+      <% var firstPhoto = listing.media.find(function (m) { return m.type === 'image'; }) || listing.media[0]; %>
+      <% var galleryVideo = listing.media.find(function (m) { return m.type === 'video'; }) || null; %>
       <section class="gallery" aria-label="Photos of <%= helpers.esc(listing.title) %>" data-gallery>
-        <div class="gallery__main">
-          <% if (listing.media.length) { %>
-            <img class="gallery__img" id="gallery-main"
-                 src="<%= listing.media[0].url %>" alt="<%= helpers.esc(listing.media[0].alt) %>"
-                 <% if (helpers.srcsetFor(listing.media[0].url)) { %>srcset="<%= helpers.srcsetFor(listing.media[0].url) %>" sizes="(min-width: 1024px) 720px, 92vw"<% } %>
+        <% var mainBlur = firstPhoto ? helpers.blurFor(firstPhoto.url) : null; %>
+        <div class="gallery__main media-blur"<% if (mainBlur) { %> style="background-image:url('<%= mainBlur %>')"<% } %>>
+          <% if (firstPhoto) { %>
+            <img class="gallery__img" id="gallery-main" data-blur-img
+                 src="<%= helpers.photoSrc(firstPhoto.url) %>" alt="<%= helpers.esc(firstPhoto.alt) %>"
+                 <% if (helpers.srcsetFor(firstPhoto.url)) { %>srcset="<%= helpers.srcsetFor(firstPhoto.url) %>" sizes="(min-width: 1024px) 720px, 92vw"<% } %>
                  width="1200" height="900" fetchpriority="high" data-gallery-main>
           <% } %>
         </div>
-        <% if (listing.media.length > 1) { %>
+        <% if (firstPhoto && (listing.media.length > 1 || galleryVideo)) { %>
           <div class="gallery__thumbs" role="tablist" aria-label="Choose a photo">
             <% listing.media.forEach(function (media, index) { %>
+              <% if (media.type !== 'image') return; %>
               <button class="gallery__thumb" type="button" role="tab"
-                      aria-current="<%= index === 0 ? 'true' : 'false' %>"
+                      aria-current="<%= media.url === firstPhoto.url ? 'true' : 'false' %>"
                       data-gallery-thumb data-src="<%= media.url %>" data-alt="<%= helpers.esc(media.alt) %>">
-                <img src="<%= media.url.replace(/\.jpg$/, helpers.srcsetFor(media.url) ? '-600.jpg' : '.jpg') %>"
+                <img src="<%= helpers.smallSrc(media.url) || media.url %>"
                      alt="<%= helpers.esc(media.shotLabel) %>" width="1200" height="900" loading="lazy" decoding="async">
               </button>
             <% }); %>
+            <% if (galleryVideo) { %>
+              <button class="gallery__thumb gallery__thumb--video" type="button" role="tab" aria-current="false"
+                      data-gallery-video
+                      data-video-src="<%= galleryVideo.url %>"
+                      data-video-poster="<%= galleryVideo.poster || '/img/seed/hero-lot.svg' %>"
+                      data-video-seconds="<%= galleryVideo.seconds || 0 %>"
+                      data-video-bytes="<%= galleryVideo.bytes || 0 %>"
+                      data-video-label="<%= helpers.esc(galleryVideo.alt || galleryVideo.shotLabel) %>">
+                <img src="<%= galleryVideo.poster || '/img/seed/hero-lot.svg' %>"
+                     alt="Video: <%= helpers.esc(galleryVideo.shotLabel) %>" width="640" height="360" loading="lazy" decoding="async">
+                <span class="gallery__thumb-play" aria-hidden="true"><%- helpers.icon('video', { size: 18 }) %></span>
+                <span class="visually-hidden">Play video (<%= helpers.formatDuration(galleryVideo.seconds) %>, <%= helpers.formatBytes(galleryVideo.bytes) %>)</span>
+              </button>
+            <% } %>
           </div>
         <% } %>
       </section>

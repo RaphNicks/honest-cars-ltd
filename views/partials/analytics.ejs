@@ -9,7 +9,8 @@
     ga4Id: <%- JSON.stringify(site.analytics.ga4Id) %>,
     metaPixelId: <%- JSON.stringify(site.analytics.metaPixelId) %>,
     eventsEndpoint: '/api/events',
-    logEndpoint: '/api/leads'
+    logEndpoint: '/api/leads',
+    saveData: <%= site.saveData ? 'true' : 'false' %>
   };
   window.HonestCars.eventNames = <%- JSON.stringify(helpers.eventNames) %>;
 </script>

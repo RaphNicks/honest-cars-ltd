@@ -14,7 +14,10 @@
   var endpoint = isBooking ? '/api/bookings' : '/api/service-requests';
   var submitLabel = service.ctaLabel;
 %>
+<%# §13.2: the draft key is per service page, so a half-filled inspection
+      form and a consultation form never mix. %>
 <form class="card card__body service-form" data-service-form
+      data-draft="service-<%= service.slug %>"
       data-kind="<%= kind %>" data-service-slug="<%= service.slug %>"
       data-endpoint="<%= endpoint %>" method="post" action="<%= endpoint %>" novalidate>
   <p class="form-hint">

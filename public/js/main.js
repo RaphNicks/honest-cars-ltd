@@ -3,7 +3,7 @@
  * Everything imported here is an *upgrade*: the HTML already works without it.
  */
 
-import { bindDeclarativeEvents, observeImpressions, observeReadDepth, track } from './events.js';
+import { bindDeclarativeEvents, observeImpressions, observeReadDepth, track, applySaveData, initBlurUp, saveData } from './events.js';
 import { initHeader } from './header.js';
 import {
   initTabs,
@@ -25,9 +25,17 @@ import { initFlows } from './flow.js';
 import { initAddToCart, initCartPage, initCheckoutPage, initComparePage } from './cart.js';
 import { initLoadMore, initVideoFacades, initTableOfContents, initHelpful } from './blog.js';
 import { initLogin, initSaveButtons, initAccount, initSaveSearch } from './account.js';
+import { initFormDrafts, initOutbox } from './drafts.js';
 
 function boot() {
   bindDeclarativeEvents();
+  // §13.2 — before anything paints: hold each photo back while its placeholder
+  // shows, and drop to the small file for a visitor who asked us to spend less.
+  initBlurUp();
+  applySaveData();
+  // §13.2 — a dropped connection should not cost anyone an enquiry they typed.
+  initFormDrafts();
+  initOutbox();
   initHeader();
   initTabs();
   initAccordions();
@@ -65,6 +73,11 @@ function boot() {
       grade: vdp.dataset.grade,
       price_position: vdp.dataset.pricePosition,
       source: 'vdp',
+      // §13.2: whether this visit declared itself data-constrained, and whether
+      // the page shipped inline placeholders — the two facts the low-bandwidth
+      // work is judged on.
+      save_data: saveData(),
+      blur_up: Boolean(document.querySelector('[data-blur-img]')),
     });
 
     const title = vdp.querySelector('.vdp__title')?.textContent?.trim();
@@ -89,6 +102,10 @@ function boot() {
     initCompare();
     initInfoTips();
     initSaveButtons();
+    // New cards arrived via fetch: give them their placeholders and, under
+    // Save-Data, their small photos too.
+    initBlurUp();
+    applySaveData();
   });
 
   // A lead was created: nudge ops in the background, then be honest about it.

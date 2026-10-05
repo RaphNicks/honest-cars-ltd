@@ -1574,3 +1574,78 @@ body[data-scroll-locked='true'] { overflow: hidden; }
 .ms-ladder__step.is-current { color: var(--colour-navy, #0E2A47); font-weight: 600; }
 
 .milestone__actions { margin-top: var(--space-2); }
+
+/* ---------------------------------------------------------------------------
+   §13.2 — blur-up placeholders.
+
+   A 20px WebP of the photo sits behind the image at 8× zoom, which smears it
+   into the car's general colour and shape for ~200 bytes that are already in the
+   HTML (scripts/prepare-images.js → src/lib/image-blur.json). The photo fades in
+   over it, so a data-conscious visitor sees what is coming instead of a grey box
+   — and the box never jumps, because the frame's aspect-ratio is fixed.
+
+   No JavaScript is involved in the reveal if the client fails to load: the image
+   fades in on its own `load` event in public/js/events.js, and if that never runs
+   the photo is simply there, opaquely, from the start (`img[data-blur-img]` is
+   only faded while `hc-blur` is on the element, which only script sets).
+   --------------------------------------------------------------------------- */
+.media-blur {
+  background-color: var(--surface);
+  background-position: center;
+  background-size: cover;
+}
+
+.media-blur > img {
+  transition: opacity 220ms ease-out;
+}
+
+/* Set by script before the browser has decoded the photo. */
+.media-blur.hc-blur > img[data-blur-img] { opacity: 0; }
+
+.media-blur > img[data-blur-img][data-hc-loaded] { opacity: 1; }
+
+@media (prefers-reduced-motion: reduce) {
+  .media-blur > img { transition: none; }
+}
+
+/* A video among the gallery thumbs (FR-24): the play glyph says which one it is,
+   and its cost is in the label the screen reader gets. */
+.gallery__thumb--video { position: relative; }
+.gallery__thumb-play {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  color: var(--white);
+  background: rgb(14 42 71 / 45%);
+}
+
+/* §13.2 — a queued enquiry is a holding message, not an error to fix. */
+.form-error--queued {
+  border-color: var(--honest-green);
+  background: #DFF5E7;
+  color: #0B6B33;
+}
+.draft-note {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-1);
+  margin: 0 0 var(--space-2);
+  padding: var(--space-1) var(--space-2);
+  border: var(--border);
+  border-left: 3px solid var(--honest-green);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  font-size: var(--text-14);
+}
+.draft-note__action {
+  border: 0;
+  background: none;
+  padding: 0;
+  color: var(--honest-navy);
+  font: inherit;
+  font-weight: var(--weight-semibold);
+  text-decoration: underline;
+  cursor: pointer;
+}

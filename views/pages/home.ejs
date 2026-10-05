@@ -71,12 +71,12 @@
       </div>
     </div>
 
-    <div class="hero__media">
-      <img src="/img/site/home-hero.jpg"
-           srcset="/img/site/home-hero-600.jpg 600w, /img/site/home-hero.jpg 1200w"
-           sizes="(min-width: 1025px) 560px, 92vw"
+    <% var heroBlur = helpers.blurFor('/img/site/home-hero.jpg'); %>
+    <div class="hero__media media-blur"<% if (heroBlur) { %> style="background-image:url('<%= heroBlur %>')"<% } %>>
+      <img src="<%= helpers.photoSrc('/img/site/home-hero.jpg') %>"
+           <% if (helpers.srcsetFor('/img/site/home-hero.jpg')) { %>srcset="<%= helpers.srcsetFor('/img/site/home-hero.jpg') %>" sizes="(min-width: 1025px) 560px, 92vw"<% } %>
            alt="A HonestCars inspector running the checklist on a silver sedan in Port Harcourt"
-           width="1200" height="900" fetchpriority="high" decoding="async">
+           width="1200" height="900" fetchpriority="high" data-blur-img decoding="async">
     </div>
   </div>
 </section>
@@ -286,7 +286,7 @@
         <h2 id="alert-heading">Get hot verified deals on WhatsApp</h2>
         <p class="mb-0">One message when a car matches your budget and grade. No spamming, unsubscribe anytime — we ask once and remember.</p>
       </div>
-      <form class="alert-form" data-lead-form data-lead-type="deal_alert" novalidate>
+      <form class="alert-form" data-lead-form data-lead-type="deal_alert" data-draft="deal-alert" novalidate>
         <label class="visually-hidden" for="alert-phone">WhatsApp number</label>
         <input class="input" id="alert-phone" name="phone" type="tel" inputmode="numeric"
                placeholder="080 0000 0000" autocomplete="tel" required>

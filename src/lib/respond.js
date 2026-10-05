@@ -30,15 +30,35 @@ const CACHE = {
  * @param {string} [options.cache]
  */
 async function sendPage(req, res, { routePath, view, page, data = {}, status = 200, cache = CACHE.ssr, headers = {} }) {
-  const locals = await buildLocals(routePath, { ...page, layout: page.layout || 'base' }, personalise(req, data));
+  const saveData = wantsLessData(req);
+  const locals = await buildLocals(
+    routePath,
+    { ...page, layout: page.layout || 'base' },
+    { ...personalise(req, data), saveData },
+  );
   const html = await render.renderPageHtml(view, locals);
   res.status(status);
   res.set('Content-Type', 'text/html; charset=utf-8');
   // A signed-in response is personalised (header state, save buttons) and must
   // never be cached publicly, whatever the route asked for.
   res.set('Cache-Control', req.user ? CACHE.private : cache);
+  // The page really does differ per Save-Data, so a cache between us and the
+  // visitor must not serve one variant for the other (§13.2).
+  res.append('Vary', 'Save-Data');
   for (const [key, value] of Object.entries(headers)) res.set(key, value);
   res.send(html);
+}
+
+/**
+ * §13.2 — is this visitor asking us to spend less of their data?
+ *
+ * `Save-Data: on` is the header Chrome and Opera send when Data Saver is on;
+ * it is a request, not a guarantee, so when it is absent we spend normally and
+ * the client-side check (`navigator.connection.saveData`) picks it up instead —
+ * which is also the only way to adapt a prebuilt static page.
+ */
+function wantsLessData(req) {
+  return String(req.get('save-data') || '').toLowerCase() === 'on';
 }
 
 /**
@@ -55,6 +75,11 @@ async function sendPrebuiltOrRender(req, res, options) {
     if (file) {
       res.set('Cache-Control', CACHE.static);
       res.set('X-HonestCars-Render', 'static');
+      // A prebuilt page cannot be trimmed per request, so it is the *client*
+      // that drops to the small images on Save-Data for these. Vary still
+      // belongs here: the inline config the page carries tells the client
+      // whether the server saw the header.
+      res.append('Vary', 'Save-Data');
       return res.sendFile(file);
     }
   }
@@ -85,4 +110,4 @@ function personalise(req, data = {}) {
   return { user: req.user || null, savedIds: req.savedCarIds || [], ...data };
 }
 
-module.exports = { CACHE, sendPage, sendPrebuiltOrRender, sendFragment, sendJson, personalise, fs };
+module.exports = { CACHE, sendPage, sendPrebuiltOrRender, sendFragment, sendJson, personalise, wantsLessData, fs };

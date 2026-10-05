@@ -51,7 +51,49 @@ export function initLoadMore(root = document) {
   });
 }
 
+/**
+ * §13.2 — video is strictly tap-to-load, and our own clips play here.
+ *
+ * Nothing is fetched until the visitor presses the button, and when they do the
+ * player is created in place of the poster with the metadata already declared,
+ * so the browser does not have to probe the file before it can show controls.
+ * The poster stays behind the <video> while it buffers, so the frame never goes
+ * black on a slow connection.
+ */
+export function initOwnVideoFacades(root = document) {
+  root.querySelectorAll('[data-video-facade]').forEach((facade) => {
+    const link = facade.querySelector('[data-video-link]');
+    if (!link) return;
+    link.addEventListener('click', (event) => {
+      event.preventDefault();
+      const src = link.getAttribute('href');
+      const video = document.createElement('video');
+      video.src = src;
+      video.controls = true;
+      video.autoplay = true;
+      video.playsInline = true;
+      video.preload = 'auto';
+      video.setAttribute('poster', facade.querySelector('img')?.getAttribute('src') || '');
+      link.classList.add('video-facade__frame--playing');
+      link.replaceChildren(video);
+      link.removeAttribute('aria-label');
+      // §13.2: the tap cost this much. Reported from the file's measured size, so
+      // the low-bandwidth work can be judged on data rather than on intent.
+      track('gallery_engaged', {
+        source: 'video_facade',
+        item_id: src,
+        video_duration: Number(link.dataset.videoSeconds) || undefined,
+        video_size: Number(link.dataset.videoBytes) || undefined,
+      });
+      video.play().catch(() => {
+        /* the controls are right there; a blocked autoplay is not an error */
+      });
+    }, { once: true });
+  });
+}
+
 export function initVideoFacades(root = document) {
+  initOwnVideoFacades(root);
   root.querySelectorAll('[data-youtube-facade]').forEach((facade) => {
     const play = facade.querySelector('[data-youtube-play]');
     if (!play) return;

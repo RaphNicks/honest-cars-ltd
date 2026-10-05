@@ -181,7 +181,9 @@ test('every service page has 4+ FAQs and every Shop/trust page has FAQs too', ()
 });
 
 test('seeded post bodies only use block types the renderer implements', () => {
-  const RENDERED = new Set(['paragraph', 'heading', 'callout', 'checklist', 'table', 'quote', 'youtube', 'listings', 'stats']);
+  const RENDERED = new Set(['paragraph', 'heading', 'callout', 'checklist', 'table', 'quote', 'youtube', 'video', 'listings', 'stats']);
+  const { videoFor } = require('../src/lib/locals');
+  let embedded = 0;
   for (const [slug, post] of Object.entries(content.POST_BODIES)) {
     for (const block of post.body) {
       assert.ok(RENDERED.has(block.type), `${slug}: unknown block type “${block.type}” would render as nothing`);
@@ -189,10 +191,20 @@ test('seeded post bodies only use block types the renderer implements', () => {
         assert.ok(block.head.length && block.rows.length, `${slug}: table without content`);
         for (const row of block.rows) assert.equal(row.length, block.head.length, `${slug}: ragged table`);
       }
+      if (block.type === 'video') {
+        embedded += 1;
+        // A post pointing at a clip that is not in this build renders a "run
+        // npm run videos" hint — better to fail here than ship the hint.
+        assert.ok(videoFor(block.src), `${slug}: “${block.src}” is not in the video manifest`);
+      }
     }
     assert.ok(post.serviceCta, `${slug}: posts must carry a contextual service CTA (§6.9)`);
     assert.ok(post.authorBio && post.authorBio.length > 40, `${slug}: author bio (E-E-A-T)`);
   }
+  // §16 asks for 8 posts with 3 embedded videos; both are now checked, so
+  // deleting one to make some other test pass cannot slip through.
+  assert.ok(Object.keys(content.POST_BODIES).length >= 8, '8 posts (§16 content inventory)');
+  assert.ok(embedded >= 3, `3 embedded videos (§16), found ${embedded}`);
 });
 
 test('delivery areas are priced in kobo and cover the checkout areas', () => {

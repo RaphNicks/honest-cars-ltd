@@ -49,7 +49,7 @@ var moveLabels = {
       <ul class="dealer-photos__strip">
         <% media.forEach(function (photo) { %>
           <li class="dealer-photos__item">
-            <img src="<%= photo.url %>" width="160" height="120" loading="lazy" alt="<%= photo.alt_text || listing.title %>">
+            <img src="<%= helpers.smallSrc(photo.url) || photo.url %>" width="160" height="120" loading="lazy" alt="<%= photo.alt_text || listing.title %>">
             <form method="post" action="/dealer/listings/<%= listing.id %>/photos" class="dealer-photos__remove">
               <input type="hidden" name="action" value="remove">
               <input type="hidden" name="media_id" value="<%= photo.id %>">

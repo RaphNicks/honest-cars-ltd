@@ -95,6 +95,13 @@ const ALLOWED_PAYLOAD_KEYS = new Set([
   'utm',
   'make',
   'model',
+  // §13.2 — the low-bandwidth set. Without these four the browser sends them
+  // and this allowlist silently drops them, which is how a working feature ends
+  // up with no evidence in the dashboard.
+  'save_data',
+  'video_duration',
+  'video_size',
+  'blur_up',
 ]);
 
 /** Strip anything not on the allowlist, and cap string sizes. */

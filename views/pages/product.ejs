@@ -11,7 +11,7 @@
       <div>
         <div class="product-detail__media">
           <% if (product.image) { %>
-            <img src="<%= product.image %>" alt="<%= helpers.esc(product.name) %> — product photo"
+            <img src="<%= helpers.photoSrc(product.image) %>" alt="<%= helpers.esc(product.name) %> — product photo"
                  width="1200" height="900" fetchpriority="high" decoding="async">
           <% } %>
         </div>

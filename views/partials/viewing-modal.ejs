@@ -15,7 +15,8 @@
     <h2 id="viewing-modal-title">Request a viewing</h2>
     <p class="note-inline"><%= listing.title %> · <%= helpers.formatNaira(listing.priceKobo) %> · <%= listing.area %></p>
 
-    <form data-lead-form data-lead-type="viewing" data-listing-id="<%= listing.id %>" novalidate>
+    <form data-lead-form data-lead-type="viewing" data-listing-id="<%= listing.id %>"
+            data-draft="viewing-<%= listing.id %>" novalidate>
       <div class="field">
         <label class="field__label" for="viewing-name">Your name</label>
         <input class="input" id="viewing-name" name="name" type="text" autocomplete="name" required>

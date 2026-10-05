@@ -53,6 +53,19 @@
         <% if (block.attribution) { %><footer class="testimonial__meta"><%= block.attribution %></footer><% } %>
       </blockquote>
 
+    <% } else if (block.type === 'video') { %>
+      <% var clipInfo = helpers.videoFor(block.src); %>
+      <% if (clipInfo) { %>
+        <%- include('video-facade', {
+              clip: { src: block.src, poster: clipInfo.poster, seconds: clipInfo.seconds, bytes: clipInfo.bytes },
+              title: block.title, caption: block.caption, helpers: helpers, alt: block.caption || block.title
+            }) %>
+      <% } else { %>
+        <%# A clip named in the post but not in the manifest: say so rather than
+            render a play button that leads nowhere. %>
+        <p class="field__hint">Video “<%= block.src %>” is not in this build — run <code>npm run videos</code>.</p>
+      <% } %>
+
     <% } else if (block.type === 'youtube') { %>
       <%# Tap-to-load facade (§13.2): the iframe only exists after a click. %>
       <div class="youtube-facade" data-youtube-facade data-video-id="<%= block.videoId %>">

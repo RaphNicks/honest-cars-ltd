@@ -47,7 +47,7 @@
             <tr>
               <td class="hire-table__media">
                 <% if (entry.image) { %>
-                  <img src="<%= entry.image %>" alt="<%= entry.imageAlt %>" width="160" height="120" loading="lazy" decoding="async">
+                  <img src="<%= helpers.smallSrc(entry.image) || entry.image %>" alt="<%= entry.imageAlt %>" width="160" height="120" loading="lazy" decoding="async">
                 <% } else { %>
                   <span class="hire-table__media-empty" aria-hidden="true"></span>
                 <% } %>
@@ -101,7 +101,7 @@
         </ul>
       </div>
 
-      <form class="card card__body service-form" data-service-form data-kind="hire" data-service-slug="hire"
+      <form class="card card__body service-form" data-service-form data-kind="hire" data-service-slug="hire" data-draft="service-hire"
             data-endpoint="/api/service-requests" method="post" action="/api/service-requests" novalidate>
         <p class="form-hint">Guest-first: no account needed. Ops confirms availability on WhatsApp before anything is charged.</p>
 

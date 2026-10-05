@@ -55,6 +55,87 @@ export function utm() {
   }
 }
 
+/**
+ * §13.2 — has the visitor asked us to spend less data?
+ *
+ * Two answers, and either one is enough. The server sees the `Save-Data: on`
+ * header and hands the flag down in the inline config. But most of this site is
+ * prebuilt to disk and served as a file, so no server code runs for it: there the
+ * client's own `navigator.connection.saveData` is the only signal. (Chrome and
+ * Opera expose it; Safari and Firefox do not, and for them the answer is "no".)
+ */
+export function saveData() {
+  if (config.saveData) return true;
+  try {
+    return Boolean(navigator.connection && navigator.connection.saveData);
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * The site photos that have a 600×450 sibling, and nothing else.
+ *
+ * Deliberately narrow: a video poster or a dealer-hosted URL has no `-600`
+ * sibling, and rewriting one of those would replace a working image with a 404.
+ * Every photo in these folders has its sibling (scripts/prepare-images.js, run
+ * as `npm run images:check`).
+ */
+const SITE_PHOTO = /^\/img\/(?:cars|details|site|blog|shop|hire)\/[\w-]+\.jpg$/;
+
+/** The 600×450 sibling, for the same reason src/lib/locals.js has one. */
+export function smallSrc(url) {
+  return typeof url === 'string' && SITE_PHOTO.test(url) ? url.replace(/\.jpg$/, '-600.jpg') : url;
+}
+
+/**
+ * Drop to the small photo and drop the srcset that would invite a bigger one.
+ *
+ * Used for the case the server cannot handle — a prebuilt page — and it is
+ * deliberately conservative: only the `src` and `srcset` attributes change, so
+ * whichever variant was already being fetched finishes normally.
+ */
+export function applySaveData(root = document) {
+  if (!saveData()) return false;
+  root.querySelectorAll('img[src]').forEach((img) => {
+    if (img.dataset.hcReduced === 'done') return;
+    const current = img.getAttribute('src');
+    const small = smallSrc(current);
+    if (small === current) return;
+    img.dataset.hcReduced = 'done';
+    img.removeAttribute('srcset');
+    img.setAttribute('src', small);
+  });
+  return true;
+}
+
+/**
+ * Blur-up (§13.2): hold the photo back while its placeholder shows.
+ *
+ * Runs before the image is painted, so the fade is the first thing seen rather
+ * than a flash of a loaded photo followed by a fade to nothing. Only script can
+ * put `hc-blur` on a frame, so without JavaScript the photo is simply visible —
+ * the placeholder never becomes a permanent grey box.
+ */
+export function initBlurUp(root = document) {
+  const frames = root.querySelectorAll('.media-blur > img[data-blur-img]');
+  frames.forEach((img) => {
+    const frame = img.parentElement;
+    const reveal = () => {
+      img.dataset.hcLoaded = 'done';
+      frame.classList.remove('hc-blur');
+    };
+    if (img.complete && img.naturalWidth) {
+      reveal();
+      return;
+    }
+    frame.classList.add('hc-blur');
+    img.addEventListener('load', reveal, { once: true });
+    // A broken photo reveals the frame rather than leaving a blur forever.
+    img.addEventListener('error', reveal, { once: true });
+  });
+}
+
 function sessionId() {
   try {
     let id = sessionStorage.getItem('hc_session');
@@ -156,6 +237,7 @@ export function observeImpressions(root = document) {
         listing_id: Number(card.dataset.listingId),
         grade: card.dataset.grade,
         price_position: card.dataset.pricePosition,
+        save_data: saveData(),
       });
     });
     return;
@@ -171,6 +253,7 @@ export function observeImpressions(root = document) {
           listing_id: Number(card.dataset.listingId),
           grade: card.dataset.grade,
           price_position: card.dataset.pricePosition,
+          save_data: saveData(),
         });
         observer.unobserve(card);
       });

@@ -33,7 +33,7 @@
                 <th scope="col">
                   <div class="compare-card__media">
                     <% if (listing.primaryImage) { %>
-                      <img src="<%= listing.primaryImage.url %>" alt="<%= helpers.esc(listing.title) %>"
+                      <img src="<%= helpers.photoSrc(listing.primaryImage.url) %>" alt="<%= helpers.esc(listing.title) %>"
                            width="1200" height="900" loading="lazy" decoding="async">
                     <% } %>
                   </div>

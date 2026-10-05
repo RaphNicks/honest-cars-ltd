@@ -285,7 +285,8 @@ async function attachMedia(listings) {
   if (!listings.length) return listings;
   const ids = listings.map((l) => l.id);
   const rows = await query(
-    `SELECT id, listing_id, type, shot_label, url, alt_text, position, width, height
+    `SELECT id, listing_id, type, shot_label, url, poster_url, duration_seconds, size_bytes,
+            alt_text, position, width, height
        FROM listing_media
       WHERE listing_id IN (${ids.map(() => '?').join(',')})
       ORDER BY listing_id, position`,
@@ -299,6 +300,11 @@ async function attachMedia(listings) {
       type: row.type,
       shotLabel: row.shot_label,
       url: row.url,
+      // Video rows carry their own cost (§13.2 tap-to-load label), and a poster
+      // stands in for the frame until someone presses play.
+      poster: row.poster_url || null,
+      seconds: row.duration_seconds === null ? null : Number(row.duration_seconds),
+      bytes: row.size_bytes === null ? null : Number(row.size_bytes),
       alt: row.alt_text,
       position: row.position,
       width: row.width,
@@ -308,8 +314,11 @@ async function attachMedia(listings) {
   for (const listing of listings) {
     const media = byListing.get(listing.id) || [];
     listing.media = media;
-    listing.primaryImage = media[0] || null;
-    listing.imageCount = media.length;
+    // A card's photo can never be the video: photos are what a buyer scrolls,
+    // and rendering an <img> pointing at an .mp4 is the bug this prevents.
+    listing.primaryImage = media.find((entry) => entry.type === 'image') || null;
+    listing.imageCount = media.filter((entry) => entry.type === 'image').length;
+    listing.videoCount = media.filter((entry) => entry.type === 'video').length;
   }
   return listings;
 }
@@ -359,7 +368,8 @@ async function findBySlug(slug, { scope = 'browsable' } = {}) {
   const listing = shapeListing(row);
   await attachMedia([listing]);
   listing.media = listing.media || [];
-  listing.primaryImage = listing.media[0] || null;
+  // attachMedia already picked the first *photo*; this repeat would undo that
+  // and put a video on the card, so it is deliberately not repeated here.
   return listing;
 }
 

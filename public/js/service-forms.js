@@ -11,6 +11,7 @@
  */
 
 import { track, utm } from './events.js';
+import { sendOrQueue, clearDraft } from './drafts.js';
 
 const PHONE_RE = /^[+()\d\s-]{7,20}$/;
 
@@ -100,8 +101,16 @@ export function initServiceForms(root = document) {
         submit.textContent = submit.dataset.label || 'Send';
       }
 
-      if (!result.ok) return fail(result.error || 'That did not send — please try again.');
+      if (!result.ok) {
+        // Queued (§13.2): kept on the device, sent when the connection is back.
+        // The form stays put and the draft stays with it.
+        if (result.queued && errorEl) {
+          errorEl.classList.add('form-error--queued');
+        }
+        return fail(result.error || 'That did not send — please try again.');
+      }
 
+      clearDraft(form);
       renderSuccess(success, { kind, serviceSlug, result });
       form.classList.add('hidden');
       track(kind === 'inspection' || kind === 'consultation' ? 'booking_completed' : 'concierge_step_completed', {
@@ -186,19 +195,15 @@ function buildPayload({ kind, serviceSlug, values }) {
   return { body };
 }
 
+/**
+ * Post a form, and hold it if the connection is what failed (§13.2).
+ *
+ * A refusal from the server (bad phone number, missing field) comes straight
+ * back to the visitor; a network failure queues the enquiry on the device and
+ * says so, rather than throwing away something they took the time to type.
+ */
 export async function post(endpoint, payload) {
-  try {
-    const response = await fetch(endpoint, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ...payload, sourcePath: location.pathname, utm: utm() || null }),
-    });
-    const body = await response.json().catch(() => ({}));
-    if (!response.ok || !body.ok) return { ok: false, error: body.error };
-    return { ok: true, ...body };
-  } catch {
-    return { ok: false, error: 'Network problem — check your connection and try again.' };
-  }
+  return sendOrQueue(endpoint, { ...payload, sourcePath: location.pathname, utm: utm() || null });
 }
 
 export function renderSuccess(container, { kind, serviceSlug, result }) {

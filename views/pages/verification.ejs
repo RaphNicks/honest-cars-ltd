@@ -114,8 +114,9 @@
     <div class="grid grid--3">
       <% catches.forEach(function (item) { %>
         <article class="catch-card">
-          <div class="catch-card__media">
-            <img src="<%= item.image %>" alt="<%= helpers.esc(item.title) %> — illustrative condition photo"
+          <% var catchBlur = helpers.blurFor(item.image); %>
+          <div class="catch-card__media media-blur"<% if (catchBlur) { %> style="background-image:url('<%= catchBlur %>')"<% } %>>
+            <img data-blur-img src="<%= helpers.photoSrc(item.image) %>" alt="<%= helpers.esc(item.title) %> — illustrative condition photo"
                  <% if (helpers.srcsetFor(item.image)) { %>srcset="<%= helpers.srcsetFor(item.image) %>" sizes="(min-width: 1024px) 380px, 92vw"<% } %>
                  width="1200" height="900" loading="lazy" decoding="async">
           </div>

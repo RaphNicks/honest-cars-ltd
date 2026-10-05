@@ -183,6 +183,10 @@ const HIRE_PHOTOS = {
  */
 const BLOG_HEROES = {
   '2015-toyota-camry-honest-buyers-guide': '/img/cars/toyota-camry-silver.jpg',
+  // The photo does not carry the whole slug in its filename; these two posts
+  // were written after the images landed.
+  'first-car-under-10m-port-harcourt': '/img/blog/first-car-under-10m.jpg',
+  'inspection-walkaround-video': '/img/blog/inspection-walkaround-video.jpg',
 };
 
 /** The hire-class photo: the dedicated one if it exists, else the honest match. */

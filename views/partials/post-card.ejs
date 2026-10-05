@@ -1,8 +1,10 @@
 <%# Blog card — “From the Blog” homepage module 8 (§6.1) and /blog grid (§6.9) %>
 <article class="post-card">
-  <div class="post-card__media">
-    <img class="post-card__img" src="<%= post.heroImage %>" alt="<%= helpers.esc(post.heroAlt) %>"
-         width="1200" height="675" loading="lazy" decoding="async">
+  <% var postBlur = helpers.blurFor(post.heroImage); %>
+  <div class="post-card__media media-blur"<% if (postBlur) { %> style="background-image:url('<%= postBlur %>')"<% } %>>
+    <img class="post-card__img" data-blur-img src="<%= helpers.photoSrc(post.heroImage) %>"
+         alt="<%= helpers.esc(post.heroAlt) %>"
+         width="1200" height="900" loading="lazy" decoding="async">
   </div>
   <div class="post-card__body">
     <span class="badge badge--ghost"><%= post.categoryLabel %></span>

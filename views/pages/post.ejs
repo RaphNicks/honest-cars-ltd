@@ -26,8 +26,9 @@
   </header>
 
   <div class="container">
-    <div class="blog-hero__media" style="margin-bottom: var(--space-4)">
-      <img src="<%= post.heroImage %>" alt="<%= helpers.esc(post.heroAlt) %>"
+    <% var postHeroBlur = helpers.blurFor(post.heroImage); %>
+    <div class="blog-hero__media media-blur" style="margin-bottom: var(--space-4)<% if (postHeroBlur) { %>; background-image: url('<%= postHeroBlur %>')<% } %>">
+      <img data-blur-img src="<%= helpers.photoSrc(post.heroImage) %>" alt="<%= helpers.esc(post.heroAlt) %>"
            <% if (helpers.srcsetFor(post.heroImage)) { %>srcset="<%= helpers.srcsetFor(post.heroImage) %>" sizes="(min-width: 1024px) 760px, 92vw"<% } %>
            width="1200" height="900" fetchpriority="high" decoding="async">
     </div>
@@ -120,7 +121,7 @@
         <div class="card card__body">
           <h2 class="mb-1">Get the next one</h2>
           <p class="mb-2">One message when a deal matches your budget. No spam, unsubscribe by replying STOP.</p>
-          <form class="alert-form" data-lead-form data-lead-type="deal_alert" novalidate>
+          <form class="alert-form" data-lead-form data-lead-type="deal_alert" data-draft="deal-alert" novalidate>
             <label class="visually-hidden" for="post-alert-phone">WhatsApp number</label>
             <input class="input" id="post-alert-phone" name="phone" type="tel" inputmode="numeric" placeholder="080 0000 0000" required>
             <button class="btn btn--primary btn--block" type="submit" data-submit>Send me deals</button>

@@ -10,10 +10,12 @@
 %>
 <% var eager = typeof eager === 'undefined' ? false : eager; %>
 <article class="car-card" data-listing-card data-listing-id="<%= listing.id %>" data-stock="<%= listing.stockNo %>">
-  <div class="car-card__media">
+  <div class="car-card__media media-blur"
+       <% var cardBlur = listing.primaryImage ? helpers.blurFor(listing.primaryImage.url) : null; %>
+       <% if (cardBlur) { %>style="background-image:url('<%= cardBlur %>')"<% } %>>
     <% if (listing.primaryImage) { %>
-      <img class="car-card__img"
-           src="<%= listing.primaryImage.url %>"
+      <img class="car-card__img" data-blur-img
+           src="<%= helpers.photoSrc(listing.primaryImage.url) %>"
            <% if (helpers.srcsetFor(listing.primaryImage.url)) { %>srcset="<%= helpers.srcsetFor(listing.primaryImage.url) %>" sizes="(min-width: 1024px) 320px, (min-width: 640px) 45vw, 92vw"<% } %>
            alt="<%= helpers.esc(listing.primaryImage.alt) %>"
            width="1200" height="900"
