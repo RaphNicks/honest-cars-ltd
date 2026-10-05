@@ -82,10 +82,10 @@ const BUILT = [
 
 /**
  * PRD §7 routes still to port. The back office is complete: §7.1 accounts,
- * §7.2 dealer portal, §7.3 console (including the price-intel table) and §7.4
- * roles are all live. What is left is not a screen but an integration — live
- * PSP keys, an OTP/SMS provider, email and telematics — so nothing is listed
- * here until that work is scoped.
+ * §7.2 dealer portal, §7.3 console (the price-intel table and the four reports)
+ * and §7.4 roles are all live. What is left is not a screen but an integration —
+ * live PSP keys, an OTP/SMS provider, email and telematics — so nothing is
+ * listed here until that work is scoped.
  */
 const PENDING = [];
 

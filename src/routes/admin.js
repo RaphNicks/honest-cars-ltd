@@ -33,6 +33,7 @@ const paymentService = require('../services/payments');
 const alertsService = require('../services/alerts');
 const money = require('../lib/money');
 const report = require('../services/report');
+const reportExport = require('../services/report-export');
 const { sendPage, CACHE } = require('../lib/respond');
 
 const router = express.Router();
@@ -51,6 +52,7 @@ const PATHS = {
   milestones: `${HOME}/milestones`,
   alerts: `${HOME}/alerts`,
   intel: `${HOME}/intel`,
+  reports: `${HOME}/reports`,
   staff: `${HOME}/staff`,
   audit: `${HOME}/audit`,
 };
@@ -68,6 +70,7 @@ const NAV = [
   { href: PATHS.milestones, label: 'Escrow', icon: 'shield', capability: 'payments.view' },
   { href: PATHS.alerts, label: 'Alerts', icon: 'bell', capability: 'intel.manage' },
   { href: PATHS.intel, label: 'Price intel', icon: 'gauge', capability: 'pricing.view' },
+  { href: PATHS.reports, label: 'Reports', icon: 'fileCheck', capability: 'reports.view' },
   { href: `${HOME}/cms`, label: 'Content', icon: 'fileCheck', capability: 'cms.manage' },
   { href: PATHS.staff, label: 'Staff & roles', icon: 'account', capability: 'users.manage' },
   { href: PATHS.audit, label: 'Audit log', icon: 'shield', capability: 'users.manage' },
@@ -1222,6 +1225,81 @@ router.post('/intel/bands/:id/refresh', auth.requireStaff('pricing.manage'), aut
     if (!result.ok) return done(res, PATHS.intel, result.error, { error: true });
     const { band } = result;
     return done(res, PATHS.intel, `${band.make} ${band.model} ${band.yearFrom}–${band.yearTo} checked against ${band.sampleSize} comparables today.`);
+  } catch (error) {
+    return next(error);
+  }
+});
+
+/**
+ * §7.3 Reports — date-ranged exports by pillar, inspector, dealer and UTM.
+ *
+ * One screen, four shapes, two file formats. `?by=` picks the report, `from`/`to`
+ * the window, and `?format=csv|pdf` returns the file instead of the page — so the
+ * file always carries the window the reader had on screen.
+ *
+ * Read-only by construction: nothing below writes a row, which is why every role
+ * with `reports.view` may pull the whole window (§7.4).
+ */
+router.get('/reports', auth.requireStaff('reports.view'), async (req, res, next) => {
+  try {
+    const by = validate.oneOf(req.query.by, Object.keys(db.reports.REPORTS), 'pillar');
+    const spec = db.reports.REPORTS[by];
+    const format = validate.oneOf(req.query.format, ['csv', 'pdf'], null);
+
+    // Absent or unparseable dates fall back to the last 30 days rather than
+    // erroring: the console opens on a working window without being asked.
+    const today = new Date().toISOString().slice(0, 10);
+    const from = validate.text(req.query.from, 10) || null;
+    const to = validate.text(req.query.to, 10) || null;
+    const window = {
+      from: from && /^\d{4}-\d{2}-\d{2}$/.test(from) ? from : null,
+      to: to && /^\d{4}-\d{2}-\d{2}$/.test(to) ? to : null,
+    };
+    const bounds = db.reports.windowBounds(window);
+
+    const rows = await spec.rows(window);
+
+    if (format) {
+      const meta = [
+        ['Window', `${bounds.start.slice(0, 10)} to ${window.to || today}`],
+        ['Rows', String(rows.length)],
+        ['Requested by', req.user.name || req.user.phone],
+      ];
+      const name = reportExport.fileName(by, { from: bounds.start.slice(0, 10), to: window.to || today }, format);
+      res.set({ 'Cache-Control': 'private, no-store' });
+      if (format === 'csv') {
+        res.set({
+          'Content-Type': 'text/csv; charset=utf-8',
+          'Content-Disposition': `attachment; filename="${name}"`,
+        });
+        return res.send(reportExport.csv({ title: spec.label, description: spec.description, columns: spec.columns, rows, meta }));
+      }
+      res.set({
+        'Content-Type': 'application/pdf',
+        'Content-Disposition': `attachment; filename="${name}"`,
+      });
+      return reportExport.pdf({ title: `Report — ${spec.label}`, description: spec.description, columns: spec.columns, rows, meta }).pipe(res);
+    }
+
+    return await page(req, res, {
+      view: 'admin/reports',
+      active: PATHS.reports,
+      title: 'Reports',
+      description: 'Date-ranged exports by pillar, inspector, dealer and acquisition channel.',
+      data: {
+        by,
+        spec,
+        reports: db.reports.REPORTS,
+        rows,
+        columns: spec.columns,
+        from: bounds.start.slice(0, 10),
+        to: window.to || today,
+        today,
+        cell: reportExport.cell,
+        naira: money.formatNaira,
+        canExport: true,
+      },
+    });
   } catch (error) {
     return next(error);
   }

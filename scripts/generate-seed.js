@@ -1209,6 +1209,18 @@ INSERT INTO subscriptions (order_id, product_id, customer_name, customer_phone, 
 -- ---------------------------------------------------------------------------
 UPDATE vehicle_listings SET archive_redirect_path = CONCAT('/cars/', LOWER(REPLACE(make, ' ', '-')))
  WHERE status = 'sold' AND sold_at <= DATE_SUB(UTC_TIMESTAMP(), INTERVAL 90 DAY);
+
+-- ---------------------------------------------------------------------------
+-- §7.3 UTM report: the links the demo traffic actually arrived on. Keyed off
+-- the lead id, so the same lead always reports the same campaign — a report
+-- that reshuffles itself on every load is worse than no report. One bucket in
+-- five stays NULL on purpose: "direct / none" is a real answer, and hiding it
+-- would make the channel mix look tidier than it is.
+-- ---------------------------------------------------------------------------
+UPDATE leads SET utm = JSON_OBJECT('source', 'instagram', 'medium', 'social', 'campaign', 'ph-suv-september') WHERE id % 5 = 0;
+UPDATE leads SET utm = JSON_OBJECT('source', 'google',    'medium', 'cpc',    'campaign', 'ph-inspection-search') WHERE id % 5 = 1;
+UPDATE leads SET utm = JSON_OBJECT('source', 'facebook',  'medium', 'social', 'campaign', 'ph-diesel-trucks') WHERE id % 5 = 2;
+UPDATE leads SET utm = JSON_OBJECT('source', 'whatsapp',  'medium', 'referral', 'campaign', 'dealer-referral') WHERE id % 5 = 3;
 `);
   return out.join('\n');
 }
