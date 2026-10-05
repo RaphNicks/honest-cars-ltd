@@ -188,6 +188,13 @@ test.after(async () => {
     await db.query('DELETE FROM notifications WHERE id > ?', [notificationIdBefore]);
     for (const id of createdLedger) await db.query('DELETE FROM admin_audit WHERE entity = ? AND entity_id = ?', ['dealer_ledger', id]);
     for (const id of createdLedger) await db.query('DELETE FROM dealer_ledger WHERE id = ?', [id]);
+    // Audit rows first, by the entity each one names — scoped to the ids this
+    // suite created, so nothing a parallel suite wrote is touched. Left behind,
+    // they read as real history in the console while pointing at rows that no
+    // longer exist.
+    for (const id of createdMilestones) await db.query('DELETE FROM admin_audit WHERE entity = ? AND entity_id = ?', ['milestone', id]);
+    for (const id of createdPayments) await db.query('DELETE FROM admin_audit WHERE entity = ? AND entity_id = ?', ['payment', id]);
+    for (const id of createdOrders) await db.query('DELETE FROM admin_audit WHERE entity = ? AND entity_id = ?', ['order', id]);
     for (const id of createdMilestones) await db.query('DELETE FROM payment_milestones WHERE id = ?', [id]);
     for (const id of createdPayments) {
       await db.query('DELETE FROM payment_events WHERE payment_id = ?', [id]);
@@ -196,11 +203,18 @@ test.after(async () => {
     for (const id of createdOrders) await db.query('DELETE FROM orders WHERE id = ?', [id]);
     if (createdBooking) await db.query('DELETE FROM bookings WHERE id = ?', [createdBooking.id]);
     if (createdPhones.size) {
-      const phones = [...createdPhones];
-      await db.query(`DELETE FROM sessions WHERE user_id IN (SELECT id FROM \`users\` WHERE phone IN (${phones.map(() => '?').join(',')}))`, phones);
-      await db.query(`DELETE FROM auth_codes WHERE phone IN (${phones.map(() => '?').join(',')})`, phones);
-      await db.query(`DELETE FROM notifications WHERE recipient IN (${phones.map(() => '?').join(',')})`, phones);
-      for (const phone of phones) await db.query('DELETE FROM `users` WHERE phone = ?', [phone]);
+      // Matched on every stored form of the number: the suite tracks the local
+      // 0806… it signs in with, while the row holds +234806…. Same expansion as
+      // test/admin.test.js — without it these accounts pile up in /admin/staff
+      // on every run.
+      const { variants } = require('../src/lib/phone');
+      const shapes = [...new Set([...createdPhones].flatMap((number) => variants(number)))];
+      const marks = shapes.map(() => '?').join(',');
+      await db.query(`DELETE FROM sessions WHERE user_id IN (SELECT id FROM \`users\` WHERE phone IN (${marks}))`, shapes);
+      await db.query(`DELETE FROM auth_codes WHERE phone IN (${marks})`, shapes);
+      await db.query(`DELETE FROM notifications WHERE recipient IN (${marks})`, shapes);
+      await db.query(`UPDATE admin_audit SET actor_id = NULL WHERE actor_id IN (SELECT id FROM \`users\` WHERE phone IN (${marks}))`, shapes);
+      await db.query(`DELETE FROM \`users\` WHERE phone IN (${marks})`, shapes);
     }
     await db.pool.end();
   }

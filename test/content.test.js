@@ -34,8 +34,28 @@ test.before(async () => {
 });
 
 test.after(async () => {
-  // Close the pool or the mysql2 sockets keep the test runner alive.
-  if (available) await require('../src/db').pool.end();
+  if (available) {
+    const db = require('../src/db');
+    // Guest checkout below runs against a fixed number so the assertions can
+    // read back a known order. It is the only fixture this suite writes, and it
+    // is not a real customer — take its orders, subscriptions, notifications and
+    // any request a purchase opened with it, or the demo console slowly fills
+    // with test money.
+    const { variants } = require('../src/lib/phone');
+    const shapes = variants('08030000009');
+    const marks = shapes.map(() => '?').join(',');
+    const orders = await db.query(`SELECT id FROM orders WHERE phone IN (${marks})`, shapes);
+    for (const order of orders) {
+      await db.query('DELETE FROM notifications WHERE entity = ? AND entity_id = ?', ['order', order.id]);
+    }
+    await db.query(`DELETE FROM subscriptions WHERE customer_phone IN (${marks})`, shapes);
+    await db.query(`DELETE FROM service_requests WHERE phone IN (${marks})`, shapes);
+    await db.query(`DELETE FROM notifications WHERE recipient IN (${marks})`, shapes);
+    await db.query(`DELETE FROM payments WHERE customer_phone IN (${marks})`, shapes);
+    await db.query(`DELETE FROM orders WHERE phone IN (${marks})`, shapes);
+    // Close the pool or the mysql2 sockets keep the test runner alive.
+    await db.pool.end();
+  }
 });
 
 // ---------------------------------------------------------------------------

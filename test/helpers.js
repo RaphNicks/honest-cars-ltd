@@ -59,4 +59,52 @@ async function getHtml(baseUrl, routePath) {
   return { response, html: await response.text() };
 }
 
-module.exports = { ROOT, dbAvailable, startTestServer, runScript, getHtml };
+// ---------------------------------------------------------------------------
+// Test-only housekeeping
+// ---------------------------------------------------------------------------
+
+/**
+ * Which table each audited entity names. Every entry here is a row this
+ * project's tests create and then hard-delete.
+ */
+const AUDIT_SUBJECTS = {
+  booking: 'bookings',
+  faq: 'faqs',
+  homepage: 'homepage_modules',
+  lead: 'leads',
+  listing: 'vehicle_listings',
+  milestone: 'payment_milestones',
+  order: 'orders',
+  payment: 'payments',
+  post: 'blog_posts',
+  request: 'service_requests',
+  testimonial: 'testimonials',
+  user: 'users',
+};
+
+/**
+ * Drop audit rows whose subject no longer exists.
+ *
+ * `admin_audit` is append-only on purpose: production history must outlive the
+ * row it describes, so the application never prunes it. A test suite is the one
+ * caller that should — it creates a fixture, exercises it, deletes it again, and
+ * otherwise leaves records in /admin/audit naming rows that are gone, which reads
+ * as real (and confusing) history in the console. Call it from a suite's
+ * teardown, never from application code.
+ */
+async function sweepOrphanAudit(query) {
+  let removed = 0;
+  for (const [entity, table] of Object.entries(AUDIT_SUBJECTS)) {
+    const marked = (await query(
+      `SELECT id FROM admin_audit WHERE entity = ? AND entity_id NOT IN (SELECT id FROM \`${table}\`)`,
+      [entity],
+    )).map((row) => row.id);
+    if (!marked.length) continue;
+    const marks = marked.map(() => '?').join(',');
+    const result = await query(`DELETE FROM admin_audit WHERE id IN (${marks})`, marked);
+    removed += result.affectedRows || 0;
+  }
+  return removed;
+}
+
+module.exports = { ROOT, dbAvailable, startTestServer, runScript, getHtml, sweepOrphanAudit };

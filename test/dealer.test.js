@@ -19,7 +19,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 
-const { dbAvailable, startTestServer } = require('./helpers');
+const { dbAvailable, startTestServer, sweepOrphanAudit } = require('./helpers');
 
 /** One column, one row — for the small "what does the database say now" checks. */
 async function scalar(db, sql, params) {
@@ -129,6 +129,8 @@ test.after(async () => {
     await db.query(`DELETE FROM sessions WHERE user_id IN (${created.userIds.map(() => '?').join(',')})`, created.userIds);
     await db.query(`DELETE FROM users WHERE id IN (${created.userIds.map(() => '?').join(',')})`, created.userIds);
   }
+  // Fixtures gone; drop the audit rows naming them (see test/helpers.js).
+  await sweepOrphanAudit(db.query);
   await db.pool.end();
 });
 

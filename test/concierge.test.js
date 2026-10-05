@@ -149,18 +149,24 @@ test.after(async () => {
   // the messages the retainer sent. A parallel suite's notifications are safe.
   for (const id of createdPayments) {
     await db.query('DELETE FROM notifications WHERE entity = ? AND entity_id = ?', ['payment', id]);
+    // Confirming and refunding a retainer is audited, so the test leaves audit
+    // rows behind unless it removes them: they would read as real money history
+    // in the console while pointing at payments that no longer exist.
+    await db.query('DELETE FROM admin_audit WHERE entity = ? AND entity_id = ?', ['payment', id]);
     await db.query('DELETE FROM payment_events WHERE payment_id = ?', [id]);
     await db.query('DELETE FROM payments WHERE id = ?', [id]);
   }
   for (const id of createdRequests) await db.query('DELETE FROM service_requests WHERE id = ?', [id]);
   if (createdPhones.size) {
-    const phones = [...createdPhones];
-    const marks = phones.map(() => '?').join(',');
-    await db.query(`DELETE FROM notifications WHERE recipient IN (${marks})`, phones);
-    await db.query(`DELETE FROM leads WHERE phone IN (${marks})`, phones);
-    await db.query(`DELETE FROM sessions WHERE user_id IN (SELECT id FROM \`users\` WHERE phone IN (${marks}))`, phones);
-    await db.query(`DELETE FROM auth_codes WHERE phone IN (${marks})`, phones);
-    await db.query(`DELETE FROM \`users\` WHERE phone IN (${marks})`, phones);
+    // Every stored form of the number — see the note in test/intel.test.js.
+    const { variants } = require('../src/lib/phone');
+    const shapes = [...new Set([...createdPhones].flatMap((number) => variants(number)))];
+    const marks = shapes.map(() => '?').join(',');
+    await db.query(`DELETE FROM notifications WHERE recipient IN (${marks})`, shapes);
+    await db.query(`DELETE FROM leads WHERE phone IN (${marks})`, shapes);
+    await db.query(`DELETE FROM sessions WHERE user_id IN (SELECT id FROM \`users\` WHERE phone IN (${marks}))`, shapes);
+    await db.query(`DELETE FROM auth_codes WHERE phone IN (${marks})`, shapes);
+    await db.query(`DELETE FROM \`users\` WHERE phone IN (${marks})`, shapes);
   }
   // Each test file is its own process; close the pool or the runner hangs.
   await db.pool.end();

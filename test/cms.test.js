@@ -15,7 +15,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 
-const { dbAvailable } = require('./helpers');
+const { dbAvailable,  sweepOrphanAudit } = require('./helpers');
 
 let available = false;
 let db;
@@ -74,6 +74,8 @@ test.after(async () => {
   await db.query("DELETE FROM content_revisions WHERE entity = 'post' AND slug LIKE 'test-post-%'");
   await db.query("DELETE FROM faqs WHERE question LIKE 'Clamp test%' OR question LIKE 'Revision kept%'");
   await db.query("DELETE FROM testimonials WHERE customer_name = 'Test Person'");
+  // The content is gone; drop the audit rows that named it (see test/helpers.js).
+  await sweepOrphanAudit(db.query);
   await db.pool.end();
 });
 
@@ -353,6 +355,9 @@ maybe('homepage modules read back only when active, and counters never hold a fi
   assert.ok(counterModule, 'counters module exists');
 
   const before = counterModule.isActive;
+  // The counters module is seed content, so toggling it writes into the real
+  // audit log — remember the watermark and take this test's entry back out.
+  const auditWatermark = (await db.queryOne('SELECT COALESCE(MAX(id), 0) AS id FROM admin_audit')).id;
   await cms.saveHomepageModule(counterModule.id, { title: counterModule.title, is_active: '1', payload: JSON.stringify(counterModule.payload) }, { actorId: 1 });
   const nowActive = await cms.homepageModules();
   assert.ok(nowActive.counters, 'an active module is returned to the homepage');
@@ -367,6 +372,11 @@ maybe('homepage modules read back only when active, and counters never hold a fi
   if (!before) {
     await cms.saveHomepageModule(counterModule.id, { title: counterModule.title, is_active: '', payload: JSON.stringify(counterModule.payload) }, { actorId: 1 });
   }
+  await db.query("DELETE FROM admin_audit WHERE entity = 'homepage' AND entity_id = ? AND action = ? AND id > ?", [
+    counterModule.id,
+    'cms.homepage.update',
+    auditWatermark,
+  ]);
 });
 
 maybe('module payloads that are not valid JSON are refused, not stored', async () => {

@@ -18,7 +18,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 
-const { dbAvailable, startTestServer } = require('./helpers');
+const { dbAvailable, startTestServer, sweepOrphanAudit } = require('./helpers');
 const roles = require('../src/services/roles');
 
 let available = false;
@@ -186,6 +186,9 @@ test.after(async () => {
       await db.query(`UPDATE admin_audit SET actor_id = NULL WHERE actor_id IN (SELECT id FROM \`users\` WHERE phone IN (${marks}))`, shapes);
       await db.query(`DELETE FROM \`users\` WHERE phone IN (${marks})`, shapes);
     }
+    // The fixtures above are gone; drop the audit rows that named them so
+    // /admin/audit shows history about rows that exist (see test/helpers.js).
+    await sweepOrphanAudit(db.query);
     // Release the pool so the test runner exits instead of waiting on MySQL.
     await db.pool.end();
   }
@@ -534,6 +537,9 @@ maybe('a request opens into its brief and its attached cars', async () => {
 maybe('cars can be attached to a request and removed again', async () => {
   const request = await db.queryOne("SELECT id FROM service_requests WHERE tracking_id = 'HC-2487'");
   const id = await scratchListing({ status: 'live' });
+  // HC-2487 is seeded, so this test writes into real history: remember where the
+  // log stood and take its own two entries back out at the end.
+  const auditWatermark = (await db.queryOne('SELECT COALESCE(MAX(id), 0) AS id FROM admin_audit')).id;
 
   const attached = await accounts.admin.client.post(`/admin/concierge/${request.id}/candidates`, {
     listing_id: String(id),
@@ -548,6 +554,10 @@ maybe('cars can be attached to a request and removed again', async () => {
   const removed = await accounts.admin.client.post(`/admin/concierge/${request.id}/candidates/${id}/remove`, {});
   assert.equal(removed.status, 303);
   assert.equal((await db.query('SELECT id FROM request_candidates WHERE request_id = ? AND listing_id = ?', [request.id, id])).length, 0);
+  await db.query(
+    'DELETE FROM admin_audit WHERE entity = ? AND entity_id = ? AND action IN (?, ?) AND id > ?',
+    ['request', request.id, 'request.candidate_add', 'request.candidate_remove', auditWatermark],
+  );
 });
 
 maybe('attaching a car that does not exist is refused', async () => {
