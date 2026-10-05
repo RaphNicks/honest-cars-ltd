@@ -14,6 +14,7 @@ const express = require('express');
 const config = require('../config');
 const db = require('../db');
 const seo = require('../services/seo');
+const compare = require('../services/compare');
 const listingQuery = require('../services/listing-query');
 const sitemap = require('../services/sitemap');
 const slice = require('../services/slice');
@@ -187,48 +188,6 @@ async function buildFacetLocals(facet) {
 // Rendered server-side from ?ids= so a shared link shows the same table, and
 // hydrated by compare.js from the device’s comparison list.
 // ---------------------------------------------------------------------------
-const COMPARE_ROWS = [
-  { key: 'priceKobo', label: 'Price', best: 'min', format: 'naira' },
-  { key: 'pricePosition', label: 'Price position', format: 'position' },
-  { key: 'year', label: 'Year', best: 'max' },
-  { key: 'mileageKm', label: 'Mileage', best: 'min', format: 'mileage' },
-  { key: 'transmissionLabel', label: 'Transmission' },
-  { key: 'fuelTypeLabel', label: 'Fuel' },
-  { key: 'conditionLabel', label: 'Condition' },
-  { key: 'grade', label: 'Verification grade', best: 'grade', format: 'grade' },
-  { key: 'documentsSummary', label: 'Documents', format: 'documents' },
-  { key: 'knownFaults', label: 'Known faults (certified)', format: 'faults' },
-  { key: 'runningCostKobo', label: 'Running cost — 5-year estimate', best: 'min', format: 'naira' },
-];
-
-function compareValue(listing, key) {
-  switch (key) {
-    case 'documentsSummary':
-      return listing.documentsSummary || '';
-    case 'knownFaults':
-      return listing.knownFaults || '';
-    default:
-      return listing[key];
-  }
-}
-
-function gradeRank(grade) {
-  return { network_listed: 1, field_checked: 2, certified: 3 }[grade] || 0;
-}
-
-function bestValueIndex(listings, row) {
-  if (!row.best || listings.length < 2) return -1;
-  const values = listings.map((listing) => {
-    const value = compareValue(listing, row.key);
-    if (row.best === 'grade') return gradeRank(listing.grade);
-    if (row.best === 'documents') return value ? 1 : 0;
-    return Number(value);
-  });
-  const target = row.best === 'max' ? Math.max(...values) : Math.min(...values);
-  // "Best" is only a highlight — ties keep every winning cell green.
-  return values.findIndex((value) => value === target);
-}
-
 router.get('/cars/compare', async (req, res, next) => {
   try {
     const ids = String(req.query.ids || '')
@@ -238,20 +197,13 @@ router.get('/cars/compare', async (req, res, next) => {
       .slice(0, 3);
     const listings = await db.listings.findByIds(ids);
 
-    const rows = COMPARE_ROWS.map((row) => ({
-      ...row,
-      values: listings.map((listing) => {
-        const raw = compareValue(listing, row.key);
-        if (row.format === 'naira') return raw ? db.shape.formatNaira(raw) : '—';
-        if (row.format === 'mileage') return raw ? db.shape.formatMileage(raw) : '—';
-        if (row.format === 'grade') return listing.gradeLabel || '—';
-        if (row.format === 'position') return listing.pricePositionLabel || '—';
-        if (row.format === 'documents') return listing.documentsSummary || '—';
-        if (row.format === 'faults') return listing.knownFaults || '—';
-        return raw === null || raw === undefined ? '—' : String(raw);
-      }),
-      bestIndex: bestValueIndex(listings, row),
-    }));
+    // One definition of the comparison, shared with the concierge shortlist
+    // (§7.3): the buyer's shortlist and the visitor's compare tool must never
+    // disagree about what a row means.
+    const rows = compare.rowsFor(listings, {
+      formatNaira: db.shape.formatNaira,
+      formatMileage: db.shape.formatMileage,
+    });
 
     const trail = [{ label: 'Cars', href: '/cars' }, { label: 'Compare' }];
     const canonical = ids.length ? `/cars/compare?ids=${listings.map((l) => l.id).join(',')}` : '/cars/compare';

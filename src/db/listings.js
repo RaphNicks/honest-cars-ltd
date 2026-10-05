@@ -427,8 +427,14 @@ async function bySlugs(slugs = []) {
   return clean.map((slug) => bySlug.get(slug)).filter(Boolean);
 }
 
-async function findByIds(ids = []) {
-  const clean = ids.map((id) => Number.parseInt(id, 10)).filter((id) => Number.isFinite(id)).slice(0, 3);
+/**
+ * Fetch these listings, in the order asked for. The default cap of three is
+ * §6.4's comparison limit; a caller that is not comparing (the concierge
+ * shortlist, §7.3) asks for its own cap and gets cards for all of them.
+ */
+async function findByIds(ids = [], { limit = 3 } = {}) {
+  const cap = Math.max(1, Math.min(24, Number(limit) || 3));
+  const clean = ids.map((id) => Number.parseInt(id, 10)).filter((id) => Number.isFinite(id)).slice(0, cap);
   if (!clean.length) return [];
   const rows = await query(
     `SELECT l.*, d.name AS dealer_name, d.lot_area AS dealer_area, d.verified AS dealer_verified

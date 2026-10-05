@@ -123,6 +123,29 @@ async function updateStatus(trackingId, status, notes = null) {
   return findByTracking(trackingId);
 }
 
+/**
+ * §7.3 — the shortlist attached to a request, as the buyer sees it.
+ *
+ * Ops curate these rows in the console (`admin.attachCandidate`); the customer's
+ * status page and its PDF are rendered from them. Deliberately narrow: rank and
+ * note are the team's work, `added_by` and audit ids are not the customer's
+ * business, so they are not selected at all rather than filtered later.
+ */
+async function candidatesFor(requestId) {
+  const rows = await query(
+    `SELECT c.listing_id, c.note, c.rank_no
+       FROM request_candidates c
+      WHERE c.request_id = ?
+      ORDER BY c.rank_no, c.id`,
+    [requestId],
+  );
+  return rows.map((row) => ({
+    listingId: Number(row.listing_id),
+    note: row.note,
+    rank: Number(row.rank_no),
+  }));
+}
+
 /** /account “Requests” card — phone-number-first, no password yet (§7.1). */
 async function listRequestsForPhone(phone) {
   const shapes = phones.variants(phone);
@@ -241,6 +264,7 @@ module.exports = {
   findByTracking,
   updateStatus,
   listRequestsForPhone,
+  candidatesFor,
   createBooking,
   findByReference,
   listBookingsForPhone,
