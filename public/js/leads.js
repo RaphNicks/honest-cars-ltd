@@ -6,7 +6,7 @@
  * Works without JavaScript too — the markup is a form with a real action.
  */
 
-import { track } from './events.js';
+import { track, utm } from './events.js';
 
 export function initViewingModal(root = document) {
   const modal = root.getElementById('viewing-modal');
@@ -77,6 +77,7 @@ export function initViewingModal(root = document) {
       preferredDay: data.get('preferred_day') || null,
       message: data.get('message') || null,
       sourcePath: location.pathname,
+      utm: utm() || null,
     };
 
     const result = await postLead(payload);

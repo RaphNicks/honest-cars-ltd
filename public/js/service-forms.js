@@ -10,7 +10,7 @@
  * the page to be usable — it only removes the round-trip.
  */
 
-import { track } from './events.js';
+import { track, utm } from './events.js';
 
 const PHONE_RE = /^[+()\d\s-]{7,20}$/;
 
@@ -191,7 +191,7 @@ export async function post(endpoint, payload) {
     const response = await fetch(endpoint, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ...payload, sourcePath: location.pathname }),
+      body: JSON.stringify({ ...payload, sourcePath: location.pathname, utm: utm() || null }),
     });
     const body = await response.json().catch(() => ({}));
     if (!response.ok || !body.ok) return { ok: false, error: body.error };

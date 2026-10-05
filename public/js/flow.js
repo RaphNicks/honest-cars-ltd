@@ -12,7 +12,7 @@
  * real form with real fields — it just loses the step-by-step guidance.
  */
 
-import { track } from './events.js';
+import { track, utm } from './events.js';
 import { post, renderSuccess } from './service-forms.js';
 
 const PHONE_RE = /^[+()\d\s-]{7,20}$/;
@@ -246,6 +246,7 @@ export function initFlows(root = document) {
         sla: slaInput ? slaInput.value : undefined,
         slaHours: slaInput ? Number(slaInput.dataset.slaHours) : undefined,
         sourcePath: location.pathname,
+        utm: utm() || null,
       });
 
       if (submit) {

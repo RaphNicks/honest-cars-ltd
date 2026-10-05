@@ -7,6 +7,7 @@
 
 const { query, queryOne } = require('./pool');
 const phones = require('../lib/phone');
+const { sanitizeUtm } = require('../lib/campaign');
 
 const LEAD_TYPES = ['viewing', 'concierge', 'sell_swap', 'hire', 'service', 'parts', 'b2b', 'deal_alert'];
 
@@ -23,7 +24,10 @@ async function createLead(lead) {
       lead.message ? String(lead.message).slice(0, 2000) : null,
       lead.preferredDay || null,
       String(lead.sourcePath || '/').slice(0, 200),
-      lead.utm ? JSON.stringify(lead.utm).slice(0, 2000) : null,
+      // Cleaned here rather than at each caller: there are four entry points
+      // (viewing, concierge, sell/swap, services) and the campaign must land
+      // identically from all of them, or §15.2's channel report is wrong.
+      sanitizeUtm(lead.utm) ? JSON.stringify(sanitizeUtm(lead.utm)).slice(0, 2000) : null,
     ],
   );
   if (lead.listingId) {

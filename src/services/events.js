@@ -1,5 +1,7 @@
 'use strict';
 
+const { UTM_KEYS, sanitizeUtm } = require('../lib/campaign');
+
 /**
  * §15.1 event plan — the single contract shared by the browser and the server.
  *
@@ -90,6 +92,7 @@ const ALLOWED_PAYLOAD_KEYS = new Set([
   'scroll_depth',
   'share_target',
   'result_count',
+  'utm',
   'make',
   'model',
 ]);
@@ -100,6 +103,11 @@ function sanitizePayload(payload) {
   const out = {};
   for (const [key, value] of Object.entries(payload)) {
     if (!ALLOWED_PAYLOAD_KEYS.has(key)) continue;
+    if (key === 'utm') {
+      const campaign = sanitizeUtm(value);
+      if (campaign) out.utm = campaign;
+      continue;
+    }
     if (value === null || value === undefined) continue;
     if (typeof value === 'string') out[key] = value.slice(0, 200);
     else if (typeof value === 'number' || typeof value === 'boolean') out[key] = value;
@@ -109,4 +117,4 @@ function sanitizePayload(payload) {
   return Object.keys(out).length ? out : null;
 }
 
-module.exports = { EVENTS, EVENT_NAMES, SERVER_ONLY, ALLOWED_PAYLOAD_KEYS, sanitizePayload };
+module.exports = { EVENTS, EVENT_NAMES, SERVER_ONLY, ALLOWED_PAYLOAD_KEYS, UTM_KEYS, sanitizeUtm, sanitizePayload };

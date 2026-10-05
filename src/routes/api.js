@@ -194,6 +194,9 @@ router.post('/service-requests', rateLimit({ windowMs: 60_000, max: 10 }), async
       phone,
       message: `Service request ${request.trackingId} (${rule.type})`,
       sourcePath: body.sourcePath || req.get('referer') || '/',
+      // The brief carries the campaign too — a concierge request from an
+      // Instagram link is an Instagram lead, not an unattributed one.
+      utm: body.utm || null,
     }).catch(() => {});
 
     await db.analytics

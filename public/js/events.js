@@ -15,6 +15,46 @@ const ALLOWED = new Set((window.HonestCars && window.HonestCars.eventNames) || [
 let queue = [];
 let timer = null;
 
+/** The five UTM parameters worth storing — the names Google/analytics use. */
+const UTM_KEYS = ['source', 'medium', 'campaign', 'content', 'term'];
+
+/**
+ * First-touch campaign for this session, or {}.
+ *
+ * Read once from the landing URL and kept in sessionStorage: a visitor who
+ * arrives on an Instagram link and browses to a listing before enquiring must
+ * still be credited to Instagram, not to the page they happened to be on when
+ * they filled the form. Session-scoped, not a cookie — nothing follows them
+ * around the web, and closing the tab forgets it (§12.2, minimal PII).
+ *
+ * `gclid`/`fbclid` are counted as paid clicks from those networks, because that
+ * is what they are; a campaign with neither UTM nor a click id is recorded as
+ * no campaign, which is an honest answer rather than a guessed one.
+ */
+export function utm() {
+  try {
+    const stored = sessionStorage.getItem('hc_utm');
+    if (stored) return JSON.parse(stored) || {};
+
+    const params = new URLSearchParams(location.search);
+    const found = {};
+    for (const key of UTM_KEYS) {
+      const value = params.get(`utm_${key}`);
+      if (value) found[key] = value.slice(0, 80);
+    }
+    if (!found.source) {
+      if (params.get('gclid')) found.source = 'google';
+      else if (params.get('fbclid')) found.source = 'facebook';
+      if (found.source && !found.medium) found.medium = 'cpc';
+    }
+    if (Object.keys(found).length) sessionStorage.setItem('hc_utm', JSON.stringify(found));
+    return found;
+  } catch {
+    /* private mode, or a storage quota — attribution is not worth breaking a page */
+    return {};
+  }
+}
+
 function sessionId() {
   try {
     let id = sessionStorage.getItem('hc_session');
@@ -37,7 +77,15 @@ export function track(name, payload = {}) {
     return;
   }
 
-  queue.push({ name, payload: { ...payload, source: payload.source || config.source } });
+  const campaign = utm();
+  queue.push({
+    name,
+    payload: {
+      ...payload,
+      source: payload.source || config.source,
+      ...(Object.keys(campaign).length ? { utm: campaign } : {}),
+    },
+  });
 
   // Mirror into GA4 when it is configured.
   if (typeof window.gtag === 'function') {
