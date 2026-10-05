@@ -598,7 +598,12 @@ DELETE FROM dealers;
       const ratio = (y - cat.years[0]) / span;
       const lo = cat.band[0] + (cat.band[1] - cat.band[0]) * ratio * 0.85;
       const hi = lo + (cat.band[1] - cat.band[0]) * 0.22;
-      bands.push([cat.make, cat.model, y, Math.min(y + 2, cat.years[1]), 'any', millions(lo), millions(hi), int(6, 40), new Date(Date.UTC(2026, 8, 21))]);
+      // §7.3 asks for a weekly pass, so the demo opens with a real mix: most
+      // bands are days old, some are overdue. All-stale would make the badge
+      // meaningless — and all-fresh would hide the work the console exists for.
+      const ageDays = chance(0.7) ? int(0, 5) : int(9, 34);
+      const refreshed = new Date(Date.now() - ageDays * 86_400_000);
+      bands.push([cat.make, cat.model, y, Math.min(y + 2, cat.years[1]), 'any', millions(lo), millions(hi), int(6, 40), refreshed]);
     }
   }
   out.push(insert('price_bands',

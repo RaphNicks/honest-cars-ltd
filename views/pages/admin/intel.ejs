@@ -1,0 +1,253 @@
+<%#
+  /admin/intel — §7.3 Inventory Pricing Intel.
+  The market price-band table per make/model/year: what the site reads when it
+  labels a listing below / within / premium. Shows the age of every band (the
+  weekly pass is the point), what live stock has no band at all, and who moved
+  which number — a band quietly edited is a price claim quietly changed.
+  Locals: rows, stats, gaps, edit, history, q, staleOnly, conditions,
+          conditionLabels, canManage, prefill
+%>
+<%
+  var form = edit || {
+    make: prefill.make, model: prefill.model,
+    yearFrom: prefill.yearFrom, yearTo: prefill.yearTo,
+    condition: prefill.condition,
+    minKobo: null, maxKobo: null, sampleSize: prefill.sample
+  };
+  var money = function (kobo) { return kobo === null || kobo === undefined || kobo === '' ? '' : String(Number(kobo) / 100); };
+  // auditLog() already parses detail; keep the guard for older rows.
+  var detail = function (row) {
+    var parsed = row.detail;
+    if (typeof parsed === 'string') { try { parsed = JSON.parse(parsed); } catch (e) { parsed = null; } }
+    return parsed || {};
+  };
+%>
+
+<div class="admin-grid admin-grid--4">
+  <div class="kpi kpi--sm">
+    <span class="kpi__label">Bands in the table</span>
+    <strong class="kpi__value tabular"><%= stats.bands %></strong>
+    <span class="kpi__foot">across <%= stats.models %> make/model pairs in stock</span>
+  </div>
+  <div class="kpi kpi--sm">
+    <span class="kpi__label">Due for the weekly pass</span>
+    <strong class="kpi__value tabular"><%= stats.stale %></strong>
+    <span class="kpi__foot"><%= stats.stale ? 'not checked in ' + stats.staleDays + '+ days' : 'every band checked this week' %></span>
+  </div>
+  <div class="kpi kpi--sm">
+    <span class="kpi__label">Live cars with no band</span>
+    <strong class="kpi__value tabular"><%= stats.unpriced %></strong>
+    <span class="kpi__foot"><%= stats.unpriced ? 'their price indicator reads “no data”' : 'every live car has a band' %></span>
+  </div>
+  <div class="kpi kpi--sm">
+    <span class="kpi__label">Live stock covered</span>
+    <strong class="kpi__value tabular"><%= stats.live - stats.unpriced %>/<%= stats.live %></strong>
+    <span class="kpi__foot">the indicator is only as good as this</span>
+  </div>
+</div>
+
+<% if (edit) { %>
+  <p class="cms-hint mt-3">Editing <strong><%= edit.make %> <%= edit.model %> <%= edit.yearFrom %>–<%= edit.yearTo %></strong>. Saving moves this band and writes the old numbers into the audit trail.</p>
+<% } %>
+
+<div class="admin-grid admin-grid--2 mt-2">
+  <% if (canManage) { %>
+    <section class="panel">
+      <div class="panel__head">
+        <h2 class="panel__title"><%= edit ? 'Update this band' : 'Weekly update' %></h2>
+        <span class="cms-hint">Prices in naira — <code>11,500,000</code> or <code>₦11,500,000</code> both work.</span>
+      </div>
+      <form method="post" action="/admin/intel/bands" class="stack">
+        <div class="admin-grid admin-grid--2">
+          <div class="field">
+            <label class="field__label" for="band-make">Make</label>
+            <input class="input" id="band-make" name="make" list="band-makes" required maxlength="60" value="<%= form.make || '' %>">
+            <datalist id="band-makes">
+              <% [...new Set(rows.map(function (r) { return r.make; }))].forEach(function (make) { %>
+                <option value="<%= make %>"></option>
+              <% }); %>
+            </datalist>
+          </div>
+          <div class="field">
+            <label class="field__label" for="band-model">Model</label>
+            <input class="input" id="band-model" name="model" required maxlength="80" value="<%= form.model || '' %>">
+          </div>
+          <div class="field">
+            <label class="field__label" for="band-from">Year from</label>
+            <input class="input tabular" id="band-from" name="year_from" type="number" min="1950" max="2100" required value="<%= form.yearFrom || '' %>">
+          </div>
+          <div class="field">
+            <label class="field__label" for="band-to">Year to</label>
+            <input class="input tabular" id="band-to" name="year_to" type="number" min="1950" max="2100" required value="<%= form.yearTo || '' %>">
+          </div>
+          <div class="field">
+            <label class="field__label" for="band-condition">Condition</label>
+            <select class="select" id="band-condition" name="condition">
+              <% conditions.forEach(function (value) { %>
+                <option value="<%= value %>" <%= form.condition === value ? 'selected' : '' %>><%= conditionLabels[value] %></option>
+              <% }); %>
+            </select>
+          </div>
+          <div class="field">
+            <label class="field__label" for="band-sample">Comparables seen</label>
+            <input class="input tabular" id="band-sample" name="sample_size" type="number" min="0" max="9999" value="<%= form.sampleSize === null || form.sampleSize === undefined ? '' : form.sampleSize %>">
+            <p class="field__hint mb-0">How many cars were priced to set this band. It shows on the row and keeps us honest about thin data.</p>
+          </div>
+          <div class="field">
+            <label class="field__label" for="band-min">Band low (₦)</label>
+            <input class="input tabular" id="band-min" name="band_min" required value="<%= money(form.minKobo) %>">
+          </div>
+          <div class="field">
+            <label class="field__label" for="band-max">Band high (₦)</label>
+            <input class="input tabular" id="band-max" name="band_max" required value="<%= money(form.maxKobo) %>">
+          </div>
+        </div>
+        <div class="btn-row">
+          <button class="btn btn--primary" type="submit"><%= edit ? 'Save the band' : 'Add or update the band' %></button>
+          <% if (edit || prefill.make) { %><a class="btn btn--ghost" href="/admin/intel">Clear</a><% } %>
+        </div>
+      </form>
+    </section>
+  <% } else { %>
+    <section class="panel">
+      <div class="panel__head">
+        <h2 class="panel__title">Read-only</h2>
+        <span class="cms-hint">§7.4 gives the price-intel table to admin and ops. Content may view it, not move it.</span>
+      </div>
+      <p class="muted mb-0">You can see every band, its age and the audit trail. Ask ops to make a change.</p>
+    </section>
+  <% } %>
+
+  <section class="panel">
+    <div class="panel__head">
+      <h2 class="panel__title">Live stock with no band</h2>
+      <span class="cms-hint">These cars show “no data” on their price indicator.</span>
+    </div>
+    <% if (!gaps.length) { %>
+      <p class="empty-line">Every live car falls inside a band. Nothing to backfill.</p>
+    <% } else { %>
+      <table class="table table--stack">
+        <thead>
+          <tr><th scope="col">Car</th><th scope="col">Years in stock</th><th scope="col">Live</th><th scope="col"></th></tr>
+        </thead>
+        <tbody>
+          <% gaps.forEach(function (gap) { %>
+            <tr>
+              <th scope="row"><%= gap.make %> <%= gap.model %><br><span class="muted"><%= gap.condition.replace(/_/g, ' ') %></span></th>
+              <td class="tabular"><%= gap.yearFrom %>–<%= gap.yearTo %></td>
+              <td class="tabular"><%= gap.listings %></td>
+              <td>
+                <% if (canManage) { %>
+                  <a class="btn btn--ghost btn--sm" href="/admin/intel?make=<%= encodeURIComponent(gap.make) %>&model=<%= encodeURIComponent(gap.model) %>&year_from=<%= gap.yearFrom %>&year_to=<%= gap.yearTo %>&condition=<%= gap.condition %>#band-make">Set a band</a>
+                <% } else { %>
+                  <a class="btn btn--ghost btn--sm" href="/cars?make=<%= encodeURIComponent(gap.make) %>" target="_blank" rel="noopener">See the cars</a>
+                <% } %>
+              </td>
+            </tr>
+          <% }); %>
+        </tbody>
+      </table>
+    <% } %>
+  </section>
+</div>
+
+<section class="panel mt-3">
+  <div class="panel__head">
+    <h2 class="panel__title">The table</h2>
+    <form class="admin-inline-form" method="get" action="/admin/intel">
+      <label class="visually-hidden" for="intel-q">Search make or model</label>
+      <input class="input input--compact" id="intel-q" name="q" value="<%= q || '' %>" placeholder="Camry, Toyota…" maxlength="60">
+      <label class="checkbox-row">
+        <input type="checkbox" name="stale" value="1" <%= staleOnly ? 'checked' : '' %>>
+        <span>Due only</span>
+      </label>
+      <button class="btn btn--secondary btn--sm" type="submit">Filter</button>
+    </form>
+  </div>
+  <% if (!rows.length) { %>
+    <p class="empty-line">No bands match. <%= stats.bands ? 'Try a different make or model.' : 'Add the first one above.' %></p>
+  <% } else { %>
+    <table class="table table--stack">
+      <thead>
+        <tr>
+          <th scope="col">Make / model</th><th scope="col">Years</th><th scope="col">Condition</th>
+          <th scope="col">Band</th><th scope="col">Comparables</th><th scope="col">Labels</th>
+          <th scope="col">Last checked</th><th scope="col"></th>
+        </tr>
+      </thead>
+      <tbody>
+        <% rows.forEach(function (row) { %>
+          <tr>
+            <th scope="row"><%= row.make %> <%= row.model %></th>
+            <td class="tabular"><%= row.yearFrom %>–<%= row.yearTo %></td>
+            <td><%= row.conditionLabel %></td>
+            <td class="tabular"><%= helpers.formatNaira(row.minKobo) %> – <%= helpers.formatNaira(row.maxKobo) %></td>
+            <td class="tabular"><%= row.sampleSize %></td>
+            <td class="tabular">
+              <%= row.listings %>
+              <% if (!row.listings) { %><br><span class="muted">no live car</span><% } %>
+            </td>
+            <td class="tabular">
+              <% if (row.stale) { %>
+                <span class="badge badge--attention"><%= row.ageDays === null ? 'never' : row.ageDays + 'd' %></span>
+              <% } else { %>
+                <%= row.ageDays === 0 ? 'today' : row.ageDays + 'd ago' %>
+              <% } %>
+            </td>
+            <td>
+              <% if (canManage) { %>
+                <div class="admin-inline-form">
+                  <a class="btn btn--ghost btn--sm" href="/admin/intel?edit=<%= row.id %>">Edit</a>
+                  <form method="post" action="/admin/intel/bands/<%= row.id %>/refresh">
+                    <button class="btn btn--ghost btn--sm" type="submit">Still accurate</button>
+                  </form>
+                </div>
+              <% } else { %>
+                <span class="muted">—</span>
+              <% } %>
+            </td>
+          </tr>
+        <% }); %>
+      </tbody>
+    </table>
+  <% } %>
+</section>
+
+<section class="panel mt-3">
+  <div class="panel__head">
+    <h2 class="panel__title">Audit history</h2>
+    <span class="cms-hint">Every created, moved or re-checked band, with the numbers before and after.</span>
+  </div>
+  <% if (!history.length) { %>
+    <p class="empty-line">Nobody has touched the table yet.</p>
+  <% } else { %>
+    <table class="table table--stack">
+      <thead>
+        <tr><th scope="col">When</th><th scope="col">Who</th><th scope="col">What</th><th scope="col">Change</th></tr>
+      </thead>
+      <tbody>
+        <% history.forEach(function (row) { %>
+          <% var info = detail(row); %>
+          <tr>
+            <th scope="row" class="tabular"><%= helpers.relativeDays(row.createdAt) %></th>
+            <td><%= row.actor || 'system' %> <span class="muted"><%= row.actorRole || '' %></span></td>
+            <td>
+              <%= String(row.action || '').replace('price_band.', '') %>
+              <br><span class="muted"><%= info.make || '' %> <%= info.model || '' %> <%= info.years || '' %></span>
+            </td>
+            <td class="tabular">
+              <% if (info.after) { %>
+                <%= helpers.formatNaira(info.after.minKobo) %> – <%= helpers.formatNaira(info.after.maxKobo) %>
+                <% if (info.before && (info.before.minKobo !== info.after.minKobo || info.before.maxKobo !== info.after.maxKobo)) { %>
+                  <br><span class="cms-flag">was <%= helpers.formatNaira(info.before.minKobo) %> – <%= helpers.formatNaira(info.before.maxKobo) %></span>
+                <% } %>
+              <% } else { %>
+                checked against <%= info.checkedAgainst %> comparables
+              <% } %>
+            </td>
+          </tr>
+        <% }); %>
+      </tbody>
+    </table>
+  <% } %>
+</section>

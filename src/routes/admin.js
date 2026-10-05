@@ -50,6 +50,7 @@ const PATHS = {
   payments: `${HOME}/payments`,
   milestones: `${HOME}/milestones`,
   alerts: `${HOME}/alerts`,
+  intel: `${HOME}/intel`,
   staff: `${HOME}/staff`,
   audit: `${HOME}/audit`,
 };
@@ -66,6 +67,7 @@ const NAV = [
   { href: PATHS.payments, label: 'Money', icon: 'chart', capability: 'payments.view' },
   { href: PATHS.milestones, label: 'Escrow', icon: 'shield', capability: 'payments.view' },
   { href: PATHS.alerts, label: 'Alerts', icon: 'bell', capability: 'intel.manage' },
+  { href: PATHS.intel, label: 'Price intel', icon: 'gauge', capability: 'pricing.view' },
   { href: `${HOME}/cms`, label: 'Content', icon: 'fileCheck', capability: 'cms.manage' },
   { href: PATHS.staff, label: 'Staff & roles', icon: 'account', capability: 'users.manage' },
   { href: PATHS.audit, label: 'Audit log', icon: 'shield', capability: 'users.manage' },
@@ -1124,6 +1126,102 @@ router.post('/alerts/run', auth.requireStaff('intel.manage'), async (req, res, n
       dryRun ? 'dry run — nothing sent or written' : null,
     ].filter(Boolean).join(' · ');
     return done(res, PATHS.alerts, `Watch run: ${summary}.`);
+  } catch (error) {
+    return next(error);
+  }
+});
+
+// ---------------------------------------------------------------------------
+// Inventory pricing intel — §7.3. The price-band table per make/model/year
+// that feeds the price-position indicator on every VDP (§3.5), the weekly
+// update form, and the audit history of who moved which band.
+// §7.4: admin and ops manage it, marketing may read it, nobody else sees it.
+// ---------------------------------------------------------------------------
+router.get('/intel', auth.requireStaff('pricing.view'), async (req, res, next) => {
+  try {
+    const q = validate.text(req.query.q, 60) || null;
+    const staleOnly = String(req.query.stale || '') === '1';
+    const editId = validate.integer(req.query.edit, { min: 1, fallback: 0 });
+    // The gap list links straight into the form, so ops never re-types a
+    // make/model the database already knows.
+    const prefill = {
+      make: validate.text(req.query.make, 60) || '',
+      model: validate.text(req.query.model, 80) || '',
+      yearFrom: validate.integer(req.query.year_from, { min: 1950, max: 2100, fallback: '' }),
+      yearTo: validate.integer(req.query.year_to, { min: 1950, max: 2100, fallback: '' }),
+      condition: validate.oneOf(req.query.condition, db.pricing.CONDITIONS, 'any'),
+      min: validate.text(req.query.min, 20) || '',
+      max: validate.text(req.query.max, 20) || '',
+      sample: validate.text(req.query.sample, 6) || '',
+    };
+    const [rows, stats, gaps, edit, history] = await Promise.all([
+      db.pricing.bands({ q, staleOnly, limit: 300 }),
+      db.pricing.coverage(),
+      db.pricing.gaps({ limit: 40 }),
+      editId ? db.pricing.bandById(editId) : Promise.resolve(null),
+      admin.auditLog({ limit: 40, entity: 'price_band' }),
+    ]);
+    return await page(req, res, {
+      view: 'admin/intel',
+      active: PATHS.intel,
+      title: 'Price intel',
+      description: 'Market price bands per make, model and year — the table behind the price-position indicator.',
+      data: {
+        rows,
+        stats,
+        gaps,
+        edit,
+        history,
+        q,
+        staleOnly,
+        prefill,
+        conditions: db.pricing.CONDITIONS,
+        conditionLabels: db.pricing.CONDITION_LABELS,
+        canManage: roles.can(req.user.role, 'pricing.manage'),
+      },
+    });
+  } catch (error) {
+    return next(error);
+  }
+});
+
+/** The weekly update form. Creates a band or moves the existing one. */
+router.post('/intel/bands', auth.requireStaff('pricing.manage'), auth.sameOriginOnly, async (req, res, next) => {
+  try {
+    const result = await db.pricing.upsertBand({
+      make: validate.text(req.body.make, 60),
+      model: validate.text(req.body.model, 80),
+      yearFrom: validate.integer(req.body.year_from, { min: 1950, max: 2100 }),
+      yearTo: validate.integer(req.body.year_to, { min: 1950, max: 2100 }),
+      condition: validate.oneOf(req.body.condition, db.pricing.CONDITIONS, 'any'),
+      minKobo: money.nairaToKobo(req.body.band_min),
+      maxKobo: money.nairaToKobo(req.body.band_max),
+      sampleSize: validate.integer(req.body.sample_size, { min: 0, max: 9999, fallback: 0 }),
+      actorId: req.user.id,
+    });
+    if (!result.ok) return done(res, PATHS.intel, result.error, { error: true, params: `q=${encodeURIComponent(req.body.make || '')}` });
+    const { band } = result;
+    const label = `${band.make} ${band.model} ${band.yearFrom}–${band.yearTo} (${band.conditionLabel})`;
+    return done(
+      res,
+      PATHS.intel,
+      result.created
+        ? `Band created for ${label}: ${money.formatNaira(band.minKobo)}–${money.formatNaira(band.maxKobo)}.`
+        : `Band updated for ${label}: ${money.formatNaira(band.minKobo)}–${money.formatNaira(band.maxKobo)}.`,
+    );
+  } catch (error) {
+    return next(error);
+  }
+});
+
+/** "Still accurate" — re-stamps the week without touching a number. */
+router.post('/intel/bands/:id/refresh', auth.requireStaff('pricing.manage'), auth.sameOriginOnly, async (req, res, next) => {
+  try {
+    const id = validate.integer(req.params.id, { min: 1, fallback: 0 });
+    const result = await db.pricing.refreshBand(id, { actorId: req.user.id });
+    if (!result.ok) return done(res, PATHS.intel, result.error, { error: true });
+    const { band } = result;
+    return done(res, PATHS.intel, `${band.make} ${band.model} ${band.yearFrom}–${band.yearTo} checked against ${band.sampleSize} comparables today.`);
   } catch (error) {
     return next(error);
   }

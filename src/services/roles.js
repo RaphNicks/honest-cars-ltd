@@ -23,7 +23,10 @@ const MATRIX = {
   'payments.view': ['admin', 'finance'],           // PSP transactions, ledgers
   'payments.approve': ['finance', 'admin'],        // refunds, milestones, payouts
   'cms.manage': ['admin', 'marketing'],
-  'intel.manage': ['admin', 'ops'],
+  'intel.manage': ['admin', 'ops'],                // alerts console (§7.3)
+  // §7.4 "Price-intel table": admin ✓, ops ✓, marketing read-only.
+  'pricing.view': ['admin', 'ops', 'marketing'],
+  'pricing.manage': ['admin', 'ops'],
   'users.manage': ['admin'],                       // staff accounts, roles, audit log
   'reports.view': ['admin', 'ops', 'finance', 'marketing'],
 };
