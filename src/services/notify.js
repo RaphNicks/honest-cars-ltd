@@ -47,6 +47,9 @@ const TEMPLATES = {
   // price, or the matched cars), and these templates carry it verbatim.
   price_drop: ({ body }) => body,
   new_match: ({ body }) => body,
+  // FR-20 — same reason: the renewal wording depends on which window it is
+  // (30/7/1 days), and that decision belongs in services/renewals.js.
+  subscription_renewal: ({ body }) => body,
 };
 
 function render(template, values = {}) {

@@ -128,6 +128,8 @@ const config = {
       // channel rather than the payment one.
       price_drop: process.env.NOTIFY_CHANNEL || 'console',
       new_match: process.env.NOTIFY_CHANNEL || 'console',
+      // FR-20 renewals — a payment prompt, so it follows the payment channel.
+      subscription_renewal: process.env.NOTIFY_CHANNEL_PAYMENT || process.env.NOTIFY_CHANNEL || 'console',
     },
   },
 

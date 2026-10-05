@@ -187,6 +187,14 @@
 .status-pill--paid,
 .status-pill--activated { border-color: var(--color-accent-strong, #0f8a44); color: var(--color-accent-strong, #0f8a44); }
 
+/* FR-20 subscription states — a renewal falling due and a lapsed unit are the
+   two the customer must not have to work out from the date on their own. */
+.status-pill--renewal_due { border-color: var(--honest-amber, #e8a13d); color: #8a5a10; }
+.status-pill--lapsed,
+.status-pill--cancelled { border-color: var(--colour-red, #c0392b); color: var(--colour-red, #c0392b); }
+.status-pill--ordered,
+.status-pill--installed { border-color: var(--color-border, #d7dbe0); color: var(--color-text-muted, #5b6672); }
+
 /* --- Saved cars ---------------------------------------------------------- */
 .saved-grid {
   display: grid;

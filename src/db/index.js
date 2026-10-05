@@ -23,6 +23,7 @@ const commerce = require('./commerce');
 const users = require('./users');
 const admin = require('./admin');
 const payments = require('./payments');
+const subscriptions = require('./subscriptions');
 const cms = require('./cms');
 const pricing = require('./pricing');
 const reports = require('./reports');
@@ -48,6 +49,7 @@ module.exports = {
   users,
   admin,
   payments,
+  subscriptions,
   cms,
   pricing,
   reports,

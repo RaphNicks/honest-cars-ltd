@@ -392,7 +392,8 @@ async function dashboard(user) {
     require('./requests').listRequestsForPhone(phone),
     require('./requests').listBookingsForPhone(phone),
     require('./commerce').listForPhone(phone),
-    require('./commerce').subscriptionsForPhone(phone),
+    require('./subscriptions').forPhone(phone, { limit: 20 }),
+
     savedCars(user.id),
     savedSearches(user.id),
     referralStats(user),

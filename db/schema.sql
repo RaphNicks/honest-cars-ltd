@@ -581,22 +581,51 @@ CREATE TABLE IF NOT EXISTS delivery_areas (
   UNIQUE KEY uq_delivery_area (name)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- kind / dealer_id / unit_label / plan_name / amount_kobo / period_months are
+-- migration 019 (FR-20): a tracker row and a dealer retainer share the table so
+-- one renewal queue and one reminder sweep serve both (§7.3).
 CREATE TABLE IF NOT EXISTS subscriptions (
   id             INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  kind           ENUM('tracker','dealer_retainer') NOT NULL DEFAULT 'tracker',
   order_id       INT UNSIGNED NULL,
+  dealer_id      INT UNSIGNED NULL,
   product_id     INT UNSIGNED NULL,
   customer_name  VARCHAR(120) NULL,
   customer_phone VARCHAR(40)  NULL,
+  unit_label     VARCHAR(80)  NULL,
+  plan_name      VARCHAR(80)  NULL,
+  amount_kobo    BIGINT       NULL,
   device_state   ENUM('ordered','installed','activated','renewal_due','lapsed','cancelled')
                                NOT NULL DEFAULT 'ordered',
   installed_at   DATETIME     NULL,
   activated_at   DATETIME     NULL,
   renewal_at     DATETIME     NULL,
+  period_months  TINYINT      NOT NULL DEFAULT 12,
   created_at     TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (id),
   KEY idx_subscription_renewal (device_state, renewal_at),
+  KEY idx_subscription_kind (kind, device_state, renewal_at),
   CONSTRAINT fk_subscription_order FOREIGN KEY (order_id) REFERENCES orders (id) ON DELETE SET NULL,
-  CONSTRAINT fk_subscription_product FOREIGN KEY (product_id) REFERENCES products (id) ON DELETE SET NULL
+  CONSTRAINT fk_subscription_product FOREIGN KEY (product_id) REFERENCES products (id) ON DELETE SET NULL,
+  CONSTRAINT fk_subscription_dealer FOREIGN KEY (dealer_id) REFERENCES dealers (id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- One row per (subscription, window) — the unique key is what makes the
+-- 30/7/1-day sweep safe to run every morning (§7.3, FR-20).
+CREATE TABLE IF NOT EXISTS subscription_reminders (
+  id              INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  subscription_id INT UNSIGNED NOT NULL,
+  window_days     SMALLINT     NOT NULL,
+  sent_at         DATETIME     NOT NULL,
+  notification_id INT UNSIGNED NULL,
+  channel         VARCHAR(24)  NULL,
+  status          VARCHAR(24)  NOT NULL DEFAULT 'sent',
+  detail          VARCHAR(200) NULL,
+  PRIMARY KEY (id),
+  UNIQUE KEY uniq_reminder_window (subscription_id, window_days),
+  KEY idx_reminder_sent (sent_at),
+  CONSTRAINT fk_reminder_subscription FOREIGN KEY (subscription_id)
+    REFERENCES subscriptions (id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ---------------------------------------------------------------------------
@@ -683,6 +712,7 @@ CREATE TABLE IF NOT EXISTS `payments` (
   order_id       INT UNSIGNED NULL,
   booking_id     INT UNSIGNED NULL,
   request_id     INT UNSIGNED NULL,
+  subscription_id INT UNSIGNED NULL,                    -- a renewal extends this (FR-20)
   customer_name  VARCHAR(120) NULL,
   customer_phone VARCHAR(40)  NULL,
   amount_kobo    BIGINT       NOT NULL,
@@ -704,9 +734,11 @@ CREATE TABLE IF NOT EXISTS `payments` (
   KEY idx_payment_order (order_id),
   KEY idx_payment_booking (booking_id),
   KEY idx_payment_phone (customer_phone, created_at),
+  KEY idx_payment_subscription (subscription_id),
   CONSTRAINT fk_payment_order   FOREIGN KEY (order_id)   REFERENCES orders (id) ON DELETE SET NULL,
   CONSTRAINT fk_payment_booking FOREIGN KEY (booking_id) REFERENCES bookings (id) ON DELETE SET NULL,
   CONSTRAINT fk_payment_request FOREIGN KEY (request_id) REFERENCES service_requests (id) ON DELETE SET NULL,
+  CONSTRAINT fk_payment_subscription FOREIGN KEY (subscription_id) REFERENCES subscriptions (id) ON DELETE SET NULL,
   CONSTRAINT fk_payment_actor   FOREIGN KEY (created_by) REFERENCES `users` (id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 

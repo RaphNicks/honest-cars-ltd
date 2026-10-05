@@ -225,21 +225,35 @@
             <% subscriptions.forEach(function (subscription) { %>
               <li class="account-item">
                 <div class="account-item__main">
-                  <span class="account-item__title"><%= subscription.productName %></span>
+                  <span class="account-item__title"><%= subscription.planName || subscription.kindLabel %></span>
                   <span class="account-item__meta">
-                    Order <a href="/order/<%= subscription.orderNo %>" class="tabular"><%= subscription.orderNo %></a> ·
-                    renewal <%= new Date(subscription.renewalAt).toLocaleDateString('en-NG', { day: 'numeric', month: 'short', year: 'numeric' }) %>
+                    <% if (subscription.unitLabel) { %><%= subscription.unitLabel %> · <% } %>
+                    <% if (subscription.orderNo) { %>order <a href="/order/<%= subscription.orderNo %>" class="tabular"><%= subscription.orderNo %></a> · <% } %>
+                    <%= subscription.renewalAt
+                          ? `renews ${new Date(subscription.renewalAt).toLocaleDateString('en-NG', { day: 'numeric', month: 'short', year: 'numeric' })}`
+                          : 'renewal date not set yet' %>
+                    <% if (subscription.daysRemaining !== null && subscription.daysRemaining >= 0) { %>
+                      · <span class="tabular"><%= subscription.daysRemaining %> day<%= subscription.daysRemaining === 1 ? '' : 's' %> to go</span>
+                    <% } else if (subscription.overdue) { %>
+                      · <strong class="text-amber">overdue</strong>
+                    <% } %>
                   </span>
                 </div>
                 <div class="account-item__side">
-                  <span class="status-pill status-pill--<%= subscription.deviceState %>"><%= subscription.deviceState %></span>
+                  <span class="status-pill status-pill--<%= subscription.state %>"><%= subscription.stateLabel %></span>
+                  <%# FR-20 in progress: the renewal price is shown, the online
+                      renew action lands with the /account subscription routes. %>
+                  <% if (subscription.amountKobo && subscription.state !== 'cancelled') { %>
+                    <span class="account-item__meta tabular">Renew · <%= helpers.formatNaira(subscription.amountKobo) %></span>
+                  <% } %>
                 </div>
               </li>
             <% }); %>
           </ul>
           <p class="note-inline mb-0">
-            Device tracking lives in the telematics partner app (§11). Renewal reminders are sent 30, 7 and 1 day
-            before the date above once the notification layer is wired.
+            Reminders go out 30, 7 and 1 day before the renewal date, to the number on this account. Device tracking
+            itself lives in the telematics partner app (§11) — if a tracker stops reporting, message us and we will
+            look at the unit rather than the bill.
           </p>
         <% } %>
       </div>
