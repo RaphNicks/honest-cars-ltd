@@ -1,5 +1,9 @@
 # honestcarsltd.com — vanilla HTML/CSS/JS · Node.js · MySQL
 
+> **Picking this up in a new session?** Read [`docs/HANDOFF.md`](docs/HANDOFF.md) first —
+> current commit, what is in flight, the conventions, and how to get the sandbox running.
+
+
 The Honest Cars LTD storefront, ported from the approved specification
 (`Honest_Cars_LTD_Website_Specifications_Final.pdf`) into the approved stack:
 **vanilla HTML, CSS and JavaScript on the front end, Node.js + Express on the
