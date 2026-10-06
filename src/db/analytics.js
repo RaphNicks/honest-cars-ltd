@@ -33,6 +33,8 @@ const EVENT_NAMES = new Set([
   // Auth & account — server-side extension beyond §15.1 (see services/events.js)
   'otp_requested', 'otp_request_failed', 'otp_verify_succeeded', 'otp_verify_failed',
   'sign_out', 'account_deleted', 'saved_car_added', 'saved_car_removed',
+  // FR-28 referrals — server-side only, like the rest of this block.
+  'referral_qualified', 'referral_reward_paid',
 ]);
 
 async function record(eventName, { payload = null, sourcePath = null, sessionId = null } = {}) {

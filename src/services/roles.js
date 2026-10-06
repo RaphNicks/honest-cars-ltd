@@ -50,6 +50,12 @@ const MATRIX = {
   // admin-managed — a neighbourhood that is not in this table cannot be
   // filtered for. Admin and ops hold it; marketing curates content, not markets.
   'settings.manage': ['admin', 'ops'],
+  // FR-28 referrals. §7.4 has no referrals column, so this follows the two
+  // screens nearest to it: the money desk reads every payment (`dealers.view`,
+  // `hire.view` include finance for exactly this reason), and the decision to
+  // pay a customer is ops' work, entered by hand like §15.2 spend.
+  'referrals.view': ['admin', 'ops', 'finance'],
+  'referrals.reward': ['admin', 'ops'],
   'reports.view': ['admin', 'ops', 'finance', 'marketing'],
   // §15.2 marketing dashboard. Read is the CMS-and-marketing column of §7.4
   // (admin, ops, marketing); entering spend is the marketing desk's own job, so

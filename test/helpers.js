@@ -77,6 +77,7 @@ const AUDIT_SUBJECTS = {
   order: 'orders',
   payment: 'payments',
   post: 'blog_posts',
+  referral_reward: 'referral_rewards',
   request: 'service_requests',
   testimonial: 'testimonials',
   user: 'users',

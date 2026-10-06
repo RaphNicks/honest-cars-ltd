@@ -30,6 +30,7 @@ const reportService = require('../services/report');
 const hireService = require('../services/hire');
 const invoiceService = require('../services/invoice');
 const paymentService = require('../services/payments');
+const referralService = require('../services/referrals');
 const phone = require('../lib/phone');
 const { helpers } = require('../lib/locals');
 const { sendPage, sendJson, CACHE } = require('../lib/respond');
@@ -109,6 +110,10 @@ function savedSearchChips(searches) {
 async function buildAccountLocals(user) {
   const dashboard = await db.users.dashboard(user);
   dashboard.savedSearches = savedSearchChips(dashboard.savedSearches);
+  // FR-28: the referral card is the link *and* the reward status behind it — the
+  // reward labels come from the service, so the card and the console can never
+  // describe the same person differently.
+  dashboard.referral = referralService.accountView(user, dashboard.referral);
   // §7.1 lists hire separately, so it does not also sit in the Requests card.
   dashboard.requests = dashboard.requests.filter((request) => request.type !== 'hire');
   const trail = [{ label: 'Account' }];

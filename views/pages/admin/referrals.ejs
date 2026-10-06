@@ -1,0 +1,242 @@
+<%#
+  /admin/referrals — FR-28: who brought whom, what it is worth, what has been paid.
+
+  §7.1 asked for "personal link + reward status"; the link and the attribution
+  have existed since migration 007, and this is the status. Two halves, and the
+  split is deliberate:
+
+    • Counting is automatic. A referred account that has bought something is
+      picked up by the sweep (here, or `npm run referrals`), gets
+      `referral_qualified_at` and appears in the queue as pending.
+    • Paying is never automatic. A human types the amount. Until then the
+      customer's card says "with the desk" and shows no figure — the site does
+      not promise money it has not decided on.
+
+  Locals: rows, summary, links, status, q, canReward, suggestedRewardLabel,
+          suggestedRewardKobo, qualifyOrders
+%>
+<% var naira = helpers.formatNaira; %>
+<% var dateLabel = function (value) {
+  return value ? new Date(value).toLocaleDateString('en-NG', { day: 'numeric', month: 'short', year: 'numeric' }) : '—';
+}; %>
+<% var badgeFor = function (status) {
+  return status === 'paid' ? 'badge--paid' : status === 'approved' ? 'badge--ok' : status === 'void' ? 'badge--fail' : 'badge--pending';
+}; %>
+
+<div class="admin-grid admin-grid--5">
+  <div class="kpi kpi--sm">
+    <span class="kpi__label">Links that worked</span>
+    <strong class="kpi__value tabular"><%= summary.referrers %></strong>
+    <span class="kpi__foot"><%= summary.brought %> account<%= summary.brought === 1 ? '' : 's' %> came through a link</span>
+  </div>
+  <div class="kpi kpi--sm">
+    <span class="kpi__label">Counted</span>
+    <strong class="kpi__value tabular"><%= summary.qualified %></strong>
+    <span class="kpi__foot">
+      bought something<%= qualifyOrders > 1 ? ` — ${qualifyOrders}+ paid orders qualify` : ' — one paid order qualifies' %>
+    </span>
+  </div>
+  <div class="kpi kpi--sm">
+    <span class="kpi__label">Waiting on the desk</span>
+    <strong class="kpi__value tabular"><%= summary.pending %></strong>
+    <span class="kpi__foot">no amount set yet — nothing promised</span>
+  </div>
+  <div class="kpi kpi--sm">
+    <span class="kpi__label">Approved, not paid</span>
+    <strong class="kpi__value tabular"><%= summary.approvedKoboLabel || '₦0' %></strong>
+    <span class="kpi__foot"><%= summary.approved %> reward<%= summary.approved === 1 ? '' : 's' %> owed</span>
+  </div>
+  <div class="kpi kpi--sm">
+    <span class="kpi__label">Paid</span>
+    <strong class="kpi__value tabular"><%= summary.paidKoboLabel || '₦0' %></strong>
+    <span class="kpi__foot"><%= summary.paid %> settled<%= summary.void ? ` · ${summary.void} voided` : '' %></span>
+  </div>
+</div>
+
+<section class="panel mt-3">
+  <div class="panel__head">
+    <div>
+      <h2 class="panel__title">Reward queue</h2>
+      <p class="cms-hint">
+        Counting is automatic — a paid order does it. Paying is not: nothing here moves money, it records
+        that a human decided and then that a human paid. Every step is in the audit log.
+      </p>
+    </div>
+    <% if (canReward) { %>
+      <form method="post" action="/admin/referrals/sweep" class="inline-form">
+        <button class="btn btn--secondary btn--sm" type="submit">Check for new referrals</button>
+      </form>
+    <% } %>
+  </div>
+
+  <form method="get" action="/admin/referrals" class="admin-filters">
+    <div class="field">
+      <label class="field__label" for="ref-status">Status</label>
+      <select class="select" id="ref-status" name="status">
+        <option value="">Every status</option>
+        <% ['pending', 'approved', 'paid', 'void'].forEach(function (option) { %>
+          <option value="<%= option %>" <%= status === option ? 'selected' : '' %>><%= option %></option>
+        <% }); %>
+      </select>
+    </div>
+    <div class="field">
+      <label class="field__label" for="ref-q">Find</label>
+      <input class="input" id="ref-q" type="search" name="q" value="<%= q || '' %>" placeholder="name, phone or code">
+    </div>
+    <button class="btn btn--secondary btn--sm" type="submit">Filter</button>
+  </form>
+
+  <% if (!rows.length) { %>
+    <p class="empty-line">
+      Nothing in the queue<%= status || q ? ' for that filter' : '' %>.
+      <% if (!status && !q) { %>
+        Referrals appear here once an account that came through someone's link has bought something —
+        press “Check for new referrals”, or let the nightly run find them.
+      <% } %>
+    </p>
+  <% } else { %>
+    <div class="table-scroll">
+      <table class="table table--stack">
+        <caption class="visually-hidden">Referrals and their reward status</caption>
+        <thead>
+          <tr>
+            <th scope="col">Referred</th>
+            <th scope="col">Brought by</th>
+            <th scope="col">Joined</th>
+            <th scope="col" class="tabular">Orders</th>
+            <th scope="col">Status</th>
+            <th scope="col">Reward</th>
+            <% if (canReward) { %><th scope="col">Action</th><% } %>
+          </tr>
+        </thead>
+        <tbody>
+          <% rows.forEach(function (row) { %>
+            <tr>
+              <td>
+                <strong><%= row.referredName || 'Account' %></strong>
+                <br><span class="muted tabular"><%= row.referredPhoneMasked %></span>
+                <% if (row.referredQualifiedAt) { %>
+                  <br><span class="badge badge--ok">counted <%= dateLabel(row.referredQualifiedAt) %></span>
+                <% } %>
+              </td>
+              <td>
+                <%= row.referrerName || 'Account' %>
+                <br><span class="muted tabular"><%= row.referralCode %> · <%= row.referrerPhoneMasked %></span>
+              </td>
+              <td class="tabular"><%= dateLabel(row.referredJoinedAt) %></td>
+              <td class="tabular">
+                <%= row.orders %>
+                <br><span class="muted"><%= row.paidOrders %> paid</span>
+              </td>
+              <td>
+                <span class="badge <%= badgeFor(row.status) %>"><%= row.statusLabel %></span>
+                <% if (row.basis) { %><br><span class="muted">basis: <%= row.basis %></span><% } %>
+                <% if (row.approvedAt) { %><br><span class="muted">approved <%= dateLabel(row.approvedAt) %></span><% } %>
+                <% if (row.paidAt) { %><br><span class="muted">paid <%= dateLabel(row.paidAt) %></span><% } %>
+              </td>
+              <td class="tabular">
+                <%= row.amountLabel || '—' %>
+                <% if (row.unitLabel) { %><br><span class="muted"><%= row.unitLabel %></span><% } %>
+                <% if (row.note) { %><br><span class="muted"><%= row.note %></span><% } %>
+                <% if (row.actorName) { %><br><span class="muted">by <%= row.actorName %></span><% } %>
+              </td>
+              <% if (canReward) { %>
+                <td>
+                  <% if (row.status === 'pending') { %>
+                    <form method="post" action="/admin/referrals/<%= row.id %>/approve" class="stack">
+                      <div class="field">
+                        <label class="field__label" for="amount-<%= row.id %>">Amount (₦)</label>
+                        <input class="input input--mono" id="amount-<%= row.id %>" name="amount" type="text"
+                               inputmode="decimal" value="<%= suggestedRewardLabel.replace('₦', '') %>" required>
+                      </div>
+                      <div class="field">
+                        <label class="field__label" for="unit-<%= row.id %>">What for (optional)</label>
+                        <input class="input" id="unit-<%= row.id %>" name="unit_label" maxlength="120"
+                               placeholder="e.g. referral credit — tracker">
+                      </div>
+                      <button class="btn btn--primary btn--sm" type="submit">Approve</button>
+                    </form>
+                    <form method="post" action="/admin/referrals/<%= row.id %>/void" class="stack mt-2">
+                      <div class="field">
+                        <label class="field__label" for="void-<%= row.id %>">Why it does not count</label>
+                        <input class="input" id="void-<%= row.id %>" name="note" maxlength="200" placeholder="reason (kept on the row)">
+                      </div>
+                      <button class="btn btn--ghost btn--sm" type="submit">Void</button>
+                    </form>
+                  <% } else if (row.status === 'approved') { %>
+                    <form method="post" action="/admin/referrals/<%= row.id %>/paid" class="stack">
+                      <div class="field">
+                        <label class="field__label" for="paid-<%= row.id %>">How it was paid</label>
+                        <input class="input" id="paid-<%= row.id %>" name="note" maxlength="200"
+                               placeholder="e.g. transfer 6 Oct · ref HC-TRF-7712">
+                      </div>
+                      <button class="btn btn--primary btn--sm" type="submit">Mark paid</button>
+                    </form>
+                    <form method="post" action="/admin/referrals/<%= row.id %>/void" class="stack mt-2">
+                      <div class="field">
+                        <label class="field__label" for="void2-<%= row.id %>">Or void it</label>
+                        <input class="input" id="void2-<%= row.id %>" name="note" maxlength="200" placeholder="reason">
+                      </div>
+                      <button class="btn btn--ghost btn--sm" type="submit">Void</button>
+                    </form>
+                  <% } else if (row.status === 'void') { %>
+                    <form method="post" action="/admin/referrals/<%= row.id %>/restore" class="inline-form">
+                      <button class="btn btn--secondary btn--sm" type="submit">Restore to pending</button>
+                    </form>
+                  <% } else { %>
+                    <span class="muted">Settled — closed to edits</span>
+                  <% } %>
+                </td>
+              <% } %>
+            </tr>
+          <% }); %>
+        </tbody>
+      </table>
+    </div>
+  <% } %>
+</section>
+
+<section class="panel mt-3">
+  <div class="panel__head">
+    <div>
+      <h2 class="panel__title">Links that worked</h2>
+      <p class="cms-hint">By counted referrals, then by how many signed up. A code that brought nobody is not listed — the account still has its link.</p>
+    </div>
+  </div>
+
+  <% if (!links.length) { %>
+    <p class="empty-line">No referral has been used yet.</p>
+  <% } else { %>
+    <div class="table-scroll">
+      <table class="table">
+        <caption class="visually-hidden">Referral codes ranked by what they brought</caption>
+        <thead>
+          <tr>
+            <th scope="col">Code</th>
+            <th scope="col">Account</th>
+            <th scope="col" class="tabular">Signed up</th>
+            <th scope="col" class="tabular">Counted</th>
+            <th scope="col" class="tabular">Approved + paid</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% links.forEach(function (link) { %>
+            <tr>
+              <td class="tabular"><strong><%= link.code %></strong></td>
+              <td><%= link.name || 'Account' %><br><span class="muted tabular"><%= link.phoneMasked %></span></td>
+              <td class="tabular"><%= link.brought %></td>
+              <td class="tabular"><%= link.qualified %></td>
+              <td class="tabular"><%= link.rewardLabel || '—' %></td>
+            </tr>
+          <% }); %>
+        </tbody>
+      </table>
+    </div>
+  <% } %>
+</section>
+
+<p class="cms-hint mt-3">
+  Suggested reward: <strong><%= suggestedRewardLabel %></strong> — configuration (<code>REFERRAL_REWARD_KOBO</code>),
+  pre-filled into the form above and changeable per referral. The PRD sets no amount, and this screen does not
+  invent one: it records what the desk decides.
+</p>

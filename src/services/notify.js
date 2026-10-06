@@ -63,6 +63,15 @@ const TEMPLATES = {
   // who thinks we stopped delivering.
   addon_paid: ({ reference, detail, ends }) =>
     `Add-on ${reference} is live. ${detail}${ends ? ` It runs until ${ends}, and we will remind you before it lapses.` : ''}`,
+  // FR-28 — referrals. The three moments a customer hears from us: their link
+  // did something, the desk approved a reward, the reward was paid. None of them
+  // announces an amount before a human has set one.
+  referral_qualified: ({ code, count }) =>
+    `Good news — someone you invited${code ? ` with your code ${code}` : ''} has bought on Honest Cars${count > 1 ? ` (${count} orders)` : ''}. A referral now counts: we will review the reward and message you here when it is approved. You can follow it any time at honestcarsltd.com/account.`,
+  referral_reward_approved: ({ amount, detail }) =>
+    `Your referral reward has been approved: ${amount}${detail ? ` (${detail})` : ''}. We will confirm here the moment it is paid. Nothing else is needed from you.`,
+  referral_reward_paid: ({ amount }) =>
+    `Your referral reward of ${amount} has been paid — thank you for bringing someone to Honest Cars. The record stays on your account at honestcarsltd.com/account.`,
   hire_completed: ({ reference, amount, deposit }) =>
     `Hire ${reference} is closed. Your invoice is in your account at honestcarsltd.com/account${amount ? ` — ${amount} was paid on it` : ''}.${deposit ? ` The deposit of ${deposit} is released back to you; it can take up to 5 working days.` : ''}`,
 };

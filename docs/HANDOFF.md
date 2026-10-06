@@ -1,6 +1,6 @@
 # Handoff — where this build is, and how to continue it
 
-**Written 2026-10-06, updated for FR-32, on branch `arena/01a0f7df-honest-cars-ltd`.**
+**Written 2026-10-06, updated for FR-28, on branch `arena/01a0f7df-honest-cars-ltd`.**
 If you are picking this up (a person or an agent in a new session), read this file
 first, then `docs/GAPS.md` for the row-by-row list of what is left.
 
@@ -48,7 +48,8 @@ Every **§9 MUST is built.** The commit trail, most recent first:
 
 | Commit | What it delivered |
 |---|---|
-| *this commit* | **FR-32** multi-city inventory + area switcher + `/admin/settings` area manager |
+| *this commit* | **FR-28** referrals: who came from whom, and the reward status behind it |
+| `c974792` | **FR-32** multi-city inventory + area switcher + `/admin/settings` area manager |
 | `e78fd4c` | **FR-33** dealer CSV/API import + API keys |
 | `9d1b4d8` | **FR-18** dealer add-ons + commission statements |
 | `9cd3b66` | **FR-35** blog: author pages, governed tags, listing embeds, editorial calendar |
@@ -97,7 +98,57 @@ embedded videos. All four clips total 726 KB.
 
 ---
 
-## 3. Just finished: FR-32 multi-city inventory
+## 3. Just finished: FR-28 referrals
+
+**Built in this commit.** §7.1 asked for *"Referrals (personal link + reward
+status)"*. The link and the attribution have existed since migration 007 — the
+card on `/account` shows the code, the count and the orders. The **status** was
+the missing half: a referral that counted was a number with no answer to "and
+then what?".
+
+What it does:
+
+- **Two columns and one table** (migration **025**): `users.referral_qualified_at`
+  is the permanent moment a referral started to count, `users.referral_note` is
+  the desk's line on it, and `referral_rewards` carries the decision —
+  `pending → approved → paid`, or `void` with a reason. The unique key
+  `(referrer_id, referred_user_id)` is the honesty constraint: a person counts
+  once, and a sweep that runs twice cannot inflate the queue.
+- **Counting is automatic, paying never is.** `sweep()` finds referred accounts
+  with a paid order and no qualification (the threshold is
+  `REFERRAL_QUALIFY_ORDERS`, default one) and queues a **pending** row with
+  `amount_kobo = 0`. Nothing is promised until a human types an amount on
+  `/admin/referrals`. `npm run referrals [-- --dry-run]` is the cron entry point
+  and prints who would count without writing anything; the button on the console
+  runs the same function.
+- **The desk's page** (capability `referrals.view` = admin/ops/finance,
+  `referrals.reward` = admin/ops) shows the queue, the totals (waiting, approved
+  but unpaid, paid, voided) and the links that worked. Approve / mark paid / void
+  / restore — every transition audited (`referral.*`) with the actor's name, and
+  every customer-facing step announced through `notify` (so an unconfigured
+  channel is recorded `skipped` with its text intact, never dropped).
+- **The customer's card** now says what happened to each person their link
+  brought in: *not counted yet*, *with the desk*, *approved · ₦2,000*, *paid ·
+  ₦2,000 on 12 Oct*, or *voided — reason*. No figure appears until the desk sets
+  one, which is why the reward amount is a form field and not a constant.
+- **The seed exercises every state**: Ngozi (qualified, pending), Emeka (signed
+  up, no order), Ifeoma (qualified, approved and paid), all under Ada's code —
+  and two real paid orders with their payment rows behind them, because a paid
+  order with no payment row is the thing the console flags.
+
+Where the code is: `db/migrations/025-referral-rewards.sql`, `src/db/referrals.js`,
+`src/services/referrals.js`, `scripts/referrals.js`, `src/routes/admin.js`
+(`/admin/referrals` + its POSTs), `views/pages/admin/referrals.ejs`, the
+Referrals card in `views/pages/account.ejs`, and `test/referrals.test.js`
+(11 tests).
+
+**A note on the time it saves:** `sweep()` is idempotent by SQL rather than by
+state in memory, so a cron job, the console button and a manual run can all
+happen in the same minute and the queue still gains one row per person.
+
+---
+
+## 3b. FR-32 multi-city inventory
 
 **Built in this commit.** FR-32 is *"Multi-city inventory structure (Owerri/Aba/
 Benin) with area switcher"*, COULD/P3 — but the PRD's data model already decided
@@ -161,7 +212,7 @@ harmless while every filter in it was empty, and a 1210 the moment a real filter
 
 ---
 
-## 3b. FR-35 blog enhancements
+## 3c. FR-35 blog enhancements
 
 **Built in this commit.** §6.9 asked for five things on top of the blog that
 existed — author pages, a governed tag taxonomy, a smarter related-posts
@@ -206,10 +257,10 @@ Where the code is: `db/migrations/021-blog-authors-tags.sql`, `src/db/content.js
 migration 020 adds the same objects after the targets exist — which is exactly
 why nobody had seen it.
 
-**Next in order:** FR-28 referrals reporting → FR-29 instant valuation → FR-30 PWA
-→ FR-34 financing handoff, then the rest of the `/admin/settings` groups
-(§18.3 privacy requests and §12.2 admin MFA are the other buildable rows).
-`docs/GAPS.md` is canonical: 23 rows, each with what “done” means.
+**Next in order:** FR-29 instant valuation → FR-30 PWA → FR-34 financing
+handoff, then the rest of the `/admin/settings` groups (§18.3 privacy requests
+and §12.2 admin MFA are the other buildable rows).
+`docs/GAPS.md` is canonical: 22 rows, each with what “done” means.
 
 ## 4. Conventions that are not negotiable
 
@@ -235,14 +286,19 @@ why nobody had seen it.
 ## 5. Gates before any commit
 
 ```bash
-npm test          # 318/318 (33 hire, 12 blog-tags)
-npm run lint      # type ladder + 14 ES modules / 75 event references
+npm test          # 379/379 (15 areas, 16 imports, 12 blog-tags, 11 referrals …)
+npm run lint      # type ladder + 15 ES modules / 75 event references
 npm run build:static && npm run crawl && npm run audit:pages
 npm run smoke && npm run smoke:cms      # role matrix + CMS round trip
 npm run images:check && npm run videos:check
 ```
 
 `crawl` must report 0 broken links; `audit:pages` 0 findings.
+
+Two cron-style sweeps run outside the request path, and both are also buttons in
+the console: `npm run alerts` (FR-25 price/new-match alerts) and `npm run
+referrals` (FR-28 — counts referrals that have earned it; `-- --dry-run` prints
+who would count and writes nothing).
 
 ## 6. Housekeeping
 

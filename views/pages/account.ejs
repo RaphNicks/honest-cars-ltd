@@ -500,11 +500,70 @@
           <p class="account-item__meta mt-2">
             Code <strong class="tabular"><%= referral.code %></strong> ·
             <strong class="tabular"><%= referral.joined %></strong> signed up ·
-            <strong class="tabular"><%= referral.orders %></strong> order<%= referral.orders === 1 ? '' : 's' %> placed
+            <strong class="tabular"><%= referral.orders %></strong> order<%= referral.orders === 1 ? '' : 's' %> placed ·
+            <strong class="tabular"><%= referral.qualified %></strong> counted
           </p>
+          <p class="note-inline">
+            A referral counts when the person you invited has bought something — that is what the desk reviews.
+            <% if (referral.approvedKobo) { %>
+              <strong><%= helpers.formatNaira(referral.approvedKobo) %></strong> approved and not yet paid.
+            <% } %>
+            <% if (referral.paidKobo) { %>
+              <strong><%= helpers.formatNaira(referral.paidKobo) %></strong> paid to date.
+            <% } %>
+          </p>
+
+          <% if (!referral.people.length) { %>
+            <p class="mb-0">
+              Nobody has used your link yet. Share it and whoever signs in through it is attached to your account
+              automatically — no code to type.
+            </p>
+          <% } else { %>
+            <div class="account-list account-list--tight mt-2">
+              <% referral.people.forEach(function (person) { %>
+                <div class="account-item">
+                  <div class="account-item__main">
+                    <span class="account-item__title"><%= person.name || 'Your invite' %></span>
+                    <span class="account-item__meta">
+                      joined <%= new Date(person.joinedAt).toLocaleDateString('en-NG', { day: 'numeric', month: 'short', year: 'numeric' }) %>
+                      <% if (person.phoneMasked) { %> · <%= person.phoneMasked %><% } %>
+                      · <%= person.orders %> order<%= person.orders === 1 ? '' : 's' %>
+                    </span>
+                    <% if (!person.counted) { %>
+                      <span class="note-inline">
+                        Not counted yet — it counts once they have bought something.
+                        <% if (referral.qualifyOrders > 1) { %>This programme counts from <%= referral.qualifyOrders %> paid orders.<% } %>
+                      </span>
+                    <% } else if (person.reward && person.reward.status === 'pending') { %>
+                      <span class="note-inline">Counted. Your reward is with the desk for review.</span>
+                    <% } else if (person.reward && person.reward.status === 'void') { %>
+                      <span class="note-inline">Reviewed and not paid<%= person.reward.note ? ` — ${person.reward.note}` : '' %>.</span>
+                    <% } %>
+                  </div>
+                  <div class="account-item__side">
+                    <% if (person.reward) { %>
+                      <span class="status-pill status-pill--<%= person.reward.status === 'paid' ? 'completed' : person.reward.status === 'approved' ? 'confirmed' : person.reward.status === 'void' ? 'cancelled' : 'new' %>">
+                        <%= person.reward.label %><%= person.reward.amountLabel ? ` · ${person.reward.amountLabel}` : '' %>
+                      </span>
+                      <% if (person.reward.paidAt) { %>
+                        <span class="account-item__meta">
+                          paid <%= new Date(person.reward.paidAt).toLocaleDateString('en-NG', { day: 'numeric', month: 'short', year: 'numeric' }) %>
+                        </span>
+                      <% } %>
+                    <% } else if (person.counted) { %>
+                      <span class="status-pill status-pill--new">With the desk</span>
+                    <% } else { %>
+                      <span class="status-pill status-pill--new">Not counted yet</span>
+                    <% } %>
+                  </div>
+                </div>
+              <% }); %>
+            </div>
+          <% } %>
+
           <p class="note-inline mb-0">
-            Reward amounts and payouts are set by the ops desk, not by this page — the counts above are the records
-            they work from, and nothing is promised until they confirm it on WhatsApp.
+            Reward amounts and payouts are set by the ops desk, not by this page — the records above are what they
+            work from, and nothing is promised until a reward shows as approved here.
           </p>
         <% } %>
 

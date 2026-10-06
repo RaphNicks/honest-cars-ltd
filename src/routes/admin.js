@@ -42,6 +42,7 @@ const hireService = require('../services/hire');
 const invoiceService = require('../services/invoice');
 const statementService = require('../services/statement');
 const dealerApi = require('../services/dealer-api');
+const referralService = require('../services/referrals');
 const { sendPage, CACHE } = require('../lib/respond');
 
 const router = express.Router();
@@ -68,6 +69,7 @@ const PATHS = {
   staff: `${HOME}/staff`,
   audit: `${HOME}/audit`,
   settings: `${HOME}/settings`,
+  referrals: `${HOME}/referrals`,
 };
 
 /** Navigation, filtered by what this role may actually open (§7.4). */
@@ -91,6 +93,7 @@ const NAV = [
   { href: `${HOME}/cms`, label: 'Content', icon: 'fileCheck', capability: 'cms.manage' },
   { href: PATHS.staff, label: 'Staff & roles', icon: 'account', capability: 'users.manage' },
   { href: PATHS.audit, label: 'Audit log', icon: 'shield', capability: 'users.manage' },
+  { href: PATHS.referrals, label: 'Referrals', icon: 'account', capability: 'referrals.view' },
   { href: PATHS.settings, label: 'Settings', icon: 'cog', capability: 'settings.manage' },
 ];
 
@@ -2197,6 +2200,114 @@ router.post('/settings/areas/:id/move', auth.requireStaff('settings.manage'), au
     return done(res, back, result.moved
       ? `${result.area.name} moved ${direction}.`
       : `${result.area.name} is already at the ${direction === 'up' ? 'top' : 'bottom'} of its list.`);
+  } catch (error) {
+    return next(error);
+  }
+});
+
+/**
+ * FR-28 — referrals: who brought whom, what it is worth, and what has been paid.
+ *
+ * The page is the answer to §7.1's "reward status". Counting a referral is
+ * automatic (a paid order does it); *paying* one never is — the desk types the
+ * amount. That split is the point: the site can say a referral counts without
+ * promising anybody a figure.
+ */
+router.get('/referrals', auth.requireStaff('referrals.view'), async (req, res, next) => {
+  try {
+    const status = validate.oneOf(req.query.status, db.referrals.STATUSES, null);
+    const q = validate.text(req.query.q, 60) || null;
+    const referralView = await referralService.consoleView({ status, q });
+    return await page(req, res, {
+      view: 'admin/referrals',
+      active: PATHS.referrals,
+      title: 'Referrals',
+      description: 'Personal links, who they brought in, and the reward queue.',
+      data: {
+        ...referralView,
+        status,
+        q,
+        canReward: roles.can(req.user.role, 'referrals.reward'),
+      },
+    });
+  } catch (error) {
+    return next(error);
+  }
+});
+
+/**
+ * Run the qualification sweep by hand. It also runs from the command line
+ * (`npm run referrals`), but ops should not have to wait for a cron to see a
+ * referral that has just landed.
+ */
+router.post('/referrals/sweep', auth.requireStaff('referrals.reward'), auth.sameOriginOnly, async (req, res, next) => {
+  const back = PATHS.referrals;
+  try {
+    const result = await referralService.sweep({ actorId: req.user.id });
+    if (!result.qualified.length) {
+      return done(res, back, `${result.considered} referral${result.considered === 1 ? '' : 's'} were eligible and already counted — nothing new.`);
+    }
+    return done(res, back, `${result.qualified.length} referral${result.qualified.length === 1 ? '' : 's'} now count. Their rewards are in the queue below.`);
+  } catch (error) {
+    return next(error);
+  }
+});
+
+/** Approve the amount. This is the only way a figure reaches a customer. */
+router.post('/referrals/:id/approve', auth.requireStaff('referrals.reward'), auth.sameOriginOnly, async (req, res, next) => {
+  const back = PATHS.referrals;
+  try {
+    const id = Number.parseInt(req.params.id, 10);
+    if (!Number.isFinite(id)) return done(res, back, 'Unknown referral.', { error: true });
+    const result = await referralService.approveReward(id, {
+      amountKobo: req.body.amount,
+      basis: req.body.basis,
+      unitLabel: req.body.unit_label,
+      note: req.body.note,
+    }, req.user);
+    if (!result.ok) return done(res, back, result.error, { error: true });
+    return done(res, back, `Approved ${money.formatNaira(result.reward.amountKobo)} for the referral. The referrer has been told what was approved — not that it is paid.`);
+  } catch (error) {
+    return next(error);
+  }
+});
+
+/** Paid: the money left. Kept as its own action so the ledger says so. */
+router.post('/referrals/:id/paid', auth.requireStaff('referrals.reward'), auth.sameOriginOnly, async (req, res, next) => {
+  const back = PATHS.referrals;
+  try {
+    const id = Number.parseInt(req.params.id, 10);
+    if (!Number.isFinite(id)) return done(res, back, 'Unknown referral.', { error: true });
+    const result = await referralService.settleReward(id, { status: 'paid', note: req.body.note }, req.user);
+    if (!result.ok) return done(res, back, result.error, { error: true });
+    return done(res, back, `Marked paid — ${money.formatNaira(result.reward.amountKobo)}. The referrer has the confirmation on their account.`);
+  } catch (error) {
+    return next(error);
+  }
+});
+
+/** Void: it does not count, with the reason kept on the row. */
+router.post('/referrals/:id/void', auth.requireStaff('referrals.reward'), auth.sameOriginOnly, async (req, res, next) => {
+  const back = PATHS.referrals;
+  try {
+    const id = Number.parseInt(req.params.id, 10);
+    if (!Number.isFinite(id)) return done(res, back, 'Unknown referral.', { error: true });
+    const result = await referralService.settleReward(id, { status: 'void', note: req.body.note }, req.user);
+    if (!result.ok) return done(res, back, result.error, { error: true });
+    return done(res, back, 'Voided. The row stays on the page — a decision with no record is indistinguishable from a mistake.');
+  } catch (error) {
+    return next(error);
+  }
+});
+
+router.post('/referrals/:id/restore', auth.requireStaff('referrals.reward'), auth.sameOriginOnly, async (req, res, next) => {
+  const back = PATHS.referrals;
+  try {
+    const id = Number.parseInt(req.params.id, 10);
+    if (!Number.isFinite(id)) return done(res, back, 'Unknown referral.', { error: true });
+    const result = await referralService.restoreReward(id, req.user);
+    if (!result.ok) return done(res, back, result.error, { error: true });
+    return done(res, back, 'Back in the queue as pending.');
   } catch (error) {
     return next(error);
   }

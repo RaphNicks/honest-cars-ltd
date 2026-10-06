@@ -28,7 +28,8 @@
     "alerts": "node scripts/run-alerts.mjs",
     "videos": "node scripts/generate-videos.js",
     "videos:check": "node scripts/generate-videos.js --check",
-    "renewals": "node scripts/renewals.js"
+    "renewals": "node scripts/renewals.js",
+    "referrals": "node scripts/referrals.js"
   },
   "engines": {
     "node": ">=20"

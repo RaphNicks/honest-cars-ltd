@@ -38,6 +38,8 @@ CREATE TABLE IF NOT EXISTS `users` (
   watchlisted      TINYINT(1)    NOT NULL DEFAULT 0,            -- admin flag (§7.3)
   referral_code    VARCHAR(16)   NULL,              -- the holder's personal link code
   referred_by      INT UNSIGNED  NULL,              -- who brought them here (§7.1 referrals)
+  referral_qualified_at DATETIME NULL,              -- FR-28: when it started to count
+  referral_note    VARCHAR(200)  NULL,              -- the desk's own line on it
   last_seen_at     DATETIME      NULL,
   created_at       TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at       TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -1087,6 +1089,37 @@ CREATE TABLE IF NOT EXISTS `service_cities` (
   PRIMARY KEY (id),
   UNIQUE KEY uq_city_slug (slug),
   KEY idx_city_active (is_active, position)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ---------------------------------------------------------------------------
+-- referral_rewards — FR-28: the reward status behind a referral (§7.1)
+--
+-- One row per referred account. `status` is the whole story — pending →
+-- approved → paid, or void when the desk says it does not count — and
+-- `amount_kobo` is entered by a human, because the PRD sets no amount: a reward
+-- is a campaign decision. The unique key means a person is counted once.
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS `referral_rewards` (
+  id               INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  referrer_id      INT UNSIGNED NOT NULL,
+  referred_user_id INT UNSIGNED NOT NULL,
+  status           ENUM('pending','approved','paid','void') NOT NULL DEFAULT 'pending',
+  basis            ENUM('signup','order') NOT NULL DEFAULT 'order',
+  amount_kobo      BIGINT       NOT NULL DEFAULT 0,
+  unit_label       VARCHAR(120) NULL,
+  note             VARCHAR(200) NULL,
+  approved_at      DATETIME     NULL,
+  paid_at          DATETIME     NULL,
+  actor_id         INT UNSIGNED NULL,
+  created_at       TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at       TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  UNIQUE KEY uq_referral_pair (referrer_id, referred_user_id),
+  KEY idx_referral_status (status, created_at),
+  KEY idx_referral_referrer (referrer_id, status),
+  CONSTRAINT fk_referral_referrer FOREIGN KEY (referrer_id)      REFERENCES `users` (id) ON DELETE CASCADE,
+  CONSTRAINT fk_referral_referred FOREIGN KEY (referred_user_id) REFERENCES `users` (id) ON DELETE CASCADE,
+  CONSTRAINT fk_referral_actor    FOREIGN KEY (actor_id)         REFERENCES `users` (id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS `service_areas` (

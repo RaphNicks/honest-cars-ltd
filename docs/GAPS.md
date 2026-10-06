@@ -6,7 +6,35 @@ integrations §11, NFRs §12, sitemap §5.1, acceptance §18.3).
 Line references below point at the code that exists. Where an item is missing, the
 note says what "done" would mean, so the work can be scoped without re-reading the PRD.
 
-**Status at this commit:** FR-32 is built — the network covers four markets
+**Status at this commit:** FR-28 is built — the referral module, end to end.
+The link and the attribution have existed since migration 007 (`users.referral_code`
+/ `referred_by`, the card on /account); what was missing was the **reward
+status** §7.1 asks for. Migration 025 adds `users.referral_qualified_at` and a
+`referral_rewards` row per referred account, so a referral can be *counted*
+without the site ever promising a figure:
+
+- **Counting is automatic.** `npm run referrals` (or the button on
+  `/admin/referrals`) finds referred accounts that have bought something
+  (`users.referral_qualified_at IS NULL` + a paid order) and queues a pending
+  reward. Running it twice does nothing the second time — the guard is the SQL
+  predicate plus the unique (referrer, referred) key, not a flag in memory.
+- **Paying is never automatic.** `pending → approved → paid`, or `void` with a
+  reason, each step typed by a human on `/admin/referrals` (capability
+  `referrals.view` for admin/ops/finance, `referrals.reward` for admin/ops),
+  each step audited (`referral.qualified|approved|paid|voided|restored`) and
+  announced to the referrer through the channel-honest `notify` layer.
+- **The customer sees the honest state of each person their link brought in** —
+  signed up, not counted yet, with the desk, approved (with the amount), paid
+  (with the date), or voided with the reason. Nothing shows a figure before the
+  desk enters one; the form pre-fills the configured suggestion
+  (`REFERRAL_REWARD_KOBO`, ₦2,000) and the desk can change it per referral.
+- The seed carries all four states (pending, paid, uncounted, and a link nobody
+  used), so every renderer is exercised on a fresh database.
+
+One row leaves the list. The list is now **22 rows** (7 buildable here, 8 blocked
+on an account, 7 with no home in this sandbox).
+
+**Status at `c974792`:** FR-32 is built — the network covers four markets
 (Port Harcourt, Owerri, Aba and Benin City). Cities and their areas are tables
 (`service_cities`, `service_areas`, migration 024) rather than a hard-coded list,
 because the PRD's data model says the area list is admin-managed: ops adds,
@@ -21,7 +49,7 @@ on /cars, labelled client-side on the prebuilt static pages. A city URL with
 nothing else canonicalises onto the market's curated page; a page filtered only by
 the remembered market is private and noindex. Two rows leave the list: FR-32, and
 the §5.1 "settings has no screen" row — what remains of settings is scoped in row
-§5.1 below. The list is now **23 rows** (8 buildable here, 8 blocked on an
+§5.1 below. That took the list to 23 rows (8 buildable here, 8 blocked on an
 account, 7 with no home in this sandbox).
 
 **Status at `e78fd4c`:** FR-33 is built — the dealer portal imports a
@@ -87,7 +115,6 @@ No external account needed. These are real gaps against the PRD.
 
 | ID | Requirement | What is actually there | What "done" means |
 |---|---|---|---|
-| FR-28 | Referral module — links, attribution, reward status (§7.1) | `referral_code` + `referred_by` exist (`users`), a link and code render on `/account`, and sign-up records the referrer. | Attribution reporting (who came from whom) and a reward status per referral. |
 | FR-29 | Instant valuation widget from price-intel data (§6.6) | `/sell-swap` promises a human valuation within 24h; `price_bands` (FR-23) holds exactly the data a widget needs. | Make/model/year/condition/mileage in, an indicative band out, with the same "sample size" honesty the VDP indicator uses. |
 | FR-30 | PWA — installable, offline shell, web push | Mobile-first responsive site; no manifest, no service worker. | Manifest + service worker + install prompt; push is a bigger call (needs VAPID keys). |
 | FR-34 | Financing-lead partner handoff | Nothing. | A financing enquiry that captures intent and hands off, with the partner recorded on the lead. |

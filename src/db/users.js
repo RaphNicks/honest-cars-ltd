@@ -30,6 +30,9 @@ function shapeUser(row) {
     watchlisted: Boolean(row.watchlisted),
     referralCode: row.referral_code || null,
     referredBy: row.referred_by || null,
+    // FR-28: when the referral started to count, and the desk's note on it.
+    referralQualifiedAt: row.referral_qualified_at || null,
+    referralNote: row.referral_note || null,
     lastSeenAt: row.last_seen_at,
     createdAt: row.created_at,
     // What the header shows — never render a full phone number back at the user.
@@ -114,25 +117,34 @@ async function upsertByPhone({ phone, name = null, referralCode = null }) {
   return findById(inserted.insertId);
 }
 
-/** Shown on the dashboard: the link, how many people used it, what they bought. */
+/**
+ * Shown on the dashboard: the link, how many people used it, what they bought,
+ * and — FR-28 — whether it counted and where the reward is.
+ *
+ * The whole tally comes from `db.referrals.listForReferrer`, so the card, the
+ * console and the reward queue can never disagree about the same person. It
+ * stays here because §7.1 calls it a dashboard card and exportData reads it.
+ */
 async function referralStats(user) {
   if (!user || !user.referralCode) return null;
-  const [joined] = await query(
-    'SELECT COUNT(*) AS n FROM `users` WHERE referred_by = ? AND status <> ?',
-    [user.id, 'deleted'],
-  );
-  const [ordered] = await query(
-    `SELECT COUNT(DISTINCT o.id) AS n
-       FROM orders o
-       JOIN \`users\` u ON u.phone = o.phone
-      WHERE u.referred_by = ? AND o.status <> 'cancelled'`,
-    [user.id],
-  );
+  const referrals = require('./referrals');
+  const people = await referrals.listForReferrer(user.id);
+  const counts = referrals.tally(people);
   return {
     code: user.referralCode,
     path: `/login?ref=${user.referralCode}`,
-    joined: Number(joined ? joined.n : 0),
-    orders: Number(ordered ? ordered.n : 0),
+    joined: counts.joined,
+    orders: counts.orders,
+    qualified: counts.qualified,
+    pending: counts.pending,
+    approved: counts.approved,
+    paid: counts.paid,
+    voided: counts.voided,
+    approvedKobo: counts.approvedKobo,
+    paidKobo: counts.paidKobo,
+    note: user.referralNote || null,
+    qualifiedAt: user.referralQualifiedAt || null,
+    people,
   };
 }
 

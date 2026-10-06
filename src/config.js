@@ -130,7 +130,20 @@ const config = {
       new_match: process.env.NOTIFY_CHANNEL || 'console',
       // FR-20 renewals — a payment prompt, so it follows the payment channel.
       subscription_renewal: process.env.NOTIFY_CHANNEL_PAYMENT || process.env.NOTIFY_CHANNEL || 'console',
+      // FR-28 referrals — qualifying is a nudge, a paid reward is a receipt.
+      referral_qualified: process.env.NOTIFY_CHANNEL || 'console',
+      referral_reward_approved: process.env.NOTIFY_CHANNEL || 'console',
+      referral_reward_paid: process.env.NOTIFY_CHANNEL_PAYMENT || process.env.NOTIFY_CHANNEL || 'console',
     },
+  },
+
+  // FR-28 referrals. §7.1 asks for a reward *status*, and the PRD deliberately
+  // names no amount — a reward is a campaign decision, so it is configuration
+  // here and a human entry in the console. `rewardKobo` only pre-fills the form;
+  // nothing is ever shown to a customer until the desk approves it.
+  referral: {
+    rewardKobo: int(process.env.REFERRAL_REWARD_KOBO, 200_000),
+    qualifyOrders: int(process.env.REFERRAL_QUALIFY_ORDERS, 1),
   },
 
   analytics: {

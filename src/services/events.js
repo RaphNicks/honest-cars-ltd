@@ -51,6 +51,10 @@ const EVENTS = {
     'account_deleted',
     'saved_car_added',
     'saved_car_removed',
+    // FR-28 referrals — recorded by the sweep and by the console when a reward
+    // is paid, never accepted from the browser (money moved).
+    'referral_qualified',
+    'referral_reward_paid',
   ],
 };
 
@@ -67,7 +71,8 @@ const SERVER_ONLY = new Set([
   'concierge_retainer_paid',
   'subscription_renewed',
   'booking_completed',
-  ...['otp_requested', 'otp_request_failed', 'otp_verify_succeeded', 'otp_verify_failed', 'sign_out', 'account_deleted'],
+  ...['otp_requested', 'otp_request_failed', 'otp_verify_succeeded', 'otp_verify_failed', 'sign_out', 'account_deleted',
+    'referral_qualified', 'referral_reward_paid'],
 ]);
 
 /** Client-side payload allowlist — keeps PII out of analytics (§12.2). */

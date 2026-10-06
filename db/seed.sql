@@ -53,6 +53,9 @@ DELETE FROM content_revisions;
 DELETE FROM faqs;
 DELETE FROM redirects;
 DELETE FROM dealer_addons;
+-- FR-28: the referral queue is seed-owned (the accounts themselves are upserted,
+-- never deleted, because a real login may be using one).
+DELETE FROM referral_rewards;
 DELETE FROM dealers;
 -- FR-32: the markets and their area lists are seed-owned too.
 DELETE FROM service_areas;
@@ -803,92 +806,92 @@ INSERT INTO listing_media (`id`, `listing_id`, `type`, `shot_label`, `duration_s
 
 -- price_bands: 84 rows
 INSERT INTO price_bands (`make`, `model`, `year_from`, `year_to`, `condition`, `band_min_kobo`, `band_max_kobo`, `sample_size`, `refreshed_at`) VALUES
-  ('Toyota', 'Camry', 2010, 2012, 'any', 650000000, 870000000, 24, '2026-10-05 18:02:41'),
-  ('Toyota', 'Camry', 2013, 2015, 'any', 968750000, 1188750000, 37, '2026-09-14 18:02:41'),
-  ('Toyota', 'Camry', 2016, 2018, 'any', 1287500000, 1507500000, 6, '2026-10-01 18:02:41'),
-  ('Toyota', 'Corolla', 2011, 2013, 'any', 700000000, 953000000, 40, '2026-10-01 18:02:41'),
-  ('Toyota', 'Corolla', 2014, 2016, 'any', 1066562500, 1319562500, 20, '2026-09-06 18:02:41'),
-  ('Toyota', 'Corolla', 2017, 2019, 'any', 1433125000, 1686125000, 18, '2026-09-10 18:02:41'),
-  ('Toyota', 'RAV4', 2010, 2012, 'any', 950000000, 1357000000, 34, '2026-09-06 18:02:41'),
-  ('Toyota', 'RAV4', 2013, 2015, 'any', 1474166667, 1881166667, 22, '2026-10-06 18:02:41'),
-  ('Toyota', 'RAV4', 2016, 2018, 'any', 1998333333, 2405333333, 10, '2026-09-12 18:02:41'),
-  ('Toyota', 'RAV4', 2019, 2019, 'any', 2522500000, 2929500000, 28, '2026-10-06 18:02:41'),
-  ('Toyota', 'Highlander', 2011, 2013, 'any', 1400000000, 1928000000, 16, '2026-09-05 18:02:41'),
-  ('Toyota', 'Highlander', 2014, 2016, 'any', 2274285714, 2802285714, 13, '2026-10-03 18:02:41'),
-  ('Toyota', 'Highlander', 2017, 2018, 'any', 3148571429, 3676571429, 30, '2026-10-06 18:02:41'),
-  ('Toyota', 'Hilux', 2014, 2016, 'any', 2000000000, 2572000000, 12, '2026-10-04 18:02:41'),
-  ('Toyota', 'Hilux', 2017, 2019, 'any', 3105000000, 3677000000, 37, '2026-10-02 18:02:41'),
-  ('Toyota', 'Hilux', 2020, 2020, 'any', 4210000000, 4782000000, 29, '2026-10-05 18:02:41'),
-  ('Toyota', 'Sienna', 2011, 2013, 'any', 1100000000, 1408000000, 34, '2026-10-02 18:02:41'),
-  ('Toyota', 'Sienna', 2014, 2016, 'any', 1610000000, 1918000000, 33, '2026-10-04 18:02:41'),
-  ('Toyota', 'Sienna', 2017, 2018, 'any', 2120000000, 2428000000, 39, '2026-10-02 18:02:41'),
-  ('Toyota', 'Prado', 2012, 2014, 'any', 3200000000, 4212000000, 32, '2026-10-05 18:02:41'),
-  ('Toyota', 'Prado', 2015, 2017, 'any', 4875714286, 5887714286, 15, '2026-10-04 18:02:41'),
-  ('Toyota', 'Prado', 2018, 2019, 'any', 6551428571, 7563428571, 14, '2026-09-12 18:02:41'),
-  ('Toyota', 'Avalon', 2012, 2014, 'any', 950000000, 1115000000, 12, '2026-10-05 18:02:41'),
-  ('Toyota', 'Avalon', 2015, 2017, 'any', 1332500000, 1497500000, 25, '2026-10-04 18:02:41'),
-  ('Honda', 'Accord', 2012, 2014, 'any', 750000000, 981000000, 12, '2026-09-09 18:02:41'),
-  ('Honda', 'Accord', 2015, 2017, 'any', 1196250000, 1427250000, 19, '2026-09-22 18:02:41'),
-  ('Honda', 'Accord', 2018, 2018, 'any', 1642500000, 1873500000, 21, '2026-10-05 18:02:41'),
-  ('Honda', 'CR-V', 2012, 2014, 'any', 900000000, 1230000000, 32, '2026-10-01 18:02:41'),
-  ('Honda', 'CR-V', 2015, 2017, 'any', 1446428571, 1776428571, 12, '2026-10-04 18:02:41'),
-  ('Honda', 'CR-V', 2018, 2019, 'any', 1992857143, 2322857143, 26, '2026-09-22 18:02:41'),
-  ('Honda', 'Civic', 2013, 2015, 'any', 700000000, 887000000, 6, '2026-10-04 18:02:41'),
-  ('Honda', 'Civic', 2016, 2018, 'any', 1061250000, 1248250000, 37, '2026-09-15 18:02:41'),
-  ('Honda', 'Civic', 2019, 2019, 'any', 1422500000, 1609500000, 28, '2026-09-15 18:02:41'),
-  ('Honda', 'Pilot', 2013, 2015, 'any', 1500000000, 1830000000, 11, '2026-10-03 18:02:41'),
-  ('Honda', 'Pilot', 2016, 2018, 'any', 2265000000, 2595000000, 30, '2026-10-01 18:02:41'),
-  ('Lexus', 'RX 350', 2012, 2014, 'any', 1700000000, 2162000000, 40, '2026-09-21 18:02:41'),
-  ('Lexus', 'RX 350', 2015, 2017, 'any', 2592500000, 3054500000, 16, '2026-09-26 18:02:41'),
-  ('Lexus', 'RX 350', 2018, 2018, 'any', 3485000000, 3947000000, 10, '2026-09-17 18:02:41'),
-  ('Lexus', 'ES 350', 2013, 2015, 'any', 1250000000, 1503000000, 6, '2026-10-05 18:02:41'),
-  ('Lexus', 'ES 350', 2016, 2018, 'any', 1836500000, 2089500000, 37, '2026-10-05 18:02:41');
+  ('Toyota', 'Camry', 2010, 2012, 'any', 650000000, 870000000, 24, '2026-10-05 18:27:58'),
+  ('Toyota', 'Camry', 2013, 2015, 'any', 968750000, 1188750000, 37, '2026-09-14 18:27:58'),
+  ('Toyota', 'Camry', 2016, 2018, 'any', 1287500000, 1507500000, 6, '2026-10-01 18:27:58'),
+  ('Toyota', 'Corolla', 2011, 2013, 'any', 700000000, 953000000, 40, '2026-10-01 18:27:58'),
+  ('Toyota', 'Corolla', 2014, 2016, 'any', 1066562500, 1319562500, 20, '2026-09-06 18:27:58'),
+  ('Toyota', 'Corolla', 2017, 2019, 'any', 1433125000, 1686125000, 18, '2026-09-10 18:27:58'),
+  ('Toyota', 'RAV4', 2010, 2012, 'any', 950000000, 1357000000, 34, '2026-09-06 18:27:58'),
+  ('Toyota', 'RAV4', 2013, 2015, 'any', 1474166667, 1881166667, 22, '2026-10-06 18:27:58'),
+  ('Toyota', 'RAV4', 2016, 2018, 'any', 1998333333, 2405333333, 10, '2026-09-12 18:27:58'),
+  ('Toyota', 'RAV4', 2019, 2019, 'any', 2522500000, 2929500000, 28, '2026-10-06 18:27:58'),
+  ('Toyota', 'Highlander', 2011, 2013, 'any', 1400000000, 1928000000, 16, '2026-09-05 18:27:58'),
+  ('Toyota', 'Highlander', 2014, 2016, 'any', 2274285714, 2802285714, 13, '2026-10-03 18:27:58'),
+  ('Toyota', 'Highlander', 2017, 2018, 'any', 3148571429, 3676571429, 30, '2026-10-06 18:27:58'),
+  ('Toyota', 'Hilux', 2014, 2016, 'any', 2000000000, 2572000000, 12, '2026-10-04 18:27:58'),
+  ('Toyota', 'Hilux', 2017, 2019, 'any', 3105000000, 3677000000, 37, '2026-10-02 18:27:58'),
+  ('Toyota', 'Hilux', 2020, 2020, 'any', 4210000000, 4782000000, 29, '2026-10-05 18:27:58'),
+  ('Toyota', 'Sienna', 2011, 2013, 'any', 1100000000, 1408000000, 34, '2026-10-02 18:27:58'),
+  ('Toyota', 'Sienna', 2014, 2016, 'any', 1610000000, 1918000000, 33, '2026-10-04 18:27:58'),
+  ('Toyota', 'Sienna', 2017, 2018, 'any', 2120000000, 2428000000, 39, '2026-10-02 18:27:58'),
+  ('Toyota', 'Prado', 2012, 2014, 'any', 3200000000, 4212000000, 32, '2026-10-05 18:27:58'),
+  ('Toyota', 'Prado', 2015, 2017, 'any', 4875714286, 5887714286, 15, '2026-10-04 18:27:58'),
+  ('Toyota', 'Prado', 2018, 2019, 'any', 6551428571, 7563428571, 14, '2026-09-12 18:27:58'),
+  ('Toyota', 'Avalon', 2012, 2014, 'any', 950000000, 1115000000, 12, '2026-10-05 18:27:58'),
+  ('Toyota', 'Avalon', 2015, 2017, 'any', 1332500000, 1497500000, 25, '2026-10-04 18:27:58'),
+  ('Honda', 'Accord', 2012, 2014, 'any', 750000000, 981000000, 12, '2026-09-09 18:27:58'),
+  ('Honda', 'Accord', 2015, 2017, 'any', 1196250000, 1427250000, 19, '2026-09-22 18:27:58'),
+  ('Honda', 'Accord', 2018, 2018, 'any', 1642500000, 1873500000, 21, '2026-10-05 18:27:58'),
+  ('Honda', 'CR-V', 2012, 2014, 'any', 900000000, 1230000000, 32, '2026-10-01 18:27:58'),
+  ('Honda', 'CR-V', 2015, 2017, 'any', 1446428571, 1776428571, 12, '2026-10-04 18:27:58'),
+  ('Honda', 'CR-V', 2018, 2019, 'any', 1992857143, 2322857143, 26, '2026-09-22 18:27:58'),
+  ('Honda', 'Civic', 2013, 2015, 'any', 700000000, 887000000, 6, '2026-10-04 18:27:58'),
+  ('Honda', 'Civic', 2016, 2018, 'any', 1061250000, 1248250000, 37, '2026-09-15 18:27:58'),
+  ('Honda', 'Civic', 2019, 2019, 'any', 1422500000, 1609500000, 28, '2026-09-15 18:27:58'),
+  ('Honda', 'Pilot', 2013, 2015, 'any', 1500000000, 1830000000, 11, '2026-10-03 18:27:58'),
+  ('Honda', 'Pilot', 2016, 2018, 'any', 2265000000, 2595000000, 30, '2026-10-01 18:27:58'),
+  ('Lexus', 'RX 350', 2012, 2014, 'any', 1700000000, 2162000000, 40, '2026-09-21 18:27:58'),
+  ('Lexus', 'RX 350', 2015, 2017, 'any', 2592500000, 3054500000, 16, '2026-09-26 18:27:58'),
+  ('Lexus', 'RX 350', 2018, 2018, 'any', 3485000000, 3947000000, 10, '2026-09-17 18:27:58'),
+  ('Lexus', 'ES 350', 2013, 2015, 'any', 1250000000, 1503000000, 6, '2026-10-05 18:27:58'),
+  ('Lexus', 'ES 350', 2016, 2018, 'any', 1836500000, 2089500000, 37, '2026-10-05 18:27:58');
 INSERT INTO price_bands (`make`, `model`, `year_from`, `year_to`, `condition`, `band_min_kobo`, `band_max_kobo`, `sample_size`, `refreshed_at`) VALUES
-  ('Lexus', 'GX 460', 2014, 2016, 'any', 2800000000, 3394000000, 20, '2026-10-02 18:02:41'),
-  ('Lexus', 'GX 460', 2017, 2019, 'any', 4177000000, 4771000000, 39, '2026-10-05 18:02:41'),
-  ('Mercedes-Benz', 'C-Class', 2013, 2015, 'any', 1100000000, 1430000000, 32, '2026-10-02 18:02:41'),
-  ('Mercedes-Benz', 'C-Class', 2016, 2018, 'any', 1865000000, 2195000000, 26, '2026-10-01 18:02:41'),
-  ('Mercedes-Benz', 'GLE', 2016, 2018, 'any', 3200000000, 4080000000, 37, '2026-10-06 18:02:41'),
-  ('Mercedes-Benz', 'GLE', 2019, 2019, 'any', 6600000000, 7480000000, 33, '2026-10-03 18:02:41'),
-  ('Mercedes-Benz', 'E-Class', 2014, 2016, 'any', 1600000000, 1996000000, 33, '2026-10-01 18:02:41'),
-  ('Mercedes-Benz', 'E-Class', 2017, 2018, 'any', 2747500000, 3143500000, 30, '2026-10-05 18:02:41'),
-  ('Hyundai', 'Elantra', 2014, 2016, 'any', 600000000, 732000000, 27, '2026-09-13 18:02:41'),
-  ('Hyundai', 'Elantra', 2017, 2018, 'any', 982500000, 1114500000, 11, '2026-09-18 18:02:41'),
-  ('Hyundai', 'Santa Fe', 2014, 2016, 'any', 1100000000, 1342000000, 16, '2026-10-04 18:02:41'),
-  ('Hyundai', 'Santa Fe', 2017, 2019, 'any', 1661000000, 1903000000, 28, '2026-09-04 18:02:41'),
-  ('Hyundai', 'Tucson', 2015, 2017, 'any', 1000000000, 1220000000, 24, '2026-10-06 18:02:41'),
-  ('Hyundai', 'Tucson', 2018, 2019, 'any', 1637500000, 1857500000, 36, '2026-10-01 18:02:41'),
-  ('Kia', 'Sportage', 2015, 2017, 'any', 1100000000, 1342000000, 10, '2026-10-06 18:02:41'),
-  ('Kia', 'Sportage', 2018, 2019, 'any', 1801250000, 2043250000, 35, '2026-10-06 18:02:41'),
-  ('Kia', 'Rio', 2015, 2017, 'any', 550000000, 638000000, 6, '2026-10-01 18:02:41'),
-  ('Kia', 'Rio', 2018, 2018, 'any', 890000000, 978000000, 39, '2026-10-06 18:02:41'),
-  ('Kia', 'Sorento', 2015, 2017, 'any', 1300000000, 1542000000, 6, '2026-10-01 18:02:41'),
-  ('Kia', 'Sorento', 2018, 2019, 'any', 2001250000, 2243250000, 33, '2026-10-03 18:02:41'),
-  ('Nissan', 'X-Trail', 2015, 2017, 'any', 1300000000, 1564000000, 7, '2026-09-27 18:02:41'),
-  ('Nissan', 'X-Trail', 2018, 2019, 'any', 2065000000, 2329000000, 37, '2026-10-06 18:02:41'),
-  ('Nissan', 'Altima', 2013, 2015, 'any', 650000000, 793000000, 6, '2026-10-01 18:02:41'),
-  ('Nissan', 'Altima', 2016, 2017, 'any', 1064375000, 1207375000, 37, '2026-10-03 18:02:41'),
-  ('Nissan', 'Rogue', 2015, 2017, 'any', 1000000000, 1242000000, 6, '2026-10-05 18:02:41'),
-  ('Nissan', 'Rogue', 2018, 2019, 'any', 1701250000, 1943250000, 7, '2026-10-06 18:02:41'),
-  ('Ford', 'Explorer', 2013, 2015, 'any', 1300000000, 1608000000, 14, '2026-10-06 18:02:41'),
-  ('Ford', 'Explorer', 2016, 2018, 'any', 2014000000, 2322000000, 24, '2026-10-01 18:02:41'),
-  ('Ford', 'Ranger', 2016, 2018, 'any', 2000000000, 2484000000, 21, '2026-10-04 18:02:41'),
-  ('Ford', 'Ranger', 2019, 2020, 'any', 3402500000, 3886500000, 23, '2026-10-01 18:02:41'),
-  ('Mazda', 'CX-5', 2015, 2017, 'any', 1200000000, 1442000000, 12, '2026-10-05 18:02:41'),
-  ('Mazda', 'CX-5', 2018, 2019, 'any', 1901250000, 2143250000, 13, '2026-10-02 18:02:41'),
-  ('Mitsubishi', 'Pajero', 2013, 2015, 'any', 1400000000, 1708000000, 12, '2026-10-02 18:02:41'),
-  ('Mitsubishi', 'Pajero', 2016, 2017, 'any', 2292500000, 2600500000, 26, '2026-10-06 18:02:41'),
-  ('Acura', 'MDX', 2012, 2014, 'any', 1200000000, 1464000000, 31, '2026-10-02 18:02:41'),
-  ('Acura', 'MDX', 2015, 2017, 'any', 1812000000, 2076000000, 16, '2026-10-01 18:02:41'),
-  ('Infiniti', 'QX60', 2014, 2016, 'any', 1500000000, 1786000000, 37, '2026-10-05 18:02:41'),
-  ('Infiniti', 'QX60', 2017, 2018, 'any', 2328750000, 2614750000, 29, '2026-10-06 18:02:41'),
-  ('BMW', 'X5', 2013, 2015, 'any', 2000000000, 2528000000, 26, '2026-09-11 18:02:41'),
-  ('BMW', 'X5', 2016, 2017, 'any', 3530000000, 4058000000, 36, '2026-09-10 18:02:41');
+  ('Lexus', 'GX 460', 2014, 2016, 'any', 2800000000, 3394000000, 20, '2026-10-02 18:27:58'),
+  ('Lexus', 'GX 460', 2017, 2019, 'any', 4177000000, 4771000000, 39, '2026-10-05 18:27:58'),
+  ('Mercedes-Benz', 'C-Class', 2013, 2015, 'any', 1100000000, 1430000000, 32, '2026-10-02 18:27:58'),
+  ('Mercedes-Benz', 'C-Class', 2016, 2018, 'any', 1865000000, 2195000000, 26, '2026-10-01 18:27:58'),
+  ('Mercedes-Benz', 'GLE', 2016, 2018, 'any', 3200000000, 4080000000, 37, '2026-10-06 18:27:58'),
+  ('Mercedes-Benz', 'GLE', 2019, 2019, 'any', 6600000000, 7480000000, 33, '2026-10-03 18:27:58'),
+  ('Mercedes-Benz', 'E-Class', 2014, 2016, 'any', 1600000000, 1996000000, 33, '2026-10-01 18:27:58'),
+  ('Mercedes-Benz', 'E-Class', 2017, 2018, 'any', 2747500000, 3143500000, 30, '2026-10-05 18:27:58'),
+  ('Hyundai', 'Elantra', 2014, 2016, 'any', 600000000, 732000000, 27, '2026-09-13 18:27:58'),
+  ('Hyundai', 'Elantra', 2017, 2018, 'any', 982500000, 1114500000, 11, '2026-09-18 18:27:58'),
+  ('Hyundai', 'Santa Fe', 2014, 2016, 'any', 1100000000, 1342000000, 16, '2026-10-04 18:27:58'),
+  ('Hyundai', 'Santa Fe', 2017, 2019, 'any', 1661000000, 1903000000, 28, '2026-09-04 18:27:58'),
+  ('Hyundai', 'Tucson', 2015, 2017, 'any', 1000000000, 1220000000, 24, '2026-10-06 18:27:58'),
+  ('Hyundai', 'Tucson', 2018, 2019, 'any', 1637500000, 1857500000, 36, '2026-10-01 18:27:58'),
+  ('Kia', 'Sportage', 2015, 2017, 'any', 1100000000, 1342000000, 10, '2026-10-06 18:27:58'),
+  ('Kia', 'Sportage', 2018, 2019, 'any', 1801250000, 2043250000, 35, '2026-10-06 18:27:58'),
+  ('Kia', 'Rio', 2015, 2017, 'any', 550000000, 638000000, 6, '2026-10-01 18:27:58'),
+  ('Kia', 'Rio', 2018, 2018, 'any', 890000000, 978000000, 39, '2026-10-06 18:27:58'),
+  ('Kia', 'Sorento', 2015, 2017, 'any', 1300000000, 1542000000, 6, '2026-10-01 18:27:58'),
+  ('Kia', 'Sorento', 2018, 2019, 'any', 2001250000, 2243250000, 33, '2026-10-03 18:27:58'),
+  ('Nissan', 'X-Trail', 2015, 2017, 'any', 1300000000, 1564000000, 7, '2026-09-27 18:27:58'),
+  ('Nissan', 'X-Trail', 2018, 2019, 'any', 2065000000, 2329000000, 37, '2026-10-06 18:27:58'),
+  ('Nissan', 'Altima', 2013, 2015, 'any', 650000000, 793000000, 6, '2026-10-01 18:27:58'),
+  ('Nissan', 'Altima', 2016, 2017, 'any', 1064375000, 1207375000, 37, '2026-10-03 18:27:58'),
+  ('Nissan', 'Rogue', 2015, 2017, 'any', 1000000000, 1242000000, 6, '2026-10-05 18:27:58'),
+  ('Nissan', 'Rogue', 2018, 2019, 'any', 1701250000, 1943250000, 7, '2026-10-06 18:27:58'),
+  ('Ford', 'Explorer', 2013, 2015, 'any', 1300000000, 1608000000, 14, '2026-10-06 18:27:58'),
+  ('Ford', 'Explorer', 2016, 2018, 'any', 2014000000, 2322000000, 24, '2026-10-01 18:27:58'),
+  ('Ford', 'Ranger', 2016, 2018, 'any', 2000000000, 2484000000, 21, '2026-10-04 18:27:58'),
+  ('Ford', 'Ranger', 2019, 2020, 'any', 3402500000, 3886500000, 23, '2026-10-01 18:27:58'),
+  ('Mazda', 'CX-5', 2015, 2017, 'any', 1200000000, 1442000000, 12, '2026-10-05 18:27:58'),
+  ('Mazda', 'CX-5', 2018, 2019, 'any', 1901250000, 2143250000, 13, '2026-10-02 18:27:58'),
+  ('Mitsubishi', 'Pajero', 2013, 2015, 'any', 1400000000, 1708000000, 12, '2026-10-02 18:27:58'),
+  ('Mitsubishi', 'Pajero', 2016, 2017, 'any', 2292500000, 2600500000, 26, '2026-10-06 18:27:58'),
+  ('Acura', 'MDX', 2012, 2014, 'any', 1200000000, 1464000000, 31, '2026-10-02 18:27:58'),
+  ('Acura', 'MDX', 2015, 2017, 'any', 1812000000, 2076000000, 16, '2026-10-01 18:27:58'),
+  ('Infiniti', 'QX60', 2014, 2016, 'any', 1500000000, 1786000000, 37, '2026-10-05 18:27:58'),
+  ('Infiniti', 'QX60', 2017, 2018, 'any', 2328750000, 2614750000, 29, '2026-10-06 18:27:58'),
+  ('BMW', 'X5', 2013, 2015, 'any', 2000000000, 2528000000, 26, '2026-09-11 18:27:58'),
+  ('BMW', 'X5', 2016, 2017, 'any', 3530000000, 4058000000, 36, '2026-09-10 18:27:58');
 INSERT INTO price_bands (`make`, `model`, `year_from`, `year_to`, `condition`, `band_min_kobo`, `band_max_kobo`, `sample_size`, `refreshed_at`) VALUES
-  ('BMW', '3 Series', 2013, 2015, 'any', 1100000000, 1342000000, 7, '2026-09-03 18:02:41'),
-  ('BMW', '3 Series', 2016, 2017, 'any', 1801250000, 2043250000, 15, '2026-10-03 18:02:41'),
-  ('Volkswagen', 'Passat', 2013, 2015, 'any', 650000000, 793000000, 8, '2026-10-04 18:02:41'),
-  ('Volkswagen', 'Passat', 2016, 2017, 'any', 1064375000, 1207375000, 21, '2026-10-03 18:02:41');
+  ('BMW', '3 Series', 2013, 2015, 'any', 1100000000, 1342000000, 7, '2026-09-03 18:27:58'),
+  ('BMW', '3 Series', 2016, 2017, 'any', 1801250000, 2043250000, 15, '2026-10-03 18:27:58'),
+  ('Volkswagen', 'Passat', 2013, 2015, 'any', 650000000, 793000000, 8, '2026-10-04 18:27:58'),
+  ('Volkswagen', 'Passat', 2016, 2017, 'any', 1064375000, 1207375000, 21, '2026-10-03 18:27:58');
 
 
 -- facets: 14 rows
@@ -1450,6 +1453,50 @@ INSERT INTO `users` (phone, name, role, referral_code, status, marketing_opt_in)
   ('+2348031234567', 'Ada Okafor', 'customer', 'HCADA2', 'active', 1)
 ON DUPLICATE KEY UPDATE name = VALUES(name), role = 'customer', status = 'active';
 
+-- FR-28. Three people Ada's link brought in, covering every state the referral
+-- card and the console queue can render — because a reward module that has only
+-- ever been seen in one state is a module nobody has tested:
+--
+--   Ngozi    qualified, reward PENDING     what the desk wakes up to
+--   Emeka    signed up, no order yet       attribution without a reward
+--   Ifeoma   qualified, reward PAID        the settled end of the ladder
+--
+-- `referred_by` is set with a session variable: MySQL refuses to update a table
+-- while selecting from the same table in a subquery (error 1093), and a
+-- hard-coded id would break the moment the seed order changes.
+INSERT INTO `users` (phone, name, role, referral_code, status, marketing_opt_in) VALUES
+  ('+2348031234568', 'Ngozi Eze',    'customer', 'HCNGOZ', 'active', 1),
+  ('+2348031234569', 'Emeka Obi',    'customer', 'HCEMEK', 'active', 1),
+  ('+2348031234570', 'Ifeoma Nwosu', 'customer', 'HCIFEO', 'active', 1)
+ON DUPLICATE KEY UPDATE name = VALUES(name), role = 'customer', status = 'active';
+
+SET @ada = (SELECT id FROM `users` WHERE phone = '+2348031234567' LIMIT 1);
+UPDATE `users` SET referred_by = @ada
+ WHERE phone IN ('+2348031234568', '+2348031234569', '+2348031234570')
+   AND referred_by IS NULL;
+
+-- The moment each of them started to count. Written here rather than left to
+-- the sweep so the queue is populated on a fresh database; `npm run referrals`
+-- produces exactly these rows for a referral that qualifies later.
+UPDATE `users` SET referral_qualified_at = DATE_SUB(UTC_TIMESTAMP(), INTERVAL 6 DAY)
+ WHERE phone IN ('+2348031234568', '+2348031234570') AND referral_qualified_at IS NULL;
+
+-- The reward rows (§7.1 “reward status”). One waiting for the desk, one already
+-- settled — amount, approver and payer all recorded, because a payout with no
+-- name on it is exactly what an audit log exists to prevent. The amounts are
+-- the configured suggestion (₦2,000) and the unit label says what it was for.
+INSERT INTO referral_rewards (referrer_id, referred_user_id, status, basis, amount_kobo, unit_label,
+                              note, approved_at, paid_at, actor_id) VALUES
+  (@ada,
+   (SELECT id FROM `users` WHERE phone = '+2348031234568' LIMIT 1),
+   'pending', 'order', 0, NULL, 'Qualified on 1 paid order.', NULL, NULL, NULL),
+  (@ada,
+   (SELECT id FROM `users` WHERE phone = '+2348031234570' LIMIT 1),
+   'paid', 'order', 200000, 'Referral credit — tracker install',
+   'Approved and paid by transfer on the same day.',
+   DATE_SUB(UTC_TIMESTAMP(), INTERVAL 4 DAY), DATE_SUB(UTC_TIMESTAMP(), INTERVAL 3 DAY),
+   (SELECT id FROM `users` WHERE phone = '+2348000000002' LIMIT 1));
+
 -- FR-25. Two saved cars: one watched at the price Ada saw (no pending alert),
 -- and one whose price has already moved down since she saved it — which is
 -- exactly what the sweep is for. Nothing here invents a price: the baseline on
@@ -1536,10 +1583,22 @@ INSERT INTO orders (order_no, name, phone, delivery_area, delivery_fee_kobo, sub
   ('HC-ORD-0001', 'Ada Okafor', '+2348031234567', 'GRA Phase 2', 0, 4500000, 4500000, 'paid', 'SEED-DEMO-0001',
    'Seeded demo order: tracker plus installation, with the receipt on her dashboard.');
 
+INSERT INTO orders (order_no, name, phone, delivery_area, delivery_fee_kobo, subtotal_kobo, total_kobo, status, payment_ref, notes) VALUES
+  ('HC-ORD-0002', 'Ngozi Eze', '+2348031234568', 'Rumuokoro', 0, 4500000, 4500000, 'paid', 'SEED-DEMO-0002',
+   'FR-28 demo: the order that makes her referral count.'),
+  ('HC-ORD-0003', 'Ifeoma Nwosu', '+2348031234570', 'Woji', 0, 8500000, 8500000, 'fulfilled', 'SEED-DEMO-0003',
+   'FR-28 demo: a referral that has already been paid out.');
+
 INSERT INTO order_items (order_id, product_id, name, qty, unit_price_kobo, install_requested) VALUES
   ((SELECT id FROM orders WHERE order_no = 'HC-ORD-0001' LIMIT 1),
    (SELECT id FROM products WHERE slug = 'tracker-standard' LIMIT 1),
-   'Tracker — Standard', 1, 4500000, 1);
+   'Tracker — Standard', 1, 4500000, 1),
+  ((SELECT id FROM orders WHERE order_no = 'HC-ORD-0002' LIMIT 1),
+   (SELECT id FROM products WHERE slug = 'tracker-standard' LIMIT 1),
+   'Tracker — Standard', 1, 4500000, 0),
+  ((SELECT id FROM orders WHERE order_no = 'HC-ORD-0003' LIMIT 1),
+   (SELECT id FROM products WHERE slug = 'tracker-premium' LIMIT 1),
+   'Tracker — Premium', 1, 8500000, 1);
 
 -- FR-20. Five tracker subscriptions across the whole lifecycle, so every state
 -- the console and the account screen can render is visible on a fresh seed:
@@ -1924,6 +1983,18 @@ INSERT INTO hire_bookings (reference, request_id, vehicle_id, class_slug, client
 INSERT INTO payments (reference, provider, provider_ref, purpose, order_id, booking_id, request_id,
                       subscription_id, hire_booking_id, customer_name, customer_phone, amount_kobo, status,
                       checkout_url, created_by, paid_at) VALUES
+  -- FR-28: the two orders that make Ada's referrals count. A paid order without
+  -- a payment row is the sort of thing the console flags as “no payment row”.
+  ('HC-PAY-000013', 'bank_transfer', 'SEED-BT-0013', 'order',
+   (SELECT id FROM orders WHERE order_no = 'HC-ORD-0002' LIMIT 1), NULL, NULL, NULL, NULL,
+   'Ngozi Eze', '+2348031234568', 4500000, 'paid', NULL,
+   (SELECT id FROM `users` WHERE phone = '+2348000000002' LIMIT 1),
+   DATE_SUB(UTC_TIMESTAMP(), INTERVAL 6 DAY)),
+  ('HC-PAY-000014', 'bank_transfer', 'SEED-BT-0014', 'order',
+   (SELECT id FROM orders WHERE order_no = 'HC-ORD-0003' LIMIT 1), NULL, NULL, NULL, NULL,
+   'Ifeoma Nwosu', '+2348031234570', 8500000, 'paid', NULL,
+   (SELECT id FROM `users` WHERE phone = '+2348000000002' LIMIT 1),
+   DATE_SUB(UTC_TIMESTAMP(), INTERVAL 5 DAY)),
   ('HC-PAY-000006', 'bank_transfer', 'SEED-BT-0006', 'hire', NULL, NULL, NULL, NULL,
    (SELECT id FROM hire_bookings WHERE reference = 'HC-HIRE-0002' LIMIT 1),
    'Fleet officer, oil & gas firm', '+2348031110004', 100320000, 'paid', NULL, NULL,
