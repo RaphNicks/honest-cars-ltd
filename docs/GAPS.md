@@ -6,7 +6,10 @@ integrations §11, NFRs §12, sitemap §5.1, acceptance §18.3).
 Line references below point at the code that exists. Where an item is missing, the
 note says what "done" would mean, so the work can be scoped without re-reading the PRD.
 
-**Status at `6a2e989`:** §13.2 is built — blur-up placeholders, adaptive quality on
+**Status at `3f01527`:** FR-20 is built — tracker subscriptions run a real
+lifecycle (derived state, activation checklist, online renewals paid by transfer
+until a PSP exists) with a 30/7/1-day reminder sweep that is safe to run every
+morning, and dealer retainers share the same queue. **Status at `6a2e989`:** §13.2 is built — blur-up placeholders, adaptive quality on
 the `Save-Data` header, video strictly tap-to-load with a measured duration/size
 label, and forms that keep a draft and hold a send that the network dropped — and
 FR-24/§16 ships with it: eight posts, four clips, a video block in three of them
@@ -23,7 +26,6 @@ No external account needed. These are real gaps against the PRD.
 
 | ID | Requirement | What is actually there | What "done" means |
 |---|---|---|---|
-| FR-20 | Tracking subscriptions — activation checklist, renewal reminders, online renewals (§7.3) | `subscriptions` rows are created from tracker orders and listed on `/account` with `renewal_at` (`views/pages/account.ejs`). | A renewal path: reminder notifications before `renewal_at`, a renew action that opens a payment, and an admin screen listing upcoming/overdue renewals. |
 | FR-22 | Hire management — pool registry, calendar, booking records (§7.3) | Public `/hire` quotes per class (`hire_classes`); a hire enquiry lands in the leads inbox. No pool, no availability, no hire-specific records. | Admin registry of hireable vehicles, an availability calendar, and hire bookings distinct from service requests. |
 | FR-28 | Referral module — links, attribution, reward status (§7.1) | `referral_code` + `referred_by` exist (`users`), a link and code render on `/account`, and sign-up records the referrer. | Attribution reporting (who came from whom) and a reward status per referral. |
 | FR-29 | Instant valuation widget from price-intel data (§6.6) | `/sell-swap` promises a human valuation within 24h; `price_bands` (FR-23) holds exactly the data a widget needs. | Make/model/year/condition/mileage in, an indicative band out, with the same "sample size" honesty the VDP indicator uses. |
