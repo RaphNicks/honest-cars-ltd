@@ -29,6 +29,7 @@ const cms = require('./cms');
 const pricing = require('./pricing');
 const reports = require('./reports');
 const dealers = require('./dealers');
+const addons = require('./addons');
 const leads = require('./leads');
 const analytics = require('./analytics');
 const redirects = require('./redirects');
@@ -56,6 +57,7 @@ module.exports = {
   pricing,
   reports,
   dealers,
+  addons,
   leads,
   analytics,
   redirects,

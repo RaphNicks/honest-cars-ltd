@@ -161,6 +161,89 @@ function shapeDealerListing(row) {
   };
 }
 
+// ---------------------------------------------------------------------------
+// Console (§5.1 “dealers”, FR-18)
+//
+// One row per lot with the four things the desk actually asks about: is the
+// account linked, is the stock alive, is the commission settled, and is
+// anything paid-for running. Money is read from the same ledger and the same
+// purchase rows the portal shows, so the two screens can never disagree.
+// ---------------------------------------------------------------------------
+async function list({ limit = 200 } = {}) {
+  const rows = await query(
+    `SELECT d.*,
+            u.name  AS account_name,
+            u.phone AS account_phone,
+            u.last_seen_at,
+            (SELECT COUNT(*) FROM vehicle_listings l WHERE l.dealer_id = d.id AND l.status = 'live')     AS live,
+            (SELECT COUNT(*) FROM vehicle_listings l WHERE l.dealer_id = d.id AND l.status = 'reserved') AS reserved,
+            (SELECT COUNT(*) FROM vehicle_listings l WHERE l.dealer_id = d.id AND l.status = 'in_review') AS in_review,
+            (SELECT COUNT(*) FROM vehicle_listings l WHERE l.dealer_id = d.id AND l.status = 'sold')     AS sold,
+            (SELECT COALESCE(SUM(g.amount_kobo), 0) FROM dealer_ledger g WHERE g.dealer_id = d.id)      AS balance_kobo,
+            (SELECT COALESCE(SUM(CASE WHEN g.amount_kobo > 0 THEN g.amount_kobo ELSE 0 END), 0)
+               FROM dealer_ledger g WHERE g.dealer_id = d.id)                                           AS owed_kobo,
+            (SELECT COUNT(*) FROM dealer_purchases p
+              WHERE p.dealer_id = d.id AND p.status = 'active'
+                AND (p.ends_at IS NULL OR p.ends_at > UTC_TIMESTAMP()))                                 AS addons_active,
+            (SELECT COUNT(*) FROM dealer_purchases p WHERE p.dealer_id = d.id AND p.status = 'pending')  AS addons_pending,
+            (SELECT COALESCE(SUM(p.amount_kobo), 0) FROM dealer_purchases p
+              WHERE p.dealer_id = d.id AND p.status = 'pending')                                         AS addons_pending_kobo
+       FROM dealers d
+       LEFT JOIN \`users\` u ON u.id = d.user_id
+      ORDER BY d.tier = 'premium' DESC, d.tier = 'standard' DESC, live DESC, d.id
+      LIMIT ?`,
+    [Math.min(500, limit)],
+  );
+  return rows.map((row) => ({
+    ...shapeDealer(row),
+    account: row.user_id
+      ? { id: row.user_id, name: row.account_name || 'Account', phone: row.account_phone || null, lastSeenAt: row.last_seen_at || null }
+      : null,
+    counts: {
+      live: Number(row.live || 0),
+      reserved: Number(row.reserved || 0),
+      in_review: Number(row.in_review || 0),
+      sold: Number(row.sold || 0),
+    },
+    ledger: {
+      balanceKobo: Number(row.balance_kobo || 0),
+      owedKobo: Number(row.owed_kobo || 0),
+    },
+    addons: {
+      active: Number(row.addons_active || 0),
+      pending: Number(row.addons_pending || 0),
+      pendingKobo: Number(row.addons_pending_kobo || 0),
+    },
+  }));
+}
+
+/** Fleet totals for the console header — one query, every lot. */
+async function fleetTotals() {
+  const row = await queryOne(
+    `SELECT
+       (SELECT COUNT(*) FROM dealers)                                                        AS lots,
+       (SELECT COUNT(*) FROM dealers WHERE user_id IS NULL)                                   AS unlinked,
+       (SELECT COUNT(*) FROM dealers WHERE agreement_signed IS NULL)                          AS unsigned_lots,
+       (SELECT COALESCE(SUM(g.amount_kobo), 0) FROM dealer_ledger g)                           AS balance_kobo,
+       (SELECT COUNT(*) FROM dealer_purchases p WHERE p.status = 'pending')                    AS addons_pending,
+       (SELECT COALESCE(SUM(p.amount_kobo), 0) FROM dealer_purchases p WHERE p.status = 'pending') AS addons_pending_kobo,
+       (SELECT COUNT(*) FROM dealer_purchases p WHERE p.status = 'active'
+          AND (p.ends_at IS NULL OR p.ends_at > UTC_TIMESTAMP()))                              AS addons_active,
+       (SELECT COUNT(*) FROM dealer_purchases p WHERE p.status = 'active'
+          AND p.ends_at IS NOT NULL AND p.ends_at <= UTC_TIMESTAMP())                          AS addons_lapsed`,
+  );
+  return {
+    lots: Number(row.lots || 0),
+    unlinked: Number(row.unlinked || 0),
+    unsigned: Number(row.unsigned_lots || 0),
+    balanceKobo: Number(row.balance_kobo || 0),
+    addonsPending: Number(row.addons_pending || 0),
+    addonsPendingKobo: Number(row.addons_pending_kobo || 0),
+    addonsActive: Number(row.addons_active || 0),
+    addonsLapsed: Number(row.addons_lapsed || 0),
+  };
+}
+
 /** §7.2 “My Listings — table + card views; states; quick actions”. */
 async function listings(dealerId, { status = null, limit = 200 } = {}) {
   const rows = await query(
@@ -582,6 +665,8 @@ module.exports = {
   forUser,
   byId,
   dashboard,
+  list,
+  fleetTotals,
   listings,
   listingForDealer,
   createListing,

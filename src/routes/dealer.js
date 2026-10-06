@@ -17,7 +17,11 @@
  *   GET  /dealer/leads               enquiries on this lot's cars
  *   POST /dealer/leads/:id           move a lead through contacted/viewing/closed/lost
  *   GET  /dealer/performance         views, enquiries, response time, freshness scorecard
- *   GET  /dealer/billing             commission statements from the dealer ledger
+ *   GET  /dealer/billing             commission summary, statements and add-ons
+ *   GET  /dealer/billing/statements/:month      one month, stated (§7.2 FR-18)
+ *   GET  /dealer/billing/statements/:month.pdf  the same statement as a PDF
+ *   POST /dealer/addons/:slug        buy an add-on — raises the purchase + payment
+ *   GET  /dealer/addons/purchase/:reference     where to pay it, and what it does
  *   GET  /dealer/profile             lot details, tier and the signed agreement
  *
  * Authorisation is one idea: the lot comes from the signed-in account's own row
@@ -33,6 +37,8 @@ const roles = require('../services/roles');
 const validate = require('../services/validate');
 const { sendPrebuiltOrRender, sendPage, CACHE } = require('../lib/respond');
 const { helpers } = require('../lib/locals');
+const addonService = require('../services/addons');
+const statementService = require('../services/statement');
 
 const router = express.Router();
 const dealers = db.dealers;
@@ -46,6 +52,8 @@ const PATHS = {
   leads: `${HOME}/leads`,
   performance: `${HOME}/performance`,
   billing: `${HOME}/billing`,
+  statements: `${HOME}/billing/statements`,
+  addons: `${HOME}/addons`,
   profile: `${HOME}/profile`,
 };
 
@@ -56,6 +64,7 @@ const NAV = [
   { href: PATHS.leads, label: 'Leads', icon: 'inbox' },
   { href: PATHS.performance, label: 'Performance', icon: 'gauge' },
   { href: PATHS.billing, label: 'Commission', icon: 'scale' },
+  { href: PATHS.addons, label: 'Add-ons', icon: 'plus' },
   { href: PATHS.profile, label: 'Profile', icon: 'store' },
 ];
 
@@ -528,16 +537,123 @@ router.get('/performance', requireDealer, async (req, res, next) => {
 
 router.get('/billing', requireDealer, async (req, res, next) => {
   try {
-    const [statements, dashboard] = await Promise.all([
+    const [statements, dashboard, months, purchases] = await Promise.all([
       dealers.statements(req.lot.id, { limit: 100 }),
       dealers.dashboard(req.lot.id),
+      statementService.months(req.lot.id),
+      db.addons.purchasesFor(req.lot.id, { limit: 50 }),
     ]);
     return await page(req, res, {
       view: 'dealer/billing',
       active: PATHS.billing,
       title: 'Commission',
       description: 'Append-only statements from the dealer ledger — a balance is the sum of the rows.',
-      data: { statements, commission: dashboard.commission },
+      data: { statements, commission: dashboard.commission, months, purchases },
+    });
+  } catch (error) {
+    return next(error);
+  }
+});
+
+// ---------------------------------------------------------------------------
+// Commission statements — FR-18, §7.2 “statements per closed deal”
+// ---------------------------------------------------------------------------
+router.get('/billing/statements/:month', requireDealer, async (req, res, next) => {
+  try {
+    const month = String(req.params.month || '');
+    if (!/^\d{4}-\d{2}$/.test(month)) return next();
+    const statement = await statementService.build(req.lot.id, month);
+    if (!statement) return next();
+    return await page(req, res, {
+      view: 'dealer/statement',
+      active: PATHS.billing,
+      title: `Statement — ${statement.label}`,
+      description: `Commission statement for ${statement.label}: opening balance, every entry, closing balance.`,
+      data: { statement },
+    });
+  } catch (error) {
+    return next(error);
+  }
+});
+
+router.get('/billing/statements/:month.pdf', requireDealer, async (req, res, next) => {
+  try {
+    const month = String(req.params.month || '');
+    if (!/^\d{4}-\d{2}$/.test(month)) return next();
+    const statement = await statementService.build(req.lot.id, month);
+    if (!statement) return next();
+    res.set('Content-Type', 'application/pdf');
+    res.set('Content-Disposition', `attachment; filename="${statementService.fileName(statement)}"`);
+    res.set('Cache-Control', CACHE.private);
+    const doc = statementService.pdf(statement);
+    doc.pipe(res);
+    doc.end();
+  } catch (error) {
+    return next(error);
+  }
+});
+
+// ---------------------------------------------------------------------------
+// Add-ons — FR-18, §7.2 “pay for add-on services … via PSP”
+// ---------------------------------------------------------------------------
+router.get('/addons', requireDealer, async (req, res, next) => {
+  try {
+    const [catalogue, purchases, listings] = await Promise.all([
+      db.addons.catalogue(),
+      db.addons.purchasesFor(req.lot.id, { limit: 50 }),
+      dealers.listings(req.lot.id, { limit: 60 }).catch(() => []),
+    ]);
+    return await page(req, res, {
+      view: 'dealer/addons',
+      active: PATHS.addons,
+      title: 'Add-ons',
+      description: 'Media shoots, featured placement and market intelligence — paid by transfer until a card processor is live.',
+      data: {
+        catalogue,
+        purchases,
+        // Only cars an add-on may be bought for: a sold car cannot be shot.
+        listings: (Array.isArray(listings) ? listings : []).filter((car) => ['draft', 'in_review', 'live', 'reserved'].includes(car.status)),
+      },
+    });
+  } catch (error) {
+    return next(error);
+  }
+});
+
+router.post('/addons/:slug', requireDealer, async (req, res, next) => {
+  try {
+    const listingId = Number.parseInt(req.body.listing_id, 10);
+    const result = await addonService.purchase({
+      dealerId: req.lot.id,
+      addonSlug: String(req.params.slug || '').toLowerCase().slice(0, 60),
+      listingId: Number.isFinite(listingId) ? listingId : null,
+      actorId: req.user.id,
+      customerName: req.user.name || req.lot.name,
+      customerPhone: req.lot.phone || req.user.phone || null,
+    });
+    if (!result.ok) return done(res, PATHS.addons, result.error, { error: true });
+    return done(res, result.purchase.url, `${result.purchase.addonName} reserved — pay against ${result.payment.reference} and it goes live the moment the money lands.`);
+  } catch (error) {
+    return next(error);
+  }
+});
+
+router.get('/addons/purchase/:reference', requireDealer, async (req, res, next) => {
+  try {
+    const reference = String(req.params.reference || '').toUpperCase().slice(0, 24);
+    if (!/^HC-ADD-\d{4,}$/.test(reference)) return next();
+    const purchase = await db.addons.purchaseByReference(reference);
+    if (!purchase || Number(purchase.dealerId) !== Number(req.lot.id)) return next();
+
+    // The payment the purchase was raised with — the page has to show what to
+    // pay, not just what was bought.
+    const payment = purchase.paymentId ? await db.payments.paymentById(purchase.paymentId) : null;
+    return await page(req, res, {
+      view: 'dealer/addon-purchase',
+      active: PATHS.addons,
+      title: `${purchase.addonName} — ${purchase.reference}`,
+      description: 'What this add-on does, what it costs, and how to pay it.',
+      data: { purchase, payment, bank: addonService.bank(purchase.paymentReference || reference) },
     });
   } catch (error) {
     return next(error);

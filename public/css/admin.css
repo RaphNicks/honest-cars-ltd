@@ -1096,3 +1096,16 @@ a.hire-cal__ref:hover { text-decoration: underline; }
 .edcal__empty { color: var(--colour-line, #C6D0DB); }
 .edcal__lead { background: #FAFBFC; }
 .cms-checks { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 6px 16px; margin-top: 6px; }
+
+/* ==========================================================================
+   Dealer add-ons (§7.2 FR-18)
+   A catalogue card per add-on: what it is, what it does, what it costs, and
+   the one car it applies to when it applies to a car.
+   ========================================================================== */
+.addon { border: 1px solid var(--colour-line, #D8E0E8); border-radius: var(--radius, 12px); padding: var(--space-2); margin-bottom: var(--space-2); }
+.addon:last-child { margin-bottom: 0; }
+.addon__head { display: flex; flex-wrap: wrap; gap: 8px; align-items: baseline; justify-content: space-between; }
+.addon__tagline { color: var(--colour-slate, #5B6B7C); margin: 2px 0 6px; }
+.addon .admin-inline-form { margin-top: 8px; }
+.panel--pay { border-left: 4px solid var(--colour-amber, #E8A13D); }
+.panel--paid { border-left: 4px solid var(--honest-green, #12A150); }

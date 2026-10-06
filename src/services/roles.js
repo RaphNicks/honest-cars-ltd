@@ -34,6 +34,12 @@ const MATRIX = {
   'hire.manage': ['admin', 'ops'],
   'pricing.view': ['admin', 'ops', 'marketing'],
   'pricing.manage': ['admin', 'ops'],
+  // §5.1 names a **dealers** screen in the console sitemap, and FR-18 hangs the
+  // commission statements off it. Ops runs the partner desk and finance reads
+  // every billing record, so both may open it; marketing may not. The screen is
+  // read-only — a lot's terms are set at onboarding, and an add-on is delivered
+  // by the payment landing, never by a button here.
+  'dealers.view': ['admin', 'ops', 'finance'],
   'users.manage': ['admin'],                       // staff accounts, roles, audit log
   'reports.view': ['admin', 'ops', 'finance', 'marketing'],
   // §15.2 marketing dashboard. Read is the CMS-and-marketing column of §7.4

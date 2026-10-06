@@ -6,6 +6,20 @@ integrations §11, NFRs §12, sitemap §5.1, acceptance §18.3).
 Line references below point at the code that exists. Where an item is missing, the
 note says what "done" would mean, so the work can be scoped without re-reading the PRD.
 
+**Status at this commit:** FR-18 is built — §7.2's Orders & Billing is real on
+both sides of the desk. A lot buys a media shoot, a featured placement or the
+monthly intelligence report from `/dealer/addons`; each purchase raises its own
+payment (purpose `addon`) and, while no PSP keys exist, says how to pay it by
+transfer. The money landing *is* the delivery: `applyPurchase` runs inside the
+transaction that marks the payment paid, so a placement sets `featured_rank`, a
+shoot becomes a `bookings` row on the dispatch calendar, and intelligence becomes
+a subscription the FR-20 renewal queue collects. Statements are per month per lot
+(`/dealer/billing/statements/{month}`, plus a PDF) and they tie: opening balance +
+the month's entries = closing, which is checked against the ledger and said out
+loud on the page when it does not. `/admin/dealers` is the §5.1 dealers screen —
+every lot's stock, commission and paid add-ons, with the same statement PDFs.
+Only the **settings** screen is still missing from the §5.1 sitemap.
+
 **Status at `9cd3b66`:** FR-35 is built — a byline is now a person with a page
 (`/blog/author/{slug}`) and a bio written once, tags are a governed list with
 their own shelves (`/blog/tag/{slug}`), the related-posts engine ranks a shared
@@ -47,7 +61,7 @@ No external account needed. These are real gaps against the PRD.
 | FR-32 | Multi-city inventory (Owerri/Aba/Benin) with area switcher | Single-city: `city` is a column, but there is no area filter or switcher anywhere. | City dimension through inventory, facets, sitemap and the area switcher in the header. |
 | FR-33 | Dealer bulk CSV/API listing import | One-listing-at-a-time via the dealer wizard and `/admin/listings/new`. | A CSV template, a validating importer with a dry-run report, and an API key per lot. |
 | FR-34 | Financing-lead partner handoff | Nothing. | A financing enquiry that captures intent and hands off, with the partner recorded on the lead. |
-| §5.1 | Admin screens named in the sitemap but absent: **dealers**, **settings** (the **subscriptions** and **hire** screens now exist) | Dealer accounts are managed from `/admin/staff` (link/unlink); settings has no screen. | One screen per item; the dealers one is the natural home for FR-18 statements and FR-33 imports. |
+| §5.1 | Admin screen named in the sitemap but absent: **settings** (the **dealers**, **subscriptions** and **hire** screens now exist) | `/admin/dealers` lists every lot with its stock, commission and paid add-ons, and opens each lot's ledger, statements and purchases. Settings has no screen. | A settings screen (business facts, thresholds, channels) — the last of the §5.1 sitemap. |
 | §18.3 | "Privacy requests actionable in admin" (NDPA) | Self-service works: `/account/export` and account deletion, with the record anonymised (`DELETED-…`). | An admin view of data-subject requests and their handling, so the duty is discharged, not just offered. |
 | §12.2 | MFA for admin roles | Sign-in is phone OTP — one factor, however strong. | TOTP (or WebAuthn) as a second factor for `admin`/`finance`, with recovery codes. |
 | §11 | Turnstile/reCAPTCHA on public forms | Rate limits per route (`src/lib/rate-limit.js`) and server-side validation; no bot challenge. | A site-key-gated invisible challenge, degrading to the current behaviour when unset. |

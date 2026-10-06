@@ -20,6 +20,7 @@ const SPECS = Object.freeze({
   booking: { table: 'bookings', column: 'reference', prefix: 'HC-BK-', pad: 4, floor: 1 },
   order: { table: 'orders', column: 'order_no', prefix: 'HC-ORD-', pad: 4, floor: 1 },
   hire: { table: 'hire_bookings', column: 'reference', prefix: 'HC-HIRE-', pad: 4, floor: 1 },
+  addon: { table: 'dealer_purchases', column: 'reference', prefix: 'HC-ADD-', pad: 4, floor: 1 },
 });
 
 /** Next unused reference for a key in SPECS. Must be called inside a transaction. */
@@ -65,4 +66,25 @@ async function uniqueRetry(work, { attempts = 5 } = {}) {
   throw lastError;
 }
 
-module.exports = { SPECS, nextId, isDuplicate, uniqueRetry };
+/**
+ * The series key for a table that already has a row in SPECS, or null.
+ * `hire.js` and `addons.js` both want “the next HC-x reference” without each
+ * re-implementing the transaction dance.
+ */
+function seriesFor(key) {
+  return SPECS[key] || null;
+}
+
+/**
+ * Convenience for callers that are not already inside a transaction: opens one,
+ * takes the next id, and commits. Callers that *are* transacting (the payment
+ * seam) pass their own connection to `nextId` instead.
+ */
+async function next(key, { conn = null } = {}) {
+  const { nextId: take, uniqueRetry: retry } = module.exports;
+  if (conn) return take(conn, key);
+  const pool = require('./pool');
+  return retry(async () => pool.transaction((tx) => take(tx, key)));
+}
+
+module.exports = { SPECS, nextId, next, seriesFor, isDuplicate, uniqueRetry };

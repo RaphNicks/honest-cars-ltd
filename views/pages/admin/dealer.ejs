@@ -1,0 +1,245 @@
+<%#
+  /admin/dealers/:id — one partner lot (FR-18).
+
+  The dealer's own /dealer/billing screen, seen from the desk: the same ledger,
+  the same monthly statements, the same purchases. The statement PDFs are built
+  by the same service, so a partner querying a figure gets the identical
+  arithmetic here and there.
+
+  Locals: lot, ledger, months, purchases, counts, commission, listings,
+          statementService
+%>
+<% var naira = helpers.formatNaira; %>
+<% var money = function (kobo) {
+  var value = Number(kobo || 0);
+  return (value < 0 ? '−' : '') + naira(Math.abs(value));
+}; %>
+<% var dayLabel = function (iso) {
+  return new Date(iso).toLocaleDateString('en-NG', { day: 'numeric', month: 'short', year: 'numeric' });
+}; %>
+<% var TYPE_LABELS = {
+  sale_commission: 'Sale commission',
+  payout: 'Payout to the lot',
+  adjustment: 'Adjustment',
+  clawback: 'Clawback',
+}; %>
+
+<p class="mb-2"><a href="/admin/dealers">← All dealers</a></p>
+
+<div class="admin-grid admin-grid--4">
+  <div class="kpi kpi--sm">
+    <span class="kpi__label">Commission balance</span>
+    <strong class="kpi__value tabular"><%= money(commission.balance_kobo) %></strong>
+    <span class="kpi__foot"><%= lot.commissionPct === null ? 'agreed rate' : lot.commissionPct + '%' %> on closed deals</span>
+  </div>
+  <div class="kpi kpi--sm">
+    <span class="kpi__label">Live stock</span>
+    <strong class="kpi__value tabular"><%= counts.live %></strong>
+    <span class="kpi__foot"><%= counts.reserved %> reserved · <%= counts.in_review %> in review · <%= counts.sold %> sold</span>
+  </div>
+  <div class="kpi kpi--sm">
+    <span class="kpi__label">Add-ons paid for</span>
+    <strong class="kpi__value tabular"><%= purchases.filter(function (p) { return p.status === 'active'; }).length %></strong>
+    <span class="kpi__foot">
+      <%= purchases.filter(function (p) { return p.status === 'pending'; }).length %> raised and unpaid
+    </span>
+  </div>
+  <div class="kpi kpi--sm">
+    <span class="kpi__label">Agreement</span>
+    <strong class="kpi__value"><%= lot.agreementSigned ? 'Signed' : 'Unsigned' %></strong>
+    <span class="kpi__foot">
+      <% if (lot.account) { %>
+        account <%= lot.account.name %>
+      <% } else { %>
+        no account linked — <a href="/admin/staff">link one</a>
+      <% } %>
+    </span>
+  </div>
+</div>
+
+<div class="admin-grid admin-grid--2">
+  <section class="panel">
+    <div class="panel__head">
+      <h2 class="panel__title">Statements</h2>
+      <span class="cms-hint">One month each — opening balance, entries, closing balance</span>
+    </div>
+    <% if (!months.length) { %>
+      <p class="empty-line">Nothing to state yet: no commission or payout has been recorded for this lot.</p>
+    <% } else { %>
+      <div class="table-scroll">
+        <table class="table">
+          <caption class="visually-hidden">Monthly statements for <%= lot.name %></caption>
+          <thead>
+            <tr>
+              <th scope="col">Month</th>
+              <th scope="col">Entries</th>
+              <th scope="col">Download</th>
+            </tr>
+          </thead>
+          <tbody>
+            <% months.forEach(function (month) { %>
+              <tr>
+                <th scope="row"><%= month %></th>
+                <td class="tabular muted">
+                  <% var inMonth = ledger.filter(function (row) { return String(row.createdAt).slice(0, 7) === month; }); %>
+                  <%= inMonth.length %> ledger row<%= inMonth.length === 1 ? '' : 's' %>
+                </td>
+                <td>
+                  <a class="btn btn--secondary btn--sm" href="/admin/dealers/<%= lot.id %>/statements/<%= month %>.pdf">PDF</a>
+                </td>
+              </tr>
+            <% }); %>
+          </tbody>
+        </table>
+      </div>
+      <p class="cms-hint mt-2">
+        The partner sees the same figures at <span class="tabular">/dealer/billing/statements/&lt;month&gt;</span>.
+        Nothing is edited in place: a correction is its own ledger row.
+      </p>
+    <% } %>
+  </section>
+
+  <section class="panel">
+    <div class="panel__head">
+      <h2 class="panel__title">Add-ons</h2>
+      <span class="cms-hint">Delivered when the payment lands</span>
+    </div>
+    <% if (!purchases.length) { %>
+      <p class="empty-line">This lot has not bought an add-on.</p>
+      <p class="mb-0 muted">
+        When one is raised it appears here with its payment reference; confirming that payment on
+        <a href="/admin/payments">Money</a> is what starts it.
+      </p>
+    <% } else { %>
+      <div class="table-scroll">
+        <table class="table table--stack">
+          <caption class="visually-hidden">Add-on purchases for <%= lot.name %></caption>
+          <thead>
+            <tr>
+              <th scope="col">Add-on</th>
+              <th scope="col">For</th>
+              <th scope="col">Amount</th>
+              <th scope="col">Window</th>
+              <th scope="col">Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            <% purchases.forEach(function (purchase) { %>
+              <tr>
+                <th scope="row">
+                  <%= purchase.addonName %>
+                  <span class="listing-row__meta tabular"><%= purchase.reference %></span>
+                </th>
+                <td>
+                  <% if (purchase.listing) { %>
+                    <a href="<%= purchase.listing.url %>" target="_blank" rel="noopener"><%= purchase.listing.title %></a>
+                    <span class="listing-row__meta"><%= purchase.listing.stockNo %></span>
+                  <% } else { %>
+                    <span class="muted">The whole lot</span>
+                  <% } %>
+                </td>
+                <td class="tabular"><%= naira(purchase.amountKobo) %></td>
+                <td class="muted">
+                  <% if (purchase.startsAt) { %>
+                    <%= dayLabel(purchase.startsAt) %> →
+                    <%= purchase.endsAt ? dayLabel(purchase.endsAt) : 'until cancelled' %>
+                  <% } else { %>
+                    not running
+                  <% } %>
+                </td>
+                <td>
+                  <span class="badge badge--<%= purchase.status === 'active' ? 'ok' : purchase.status === 'pending' ? 'attention' : 'closed' %>"><%= purchase.statusLabel %></span>
+                  <span class="listing-row__meta tabular"><%= purchase.paymentReference || 'no payment raised' %></span>
+                </td>
+              </tr>
+            <% }); %>
+          </tbody>
+        </table>
+      </div>
+    <% } %>
+  </section>
+</div>
+
+<section class="panel">
+  <div class="panel__head">
+    <h2 class="panel__title">Ledger</h2>
+    <span class="cms-hint">Append-only · <%= ledger.length %> row<%= ledger.length === 1 ? '' : 's' %></span>
+  </div>
+  <% if (!ledger.length) { %>
+    <p class="empty-line">No entries. Commission appears the moment a deal closes and the payment clears.</p>
+  <% } else { %>
+    <div class="table-scroll">
+      <table class="table table--stack">
+        <caption class="visually-hidden">The commission ledger for <%= lot.name %></caption>
+        <thead>
+          <tr>
+            <th scope="col">When</th>
+            <th scope="col">Entry</th>
+            <th scope="col">Car / reference</th>
+            <th scope="col">Detail</th>
+            <th scope="col">Amount</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% ledger.forEach(function (row) { %>
+            <tr>
+              <td class="muted"><%= dayLabel(row.createdAt) %></td>
+              <th scope="row"><span class="badge badge--<%= row.type %>"><%= TYPE_LABELS[row.type] || row.type %></span></th>
+              <td>
+                <% if (row.listing) { %>
+                  <a href="/cars/<%= row.listing.slug %>" target="_blank" rel="noopener"><%= row.listing.title %></a>
+                  <span class="listing-row__meta"><%= row.listing.stockNo %></span>
+                <% } else { %>
+                  <span class="muted">—</span>
+                <% } %>
+              </td>
+              <td class="muted">
+                <%= row.detail || '—' %>
+                <% if (row.reference) { %><br><span class="tabular"><%= row.reference %></span><% } %>
+                <% if (row.paymentReference) { %><br><span class="tabular">payment <%= row.paymentReference %></span><% } %>
+              </td>
+              <td class="tabular<%= row.amountKobo < 0 ? ' muted' : '' %>"><%= money(row.amountKobo) %></td>
+            </tr>
+          <% }); %>
+        </tbody>
+      </table>
+    </div>
+  <% } %>
+</section>
+
+<section class="panel">
+  <div class="panel__head">
+    <h2 class="panel__title">Stock</h2>
+    <span class="cms-hint">Newest first · the moderation queue stays at <a href="/admin/listings">Listings</a></span>
+  </div>
+  <% if (!listings.length) { %>
+    <p class="empty-line">This lot has no cars.</p>
+  <% } else { %>
+    <div class="table-scroll">
+      <table class="table table--stack">
+        <caption class="visually-hidden">Stock held by <%= lot.name %></caption>
+        <thead>
+          <tr>
+            <th scope="col">Car</th>
+            <th scope="col">Status</th>
+            <th scope="col">Price</th>
+            <th scope="col">Engagement</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% listings.slice(0, 20).forEach(function (car) { %>
+            <tr>
+              <th scope="row">
+                <a href="<%= car.url %>" target="_blank" rel="noopener"><%= car.title %></a>
+                <span class="listing-row__meta"><%= car.stockNo %></span>
+              </th>
+              <td><span class="badge badge--<%= car.status %>"><%= car.status.replace(/_/g, ' ') %></span></td>
+              <td class="tabular"><%= naira(car.priceKobo) %></td>
+              <td class="muted"><%= car.views %> views · <%= car.enquiries %> enquiries · <%= car.saves %> saves</td>
+            </tr>
+          <% }); %>
+        </tbody>
+      </table>
+    </div>
+  <% } %>
+</section>

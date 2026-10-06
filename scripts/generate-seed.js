@@ -549,6 +549,17 @@ function build() {
 
 function render({ listings, media }) {
   const now = "UTC_TIMESTAMP()";
+  // FR-18: three lots, three of their own cars. Named here so the seed fails
+  // loudly if the generator ever stops producing stock for them.
+  const lotStock = (lotName, status) => {
+    const dealerId = DEALERS.findIndex((d) => d.name === lotName) + 1;
+    const car = listings.find((l) => DEALERS.indexOf(l.dealer) + 1 === dealerId && l.status === status);
+    if (!car) throw new Error(`seed: no ${status} stock for ${lotName}`);
+    return car.stockNo;
+  };
+  const featuredCar = lotStock('Aba Road Autos', 'live');
+  const shootCar = lotStock('Woji Car Mart', 'live');
+  const expiredCar = lotStock('Trans-Amadi Motors', 'live');
   const out = [];
 
   out.push(`-- ============================================================================
@@ -591,6 +602,7 @@ DELETE FROM service_requests;
 DELETE FROM products;
 DELETE FROM hire_classes;
 DELETE FROM pages;
+DELETE FROM dealer_purchases;
 DELETE FROM vehicle_listings;
 DELETE FROM price_bands;
 DELETE FROM facets;
@@ -604,12 +616,30 @@ DELETE FROM homepage_modules;
 DELETE FROM content_revisions;
 DELETE FROM faqs;
 DELETE FROM redirects;
+DELETE FROM dealer_addons;
 DELETE FROM dealers;
 `);
 
   out.push(insert('dealers',
     ['id', 'name', 'slug', 'lot_area', 'city', 'tier', 'verified', 'agreement_signed'],
     DEALERS.map((d, i) => [i + 1, d.name, d.slug, d.area, 'Port Harcourt', d.tier, d.verified, new Date(Date.UTC(2026, 5, 1 + i))])));
+
+  // FR-18 — the add-on catalogue the dealer portal sells from (§7.2). Each
+  // `effect` is delivered by services/addons.applyPurchase when the money
+  // lands; the console cannot offer a benefit no code delivers.
+  out.push(insert('dealer_addons',
+    ['id', 'slug', 'name', 'tagline', 'description', 'price_kobo', 'interval', 'effect', 'duration_days', 'needs_listing', 'is_active', 'position'],
+    [
+      [1, 'media-shoot', 'Media shoot', 'A photographer and a 25-shot set for one car, shot at your lot.',
+        'Front three-quarter, rear, interior, dashboard, odometer and engine bay to the same shot list the portal wizard asks you for. Delivered as web-sized photos plus a 15-second walkaround clip.',
+        4500000, 'one_off', 'media_shoot', null, 1, 1, 10],
+      [2, 'featured-placement', 'Featured placement', 'Thirty days of featured placement on one listing.',
+        'The car leads the /cars grid and the homepage featured rail for the paid window. It is ranked by the same featured_rank column the ops desk uses, so nothing about it is a separate promise.',
+        3000000, 'one_off', 'featured_placement', 30, 1, 1, 20],
+      [3, 'market-intelligence', 'Market intelligence', 'The monthly price-band and demand report for your segments.',
+        'Every month: what your models actually sold for in Port Harcourt, which bands are moving, and which of your cars are priced above the market. Billed monthly, cancel any time.',
+        2500000, 'monthly', 'intelligence', null, 0, 1, 30],
+    ]));
 
   out.push(insert('vehicle_listings',
     ['id', 'stock_no', 'dealer_id', 'status', 'verification_grade', 'make', 'model', 'year', 'trim',
@@ -1749,6 +1779,61 @@ INSERT INTO hire_incidents (booking_id, vehicle_id, kind, severity, detail, cost
    0, 0, 'resolved', DATE_SUB(UTC_TIMESTAMP(), INTERVAL 5 DAY),
    DATE_SUB(UTC_TIMESTAMP(), INTERVAL 5 DAY),
    'Within the tolerance we allow on a five-day hire — no charge to the client.', NULL);
+
+-- ---------------------------------------------------------------------------
+-- FR-18 — dealer add-on purchases (§7.2).
+--
+-- Three of the four states the lifecycle can be in, so the portal and the
+-- console have something real to show:
+--
+--   HC-ADD-0001  featured placement, PAID and running   (featured_rank is set)
+--   HC-ADD-0002  media shoot, raised and UNPAID         (the dealer owes it)
+--   HC-ADD-0003  featured placement, PAID and EXPIRED   (rank taken back)
+--
+-- Each purchase names a car that lot actually holds: a lot cannot buy a
+-- featured slot for someone else's stock, so the seed must not either.
+-- ---------------------------------------------------------------------------
+INSERT INTO dealer_purchases (id, reference, dealer_id, addon_id, listing_id, amount_kobo, status,
+                              starts_at, ends_at, detail, created_by) VALUES
+  (1, 'HC-ADD-0001',
+   (SELECT id FROM dealers WHERE name = 'Aba Road Autos' LIMIT 1), 2,
+   (SELECT id FROM vehicle_listings WHERE stock_no = '${featuredCar}' LIMIT 1),
+   3000000, 'active',
+   DATE_SUB(UTC_TIMESTAMP(), INTERVAL 9 DAY), DATE_ADD(UTC_TIMESTAMP(), INTERVAL 21 DAY),
+   'Featured placement is live on that listing.', NULL),
+  (2, 'HC-ADD-0002',
+   (SELECT id FROM dealers WHERE name = 'Woji Car Mart' LIMIT 1), 1,
+   (SELECT id FROM vehicle_listings WHERE stock_no = '${shootCar}' LIMIT 1),
+   4500000, 'pending', NULL, NULL, NULL, NULL),
+  (3, 'HC-ADD-0003',
+   (SELECT id FROM dealers WHERE name = 'Trans-Amadi Motors' LIMIT 1), 2,
+   (SELECT id FROM vehicle_listings WHERE stock_no = '${expiredCar}' LIMIT 1),
+   3000000, 'expired',
+   DATE_SUB(UTC_TIMESTAMP(), INTERVAL 48 DAY), DATE_SUB(UTC_TIMESTAMP(), INTERVAL 18 DAY),
+   'Featured placement is live on that listing.', NULL);
+
+INSERT INTO payments (reference, provider, provider_ref, purpose, order_id, booking_id, request_id,
+                      subscription_id, hire_booking_id, dealer_purchase_id, customer_name, customer_phone,
+                      amount_kobo, status, created_by, paid_at) VALUES
+  ('HC-PAY-000010', 'bank_transfer', 'SEED-BT-0010', 'addon', NULL, NULL, NULL, NULL, NULL,
+   (SELECT id FROM dealer_purchases WHERE reference = 'HC-ADD-0001' LIMIT 1),
+   'Aba Road Autos', '+2348000000007', 3000000, 'paid', NULL,
+   DATE_SUB(UTC_TIMESTAMP(), INTERVAL 9 DAY)),
+  ('HC-PAY-000011', 'manual', NULL, 'addon', NULL, NULL, NULL, NULL, NULL,
+   (SELECT id FROM dealer_purchases WHERE reference = 'HC-ADD-0002' LIMIT 1),
+   'Woji Car Mart', '+2348000000006', 4500000, 'pending', NULL, NULL),
+  ('HC-PAY-000012', 'bank_transfer', 'SEED-BT-0012', 'addon', NULL, NULL, NULL, NULL, NULL,
+   (SELECT id FROM dealer_purchases WHERE reference = 'HC-ADD-0003' LIMIT 1),
+   'Trans-Amadi Motors', '+2348000000008', 3000000, 'paid', NULL,
+   DATE_SUB(UTC_TIMESTAMP(), INTERVAL 48 DAY));
+
+UPDATE dealer_purchases p
+   SET p.payment_id = (SELECT pay.id FROM payments pay WHERE pay.dealer_purchase_id = p.id LIMIT 1)
+ WHERE p.reference IN ('HC-ADD-0001', 'HC-ADD-0002', 'HC-ADD-0003');
+
+-- The paid, running placement is what puts featured_rank back on its car.
+UPDATE vehicle_listings SET featured_rank = 1 WHERE stock_no = '${featuredCar}';
+
 
 -- ---------------------------------------------------------------------------
 -- §15.2 CAC guardrail: what the advertising cost.

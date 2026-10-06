@@ -25,6 +25,12 @@ const crypto = require('node:crypto');
 const config = require('../config');
 const db = require('../db');
 const notify = require('./notify');
+// services/addons requires this module back — it raises the payment for a
+// purchase — so the require is late. A top-level one closes the cycle and hands
+// one of the two a half-built module.
+function addons() {
+  return require('./addons');
+}
 
 const PROVIDERS = db.payments.PROVIDERS;
 
@@ -208,13 +214,13 @@ adapters.cash = adapters.manual;
  * Without one the payment stays `pending` and the confirmation page says how
  * to pay — the honest behaviour, and exactly what the bank-transfer flow needs.
  */
-async function initiate({ purpose, amountKobo, orderId = null, bookingId = null, requestId = null, subscriptionId = null, hireBookingId = null, customerName = null, customerPhone = null, provider = null, actorId = null }) {
+async function initiate({ purpose, amountKobo, orderId = null, bookingId = null, requestId = null, subscriptionId = null, hireBookingId = null, dealerPurchaseId = null, customerName = null, customerPhone = null, provider = null, actorId = null }) {
   const chosen = provider || activeProvider();
   const adapter = adapters[chosen];
   if (!adapter) return { ok: false, error: 'Unknown payment provider.' };
 
   const created = await db.payments.createPayment({
-    provider: chosen, purpose, amountKobo, orderId, bookingId, requestId, subscriptionId, hireBookingId, customerName, customerPhone, createdBy: actorId,
+    provider: chosen, purpose, amountKobo, orderId, bookingId, requestId, subscriptionId, hireBookingId, dealerPurchaseId, customerName, customerPhone, createdBy: actorId,
   });
   if (!created.ok) return created;
 
@@ -279,9 +285,12 @@ async function handleWebhook({ provider, headers = {}, rawBody, body = null }) {
   const refundTypes = ['refund.processed', 'refund.completed', 'refunded'];
 
   if (paidTypes.includes(event.type) || (event.status === 'success' && !refundTypes.includes(event.type))) {
-    await db.payments.markPaid(payment.id, {
+    const paid = await db.payments.markPaid(payment.id, {
       provider, providerRef: event.providerRef, raw: event.raw, eventId: event.eventId, source: 'webhook',
     });
+    // FR-18: a hosted provider can land an add-on payment too, and the dealer
+    // is owed the same sentence a manual confirmation sends.
+    await addons().announce(paid.payment, paid.purchased);
   } else if (refundTypes.includes(event.type)) {
     await db.payments.refund(payment.id, {
       amountKobo: event.amountKobo || null,
@@ -305,6 +314,8 @@ async function confirmManually(paymentId, { actorId, note = null }) {
   const result = await db.payments.markPaid(paymentId, { actorId, providerRef: note ? `manual:${String(note).slice(0, 40)}` : null });
   if (!result.ok) return result;
   const payment = result.payment;
+  // The receipt says money moved; this says what the money switched on.
+  await addons().announce(payment, result.purchased);
   await notify.send({
     template: 'payment_receipt',
     entity: 'payment',

@@ -15,6 +15,11 @@
  * Delivery goes through the configured notify channel. With no provider set the
  * message is recorded `skipped` with its text intact, so it is never silently
  * lost — /admin/payments shows both the sent and the skipped ones.
+ *
+ * The same run settles lapsed paid windows (FR-18): an add-on whose paid window
+ * has closed is marked `expired` and, if it was a featured placement, the car
+ * gives its featured rank back. A cron that runs the alerts is therefore also a
+ * cron that keeps the paid window honest.
  */
 
 import { createRequire } from 'node:module';
@@ -54,7 +59,12 @@ async function main() {
     console.log(`  ! ${skip.kind} for user ${skip.userId} was not delivered: ${skip.reason}`);
   }
 
-  if (!dryRun) console.log(`  sent ${report.sent}, deferred ${report.remaining}`);
+  if (!dryRun) {
+    // FR-18: paid windows that have closed give their benefit up.
+    const settled = await db.addons.expireDue();
+    if (settled.expired) console.log(`  ⌛ ${settled.expired} paid add-on window(s) closed — featured placement released`);
+    console.log(`  sent ${report.sent}, deferred ${report.remaining}`);
+  }
   if (report.ms !== undefined) console.log(`  ${report.ms}ms`);
 
   if (!dryRun && (report.sent > 0 || report.skipped.length)) {

@@ -4,6 +4,8 @@
  * Admin console — §7.3, gated by the §7.4 role matrix.
  *
  *   GET  /admin                     KPI home + daily summary
+ *   GET  /admin/dealers            partner lots, commission and paid add-ons (FR-18)
+ *   GET  /admin/dealers/:id        one lot: ledger, monthly statements, add-ons
  *   GET  /admin/listings            moderation queue, grades, expiry sweep
  *   GET  /admin/leads               unified CRM-lite inbox
  *   GET  /admin/concierge           pipeline board, candidates, SLA
@@ -38,6 +40,7 @@ const report = require('../services/report');
 const reportExport = require('../services/report-export');
 const hireService = require('../services/hire');
 const invoiceService = require('../services/invoice');
+const statementService = require('../services/statement');
 const { sendPage, CACHE } = require('../lib/respond');
 
 const router = express.Router();
@@ -56,6 +59,7 @@ const PATHS = {
   milestones: `${HOME}/milestones`,
   alerts: `${HOME}/alerts`,
   subscriptions: `${HOME}/subscriptions`,
+  dealers: `${HOME}/dealers`,
   hire: `${HOME}/hire`,
   intel: `${HOME}/intel`,
   reports: `${HOME}/reports`,
@@ -77,6 +81,7 @@ const NAV = [
   { href: PATHS.milestones, label: 'Escrow', icon: 'shield', capability: 'payments.view' },
   { href: PATHS.alerts, label: 'Alerts', icon: 'bell', capability: 'intel.manage' },
   { href: PATHS.subscriptions, label: 'Subscriptions', icon: 'repeat', capability: 'payments.view' },
+  { href: PATHS.dealers, label: 'Dealers', icon: 'store', capability: 'dealers.view' },
   { href: PATHS.hire, label: 'Hire', icon: 'car', capability: 'hire.view' },
   { href: PATHS.intel, label: 'Price intel', icon: 'gauge', capability: 'pricing.view' },
   { href: PATHS.reports, label: 'Reports', icon: 'fileCheck', capability: 'reports.view' },
@@ -1347,6 +1352,75 @@ router.post('/subscriptions/reminders', auth.requireStaff('payments.approve'), a
 // hire.manage — fleet, quoting, allocation, incidents — is admin/ops only. The
 // choice is recorded in docs/GAPS.md under FR-22.
 // ---------------------------------------------------------------------------
+// ---------------------------------------------------------------------------
+// Dealers — §5.1 “dealers”, the partner desk. FR-18's commission statements and
+// its paid add-ons live here because this is where ops already looks at lots.
+// ---------------------------------------------------------------------------
+router.get('/dealers', auth.requireStaff('dealers.view'), async (req, res, next) => {
+  try {
+    const [lots, totals, purchases] = await Promise.all([
+      db.dealers.list(),
+      db.dealers.fleetTotals(),
+      db.addons.recentPurchases(20),
+    ]);
+    return await page(req, res, {
+      view: 'admin/dealers',
+      active: PATHS.dealers,
+      title: 'Dealers',
+      description: 'Every partner lot: stock, commission, statement history and the add-ons they have paid for.',
+      data: { lots, totals, purchases, statementService },
+    });
+  } catch (error) {
+    return next(error);
+  }
+});
+
+router.get('/dealers/:id', auth.requireStaff('dealers.view'), async (req, res, next) => {
+  try {
+    const id = Number.parseInt(req.params.id, 10);
+    if (!Number.isFinite(id) || id < 1) return next();
+    const lot = await db.dealers.byId(id);
+    if (!lot) return next();
+
+    const [ledger, months, purchases, dashboard, listings] = await Promise.all([
+      db.dealers.statements(id, { limit: 200 }),
+      statementService.months(id),
+      db.addons.purchasesFor(id, { limit: 100 }),
+      db.dealers.dashboard(id),
+      db.dealers.listings(id, { limit: 100 }),
+    ]);
+    return await page(req, res, {
+      view: 'admin/dealer',
+      active: PATHS.dealers,
+      title: lot.name,
+      description: `Commission ledger, monthly statements and add-on purchases for ${lot.name}.`,
+      data: { lot, ledger, months, purchases, counts: dashboard.counts, commission: dashboard.commission, listings },
+    });
+  } catch (error) {
+    return next(error);
+  }
+});
+
+// The same statement the dealer can download, from the desk's side — a finance
+// officer checking a query does not have to ask the partner for a copy.
+router.get('/dealers/:id/statements/:month.pdf', auth.requireStaff('dealers.view'), async (req, res, next) => {
+  try {
+    const id = Number.parseInt(req.params.id, 10);
+    const month = String(req.params.month || '');
+    if (!Number.isFinite(id) || !/^\d{4}-\d{2}$/.test(month)) return next();
+    const statement = await statementService.build(id, month);
+    if (!statement) return next();
+    res.set('Content-Type', 'application/pdf');
+    res.set('Content-Disposition', `attachment; filename="${statementService.fileName(statement)}"`);
+    res.set('Cache-Control', CACHE.private);
+    const doc = statementService.pdf(statement);
+    doc.pipe(res);
+    doc.end();
+  } catch (error) {
+    return next(error);
+  }
+});
+
 router.get('/hire', auth.requireStaff('hire.view'), async (req, res, next) => {
   try {
     const status = db.hire.BOOKING_STATUSES.includes(String(req.query.status || '')) ? String(req.query.status) : null;

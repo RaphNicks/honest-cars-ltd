@@ -6,7 +6,9 @@
  * The ledger is append-only: commission in, payouts out, adjustments named.
  * The balance is the sum of the rows and nothing else, so a dealer can check
  * the arithmetic themselves.
- * Locals: statements, commission
+ * FR-18 adds the two things §7.2 asks for beyond the ledger itself: a month
+ * statement that can be downloaded as a PDF, and the add-ons a lot can buy.
+ * Locals: statements, commission, months, purchases
  */
 var TYPE_LABELS = {
   sale_commission: 'Sale commission',
@@ -42,13 +44,74 @@ var TYPE_COPY = {
 
 <section class="panel mt-3">
   <div class="panel__head">
-    <h2 class="panel__title">Statement</h2>
+    <h2 class="panel__title">Monthly statements</h2>
+    <span class="cms-hint">Each month stated on its own — opening balance, entries, closing balance</span>
+  </div>
+
+  <% if (!months.length) { %>
+    <p class="empty-line">No statement to send yet. The first one appears the month a commission or payout is recorded.</p>
+  <% } else { %>
+    <div class="btn-row">
+      <% months.forEach(function (month) { %>
+        <a class="btn btn--sm btn--secondary" href="/dealer/billing/statements/<%= month %>"><%= month %></a>
+      <% }); %>
+    </div>
+    <p class="cms-hint mt-2">
+      Open a month to check it line by line, or
+      <a href="/dealer/billing/statements/<%= months[0] %>.pdf">download the latest as a PDF</a>.
+    </p>
+  <% } %>
+</section>
+
+<section class="panel mt-3">
+  <div class="panel__head">
+    <h2 class="panel__title">Add-ons</h2>
+    <a class="section-head__link" href="/dealer/addons">Buy an add-on →</a>
+  </div>
+  <% if (!purchases.length) { %>
+    <p class="empty-line">Nothing bought yet. A <a href="/dealer/addons">media shoot or featured placement</a> is what most lots start with.</p>
+  <% } else { %>
+    <div class="table-scroll">
+      <table class="table">
+        <caption class="visually-hidden">Add-ons bought by this lot</caption>
+        <thead>
+          <tr>
+            <th scope="col">Add-on</th>
+            <th scope="col">For</th>
+            <th scope="col">Amount</th>
+            <th scope="col">Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% purchases.slice(0, 8).forEach(function (purchase) { %>
+            <tr>
+              <th scope="row">
+                <a href="<%= purchase.url %>"><%= purchase.addonName %></a>
+                <span class="listing-row__meta tabular"><%= purchase.reference %></span>
+              </th>
+              <td>
+                <% if (purchase.listing) { %><%= purchase.listing.title %><% } else { %><span class="muted">The whole lot</span><% } %>
+              </td>
+              <td class="tabular"><%= helpers.formatNaira(purchase.amountKobo) %></td>
+              <td>
+                <span class="badge badge--<%= purchase.status === 'active' ? 'ok' : purchase.status === 'pending' ? 'attention' : 'closed' %>"><%= purchase.statusLabel %></span>
+              </td>
+            </tr>
+          <% }); %>
+        </tbody>
+      </table>
+    </div>
+  <% } %>
+</section>
+
+<section class="panel mt-3">
+  <div class="panel__head">
+    <h2 class="panel__title">Ledger</h2>
     <span class="cms-hint">Newest first · every row names its reference</span>
   </div>
 
   <% if (!statements.length) { %>
     <p class="empty-line">No entries yet. Commission appears the moment a deal closes and the payment clears.</p>
-    <p class="mb-0 muted">Payments for add-ons (inspection, detailing, tracking) run through the HonestCars payment provider — talk to the desk and they will raise it on this lot’s account.</p>
   <% } else { %>
     <div class="table-scroll">
       <table class="table table--stack">

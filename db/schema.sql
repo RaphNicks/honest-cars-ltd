@@ -406,14 +406,6 @@ CREATE TABLE IF NOT EXISTS blog_tags (
   KEY idx_tag_kind (kind, label)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-CREATE TABLE IF NOT EXISTS blog_post_tags (
-  post_id INT UNSIGNED NOT NULL,
-  tag_id  INT UNSIGNED NOT NULL,
-  PRIMARY KEY (post_id, tag_id),
-  KEY idx_post_tag_tag (tag_id),
-  CONSTRAINT fk_post_tag_post FOREIGN KEY (post_id) REFERENCES blog_posts (id) ON DELETE CASCADE,
-  CONSTRAINT fk_post_tag_tag  FOREIGN KEY (tag_id)  REFERENCES blog_tags  (id) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ---------------------------------------------------------------------------
 -- blog_posts — "Home of the Honest Buyer's Guide" (§6.9)
@@ -451,6 +443,15 @@ CREATE TABLE IF NOT EXISTS blog_posts (
   CONSTRAINT fk_blog_author        FOREIGN KEY (author_id)     REFERENCES blog_authors (id) ON DELETE SET NULL,
   CONSTRAINT fk_blog_published_by FOREIGN KEY (published_by) REFERENCES `users` (id) ON DELETE SET NULL,
   CONSTRAINT fk_blog_updated_by   FOREIGN KEY (updated_by)   REFERENCES `users` (id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS blog_post_tags (
+  post_id INT UNSIGNED NOT NULL,
+  tag_id  INT UNSIGNED NOT NULL,
+  PRIMARY KEY (post_id, tag_id),
+  KEY idx_post_tag_tag (tag_id),
+  CONSTRAINT fk_post_tag_post FOREIGN KEY (post_id) REFERENCES blog_posts (id) ON DELETE CASCADE,
+  CONSTRAINT fk_post_tag_tag  FOREIGN KEY (tag_id)  REFERENCES blog_tags  (id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ---------------------------------------------------------------------------
@@ -634,7 +635,7 @@ CREATE TABLE IF NOT EXISTS delivery_areas (
 -- one renewal queue and one reminder sweep serve both (§7.3).
 CREATE TABLE IF NOT EXISTS subscriptions (
   id             INT UNSIGNED NOT NULL AUTO_INCREMENT,
-  kind           ENUM('tracker','dealer_retainer') NOT NULL DEFAULT 'tracker',
+  kind           ENUM('tracker','dealer_retainer','intelligence') NOT NULL DEFAULT 'tracker',
   order_id       INT UNSIGNED NULL,
   dealer_id      INT UNSIGNED NULL,
   product_id     INT UNSIGNED NULL,
@@ -801,7 +802,7 @@ CREATE TABLE IF NOT EXISTS hire_bookings (
 CREATE TABLE IF NOT EXISTS bookings (
   id             INT UNSIGNED  NOT NULL AUTO_INCREMENT,
   reference      VARCHAR(24)   NOT NULL,                -- HC-BK-0001
-  type           ENUM('inspection','install','consultation') NOT NULL,
+  type           ENUM('inspection','install','consultation','media_shoot') NOT NULL,
   service_slug   VARCHAR(80)   NULL,
   slot_at        DATETIME      NULL,
   location       VARCHAR(200)  NULL,
@@ -835,19 +836,75 @@ CREATE TABLE IF NOT EXISTS bookings (
 -- polymorphic (order / booking / retainer / subscription / milestone) and
 -- never hold card data; (provider, event_id) is the webhook idempotency key.
 -- ---------------------------------------------------------------------------
+-- ---------------------------------------------------------------------------
+-- dealer_addons · dealer_purchases — FR-18, §7.2 “pay for add-on services
+-- (media shoot, featured placement, intelligence subscription)”
+--
+-- A purchase is a thing with a life: raised unpaid → paid → in effect →
+-- expired. `effect` is what the purchase does when the money lands, applied in
+-- the same transaction that marks the payment paid.
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS dealer_addons (
+  id            INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  slug          VARCHAR(60)  NOT NULL,
+  name          VARCHAR(120) NOT NULL,
+  tagline       VARCHAR(160) NOT NULL,
+  description   VARCHAR(600) NULL,
+  price_kobo    BIGINT       NOT NULL,
+  `interval`    ENUM('one_off','monthly') NOT NULL DEFAULT 'one_off',   -- reserved word, hence the quotes
+  effect        ENUM('media_shoot','featured_placement','intelligence') NOT NULL,
+  -- NULL duration = the benefit runs until it is cancelled
+  duration_days SMALLINT     NULL,
+  needs_listing TINYINT(1)   NOT NULL DEFAULT 0,
+  is_active     TINYINT(1)   NOT NULL DEFAULT 1,
+  position      TINYINT      NOT NULL DEFAULT 0,
+  created_at    TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  UNIQUE KEY uq_addon_slug (slug),
+  KEY idx_addon_active (is_active, position)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS dealer_purchases (
+  id         INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  reference  VARCHAR(24)  NOT NULL,
+  dealer_id  INT UNSIGNED NOT NULL,
+  addon_id   INT UNSIGNED NOT NULL,
+  listing_id INT UNSIGNED NULL,
+  payment_id INT UNSIGNED NULL,
+  amount_kobo BIGINT      NOT NULL,
+  status     ENUM('pending','active','expired','cancelled') NOT NULL DEFAULT 'pending',
+  starts_at  DATETIME     NULL,
+  ends_at    DATETIME     NULL,
+  detail     VARCHAR(200) NULL,
+  created_by INT UNSIGNED NULL,
+  created_at TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  UNIQUE KEY uq_purchase_reference (reference),
+  KEY idx_purchase_dealer (dealer_id, status, created_at),
+  KEY idx_purchase_addon (addon_id),
+  KEY idx_purchase_listing (listing_id),
+  KEY idx_purchase_expiry (status, ends_at),
+  CONSTRAINT fk_purchase_dealer  FOREIGN KEY (dealer_id)  REFERENCES dealers (id) ON DELETE CASCADE,
+  CONSTRAINT fk_purchase_addon   FOREIGN KEY (addon_id)   REFERENCES dealer_addons (id),
+  CONSTRAINT fk_purchase_listing FOREIGN KEY (listing_id) REFERENCES vehicle_listings (id) ON DELETE SET NULL,
+  CONSTRAINT fk_purchase_actor   FOREIGN KEY (created_by) REFERENCES `users` (id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 CREATE TABLE IF NOT EXISTS `payments` (
   id             INT UNSIGNED NOT NULL AUTO_INCREMENT,
   reference      VARCHAR(32)  NOT NULL,              -- HC-PAY-000123
   provider       ENUM('manual','paystack','flutterwave','bank_transfer','cash')
                               NOT NULL DEFAULT 'manual',
   provider_ref   VARCHAR(80)  NULL,                  -- PSP transaction reference
-  purpose        ENUM('order','booking','retainer','subscription','milestone','other','hire')
+  purpose        ENUM('order','booking','retainer','subscription','milestone','other','hire','addon')
                               NOT NULL DEFAULT 'other',
   order_id       INT UNSIGNED NULL,
   booking_id     INT UNSIGNED NULL,
   request_id     INT UNSIGNED NULL,
   subscription_id INT UNSIGNED NULL,                    -- a renewal extends this (FR-20)
   hire_booking_id INT UNSIGNED NULL,                    -- paying this confirms a hire (FR-22)
+  dealer_purchase_id INT UNSIGNED NULL,                 -- paying this delivers an add-on (FR-18)
   customer_name  VARCHAR(120) NULL,
   customer_phone VARCHAR(40)  NULL,
   amount_kobo    BIGINT       NOT NULL,
@@ -871,10 +928,12 @@ CREATE TABLE IF NOT EXISTS `payments` (
   KEY idx_payment_phone (customer_phone, created_at),
   KEY idx_payment_subscription (subscription_id),
   KEY idx_payment_hire (hire_booking_id),
+  KEY idx_payment_dealer_purchase (dealer_purchase_id),
   CONSTRAINT fk_payment_order   FOREIGN KEY (order_id)   REFERENCES orders (id) ON DELETE SET NULL,
   CONSTRAINT fk_payment_booking FOREIGN KEY (booking_id) REFERENCES bookings (id) ON DELETE SET NULL,
   CONSTRAINT fk_payment_request FOREIGN KEY (request_id) REFERENCES service_requests (id) ON DELETE SET NULL,
   CONSTRAINT fk_payment_subscription FOREIGN KEY (subscription_id) REFERENCES subscriptions (id) ON DELETE SET NULL,
+  CONSTRAINT fk_payment_dealer_purchase FOREIGN KEY (dealer_purchase_id) REFERENCES dealer_purchases (id) ON DELETE SET NULL,
   CONSTRAINT fk_payment_hire FOREIGN KEY (hire_booking_id) REFERENCES hire_bookings (id) ON DELETE SET NULL,
   CONSTRAINT fk_payment_actor   FOREIGN KEY (created_by) REFERENCES `users` (id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
