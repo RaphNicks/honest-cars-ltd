@@ -24,9 +24,10 @@ const { query, queryOne, transaction } = require('./pool');
 const { parseJson } = require('./shape');
 const phones = require('../lib/phone');
 const subscriptions = require('./subscriptions');
+const hire = require('./hire');
 
 const PROVIDERS = ['manual', 'paystack', 'flutterwave', 'bank_transfer', 'cash'];
-const PURPOSES = ['order', 'booking', 'retainer', 'subscription', 'milestone', 'other'];
+const PURPOSES = ['order', 'booking', 'retainer', 'subscription', 'milestone', 'other', 'hire'];
 const PAYMENT_STATUSES = ['pending', 'paid', 'failed', 'abandoned', 'refunded', 'partially_refunded'];
 
 /**
@@ -95,6 +96,7 @@ function shapePayment(row) {
     bookingId: row.booking_id,
     requestId: row.request_id,
     subscriptionId: row.subscription_id || null,
+    hireBookingId: row.hire_booking_id || null,
     customerName: row.customer_name || 'Guest',
     maskedPhone: row.customer_phone ? phones.mask(row.customer_phone) : null,
     amountKobo: Number(row.amount_kobo),
@@ -125,6 +127,7 @@ async function createPayment({
   bookingId = null,
   requestId = null,
   subscriptionId = null,   // a renewal (FR-20) — extends the subscription when it is paid
+  hireBookingId = null,    // a hire (FR-22) — confirms the booking when it is paid
   customerName = null,
   customerPhone = null,
   createdBy = null,
@@ -140,10 +143,10 @@ async function createPayment({
   const reference = await nextReference('HC-PAY-', 'payments', 'reference');
   const result = await query(
     `INSERT INTO payments
-       (reference, provider, provider_ref, purpose, order_id, booking_id, request_id, subscription_id,
+       (reference, provider, provider_ref, purpose, order_id, booking_id, request_id, subscription_id, hire_booking_id,
         customer_name, customer_phone, amount_kobo, status, checkout_url, created_by)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?)`,
-    [reference, provider, providerRef, purpose, orderId, bookingId, requestId, subscriptionId,
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?)`,
+    [reference, provider, providerRef, purpose, orderId, bookingId, requestId, subscriptionId, hireBookingId,
       customerName, customerPhone ? phones.canonical(customerPhone) : null, amount, checkoutUrl, createdBy],
   );
   await recordPaymentEvent({
@@ -294,6 +297,7 @@ async function markPaid(id, { providerRef = null, raw = null, actorId = null, ev
   if (payment.status === 'paid' || payment.status === 'partially_refunded') return { ok: true, already: true, payment };
 
   let renewed = null;
+  let hired = null;
   await transaction(async (conn) => {
     await conn.query(
       "UPDATE payments SET status = 'paid', paid_at = UTC_TIMESTAMP(), provider_ref = COALESCE(?, provider_ref), raw = COALESCE(?, raw) WHERE id = ?",
@@ -310,6 +314,8 @@ async function markPaid(id, { providerRef = null, raw = null, actorId = null, ev
     // makes the two inseparable: no path (webhook, console, manual record) can
     // take a renewal without granting the period, and none can grant it twice.
     renewed = await subscriptions.applyRenewal(conn, payment);
+    // FR-22: paying a hire confirms it, in the same transaction as the money.
+    hired = await hire.confirmFromPayment(conn, payment);
   });
 
   await recordPaymentEvent({
@@ -323,7 +329,7 @@ async function markPaid(id, { providerRef = null, raw = null, actorId = null, ev
   if (actorId) {
     await recordAudit({ actorId, action: 'payment.paid', entity: 'payment', entityId: id, detail: { reference: payment.reference, amountKobo: payment.amountKobo, source } });
   }
-  return { ok: true, payment: await paymentById(id), renewed };
+  return { ok: true, payment: await paymentById(id), renewed, hired };
 }
 
 async function markFailed(id, { reason = null, status = 'failed', actorId = null, eventId = null, provider = null } = {}) {

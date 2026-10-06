@@ -25,6 +25,13 @@ const MATRIX = {
   'cms.manage': ['admin', 'marketing'],
   'intel.manage': ['admin', 'ops'],                // alerts console (§7.3)
   // §7.4 "Price-intel table": admin ✓, ops ✓, marketing read-only.
+  // FR-22 hire management. §7.4's “Bookings & dispatch” row is admin ✓ / ops ✓
+  // with inspectors scoped to their own jobs — hire is that desk's work, so
+  // hire.manage is admin/ops. Finance is added to hire.view because a hire
+  // carries money and an invoice, and §7.4 gives finance payments-view on
+  // everything that bills. Marketing holds neither.
+  'hire.view': ['admin', 'ops', 'finance'],
+  'hire.manage': ['admin', 'ops'],
   'pricing.view': ['admin', 'ops', 'marketing'],
   'pricing.manage': ['admin', 'ops'],
   'users.manage': ['admin'],                       // staff accounts, roles, audit log

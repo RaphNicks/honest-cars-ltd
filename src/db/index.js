@@ -24,6 +24,7 @@ const users = require('./users');
 const admin = require('./admin');
 const payments = require('./payments');
 const subscriptions = require('./subscriptions');
+const hire = require('./hire');
 const cms = require('./cms');
 const pricing = require('./pricing');
 const reports = require('./reports');
@@ -50,6 +51,7 @@ module.exports = {
   admin,
   payments,
   subscriptions,
+  hire,
   cms,
   pricing,
   reports,

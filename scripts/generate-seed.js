@@ -584,6 +584,9 @@ DELETE FROM delivery_areas;
 DELETE FROM order_items;
 DELETE FROM orders;
 DELETE FROM bookings;
+DELETE FROM hire_incidents;
+DELETE FROM hire_bookings;
+DELETE FROM hire_vehicles;
 DELETE FROM service_requests;
 DELETE FROM products;
 DELETE FROM hire_classes;
@@ -949,7 +952,7 @@ INSERT INTO leads (type, listing_id, name, phone, message, preferred_day, source
 INSERT INTO service_requests (tracking_id, type, status, name, phone, brief, sla_due_at, source_path,
                               notes, assigned_to, assigned_at, last_contacted_at) VALUES
   ('HC-2482', 'hire', 'new', 'Fleet officer, oil & gas firm', '+2348031110004',
-    '{"class":"suv","vehicles":4,"days":14,"with_driver":true,"airport_pickup":true,"corporate":true}',
+    '{"vehicle_class":"suv","vehicles":4,"days":14,"with_driver":"yes","airport_pickup":"yes","corporate":"yes","location":"Woji yard, with driver change-over at the base"}',
     DATE_SUB(UTC_TIMESTAMP(), INTERVAL 5 HOUR), '/hire', 'Corporate rotation — needs an invoice.',
     NULL, NULL, NULL),
   ('HC-2483', 'sell', 'new', 'Uche Nnamdi', '+2348031110009',
@@ -1260,8 +1263,12 @@ INSERT INTO saved_searches (user_id, label, query, alerts_enabled, alert_price_d
 
 INSERT INTO service_requests (tracking_id, type, status, name, phone, brief, sla_due_at, source_path, notes) VALUES
   ('HC-2490', 'hire', 'options_ready', 'Ada Okafor', '+2348031234567',
-   '{"class":"suv","pickup":"2026-10-10","dropoff":"2026-10-13","days":3,"with_driver":false,"pickup_point":"airport","addons":["tracking"]}',
-   DATE_ADD(UTC_TIMESTAMP(), INTERVAL 20 HOUR), '/hire', 'Three days with an SUV, airport pickup Friday.');
+   JSON_OBJECT('vehicle_class', 'suv',
+               'date_from', DATE_FORMAT(DATE_ADD(UTC_DATE(), INTERVAL 4 DAY), '%Y-%m-%d'),
+               'date_to',   DATE_FORMAT(DATE_ADD(UTC_DATE(), INTERVAL 7 DAY), '%Y-%m-%d'),
+               'days', 4, 'location', 'Omagwa arrivals',
+               'airport_pickup', 'yes', 'addons', JSON_ARRAY('tracking')),
+   DATE_ADD(UTC_TIMESTAMP(), INTERVAL 20 HOUR), '/hire', 'Four days with an SUV, airport pickup — the brief matches what /hire posts.');
 
 INSERT INTO orders (order_no, name, phone, delivery_area, delivery_fee_kobo, subtotal_kobo, total_kobo, status, payment_ref, notes) VALUES
   ('HC-ORD-0001', 'Ada Okafor', '+2348031234567', 'GRA Phase 2', 0, 4500000, 4500000, 'paid', 'SEED-DEMO-0001',
@@ -1551,6 +1558,140 @@ SELECT 'booking_completed',
 DROP TEMPORARY TABLE seed_channel;
 DROP TEMPORARY TABLE seed_day;
 DROP TEMPORARY TABLE seed_slot;
+
+-- ---------------------------------------------------------------------------
+-- FR-22 — hire management.
+--
+-- The pool is ten real units, not ten of the same car: two partner-owned,
+-- one whose papers are missing (so the allocation guard has something to
+-- refuse), one with papers expiring inside the month, one with a tracker still
+-- on order, one in the workshop. A demo where every unit is identical hides
+-- exactly the decisions this screen exists to support.
+--
+-- The hire book covers every state the lifecycle can be in: quoted (waiting on
+-- the client), accepted (payment raised), confirmed (paid, car allocated),
+-- on hire (out now), completed (came back, invoice issued) and cancelled. The
+-- corporate RFQ from HC-2482 is four references under one request — a hire is
+-- one car, so four cars is four hires.
+-- ---------------------------------------------------------------------------
+INSERT INTO hire_vehicles (plate, class_slug, make, model, year, colour, seats, owner, partner_name,
+                           driver_available, documents_state, documents_due, tracker_state, status,
+                           location, notes) VALUES
+  ('KJA-482-PH', 'suv',    'Toyota', 'Highlander', 2019, 'Silver',  7, 'honestcars', NULL, 1, 'current',  DATE_ADD(UTC_DATE(), INTERVAL 400 DAY), 'fitted',   'on_hire',   'Woji yard',      'Corporate favourite — out on the Saipem rotation.'),
+  ('RUM-119-PH', 'suv',    'Ford',   'Explorer',   2018, 'Black',   7, 'partner',    'Delta Fleet Services', 1, 'missing', NULL, 'none', 'available', 'GRA Phase 2', 'Partner unit. Insurance lapsed — nothing goes out on it until papers are back.'),
+  ('WOJ-630-PH', 'sedan',  'Toyota', 'Corolla',    2018, 'White',   5, 'honestcars', NULL, 1, 'current',  DATE_ADD(UTC_DATE(), INTERVAL 250 DAY), 'fitted',   'available', 'Woji yard',      NULL),
+  ('GRA-274-PH', 'sedan',  'Toyota', 'Camry',      2019, 'Grey',    5, 'partner',    'Rivers Fleet Ltd', 1, 'current',  DATE_ADD(UTC_DATE(), INTERVAL 120 DAY), 'fitted',   'available', 'GRA Phase 2', 'Partner unit, driver supplied by us.'),
+  ('PHC-905-PH', 'suv',    'Lexus',  'RX 350',     2017, 'Blue',    5, 'honestcars', NULL, 1, 'expiring', DATE_ADD(UTC_DATE(), INTERVAL 18 DAY),  'fitted',   'available', 'Woji yard',      'Papers due this month — renewal with the underwriter.'),
+  ('RUM-518-PH', 'suv',    'Toyota', 'RAV4',       2019, 'Green',   5, 'honestcars', NULL, 1, 'current',  DATE_ADD(UTC_DATE(), INTERVAL 275 DAY), 'fitted',   'available', 'Woji yard',      'Spare SUV — the one the desk puts on a late corporate ask.'),
+  ('TRA-188-PH', 'pickup', 'Toyota', 'Hilux',      2020, 'White',   5, 'honestcars', NULL, 1, 'current',  DATE_ADD(UTC_DATE(), INTERVAL 310 DAY), 'fitted',   'available', 'Trans-Amadi',    'Site and project work.'),
+  ('OBI-357-PH', 'bus',    'Toyota', 'Hiace',      2016, 'White',  14, 'honestcars', NULL, 1, 'current',  DATE_ADD(UTC_DATE(), INTERVAL 200 DAY), 'on_order', 'available', 'Rumuokoro',      'Tracker still on order — booked to be fitted next week.'),
+  ('ELE-712-PH', 'luxury', 'Lexus',  'GX 460',     2018, 'Black',   5, 'honestcars', NULL, 1, 'current',  DATE_ADD(UTC_DATE(), INTERVAL 140 DAY), 'fitted',   'available', 'Woji yard',      'Weddings, delegations, the chairman.'),
+  ('RIV-204-PH', 'sedan',  'Hyundai','Elantra',    2017, 'Ash',     5, 'honestcars', NULL, 1, 'current',  DATE_ADD(UTC_DATE(), INTERVAL 60 DAY),  'fitted',   'service',   'Woji workshop',  'In the workshop — see the open incident against it.');
+
+-- The hire book. Amounts are computed off the rate card the client saw, with the
+-- 10% refundable deposit the /hire page describes.
+INSERT INTO hire_bookings (reference, request_id, vehicle_id, class_slug, client_name, client_phone, company,
+                           pickup_at, dropoff_at, pickup_point, days, with_driver, driver_name, airport_pickup,
+                           day_rate_kobo, driver_kobo, extras_kobo, deposit_kobo, total_kobo, status,
+                           quote_sent_at, accepted_at, completed_at, cancelled_at, cancel_reason,
+                           notes, fuel_out, fuel_in, odometer_out, odometer_in) VALUES
+  -- ① The concierge hire request: quoted, waiting on Ada to accept.
+  ('HC-HIRE-0001',
+   (SELECT id FROM service_requests WHERE tracking_id = 'HC-2490' LIMIT 1), NULL, 'suv',
+   'Ada Okafor', '+2348031234567', NULL,
+   DATE_ADD(UTC_DATE(), INTERVAL 4 DAY), DATE_ADD(UTC_DATE(), INTERVAL 7 DAY), 'Omagwa arrivals', 3, 0, NULL, 1,
+   5500000, 0, 0, 1650000, 18150000, 'quoted',
+   DATE_SUB(UTC_TIMESTAMP(), INTERVAL 20 HOUR), NULL, NULL, NULL, NULL,
+   'Airport pick-up Friday morning; add the tracking add-on after handover.', NULL, NULL, NULL, NULL),
+
+  -- ②–⑤ The corporate RFQ (HC-2482): fourteen days, four SUVs, with drivers.
+  ('HC-HIRE-0002',
+   (SELECT id FROM service_requests WHERE tracking_id = 'HC-2482' LIMIT 1),
+   (SELECT id FROM hire_vehicles WHERE plate = 'KJA-482-PH' LIMIT 1), 'suv',
+   'Fleet officer, oil & gas firm', '+2348031110004', 'Saipem Nigeria field rotation',
+   DATE_SUB(UTC_DATE(), INTERVAL 2 DAY), DATE_ADD(UTC_DATE(), INTERVAL 12 DAY), 'Woji yard', 14, 1, 'Monday Chukwu', 1,
+   33000000, 25200000, 0, 9120000, 100320000, 'on_hire',
+   DATE_SUB(UTC_TIMESTAMP(), INTERVAL 6 DAY), DATE_SUB(UTC_TIMESTAMP(), INTERVAL 5 DAY), NULL, NULL, NULL,
+   'Rotation 1 — unit out, driver assigned.', 92, NULL, 61240, NULL),
+  ('HC-HIRE-0003',
+   (SELECT id FROM service_requests WHERE tracking_id = 'HC-2482' LIMIT 1),
+   (SELECT id FROM hire_vehicles WHERE plate = 'PHC-905-PH' LIMIT 1), 'suv',
+   'Fleet officer, oil & gas firm', '+2348031110004', 'Saipem Nigeria field rotation',
+   DATE_ADD(UTC_DATE(), INTERVAL 1 DAY), DATE_ADD(UTC_DATE(), INTERVAL 15 DAY), 'Woji yard', 14, 1, 'Ibrahim Sule', 1,
+   33000000, 25200000, 0, 9120000, 100320000, 'confirmed',
+   DATE_SUB(UTC_TIMESTAMP(), INTERVAL 6 DAY), DATE_SUB(UTC_TIMESTAMP(), INTERVAL 5 DAY), NULL, NULL, NULL,
+   'Rotation 1 — paid, unit allocated, goes out tomorrow.', NULL, NULL, NULL, NULL),
+  ('HC-HIRE-0004',
+   (SELECT id FROM service_requests WHERE tracking_id = 'HC-2482' LIMIT 1), NULL, 'suv',
+   'Fleet officer, oil & gas firm', '+2348031110004', 'Saipem Nigeria field rotation',
+   DATE_ADD(UTC_DATE(), INTERVAL 1 DAY), DATE_ADD(UTC_DATE(), INTERVAL 15 DAY), 'Woji yard', 14, 1, NULL, 1,
+   33000000, 25200000, 0, 9120000, 100320000, 'accepted',
+   DATE_SUB(UTC_TIMESTAMP(), INTERVAL 6 DAY), DATE_SUB(UTC_TIMESTAMP(), INTERVAL 3 DAY), NULL, NULL, NULL,
+   'Rotation 1 — client accepted, transfer not yet landed. Fourth unit owes us a car: the Explorer cannot go out.', NULL, NULL, NULL, NULL),
+  ('HC-HIRE-0005',
+   (SELECT id FROM service_requests WHERE tracking_id = 'HC-2482' LIMIT 1), NULL, 'suv',
+   'Fleet officer, oil & gas firm', '+2348031110004', 'Saipem Nigeria field rotation',
+   DATE_ADD(UTC_DATE(), INTERVAL 16 DAY), DATE_ADD(UTC_DATE(), INTERVAL 30 DAY), 'Woji yard', 14, 1, NULL, 1,
+   33000000, 25200000, 0, 9120000, 100320000, 'quoted',
+   DATE_SUB(UTC_TIMESTAMP(), INTERVAL 2 DAY), NULL, NULL, NULL, NULL,
+   'Rotation 2 — quoted, waiting on their procurement.', NULL, NULL, NULL, NULL),
+
+  -- ⑥ A hire that ran and closed, with the readings taken both ways.
+  ('HC-HIRE-0006',
+   NULL, (SELECT id FROM hire_vehicles WHERE plate = 'WOJ-630-PH' LIMIT 1), 'sedan',
+   'Chinedu Okafor', '+2348031110013', 'Zenith Bank, Aba Road branch',
+   DATE_SUB(UTC_DATE(), INTERVAL 9 DAY), DATE_SUB(UTC_DATE(), INTERVAL 5 DAY), 'Our Woji office', 5, 0, NULL, 0,
+   3500000, 0, 0, 1750000, 19250000, 'completed',
+   DATE_SUB(UTC_TIMESTAMP(), INTERVAL 12 DAY), DATE_SUB(UTC_TIMESTAMP(), INTERVAL 11 DAY),
+   DATE_SUB(UTC_TIMESTAMP(), INTERVAL 5 DAY), NULL, NULL,
+   'Left with a full tank and came back with three-quarters — no charge, within tolerance.',
+   100, 74, 45120, 45533),
+
+  -- ⑦ A hire that stopped before it started.
+  ('HC-HIRE-0007',
+   NULL, (SELECT id FROM hire_vehicles WHERE plate = 'OBI-357-PH' LIMIT 1), 'bus',
+   'Bright Iheanacho', '+2348031110014', 'Iheanacho Events',
+   DATE_ADD(UTC_DATE(), INTERVAL 9 DAY), DATE_ADD(UTC_DATE(), INTERVAL 11 DAY), 'Hotel Presidential', 3, 1, NULL, 1,
+   9500000, 7500000, 0, 3600000, 39600000, 'cancelled',
+   DATE_SUB(UTC_TIMESTAMP(), INTERVAL 8 DAY), NULL, NULL, DATE_SUB(UTC_TIMESTAMP(), INTERVAL 4 DAY),
+   'Event moved to next month — the client will rebook.',
+   'Cancelled before any money moved; the unit was never allocated for the new dates.', NULL, NULL, NULL, NULL);
+
+-- The hire payments: two paid (the unit is out, and the one that closed) and one
+-- raised and still pending (the fourth rotation car, waiting on procurement).
+INSERT INTO payments (reference, provider, provider_ref, purpose, order_id, booking_id, request_id,
+                      subscription_id, hire_booking_id, customer_name, customer_phone, amount_kobo, status,
+                      checkout_url, created_by, paid_at) VALUES
+  ('HC-PAY-000006', 'bank_transfer', 'SEED-BT-0006', 'hire', NULL, NULL, NULL, NULL,
+   (SELECT id FROM hire_bookings WHERE reference = 'HC-HIRE-0002' LIMIT 1),
+   'Fleet officer, oil & gas firm', '+2348031110004', 100320000, 'paid', NULL, NULL,
+   DATE_SUB(UTC_TIMESTAMP(), INTERVAL 5 DAY)),
+  ('HC-PAY-000007', 'bank_transfer', 'SEED-BT-0007', 'hire', NULL, NULL, NULL, NULL,
+   (SELECT id FROM hire_bookings WHERE reference = 'HC-HIRE-0003' LIMIT 1),
+   'Fleet officer, oil & gas firm', '+2348031110004', 100320000, 'paid', NULL, NULL,
+   DATE_SUB(UTC_TIMESTAMP(), INTERVAL 4 DAY)),
+  ('HC-PAY-000008', 'manual', NULL, 'hire', NULL, NULL, NULL, NULL,
+   (SELECT id FROM hire_bookings WHERE reference = 'HC-HIRE-0004' LIMIT 1),
+   'Fleet officer, oil & gas firm', '+2348031110004', 100320000, 'pending', NULL, NULL, NULL),
+  ('HC-PAY-000009', 'bank_transfer', 'SEED-BT-0009', 'hire', NULL, NULL, NULL, NULL,
+   (SELECT id FROM hire_bookings WHERE reference = 'HC-HIRE-0006' LIMIT 1),
+   'Chinedu Okafor', '+2348031110013', 19250000, 'paid', NULL, NULL,
+   DATE_SUB(UTC_TIMESTAMP(), INTERVAL 11 DAY));
+
+-- The incident log. One open against the workshop car (which is why it is off
+-- the road), and one closed from the hire that just finished — the resolved
+-- record is the point of keeping a log at all.
+INSERT INTO hire_incidents (booking_id, vehicle_id, kind, severity, detail, cost_kobo, charged_kobo,
+                            status, occurred_at, resolved_at, resolution, reported_by) VALUES
+  (NULL, (SELECT id FROM hire_vehicles WHERE plate = 'RIV-204-PH' LIMIT 1), 'breakdown', 'major',
+   'Overheated on Aba Road during a hire — head gasket suspected. Recovered to the Woji workshop.',
+   0, 0, 'open', DATE_SUB(UTC_TIMESTAMP(), INTERVAL 3 DAY), NULL, NULL, NULL),
+  ((SELECT id FROM hire_bookings WHERE reference = 'HC-HIRE-0006' LIMIT 1),
+   (SELECT id FROM hire_vehicles WHERE plate = 'WOJ-630-PH' LIMIT 1), 'fuel', 'minor',
+   'Returned with the tank at 74% against 100% at handover.',
+   0, 0, 'resolved', DATE_SUB(UTC_TIMESTAMP(), INTERVAL 5 DAY),
+   DATE_SUB(UTC_TIMESTAMP(), INTERVAL 5 DAY),
+   'Within the tolerance we allow on a five-day hire — no charge to the client.', NULL);
 
 -- ---------------------------------------------------------------------------
 -- §15.2 CAC guardrail: what the advertising cost.

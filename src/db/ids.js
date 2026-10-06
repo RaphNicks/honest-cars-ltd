@@ -19,6 +19,7 @@ const SPECS = Object.freeze({
   request: { table: 'service_requests', column: 'tracking_id', prefix: 'HC-', pad: 0, floor: 2481 },
   booking: { table: 'bookings', column: 'reference', prefix: 'HC-BK-', pad: 4, floor: 1 },
   order: { table: 'orders', column: 'order_no', prefix: 'HC-ORD-', pad: 4, floor: 1 },
+  hire: { table: 'hire_bookings', column: 'reference', prefix: 'HC-HIRE-', pad: 4, floor: 1 },
 });
 
 /** Next unused reference for a key in SPECS. Must be called inside a transaction. */

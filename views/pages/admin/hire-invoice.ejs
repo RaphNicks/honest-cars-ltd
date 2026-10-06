@@ -1,0 +1,117 @@
+<%
+  /**
+   * /admin/hire/:id/invoice — the hire document on screen (FR-22, J6).
+   *
+   * The same `doc` object the PDF is built from, so the page and the PDF cannot
+   * disagree. Printing this page gives the desk the same sheet the client keeps.
+   */
+%>
+<% var naira = helpers.formatNaira; %>
+<div class="panel panel--plain">
+  <div class="panel__head">
+    <h2 class="panel__title">
+      <%= doc.ready ? 'Hire invoice' : 'Hire quote' %> <span class="tabular"><%= doc.reference %></span>
+    </h2>
+    <div class="admin-actions">
+      <a class="btn btn--secondary btn--sm" href="/admin/hire/<%= doc.booking.id %>/invoice.pdf">Open the PDF</a>
+      <a class="btn btn--ghost btn--sm" href="/admin/hire">Back to hire</a>
+    </div>
+  </div>
+
+  <% if (!doc.ready) { %>
+    <p class="note-inline">
+      This hire is still <strong><%= doc.statusLabel.toLowerCase() %></strong>, so this is the quote — the invoice
+      proper appears once the client has accepted and paid.
+    </p>
+  <% } %>
+
+  <div class="hire-doc">
+    <div class="hire-doc__row">
+      <span class="muted">Hired by</span>
+      <span><%= doc.customer.company ? doc.customer.company + ' — ' : '' %><%= doc.customer.name %></span>
+    </div>
+    <div class="hire-doc__row">
+      <span class="muted">Contact</span>
+      <span class="tabular"><%= doc.customer.phone || '—' %></span>
+    </div>
+    <div class="hire-doc__row">
+      <span class="muted">Vehicle</span>
+      <span>
+        <%= doc.vehicle.title ? doc.vehicle.title + ' (' + doc.vehicle.plate + ')' : doc.vehicle.className + ' — unit assigned at handover' %>
+      </span>
+    </div>
+    <div class="hire-doc__row">
+      <span class="muted">Period</span>
+      <span><%= doc.period.label %> · <%= doc.period.days %> day<%= doc.period.days === 1 ? '' : 's' %></span>
+    </div>
+    <div class="hire-doc__row">
+      <span class="muted">Driver</span>
+      <span><%= doc.booking.withDriver ? (doc.booking.driverName || 'Included') : 'Self-drive' %></span>
+    </div>
+    <div class="hire-doc__row">
+      <span class="muted">Handover</span>
+      <span><%= doc.booking.pickupPoint || 'Port Harcourt office' %></span>
+    </div>
+    <div class="hire-doc__row">
+      <span class="muted">Status</span>
+      <span><%= doc.statusLabel %><% if (doc.payment) { %> · <%= doc.payment.reference %> (<%= doc.payment.status %>)<% } %></span>
+    </div>
+
+    <h3 class="mt-3">What <%= doc.ready ? 'you are paying for' : 'the quote covers' %></h3>
+    <% doc.lines.forEach(function (line) { %>
+      <div class="hire-doc__row">
+        <span>
+          <%= line.label %>
+          <% if (line.detail) { %><br><span class="muted"><%= line.detail %></span><% } %>
+        </span>
+        <span class="tabular"><%= naira(line.amountKobo) %></span>
+      </div>
+    <% }); %>
+    <div class="hire-doc__row hire-doc__total">
+      <span>Total</span>
+      <span class="tabular"><%= naira(doc.totalKobo) %></span>
+    </div>
+    <div class="hire-doc__row">
+      <span class="muted">Money</span>
+      <span class="tabular">
+        <% if (doc.paidKobo) { %>
+          paid <%= naira(doc.paidKobo) %><%= doc.balanceKobo ? ' · balance ' + naira(doc.balanceKobo) : ' · nothing outstanding' %>
+        <% } else { %>
+          payable before handover
+        <% } %>
+      </span>
+    </div>
+    <% if (doc.depositKobo) { %>
+      <div class="hire-doc__row">
+        <span class="muted">Deposit</span>
+        <span>
+          <%= doc.depositReturnKobo
+                ? naira(doc.depositReturnKobo) + ' released back at handover'
+                : naira(doc.depositKobo) + ' refundable, returned at handover' %>
+        </span>
+      </div>
+    <% } %>
+    <div class="hire-doc__row">
+      <span class="muted">Handover readings</span>
+      <span class="tabular">
+        fuel out <%= doc.fuel.out === null || doc.fuel.out === undefined ? '—' : doc.fuel.out + '%' %> ·
+        in <%= doc.fuel.in === null || doc.fuel.in === undefined ? '—' : doc.fuel.in + '%' %> ·
+        odometer out <%= doc.fuel.odometerOut ? Number(doc.fuel.odometerOut).toLocaleString('en-NG') + ' km' : '—' %> ·
+        in <%= doc.fuel.odometerIn ? Number(doc.fuel.odometerIn).toLocaleString('en-NG') + ' km' : '—' %>
+      </span>
+    </div>
+
+    <% if (doc.chargedIncidents.length) { %>
+      <h3 class="mt-3">Incidents charged on this hire</h3>
+      <% doc.chargedIncidents.forEach(function (i) { %>
+        <div class="hire-doc__row">
+          <span><%= i.kindLabel %> — <%= i.detail %></span>
+          <span class="tabular"><%= naira(i.chargedKobo) %></span>
+        </div>
+      <% }); %>
+    <% } %>
+
+    <h3 class="mt-3">Terms of hire</h3>
+    <p class="hire-doc__terms mb-0"><%= doc.terms %></p>
+  </div>
+</div>

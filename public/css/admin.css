@@ -1039,3 +1039,40 @@ body.admin {
 .row-details form { margin-top: var(--space-1); }
 .row-details .field { margin-bottom: var(--space-1); }
 .topbar-check { display: inline-flex; align-items: center; gap: 6px; min-height: 32px; }
+
+/* FR-22 hire management — the availability calendar.
+   A grid of units by days: colour carries the state, the number in the cell is
+   the hire reference so the desk can read “who has the Highlander on Friday”
+   without hover. Kept as a table because it is one. */
+.hire-cal__scroll { overflow-x: auto; margin: 0 calc(-1 * var(--space-3)); padding: 0 var(--space-3); }
+.hire-cal { border-collapse: collapse; width: 100%; min-width: 720px; font-size: var(--text-12); }
+.hire-cal th, .hire-cal td { border: 1px solid var(--colour-line, #E3E8EF); padding: 4px 6px; }
+.hire-cal thead th { background: var(--colour-mist, #F5F7FA); font-weight: var(--weight-semibold, 600); text-align: center; }
+.hire-cal__weekday { display: block; font-size: var(--text-12); color: var(--colour-slate, #5B6B7C); font-weight: var(--weight-regular, 400); }
+.hire-cal__day { display: block; }
+.hire-cal__day--weekend { background: #EEF2F7; }
+.hire-cal__unit { text-align: left; white-space: nowrap; min-width: 150px; }
+.hire-cal__cell { text-align: center; height: 30px; }
+.hire-cal__cell--free { background: #F4FBF6; }
+.hire-cal__cell--out { background: #DCEAFB; }
+.hire-cal__cell--held { background: #FFF6E5; }
+.hire-cal__cell--service { background: #F0EFF4; }
+.hire-cal__cell--invalid { background: #FDECEA; }
+.hire-cal__cell--retired { background: #EDEDED; }
+.hire-cal__ref { font-size: var(--text-12); color: var(--colour-navy, #10233D); text-decoration: none; }
+a.hire-cal__ref:hover { text-decoration: underline; }
+.hire-cal__mark { color: var(--colour-slate, #5B6B7C); }
+.hire-key { display: inline-block; padding: 1px 8px; border-radius: 999px; margin-right: 4px; font-size: var(--text-12); }
+.hire-key--free { background: #F4FBF6; border: 1px solid #CFE9DA; }
+.hire-key--out { background: #DCEAFB; border: 1px solid #B9D3F2; }
+.hire-key--held { background: #FFF6E5; border: 1px solid #F0D9A8; }
+.hire-key--service { background: #F0EFF4; border: 1px solid #D8D5E2; }
+.hire-key--invalid { background: #FDECEA; border: 1px solid #F3C6C0; }
+.hire-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-bottom: 6px; }
+.hire-actions__form { display: flex; align-items: center; gap: 6px; }
+.hire-actions__form .input { max-width: 190px; }
+.hire-doc { max-width: 720px; }
+.hire-doc__row { display: flex; justify-content: space-between; gap: var(--space-2); padding: 6px 0; border-bottom: 1px solid var(--colour-line, #E3E8EF); }
+.hire-doc__row:last-child { border-bottom: 0; }
+.hire-doc__total { font-weight: var(--weight-bold, 700); border-top: 2px solid var(--colour-navy, #10233D); border-bottom: 0; margin-top: 4px; padding-top: 10px; }
+.hire-doc__terms { font-size: var(--text-12); color: var(--colour-slate, #5B6B7C); line-height: 1.55; }

@@ -31,6 +31,7 @@ const PAGES_ADMIN = [
   '/admin/reports',
   '/admin/marketing',
   '/admin/subscriptions',
+  '/admin/hire',
   '/admin/cms', '/admin/cms/pages', '/admin/cms/faqs', '/admin/cms/testimonials', '/admin/cms/modules',
 ];
 
@@ -44,9 +45,9 @@ const PAGES_ADMIN = [
  */
 const ROLES = [
   { phone: '+2348000000001', role: 'admin', must: PAGES_ADMIN },
-  { phone: '+2348000000002', role: 'ops', must: ['/admin', '/admin/listings', '/admin/leads', '/admin/concierge', '/admin/bookings', '/admin/alerts', '/admin/intel', '/admin/reports', '/admin/marketing'] },
+  { phone: '+2348000000002', role: 'ops', must: ['/admin', '/admin/listings', '/admin/leads', '/admin/concierge', '/admin/bookings', '/admin/alerts', '/admin/intel', '/admin/reports', '/admin/marketing', '/admin/hire'] },
   { phone: '+2348000000003', role: 'inspector', must: ['/admin/jobs'] },
-  { phone: '+2348000000004', role: 'finance', must: ['/admin', '/admin/orders', '/admin/payments', '/admin/milestones', '/admin/reports', '/admin/subscriptions'] },
+  { phone: '+2348000000004', role: 'finance', must: ['/admin', '/admin/orders', '/admin/payments', '/admin/milestones', '/admin/reports', '/admin/subscriptions', '/admin/hire'] },
   { phone: '+2348000000005', role: 'marketing', must: ['/admin', '/admin/cms', '/admin/cms/pages', '/admin/cms/faqs', '/admin/cms/testimonials', '/admin/cms/modules', '/admin/intel', '/admin/reports', '/admin/marketing'] },
 ];
 
@@ -58,7 +59,7 @@ const ROLES = [
 const MUST_NOT = [
   // Marketing runs the channel report but does not see the ledgers, and finance
   // reads the money without seeing where the traffic came from (§7.4).
-  { phone: '+2348000000005', role: 'marketing', blocked: ['/admin/payments', '/admin/milestones', '/admin/staff', '/admin/audit', '/admin/subscriptions'] },
+  { phone: '+2348000000005', role: 'marketing', blocked: ['/admin/payments', '/admin/milestones', '/admin/staff', '/admin/audit', '/admin/subscriptions', '/admin/hire'] },
   { phone: '+2348000000004', role: 'finance', blocked: ['/admin/marketing'] },
   // Renewals are a money queue with a customer attached: ops runs the listings
   // and the leads, and does not need to see what anyone pays us (§7.4).
@@ -73,6 +74,7 @@ const PAGES = [
   '/admin/reports',
   '/admin/marketing',
   '/admin/subscriptions',
+  '/admin/hire',
   '/admin/cms', '/admin/cms/pages', '/admin/cms/faqs', '/admin/cms/testimonials', '/admin/cms/modules',
 ];
 

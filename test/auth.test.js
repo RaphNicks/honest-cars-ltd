@@ -394,7 +394,10 @@ maybe('hire gets its own card and is not double-counted in requests', async () =
   const page = await client.request('/account');
   const hireCard = page.text.slice(page.text.indexOf('id="hire"'), page.text.indexOf('id="bookings"'));
   assert.match(hireCard, /SUV \(Prado \/ Highlander\)/, 'the brief is on the hire card');
-  assert.match(hireCard, /3 days/, 'the dates are turned into a duration');
+  // 1 → 4 November is four hire days: the pick-up day counts, exactly as the
+  // quote bills it (services/hire.js counts both ends). The number on this card
+  // and the number on the invoice have to be the same number.
+  assert.match(hireCard, /4 days/, 'the dates are turned into a duration');
   assert.match(hireCard, new RegExp(created.json.trackingId));
 
   const requestsCard = page.text.slice(page.text.indexOf('id="requests"'), page.text.indexOf('id="hire"'));

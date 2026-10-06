@@ -629,6 +629,115 @@ CREATE TABLE IF NOT EXISTS subscription_reminders (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ---------------------------------------------------------------------------
+-- hire_vehicles / hire_bookings / hire_incidents — FR-22, §7.3 “Hire Management
+-- (vehicle pool registry, availability calendar, booking records, incident log)”.
+-- Migration 020. Kept out of `bookings` on purpose: an inspection booking is a
+-- job for an inspector on a slot; a hire is a vehicle occupied over a range of
+-- days.
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS hire_vehicles (
+  id               INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  plate            VARCHAR(20)  NOT NULL,
+  class_slug       VARCHAR(40)  NOT NULL,
+  make             VARCHAR(40)  NULL,
+  model            VARCHAR(60)  NULL,
+  year             SMALLINT     NULL,
+  colour           VARCHAR(30)  NULL,
+  seats            TINYINT      NULL,
+  owner            ENUM('honestcars','partner') NOT NULL DEFAULT 'honestcars',
+  partner_name     VARCHAR(120) NULL,
+  driver_available TINYINT(1)   NOT NULL DEFAULT 1,
+  documents_state  ENUM('current','expiring','missing') NOT NULL DEFAULT 'missing',
+  documents_due    DATE         NULL,
+  tracker_state    ENUM('fitted','on_order','none') NOT NULL DEFAULT 'none',
+  status           ENUM('available','on_hire','service','retired') NOT NULL DEFAULT 'available',
+  location         VARCHAR(80)  NULL,
+  notes            VARCHAR(300) NULL,
+  image            VARCHAR(300) NULL,
+  created_at       TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at       TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  UNIQUE KEY uq_hire_vehicle_plate (plate),
+  KEY idx_hire_vehicle_class (class_slug, status),
+  KEY idx_hire_vehicle_docs (documents_state, documents_due)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS hire_bookings (
+  id             INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  reference      VARCHAR(24)  NOT NULL,
+  request_id     INT UNSIGNED NULL,
+  vehicle_id     INT UNSIGNED NULL,
+  class_slug     VARCHAR(40)  NOT NULL,
+  client_name    VARCHAR(120) NOT NULL,
+  client_phone   VARCHAR(40)  NOT NULL,
+  company        VARCHAR(120) NULL,
+  phone2         VARCHAR(40)  NULL,
+  pickup_at      DATE         NOT NULL,
+  dropoff_at     DATE         NOT NULL,
+  pickup_point   VARCHAR(80)  NULL,
+  dropoff_point  VARCHAR(80)  NULL,
+  days           SMALLINT     NOT NULL DEFAULT 1,
+  with_driver    TINYINT(1)   NOT NULL DEFAULT 0,
+  driver_name    VARCHAR(80)  NULL,
+  airport_pickup TINYINT(1)   NOT NULL DEFAULT 0,
+  day_rate_kobo  BIGINT       NOT NULL DEFAULT 0,
+  driver_kobo    BIGINT       NOT NULL DEFAULT 0,
+  extras_kobo    BIGINT       NOT NULL DEFAULT 0,
+  deposit_kobo   BIGINT       NOT NULL DEFAULT 0,
+  total_kobo     BIGINT       NOT NULL DEFAULT 0,
+  currency       CHAR(3)      NOT NULL DEFAULT 'NGN',
+  status         ENUM('requested','quoted','accepted','confirmed','on_hire','completed','cancelled')
+                              NOT NULL DEFAULT 'requested',
+  quote_sent_at  DATETIME     NULL,
+  accepted_at    DATETIME     NULL,
+  completed_at   DATETIME     NULL,
+  cancelled_at   DATETIME     NULL,
+  cancel_reason  VARCHAR(200) NULL,
+  notes          VARCHAR(400) NULL,
+  fuel_out       TINYINT      NULL,
+  fuel_in        TINYINT      NULL,
+  odometer_out   INT UNSIGNED NULL,
+  odometer_in    INT UNSIGNED NULL,
+  created_by     INT UNSIGNED NULL,
+  created_at     TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at     TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  UNIQUE KEY uq_hire_reference (reference),
+  KEY idx_hire_booking_dates (pickup_at, dropoff_at),
+  KEY idx_hire_booking_status (status, pickup_at),
+  KEY idx_hire_booking_phone (client_phone, created_at),
+  KEY idx_hire_booking_vehicle (vehicle_id, pickup_at),
+  CONSTRAINT fk_hire_booking_request FOREIGN KEY (request_id) REFERENCES service_requests (id) ON DELETE SET NULL,
+  CONSTRAINT fk_hire_booking_vehicle FOREIGN KEY (vehicle_id) REFERENCES hire_vehicles (id) ON DELETE SET NULL,
+  CONSTRAINT fk_hire_booking_actor FOREIGN KEY (created_by) REFERENCES `users` (id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS hire_incidents (
+  id             INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  booking_id     INT UNSIGNED NULL,
+  vehicle_id     INT UNSIGNED NULL,
+  kind           ENUM('damage','late_return','fine','breakdown','fuel','theft','other') NOT NULL DEFAULT 'other',
+  severity       ENUM('minor','major','write_off') NOT NULL DEFAULT 'minor',
+  detail         VARCHAR(500) NOT NULL,
+  cost_kobo      BIGINT       NOT NULL DEFAULT 0,
+  charged_kobo   BIGINT       NOT NULL DEFAULT 0,
+  status         ENUM('open','resolved','written_off') NOT NULL DEFAULT 'open',
+  occurred_at    DATETIME     NULL,
+  resolved_at    DATETIME     NULL,
+  resolution     VARCHAR(400) NULL,
+  payment_id     INT UNSIGNED NULL,
+  reported_by    INT UNSIGNED NULL,
+  created_at     TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  KEY idx_incident_booking (booking_id),
+  KEY idx_incident_status (status, created_at),
+  CONSTRAINT fk_incident_booking FOREIGN KEY (booking_id) REFERENCES hire_bookings (id) ON DELETE SET NULL,
+  CONSTRAINT fk_incident_vehicle FOREIGN KEY (vehicle_id) REFERENCES hire_vehicles (id) ON DELETE SET NULL,
+  CONSTRAINT fk_incident_payment FOREIGN KEY (payment_id) REFERENCES payments (id) ON DELETE SET NULL,
+  CONSTRAINT fk_incident_actor FOREIGN KEY (reported_by) REFERENCES `users` (id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ---------------------------------------------------------------------------
 -- service_requests — §10.1: “User has many ServiceRequest (types: concierge,
 -- sell, swap, documents, research, parts, consultation)”. One table, a JSON
 -- brief, and a tracking id that the customer can watch at /concierge/{id}.
@@ -707,12 +816,13 @@ CREATE TABLE IF NOT EXISTS `payments` (
   provider       ENUM('manual','paystack','flutterwave','bank_transfer','cash')
                               NOT NULL DEFAULT 'manual',
   provider_ref   VARCHAR(80)  NULL,                  -- PSP transaction reference
-  purpose        ENUM('order','booking','retainer','subscription','milestone','other')
+  purpose        ENUM('order','booking','retainer','subscription','milestone','other','hire')
                               NOT NULL DEFAULT 'other',
   order_id       INT UNSIGNED NULL,
   booking_id     INT UNSIGNED NULL,
   request_id     INT UNSIGNED NULL,
   subscription_id INT UNSIGNED NULL,                    -- a renewal extends this (FR-20)
+  hire_booking_id INT UNSIGNED NULL,                    -- paying this confirms a hire (FR-22)
   customer_name  VARCHAR(120) NULL,
   customer_phone VARCHAR(40)  NULL,
   amount_kobo    BIGINT       NOT NULL,
@@ -735,10 +845,12 @@ CREATE TABLE IF NOT EXISTS `payments` (
   KEY idx_payment_booking (booking_id),
   KEY idx_payment_phone (customer_phone, created_at),
   KEY idx_payment_subscription (subscription_id),
+  KEY idx_payment_hire (hire_booking_id),
   CONSTRAINT fk_payment_order   FOREIGN KEY (order_id)   REFERENCES orders (id) ON DELETE SET NULL,
   CONSTRAINT fk_payment_booking FOREIGN KEY (booking_id) REFERENCES bookings (id) ON DELETE SET NULL,
   CONSTRAINT fk_payment_request FOREIGN KEY (request_id) REFERENCES service_requests (id) ON DELETE SET NULL,
   CONSTRAINT fk_payment_subscription FOREIGN KEY (subscription_id) REFERENCES subscriptions (id) ON DELETE SET NULL,
+  CONSTRAINT fk_payment_hire FOREIGN KEY (hire_booking_id) REFERENCES hire_bookings (id) ON DELETE SET NULL,
   CONSTRAINT fk_payment_actor   FOREIGN KEY (created_by) REFERENCES `users` (id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 

@@ -27,6 +27,8 @@ const roles = require('../services/roles');
 const validate = require('../services/validate');
 const listingQuery = require('../services/listing-query');
 const reportService = require('../services/report');
+const hireService = require('../services/hire');
+const invoiceService = require('../services/invoice');
 const paymentService = require('../services/payments');
 const phone = require('../lib/phone');
 const { helpers } = require('../lib/locals');
@@ -326,6 +328,120 @@ router.get('/account/renewals/:reference', auth.requireUser, async (req, res, ne
         trail: [{ label: 'Account', href: '/account' }, { label: reference }],
       },
     });
+  } catch (error) {
+    return next(error);
+  }
+});
+
+/**
+ * FR-22 — the customer's own hire, owned by the phone on the booking.
+ *
+ * Anyone can type HC-HIRE-0001 into the URL bar; only the number the hire was
+ * quoted to gets the page, the same rule as receipts and renewals.
+ */
+async function ownedHire(user, reference) {
+  const booking = await db.hire.bookingByReference(reference);
+  if (!booking) return null;
+  const shapes = require('../lib/phone').variants(user.phone);
+  const stored = booking.phone ? require('../lib/phone').canonical(booking.phone) : null;
+  if (!stored || !shapes.includes(stored)) return null;
+  return booking;
+}
+
+router.get('/account/hire/:reference', auth.requireUser, async (req, res, next) => {
+  try {
+    const reference = String(req.params.reference || '').toUpperCase().slice(0, 24);
+    if (!/^HC-HIRE-\d{4,}$/.test(reference)) return next();
+    const booking = await ownedHire(req.user, reference);
+    if (!booking) {
+      return await sendPage(req, res, {
+        view: 'error',
+        status: 404,
+        cache: CACHE.private,
+        page: {
+          title: 'Hire not found',
+          metaTitle: 'Hire not found',
+          canonical: `/account/hire/${reference}`,
+          robots: 'noindex,nofollow',
+          bodyClass: 'page-error',
+          jsonLd: [],
+        },
+        data: { reason: 'not-found', detail: 'That hire is not on this account.' },
+      });
+    }
+
+    const doc = await invoiceService.build(booking.id);
+    const trail = [{ label: 'Account', href: '/account' }, { label: reference }];
+    return await sendPage(req, res, {
+      routePath: `/account/hire/${reference}`,
+      view: 'hire-booking',
+      cache: CACHE.private,
+      page: {
+        title: `Hire ${reference}`,
+        metaTitle: `Hire ${reference}`,
+        titleSuffix: false,
+        description: 'Your car hire, what it costs and how to pay it.',
+        canonical: `/account/hire/${reference}`,
+        robots: 'noindex,nofollow',
+        breadcrumbs: trail,
+        bodyClass: 'page-order',
+        jsonLd: [],
+      },
+      data: {
+        booking,
+        doc,
+        bank: bankDetails(booking.paymentReference || reference),
+        trail,
+        // Accepting is only on offer while the hire is still a decision; once it
+        // is paid or finished the page is a record, not a form.
+        canAccept: ['requested', 'quoted', 'accepted'].includes(booking.status),
+        invoiceUrl: doc && doc.ready ? `/account/hire/${reference}/invoice.pdf` : null,
+      },
+    });
+  } catch (error) {
+    return next(error);
+  }
+});
+
+/** Accept the quote, and raise the payment for it in the same step. */
+router.post('/account/hire/:reference/accept', auth.sameOriginOnly, auth.requireUser, async (req, res, next) => {
+  try {
+    const reference = String(req.params.reference || '').toUpperCase().slice(0, 24);
+    const booking = await ownedHire(req.user, reference);
+    if (!booking) return res.redirect(303, `/account?err=${encodeURIComponent('That hire is not on this account.')}`);
+    if (['confirmed', 'on_hire', 'completed'].includes(booking.status)) {
+      return res.redirect(303, `/account/hire/${reference}`);
+    }
+    if (booking.status === 'cancelled') {
+      return res.redirect(303, `/account/hire/${reference}?err=${encodeURIComponent('That hire was cancelled — message us if you want it back.')}`);
+    }
+
+    const result = await hireService.accept(booking.id, { actorId: null });
+    if (!result.ok) {
+      return res.redirect(303, `/account/hire/${reference}?err=${encodeURIComponent(result.error || 'That quote could not be accepted.')}`);
+    }
+    if (result.hosted && result.checkoutUrl) return res.redirect(303, result.checkoutUrl);
+    return res.redirect(303, `/account/hire/${reference}?ok=${encodeURIComponent('Accepted — pay with the reference below and the car is held the moment it lands.')}`);
+  } catch (error) {
+    return next(error);
+  }
+});
+
+/** J6 “completion + invoice PDF”, from the customer's side of it. */
+router.get('/account/hire/:reference/invoice.pdf', auth.requireUser, async (req, res, next) => {
+  try {
+    const booking = await ownedHire(req.user, req.params.reference);
+    if (!booking) return res.status(404).json({ ok: false, error: 'Not found' });
+    const doc = await invoiceService.build(booking.id);
+    if (!doc || !doc.ready) {
+      return res.status(409).json({ ok: false, error: 'Your invoice appears once the hire is confirmed.' });
+    }
+    res.set({
+      'Content-Type': 'application/pdf',
+      'Content-Disposition': `inline; filename="${invoiceService.fileName(doc)}"`,
+      'Cache-Control': 'private, no-store',
+    });
+    return invoiceService.pdf(doc).pipe(res);
   } catch (error) {
     return next(error);
   }

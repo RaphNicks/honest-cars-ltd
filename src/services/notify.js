@@ -50,6 +50,16 @@ const TEMPLATES = {
   // FR-20 — same reason: the renewal wording depends on which window it is
   // (30/7/1 days), and that decision belongs in services/renewals.js.
   subscription_renewal: ({ body }) => body,
+  // FR-22 — hire. The quote is the one message that must never be vague: it
+  // carries the reference, the car, the days and the full amount including the
+  // deposit, because a client compares it against another company's quote over
+  // the phone.
+  hire_quote: ({ client, className, days, from, to, total, deposit, reference, withDriver }) =>
+    `${client ? `${client}, ` : ''}your hire quote ${reference}: ${className} for ${days} day${days === 1 ? '' : 's'}, ${from} to ${to}${withDriver ? ', with a driver' : ', self-drive'}. Total ${total}${deposit ? `, which includes a ${deposit} refundable deposit` : ''}. Reply here to accept and we will send payment details, or tell us what to change.`,
+  hire_confirmed: ({ reference, className, plate, from, to, driver }) =>
+    `Hire ${reference} is confirmed — ${className}${plate ? ` (${plate})` : ''} from ${from} to ${to}.${driver ? ` ${driver} will meet you with the car.` : ''} Papers and fuel readings are checked with you at handover.`,
+  hire_completed: ({ reference, amount, deposit }) =>
+    `Hire ${reference} is closed. Your invoice is in your account at honestcarsltd.com/account${amount ? ` — ${amount} was paid on it` : ''}.${deposit ? ` The deposit of ${deposit} is released back to you; it can take up to 5 working days.` : ''}`,
 };
 
 function render(template, values = {}) {

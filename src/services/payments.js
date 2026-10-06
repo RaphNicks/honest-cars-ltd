@@ -208,13 +208,13 @@ adapters.cash = adapters.manual;
  * Without one the payment stays `pending` and the confirmation page says how
  * to pay — the honest behaviour, and exactly what the bank-transfer flow needs.
  */
-async function initiate({ purpose, amountKobo, orderId = null, bookingId = null, requestId = null, subscriptionId = null, customerName = null, customerPhone = null, provider = null, actorId = null }) {
+async function initiate({ purpose, amountKobo, orderId = null, bookingId = null, requestId = null, subscriptionId = null, hireBookingId = null, customerName = null, customerPhone = null, provider = null, actorId = null }) {
   const chosen = provider || activeProvider();
   const adapter = adapters[chosen];
   if (!adapter) return { ok: false, error: 'Unknown payment provider.' };
 
   const created = await db.payments.createPayment({
-    provider: chosen, purpose, amountKobo, orderId, bookingId, requestId, subscriptionId, customerName, customerPhone, createdBy: actorId,
+    provider: chosen, purpose, amountKobo, orderId, bookingId, requestId, subscriptionId, hireBookingId, customerName, customerPhone, createdBy: actorId,
   });
   if (!created.ok) return created;
 

@@ -388,21 +388,26 @@ async function deleteSavedSearch(userId, id) {
 // ---------------------------------------------------------------------------
 async function dashboard(user) {
   const phone = user.phone;
-  const [requests, bookings, orders, subscriptions, savedCarList, searches, referral, paymentRows, escrow] = await Promise.all([
+  const [requests, bookings, orders, subscriptions, savedCarList, searches, referral, paymentRows, escrow, hires] = await Promise.all([
     require('./requests').listRequestsForPhone(phone),
     require('./requests').listBookingsForPhone(phone),
     require('./commerce').listForPhone(phone),
     require('./subscriptions').forPhone(phone, { limit: 20 }),
-
     savedCars(user.id),
     savedSearches(user.id),
     referralStats(user),
     require('./payments').listForPhone(phone, { limit: 20 }),
     require('./payments').milestonesForPhone(phone),
+
+    // FR-22: the customer's own hires, keyed to their phone like everything else.
+    // Appended last so the destructuring above keeps its order — a hire query
+    // in the middle of this list silently gave `savedCarList` the hires.
+    require('./hire').bookingsForPhone(phone, { limit: 20 }),
   ]);
 
-  // §7.1 lists hire separately from the other requests, and the briefing
-  // fields are what a customer with a booking actually wants to see.
+  // §7.1 lists hire separately from the other requests. A hire that has been
+  // quoted is a booking (with a price, dates and a car) and shows as one; a
+  // request with no quote yet still shows as “with the ops desk”.
   const hireRequests = requests.filter((request) => request.type === 'hire');
 
   // §7.1 “Documents” — the two things a customer actually keeps: the receipt
@@ -436,6 +441,7 @@ async function dashboard(user) {
   return {
     requests,
     hireRequests,
+    hires,
     bookings,
     orders,
     subscriptions,
@@ -451,6 +457,7 @@ async function dashboard(user) {
       allRequests: requests.length,
       requests: requests.length - hireRequests.length,
       hireRequests: hireRequests.length,
+      hires: hires.length,
       bookings: bookings.length,
       orders: orders.length,
       subscriptions: subscriptions.length,
@@ -481,6 +488,7 @@ async function exportData(userId) {
     },
     requests: data.requests,
     hireRequests: data.hireRequests,
+    hires: data.hires,
     bookings: data.bookings,
     orders: data.orders,
     subscriptions: data.subscriptions,

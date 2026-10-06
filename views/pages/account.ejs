@@ -4,7 +4,7 @@
     Documents (receipts + inspection reports) · Escrow · Saved cars · Saved searches (price-drop and
     new-match switches) · Your details · Referrals
   Every card reads a record the public site already wrote, matched by phone.
-  Locals: user, requests, hireRequests, bookings, orders, subscriptions,
+  Locals: user, requests, hireRequests, hires, bookings, orders, subscriptions,
           documents, savedCars, savedSearches, referral, counts, trail
 %>
 <section class="page-hero page-hero--account">
@@ -29,7 +29,7 @@
     </div>
 
     <div class="dash-counts">
-      <% [['Requests', counts.requests], ['Hire', counts.hireRequests], ['Bookings', counts.bookings],
+      <% [['Requests', counts.requests], ['Hire', counts.hireRequests + counts.hires], ['Bookings', counts.bookings],
           ['Orders', counts.orders], ['Trackers', counts.subscriptions], ['Saved cars', counts.savedCars],
           ['Saved searches', counts.savedSearches]]
          .forEach(function (pair) { %>
@@ -86,46 +86,84 @@
           <a class="section-head__link" href="/hire">Book a car →</a>
         </div>
 
-        <% if (!hireRequests.length) { %>
+        <% if (!hires.length && !hireRequests.length) { %>
           <div class="empty-state">
             <p class="mb-1">No hire bookings yet — daily, weekly and corporate hire around Port Harcourt, with or without a driver.</p>
             <a class="btn btn--primary btn--sm" href="/hire">See the fleet</a>
           </div>
         <% } else { %>
-          <ul class="account-list">
-            <% hireRequests.forEach(function (hire) { %>
-              <% var brief = hire.brief || {}; %>
-              <% var nights = brief.date_from && brief.date_to
-                   ? Math.round((new Date(brief.date_to) - new Date(brief.date_from)) / 86400000)
-                   : null; %>
-              <li class="account-item">
-                <div class="account-item__main">
-                  <a class="account-item__title" href="<%= hire.url %>">
-                    <%= brief.vehicle_class || 'Car hire' %>
-                    <% if (brief.with_driver === 'yes') { %>· with driver<% } %>
-                  </a>
-                  <span class="account-item__meta">
-                    <% if (brief.date_from && brief.date_to) { %>
-                      <%= brief.date_from %> → <%= brief.date_to %>
-                      <% if (nights && nights > 0) { %> · <%= nights %> day<%= nights === 1 ? '' : 's' %><% } %>
-                    <% } else { %>
-                      Dates to confirm
+          <%# Quoted hires first: they have a price, dates and a car, which is what
+              a client actually wants to see. %>
+          <% if (hires.length) { %>
+            <ul class="account-list">
+              <% hires.forEach(function (hire) { %>
+                <li class="account-item">
+                  <div class="account-item__main">
+                    <a class="account-item__title" href="/account/hire/<%= hire.reference %>">
+                      <%= hire.className %><%= hire.plate ? ' · ' + hire.plate : '' %>
+                    </a>
+                    <span class="account-item__meta">
+                      <%= new Date(hire.pickupAt).toLocaleDateString('en-NG', { day: 'numeric', month: 'short' }) %>
+                      → <%= new Date(hire.dropoffAt).toLocaleDateString('en-NG', { day: 'numeric', month: 'short' }) %>
+                      · <%= hire.days %> day<%= hire.days === 1 ? '' : 's' %>
+                      <%= hire.withDriver ? ' · with driver' : '' %>
+                      · <span class="tabular"><%= helpers.formatNaira(hire.totalKobo) %></span>
+                      <% if (hire.paymentStatus) { %> · <%= hire.paymentStatus %><% } %>
+                    </span>
+                  </div>
+                  <div class="account-item__side">
+                    <span class="status-pill status-pill--<%= hire.status %>"><%= hire.statusLabel %></span>
+                    <% if (['requested', 'quoted', 'accepted'].includes(hire.status) && hire.paymentStatus !== 'paid') { %>
+                      <form method="post" action="/account/hire/<%= hire.reference %>/accept">
+                        <button class="btn btn--primary btn--sm" type="submit">
+                          <%= hire.status === 'accepted' ? 'Pay' : 'Accept & pay' %>
+                        </button>
+                      </form>
                     <% } %>
-                    <% if (brief.location) { %> · <%= brief.location %><% } %>
-                    <% if (brief.airport_pickup === 'yes') { %> · airport pickup<% } %>
-                    <% if (brief.corporate === 'yes') { %> · corporate<% } %>
-                  </span>
-                </div>
-                <div class="account-item__side">
-                  <span class="status-pill status-pill--<%= hire.status %>"><%= hire.statusLabel %></span>
-                  <a class="btn btn--secondary btn--sm" href="<%= hire.url %>">Track</a>
-                </div>
-              </li>
-            <% }); %>
-          </ul>
+                    <a class="btn btn--secondary btn--sm" href="/account/hire/<%= hire.reference %>">
+                      <%= hire.status === 'completed' ? 'Invoice' : 'Details' %>
+                    </a>
+                  </div>
+                </li>
+              <% }); %>
+            </ul>
+          <% } %>
+
+          <% if (hireRequests.length) { %>
+            <ul class="account-list">
+              <% hireRequests.forEach(function (hire) { %>
+                <% var brief = hire.brief || {}; %>
+                <li class="account-item">
+                  <div class="account-item__main">
+                    <a class="account-item__title" href="<%= hire.url %>">
+                      <%= brief.vehicle_class || brief.class || 'Car hire' %>
+                      <% if (brief.with_driver === 'yes') { %>· with driver<% } %>
+                    </a>
+                    <span class="account-item__meta">
+                      <% if (brief.date_from && brief.date_to) { %>
+                        <% var days = Math.round((new Date(brief.date_to) - new Date(brief.date_from)) / 86400000) + 1; %>
+                        <%= brief.date_from %> → <%= brief.date_to %>
+                        <% if (days > 0) { %> · <%= days %> day<%= days === 1 ? '' : 's' %><% } %>
+                      <% } else { %>
+                        Dates to confirm
+                      <% } %>
+                      <% if (brief.location) { %> · <%= brief.location %><% } %>
+                      <% if (brief.airport_pickup === 'yes') { %> · airport pickup<% } %>
+                      <% if (brief.corporate === 'yes') { %> · corporate<% } %>
+                    </span>
+                  </div>
+                  <div class="account-item__side">
+                    <span class="status-pill status-pill--<%= hire.status %>"><%= hire.statusLabel %></span>
+                    <a class="btn btn--secondary btn--sm" href="<%= hire.url %>">Track</a>
+                  </div>
+                </li>
+              <% }); %>
+            </ul>
+          <% } %>
+
           <p class="note-inline mb-0">
-            A hire is confirmed once the ops desk has confirmed the car and the dates — you will get a WhatsApp with
-            the driver's details on the day.
+            A hire is confirmed once the money lands, and the driver's details come with the handover on the day.
+            The invoice and the deposit note live on each hire.
           </p>
         <% } %>
 

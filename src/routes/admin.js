@@ -36,6 +36,8 @@ const notify = require('../services/notify');
 const money = require('../lib/money');
 const report = require('../services/report');
 const reportExport = require('../services/report-export');
+const hireService = require('../services/hire');
+const invoiceService = require('../services/invoice');
 const { sendPage, CACHE } = require('../lib/respond');
 
 const router = express.Router();
@@ -54,6 +56,7 @@ const PATHS = {
   milestones: `${HOME}/milestones`,
   alerts: `${HOME}/alerts`,
   subscriptions: `${HOME}/subscriptions`,
+  hire: `${HOME}/hire`,
   intel: `${HOME}/intel`,
   reports: `${HOME}/reports`,
   marketing: `${HOME}/marketing`,
@@ -74,6 +77,7 @@ const NAV = [
   { href: PATHS.milestones, label: 'Escrow', icon: 'shield', capability: 'payments.view' },
   { href: PATHS.alerts, label: 'Alerts', icon: 'bell', capability: 'intel.manage' },
   { href: PATHS.subscriptions, label: 'Subscriptions', icon: 'repeat', capability: 'payments.view' },
+  { href: PATHS.hire, label: 'Hire', icon: 'car', capability: 'hire.view' },
   { href: PATHS.intel, label: 'Price intel', icon: 'gauge', capability: 'pricing.view' },
   { href: PATHS.reports, label: 'Reports', icon: 'fileCheck', capability: 'reports.view' },
   { href: PATHS.marketing, label: 'Marketing', icon: 'chart', capability: 'marketing.view' },
@@ -1321,6 +1325,380 @@ router.post('/subscriptions/reminders', auth.requireStaff('payments.approve'), a
       dryRun ? 'dry run — nothing sent or written' : null,
     ].filter(Boolean).join(' · ');
     return done(res, PATHS.subscriptions, `Renewal sweep: ${summary}.`);
+  } catch (error) {
+    return next(error);
+  }
+});
+
+// ---------------------------------------------------------------------------
+// Hire management — FR-22, §7.3.
+//
+//   “Vehicle pool registry (partner-owned units, docs, tracker status),
+//    availability calendar, booking records, incident log.”
+//
+// One screen for the whole desk: the pool at the top with its documents and
+// trackers, the calendar under it, the hire book in the middle, and the incident
+// log at the bottom. The pieces are together because that is how the phone call
+// goes — “is the Highlander free on the 10th, has it got its papers, and what
+// happened to the bumper last time it went out.”
+//
+// §7.4: this is the bookings-and-dispatch desk's work, so hire.view is
+// admin/ops plus finance (who needs the hire revenue and invoices), and
+// hire.manage — fleet, quoting, allocation, incidents — is admin/ops only. The
+// choice is recorded in docs/GAPS.md under FR-22.
+// ---------------------------------------------------------------------------
+router.get('/hire', auth.requireStaff('hire.view'), async (req, res, next) => {
+  try {
+    const status = db.hire.BOOKING_STATUSES.includes(String(req.query.status || '')) ? String(req.query.status) : null;
+    const classSlug = validate.text(req.query.class, 40) || null;
+    const search = validate.text(req.query.q, 60) || null;
+    const vehicleStatus = ['available', 'on_hire', 'service', 'retired'].includes(String(req.query.unit || '')) ? String(req.query.unit) : null;
+
+    const today = new Date();
+    const from = /^\d{4}-\d{2}-\d{2}$/.test(String(req.query.from || '')) ? String(req.query.from) : db.hire.sqlDate(today);
+    const days = validate.integer(req.query.days, { min: 7, max: 31 }) || 14;
+    const to = db.hire.sqlDate(new Date(new Date(`${from}T00:00:00Z`).getTime() + (days - 1) * 86_400_000));
+
+    const [classes, summary, bookings, poolRows, calendar, incidents, requests] = await Promise.all([
+      db.hire.classOptions(),
+      db.hire.summary(),
+      db.hire.bookings({ status, classSlug, search, limit: 200 }),
+      db.hire.pool({ classSlug, status: vehicleStatus, search, limit: 200 }),
+      db.hire.availability({ from, to, classSlug }),
+      db.hire.incidents({ limit: 100 }),
+      // The RFQ desk: every open hire request, with whatever has been quoted
+      // against it. A request with no booking is the work waiting to be done.
+      db.query(
+        `SELECT r.id, r.tracking_id, r.name, r.phone, r.status, r.brief, r.notes, r.created_at, r.sla_due_at
+           FROM service_requests r
+          WHERE r.type = 'hire' AND r.status NOT IN ('closed','lost')
+          ORDER BY r.created_at DESC LIMIT 40`,
+      ),
+    ]);
+
+    const briefOf = (row) => {
+      const raw = typeof row.brief === 'string' ? safeJson(row.brief) : (row.brief || {});
+      return raw;
+    };
+    const quotedByRequest = new Map();
+    for (const booking of await db.hire.bookings({ limit: 200 })) {
+      if (!booking.requestId) continue;
+      if (!quotedByRequest.has(booking.requestId)) quotedByRequest.set(booking.requestId, []);
+      quotedByRequest.get(booking.requestId).push(booking);
+    }
+
+    // Each unallocated hire is shown the units that are actually free on its
+    // dates, so allocation is a choice between real options rather than a
+    // dropdown of the whole fleet that fails on submit.
+    const freeByBooking = new Map();
+    for (const booking of bookings) {
+      if (booking.vehicleId || booking.status === 'cancelled') continue;
+      const free = await db.hire.availableVehicles({ classSlug: booking.classSlug, from: booking.pickupAt, to: booking.dropoffAt, ignoreBookingId: booking.id });
+      freeByBooking.set(booking.id, free);
+    }
+
+    return await page(req, res, {
+      view: 'admin/hire',
+      active: PATHS.hire,
+      title: 'Hire management',
+      description: 'The vehicle pool, the availability calendar, hire records and the incident log.',
+      data: {
+        classes,
+        summary,
+        bookings,
+        pool: poolRows,
+        calendar,
+        incidents,
+        requests: requests.map((row) => {
+          const brief = briefOf(row);
+          const quoted = quotedByRequest.get(row.id) || [];
+          return {
+            id: row.id,
+            trackingId: row.tracking_id,
+            name: row.name,
+            phone: row.phone,
+            status: row.status,
+            createdAt: row.created_at,
+            slaDueAt: row.sla_due_at,
+            company: brief.company || null,
+            className: brief.vehicle_class || brief.class || null,
+            units: Number(brief.vehicles) || 1,
+            days: Number(brief.days) || null,
+            dateFrom: brief.date_from || brief.pickup || null,
+            dateTo: brief.date_to || brief.dropoff || null,
+            withDriver: brief.with_driver === 'yes' || brief.with_driver === true,
+            airportPickup: brief.airport_pickup === 'yes' || brief.airport_pickup === true,
+            corporate: brief.corporate === 'yes' || brief.corporate === true,
+            pickupPoint: brief.location || brief.pickup_point || null,
+            notes: brief.notes || null,
+            bookings: quoted,
+            quotedTotalKobo: quoted.reduce((sum, booking) => sum + booking.totalKobo, 0),
+          };
+        }),
+        freeByBooking,
+        filters: { status, classSlug, search, vehicleStatus, from, to, days },
+        window: { from, to, days },
+        statuses: Object.entries(db.hire.STATUS_LABELS).map(([value, label]) => ({ value, label })),
+        vehicleStatuses: Object.entries(db.hire.VEHICLE_STATUS_LABELS).map(([value, label]) => ({ value, label })),
+        documentsStates: Object.entries(db.hire.DOCUMENT_LABELS).map(([value, label]) => ({ value, label })),
+        trackerStates: Object.entries(db.hire.TRACKER_LABELS).map(([value, label]) => ({ value, label })),
+        incidentKinds: Object.entries(db.hire.INCIDENT_LABELS).map(([value, label]) => ({ value, label })),
+        severities: db.hire.INCIDENT_SEVERITIES,
+        weeklyFromDays: hireService.WEEKLY_FROM_DAYS,
+        depositRate: hireService.DEPOSIT_RATE,
+        canManage: roles.can(req.user.role, 'hire.manage'),
+      },
+    });
+  } catch (error) {
+    return next(error);
+  }
+});
+
+function safeJson(value) {
+  try {
+    return JSON.parse(value);
+  } catch {
+    return {};
+  }
+}
+
+/** Add a unit to the pool — the registry half of §7.3. */
+router.post('/hire/vehicles', auth.requireStaff('hire.manage'), auth.sameOriginOnly, async (req, res, next) => {
+  try {
+    const body = req.body || {};
+    const result = await db.hire.createVehicle({
+      plate: validate.text(body.plate, 20),
+      classSlug: validate.text(body.class_slug, 40),
+      make: validate.text(body.make, 40) || null,
+      model: validate.text(body.model, 60) || null,
+      year: validate.integer(body.year, { min: 1980, max: new Date().getFullYear() + 2 }) || null,
+      colour: validate.text(body.colour, 30) || null,
+      seats: validate.integer(body.seats, { min: 2, max: 60 }) || null,
+      owner: body.owner === 'partner' ? 'partner' : 'honestcars',
+      partnerName: validate.text(body.partner_name, 120) || null,
+      driverAvailable: body.driver_available !== undefined ? Boolean(body.driver_available) : true,
+      documentsState: ['current', 'expiring', 'missing'].includes(String(body.documents_state)) ? String(body.documents_state) : 'missing',
+      documentsDue: validate.text(body.documents_due, 20) || null,
+      trackerState: ['fitted', 'on_order', 'none'].includes(String(body.tracker_state)) ? String(body.tracker_state) : 'none',
+      status: ['available', 'on_hire', 'service', 'retired'].includes(String(body.status)) ? String(body.status) : 'available',
+      location: validate.text(body.location, 80) || null,
+      notes: validate.text(body.notes, 300) || null,
+      actorId: req.user.id,
+    });
+    if (!result.ok) return done(res, PATHS.hire, result.error, { error: true });
+    return done(res, PATHS.hire, `${result.vehicle.plate} is in the pool — ${result.vehicle.className}, papers ${result.vehicle.documentsLabel.toLowerCase()}.`);
+  } catch (error) {
+    return next(error);
+  }
+});
+
+/** Documents, tracker, workshop and retirement — one update path. */
+router.post('/hire/vehicles/:id', auth.requireStaff('hire.manage'), auth.sameOriginOnly, async (req, res, next) => {
+  try {
+    const body = req.body || {};
+    const result = await db.hire.updateVehicle(req.params.id, {
+      documentsState: body.documents_state || undefined,
+      documentsDue: body.documents_due !== undefined ? (validate.text(body.documents_due, 20) || null) : undefined,
+      trackerState: body.tracker_state || undefined,
+      status: body.status || undefined,
+      location: body.location !== undefined ? validate.text(body.location, 80) : undefined,
+      notes: body.notes !== undefined ? validate.text(body.notes, 300) : undefined,
+      driverAvailable: body.driver_available !== undefined ? Boolean(body.driver_available) : undefined,
+    }, { actorId: req.user.id });
+    if (!result.ok) return done(res, PATHS.hire, result.error, { error: true });
+    if (result.unchanged) return done(res, PATHS.hire, 'Nothing to change on that unit.');
+    const vehicle = result.vehicle;
+    return done(res, PATHS.hire, `${vehicle.plate} updated — ${vehicle.statusLabel}, papers ${vehicle.documentsLabel.toLowerCase()}, tracker ${vehicle.trackerLabel.toLowerCase()}.`);
+  } catch (error) {
+    return next(error);
+  }
+});
+
+/** Quote a hire request: rate card in, priced hire out (never a typed amount). */
+router.post('/hire/quote', auth.requireStaff('hire.manage'), auth.sameOriginOnly, async (req, res, next) => {
+  try {
+    const body = req.body || {};
+    const result = await hireService.quoteFromRequest(validate.integer(body.request_id, { min: 1, fallback: 0 }), {
+      classSlug: validate.text(body.class_slug, 40) || null,
+      pickupAt: validate.text(body.date_from, 20) || null,
+      dropoffAt: validate.text(body.date_to, 20) || null,
+      units: validate.integer(body.units, { min: 1, max: 20 }) || null,
+      withDriver: body.with_driver !== undefined ? Boolean(body.with_driver) : null,
+      airportPickup: body.airport_pickup !== undefined ? Boolean(body.airport_pickup) : null,
+      extrasKobo: body.extras ? money.nairaToKobo(body.extras) : 0,
+      note: validate.text(body.note, 400) || null,
+      actorId: req.user.id,
+    });
+    if (!result.ok) return done(res, PATHS.hire, result.error, { error: true });
+    if (result.repriced) {
+      return done(res, PATHS.hire, `${result.booking.reference} requoted — ${money.formatNaira(result.booking.totalKobo)}. Send it to the client when you are ready.`);
+    }
+    const refs = result.bookings.map((booking) => booking.reference).join(', ');
+    return done(res, PATHS.hire, `Quoted ${result.units} hire${result.units === 1 ? '' : 's'} (${refs}) at ${money.formatNaira(result.unitTotalKobo)} each — ${money.formatNaira(result.groupTotalKobo)} for the group.`);
+  } catch (error) {
+    return next(error);
+  }
+});
+
+/** Send the quote. The message is the client's record of what they agreed to. */
+router.post('/hire/:id/quote', auth.requireStaff('hire.manage'), auth.sameOriginOnly, async (req, res, next) => {
+  try {
+    const result = await hireService.sendQuote(req.params.id, { actorId: req.user.id });
+    if (!result.ok) return done(res, PATHS.hire, result.error, { error: true });
+    return done(
+      res,
+      PATHS.hire,
+      result.sent
+        ? `Quote sent to ${result.booking.clientName} by ${result.channel}.`
+        : `Quote recorded but not delivered (${result.channel}) — send it from WhatsApp and it will show in the client's account.`,
+      { error: !result.sent },
+    );
+  } catch (error) {
+    return next(error);
+  }
+});
+
+/** Put a specific unit on a hire. Refuses anything that is not actually free. */
+router.post('/hire/:id/allocate', auth.requireStaff('hire.manage'), auth.sameOriginOnly, async (req, res, next) => {
+  try {
+    const result = await db.hire.allocateVehicle(req.params.id, (req.body || {}).vehicle_id, { actorId: req.user.id });
+    if (!result.ok) return done(res, PATHS.hire, result.error, { error: true });
+    return done(res, PATHS.hire, `${result.booking.plate} is on ${result.booking.reference} — ${result.booking.vehicleTitle || result.booking.className}, ${result.booking.days} day${result.booking.days === 1 ? '' : 's'} from ${db.hire.sqlDate(result.booking.pickupAt)}.`);
+  } catch (error) {
+    return next(error);
+  }
+});
+
+/**
+ * The client said yes. Accepting raises the payment in the same step, because an
+ * accepted quote with no way to pay it is where hires go to die.
+ */
+router.post('/hire/:id/accept', auth.requireStaff('hire.manage'), auth.sameOriginOnly, async (req, res, next) => {
+  try {
+    const result = await hireService.accept(req.params.id, { actorId: req.user.id });
+    if (!result.ok) return done(res, PATHS.hire, result.error, { error: true });
+    if (result.already) return done(res, PATHS.hire, `${result.booking.reference} is already ${result.booking.statusLabel.toLowerCase()}.`);
+    return done(
+      res,
+      PATHS.hire,
+      result.reusedPayment
+        ? `${result.booking.reference} accepted — it is still waiting on ${result.paymentReference}.`
+        : `${result.booking.reference} accepted — payment ${result.paymentReference} raised for ${money.formatNaira(result.booking.totalKobo)}. It confirms itself the moment the money lands.`,
+    );
+  } catch (error) {
+    return next(error);
+  }
+});
+
+/** Confirm, start, complete, cancel — the lifecycle, with its rules enforced. */
+router.post('/hire/:id/status', auth.requireStaff('hire.manage'), auth.sameOriginOnly, async (req, res, next) => {
+  try {
+    const body = req.body || {};
+    const next_ = String(body.status || '');
+    const result = await db.hire.setStatus(req.params.id, next_, {
+      actorId: req.user.id,
+      reason: validate.text(body.reason, 200) || null,
+      fuelIn: body.fuel_in !== '' && body.fuel_in !== undefined ? validate.integer(body.fuel_in, { min: 0, max: 100 }) : null,
+      odometerIn: body.odometer_in !== '' && body.odometer_in !== undefined ? validate.integer(body.odometer_in, { min: 0 }) : null,
+    });
+    if (!result.ok) return done(res, PATHS.hire, result.error, { error: true });
+    if (result.unchanged) return done(res, PATHS.hire, `${result.booking.reference} is already ${result.booking.statusLabel.toLowerCase()}.`);
+    const booking = result.booking;
+
+    // Closing a hire is the moment the client is owed their paperwork, so the
+    // completion note goes out with the invoice link rather than as a surprise.
+    if (next_ === 'completed') {
+      await notify.send({
+        template: 'hire_completed',
+        entity: 'hire_booking',
+        entityId: booking.id,
+        recipient: booking.phone,
+        values: {
+          reference: booking.reference,
+          amount: booking.paymentStatus === 'paid' ? money.formatNaira(booking.totalKobo) : '',
+          deposit: booking.depositKobo ? money.formatNaira(booking.depositKobo) : '',
+        },
+        createdBy: req.user.id,
+      }).catch(() => {});
+    }
+    return done(res, PATHS.hire, `${booking.reference} is now ${booking.statusLabel.toLowerCase()}${booking.plate ? ` — ${booking.plate}` : ''}.`);
+  } catch (error) {
+    return next(error);
+  }
+});
+
+/** Log what happened to a car — damage, a fine, a breakdown, a late return. */
+router.post('/hire/incidents', auth.requireStaff('hire.manage'), auth.sameOriginOnly, async (req, res, next) => {
+  try {
+    const body = req.body || {};
+    const result = await db.hire.logIncident({
+      bookingId: validate.integer(body.booking_id, { min: 1 }) || null,
+      vehicleId: validate.integer(body.vehicle_id, { min: 1 }) || null,
+      kind: String(body.kind || 'other'),
+      severity: String(body.severity || 'minor'),
+      detail: validate.text(body.detail, 500),
+      costKobo: body.cost ? money.nairaToKobo(body.cost) : 0,
+      chargedKobo: body.charged ? money.nairaToKobo(body.charged) : 0,
+      occurredAt: validate.text(body.occurred_at, 20) || null,
+      actorId: req.user.id,
+    });
+    if (!result.ok) return done(res, PATHS.hire, result.error, { error: true });
+    return done(res, PATHS.hire, 'Incident logged. Anything above minor takes the unit off the road until it is closed.');
+  } catch (error) {
+    return next(error);
+  }
+});
+
+router.post('/hire/incidents/:id/resolve', auth.requireStaff('hire.manage'), auth.sameOriginOnly, async (req, res, next) => {
+  try {
+    const body = req.body || {};
+    const result = await db.hire.resolveIncident(req.params.id, {
+      resolution: validate.text(body.resolution, 400) || null,
+      chargedKobo: body.charged !== undefined && body.charged !== '' ? money.nairaToKobo(body.charged) : null,
+      writtenOff: String(body.written_off || '') === '1',
+      actorId: req.user.id,
+    });
+    if (!result.ok) return done(res, PATHS.hire, result.error, { error: true });
+    return done(res, PATHS.hire, 'Incident closed. The unit goes back on the road if nothing else is open against it.');
+  } catch (error) {
+    return next(error);
+  }
+});
+
+/**
+ * The invoice (J6 “completion + invoice PDF”). Only a confirmed or finished hire
+ * has one: before that the client is holding a quote, and the same document with
+ * “invoice” on it would be a lie.
+ */
+router.get('/hire/:id/invoice.pdf', auth.requireStaff('hire.view'), async (req, res, next) => {
+  try {
+    const built = await invoiceService.build(validate.integer(req.params.id, { min: 1, fallback: 0 }));
+    if (!built) return res.status(404).json({ ok: false, error: 'Not found' });
+    if (!built.ready) {
+      return res.status(409).json({ ok: false, error: 'That hire is still a quote — there is no invoice until the client has accepted and paid it.' });
+    }
+    res.set({
+      'Content-Type': 'application/pdf',
+      'Content-Disposition': `inline; filename="${invoiceService.fileName(built)}"`,
+      'Cache-Control': 'private, no-store',
+    });
+    return invoiceService.pdf(built).pipe(res);
+  } catch (error) {
+    return next(error);
+  }
+});
+
+router.get('/hire/:id/invoice', auth.requireStaff('hire.view'), async (req, res, next) => {
+  try {
+    const built = await invoiceService.build(validate.integer(req.params.id, { min: 1, fallback: 0 }));
+    if (!built) return next();
+    return await page(req, res, {
+      view: 'admin/hire-invoice',
+      active: PATHS.hire,
+      title: `Hire ${built.reference}`,
+      description: `The hire document for ${built.reference}.`,
+      data: { doc: built, pdfUrl: `/admin/hire/${built.booking.id}/invoice.pdf`, canManage: roles.can(req.user.role, 'hire.manage') },
+    });
   } catch (error) {
     return next(error);
   }
