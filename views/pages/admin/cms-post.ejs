@@ -116,7 +116,18 @@
 
       <div class="admin-grid admin-grid--3 mt-2">
         <div class="field">
-          <label class="field__label" for="f-author">Author</label>
+          <label class="field__label" for="f-author-entity">Author page</label>
+          <%# FR-35 — linking the byline to a person is what makes /blog/author/{slug} %>
+          <select class="select" id="f-author-entity" name="author_id">
+            <option value="">No author page</option>
+            <% authors.forEach(function (person) { %>
+              <option value="<%= person.id %>" <%= post && post.authorId === person.id ? 'selected' : '' %>><%= person.name %> — <%= person.role %></option>
+            <% }); %>
+          </select>
+          <span class="cms-hint">Pick a person and the byline links to their page. Manage bios from the seed for now.</span>
+        </div>
+        <div class="field">
+          <label class="field__label" for="f-author">Byline name</label>
           <input class="input" id="f-author" name="author_name" type="text" maxlength="120"
                  value="<%= post ? post.authorName : 'Honest Cars editorial' %>">
         </div>
@@ -131,6 +142,22 @@
                  value="<%= post ? post.readMinutes : 6 %>">
         </div>
       </div>
+
+      <fieldset class="field">
+        <legend class="field__label">Tags (governed list)</legend>
+        <%# FR-35 — the fixed taxonomy. A tag with no posts still shows so the next
+            writer knows it exists and does not invent a synonym for it. %>
+        <div class="cms-checks">
+          <% allTags.forEach(function (tag) { %>
+            <label class="cms-check">
+              <input type="checkbox" name="tags" value="<%= tag.slug %>"
+                     <%= post && post.tagSlugs && post.tagSlugs.indexOf(tag.slug) !== -1 ? 'checked' : '' %>>
+              <%= tag.label %>
+              <span class="cms-hint"><%= tag.kind %><%= tag.count ? ' · ' + tag.count + ' post' + (tag.count === 1 ? '' : 's') : ' · unused' %></span>
+            </label>
+          <% }); %>
+        </div>
+      </fieldset>
 
       <div class="field">
         <label class="field__label" for="f-bio">Author bio (E-E-A-T card)</label>

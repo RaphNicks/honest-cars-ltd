@@ -28,7 +28,17 @@ const { staticRoutes } = require('../routes/registry');
 
 /** Everything the CMS can put on a public page, in one place. */
 const TOUCHES = {
-  post: (slug) => ['/', '/guide', '/blog', `/blog/${slug}`, '/sitemap.xml'],
+  // FR-35: a post carries tags and an author, so publishing one can change
+  // every shelf it appears on — the tag pages it is filed under and its
+  // author's page. Callers pass `{slug, tagSlugs, authorSlug}`; a bare slug
+  // still works and rebuilds just the post itself.
+  post: (key) => {
+    const spec = typeof key === 'object' && key ? key : { slug: key };
+    const paths = ['/', '/guide', '/blog', `/blog/${spec.slug}`, '/sitemap.xml'];
+    for (const tag of spec.tagSlugs || []) paths.push(`/blog/tag/${tag}`);
+    if (spec.authorSlug) paths.push(`/blog/author/${spec.authorSlug}`);
+    return paths;
+  },
   postRemoved: () => ['/', '/guide', '/blog', '/sitemap.xml'],
   page: (slug) => [`/${slug}`, '/sitemap.xml'],
   faq: () => ['/', '/faq', '/how-it-works', '/services/inspection', '/sitemap.xml', '/verification'],

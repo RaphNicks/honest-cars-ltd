@@ -32,7 +32,7 @@ const PAGES_ADMIN = [
   '/admin/marketing',
   '/admin/subscriptions',
   '/admin/hire',
-  '/admin/cms', '/admin/cms/pages', '/admin/cms/faqs', '/admin/cms/testimonials', '/admin/cms/modules',
+  '/admin/cms', '/admin/cms/calendar', '/admin/cms/pages', '/admin/cms/faqs', '/admin/cms/testimonials', '/admin/cms/modules',
 ];
 
 /**
@@ -48,7 +48,7 @@ const ROLES = [
   { phone: '+2348000000002', role: 'ops', must: ['/admin', '/admin/listings', '/admin/leads', '/admin/concierge', '/admin/bookings', '/admin/alerts', '/admin/intel', '/admin/reports', '/admin/marketing', '/admin/hire'] },
   { phone: '+2348000000003', role: 'inspector', must: ['/admin/jobs'] },
   { phone: '+2348000000004', role: 'finance', must: ['/admin', '/admin/orders', '/admin/payments', '/admin/milestones', '/admin/reports', '/admin/subscriptions', '/admin/hire'] },
-  { phone: '+2348000000005', role: 'marketing', must: ['/admin', '/admin/cms', '/admin/cms/pages', '/admin/cms/faqs', '/admin/cms/testimonials', '/admin/cms/modules', '/admin/intel', '/admin/reports', '/admin/marketing'] },
+  { phone: '+2348000000005', role: 'marketing', must: ['/admin', '/admin/cms', '/admin/cms/calendar', '/admin/cms/pages', '/admin/cms/faqs', '/admin/cms/testimonials', '/admin/cms/modules', '/admin/intel', '/admin/reports', '/admin/marketing'] },
 ];
 
 /** Pages probed for every role; the verdict comes from `must`. */
@@ -75,7 +75,7 @@ const PAGES = [
   '/admin/marketing',
   '/admin/subscriptions',
   '/admin/hire',
-  '/admin/cms', '/admin/cms/pages', '/admin/cms/faqs', '/admin/cms/testimonials', '/admin/cms/modules',
+  '/admin/cms', '/admin/cms/calendar', '/admin/cms/pages', '/admin/cms/faqs', '/admin/cms/testimonials', '/admin/cms/modules',
 ];
 
 /**

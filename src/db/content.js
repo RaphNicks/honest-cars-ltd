@@ -458,6 +458,18 @@ async function authorsWithCounts({ limit = 12 } = {}) {
 }
 
 /**
+ * A DATE/DATETIME column comes back as a Date object, and `String(date)` is
+ * “Sun Sep 28 2026 …” — never the calendar day. Everything here compares by
+ * `YYYY-MM-DD` in local time (the same rule §7.3's hire calendar uses).
+ */
+function dayKey(value) {
+  if (!value) return null;
+  const date = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(date.getTime())) return null;
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+}
+
+/**
  * Editorial calendar (FR-35) — every post that touches the month, grouped by
  * the day it is (or was) due. A month at a glance is what stops two posts
  * landing on the same morning.
@@ -487,7 +499,7 @@ async function editorialCalendar(monthKey = null) {
       day,
       key,
       posts: rows
-        .filter((row) => String(row.published_at || row.updated_at).slice(0, 10) === key)
+        .filter((row) => dayKey(row.published_at || row.updated_at) === key)
         .map((row) => ({
           id: row.id,
           slug: row.slug,

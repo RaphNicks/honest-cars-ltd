@@ -120,6 +120,13 @@ async function main() {
   const opsRes = await request('/admin/cms', { cookies: ops });
   assert(opsRes.status === 403, 'ops role cannot open the CMS (role matrix holds)', `HTTP ${opsRes.status}`);
 
+  // FR-35 fixtures: a real author row and a real governed tag, taken from the
+  // console itself so the numbers are never guessed.
+  const editorSeed = bodyOf(await (await request('/admin/cms/posts/new', { cookies: marketing })).text());
+  const authorId = (editorSeed.match(/name="author_id"[\s\S]{0,400}?value="(\d+)"/) || [])[1];
+  const tagSlug = (editorSeed.match(/name="tags" value="([a-z0-9-]+)"/) || [])[1];
+  assert(authorId && tagSlug, 'the editor offers the author list and the governed tags', `author ${authorId}, tag ${tagSlug}`);
+
   // --- create a draft ------------------------------------------------------
   const slug = `smoke-post-${Date.now()}`;
   const created = await request('/admin/cms/posts', {
@@ -134,6 +141,8 @@ async function main() {
       author_name: 'Smoke Test',
       author_role: 'Content',
       read_minutes: '4',
+      author_id: String(authorId),
+      tags: [tagSlug],
     },
   });
   const editorPath = created.headers.get('location') || '';
@@ -189,6 +198,8 @@ async function main() {
       hero_alt: 'Smoke test hero',
       meta_title: 'Smoke test: the publish gate',
       meta_description: 'Created by scripts/cms-smoke.mjs to prove the CMS gate, revisions and revalidation really work.',
+      author_id: String(authorId),
+      tags: [tagSlug],
       note: 'Added the required links and meta.',
     },
   });
@@ -207,6 +218,22 @@ async function main() {
   assert(liveHtml.includes('Smoke test: what a house-rule gate'), 'the public page has the copy');
   assert(liveHtml.includes('/services/documents'), 'inline links render as real links');
   assert(liveHtml.includes('Article') || liveHtml.includes('application/ld+json'), 'the page carries its JSON-LD');
+  // FR-35 — the byline links to the author page and the post carries its tag.
+  assert(liveHtml.includes('/blog/author/'), 'the byline links to the author page'); 
+  assert(liveHtml.includes(`/blog/tag/${tagSlug}`), 'the post shows its governed tag');
+  const authorPage = await request(`/blog/author/${(liveHtml.match(/\/blog\/author\/([a-z0-9-]+)/) || [])[1]}`);
+  assert(authorPage.status === 200, 'and that author page renders', `HTTP ${authorPage.status}`);
+  const tagPage = await request(`/blog/tag/${tagSlug}`);
+  assert(tagPage.status === 200 && bodyOf(await tagPage.text()).includes('Smoke test'), 'the tag page lists the new post');
+
+  // --- editorial calendar (FR-35) -----------------------------------------
+  const calendar = await request('/admin/cms/calendar', { cookies: marketing });
+  const calendarHtml = bodyOf(await calendar.text());
+  assert(calendar.status === 200, 'the editorial calendar opens', `HTTP ${calendar.status}`);
+  assert(calendarHtml.includes('edcal'), 'it renders a month grid');
+  assert(calendarHtml.includes('Governed tags'), 'and lists the governed taxonomy');
+  const opsCalendar = await request('/admin/cms/calendar', { cookies: ops });
+  assert(opsCalendar.status === 403, 'ops cannot read the calendar (cms.manage)', `HTTP ${opsCalendar.status}`);
 
   // --- revisions ----------------------------------------------------------
   const revisions = await request(`/admin/cms/posts/${postId}`, { cookies: marketing });

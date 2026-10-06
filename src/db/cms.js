@@ -20,7 +20,7 @@
  * and what it looked like before, is never guesswork.
  */
 
-const { query, queryOne } = require('./pool');
+const { query, queryOne, transaction } = require('./pool');
 const { parseJson } = require('./shape');
 const blocksService = require('../services/blocks');
 
@@ -177,10 +177,11 @@ async function overview() {
 // ---------------------------------------------------------------------------
 async function postById(id) {
   const row = await queryOne(
-    `SELECT p.*, u.name AS updated_by_name, pb.name AS published_by_name
+    `SELECT p.*, u.name AS updated_by_name, pb.name AS published_by_name, a.slug AS author_slug
        FROM blog_posts p
        LEFT JOIN \`users\` u ON u.id = p.updated_by
        LEFT JOIN \`users\` pb ON pb.id = p.published_by
+       LEFT JOIN blog_authors a ON a.id = p.author_id
       WHERE p.id = ? LIMIT 1`,
     [id],
   );
@@ -204,6 +205,12 @@ async function postById(id) {
     updatedAt: row.updated_at,
     isFeatured: Boolean(row.is_featured),
     makeTags: parseJson(row.make_tags, []) || [],
+    authorId: row.author_id || null,
+    authorSlug: row.author_slug || null,
+    tagSlugs: (await query(
+      'SELECT t.slug FROM blog_post_tags pt JOIN blog_tags t ON t.id = pt.tag_id WHERE pt.post_id = ? ORDER BY t.label',
+      [id],
+    )).map((tag) => tag.slug),
     serviceCta: row.service_cta || null,
     metaTitle: row.meta_title || '',
     metaDescription: row.meta_description || '',
@@ -226,8 +233,15 @@ function postInput(form = {}) {
     .map((tag) => tag.trim().toLowerCase().slice(0, 40))
     .filter(Boolean)
     .slice(0, 8);
+  const authorId = Number.parseInt(form.author_id, 10);
+  const tagSlugs = (Array.isArray(form.tags) ? form.tags : [form.tags])
+    .map((tag) => String(tag || '').trim().toLowerCase().slice(0, 80))
+    .filter(Boolean)
+    .slice(0, 8);
   return {
     input: {
+      authorId: Number.isFinite(authorId) && authorId > 0 ? authorId : null,
+      tagSlugs,
       title: String(form.title || '').trim().slice(0, 240),
       slug: slugify(form.slug || form.title || ''),
       category: String(form.category || 'honest_buyers_guide').slice(0, 40),
@@ -252,6 +266,24 @@ function postInput(form = {}) {
   };
 }
 
+/**
+ * Replace a post's tags. Delete-then-insert inside one transaction: a save that
+ * fails halfway must not leave a post half-filed. Only ids that exist are
+ * written, so a stale checkbox cannot break the save.
+ */
+async function setPostTags(postId, slugs = []) {
+  const clean = [...new Set((slugs || []).filter(Boolean))];
+  const ids = clean.length
+    ? (await query(`SELECT id FROM blog_tags WHERE slug IN (${clean.map(() => '?').join(',')})`, clean)).map((row) => row.id)
+    : [];
+  await transaction(async (conn) => {
+    await conn.query('DELETE FROM blog_post_tags WHERE post_id = ?', [postId]);
+    for (const tagId of ids) {
+      await conn.query('INSERT IGNORE INTO blog_post_tags (post_id, tag_id) VALUES (?, ?)', [postId, tagId]);
+    }
+  });
+}
+
 async function createPost(input, { actorId } = {}) {
   if (!input.title) return { ok: false, error: 'A post needs a title.' };
   if (!input.slug) return { ok: false, error: 'A post needs a slug.' };
@@ -261,14 +293,15 @@ async function createPost(input, { actorId } = {}) {
 
   const result = await query(
     `INSERT INTO blog_posts
-       (slug, title, category, excerpt, hero_image, hero_alt, author_name, author_role, author_bio,
+       (slug, title, category, excerpt, hero_image, hero_alt, author_name, author_role, author_bio, author_id,
         read_minutes, status, make_tags, body, service_cta, meta_title, meta_description, is_featured, updated_by)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'draft', ?, ?, ?, ?, ?, ?, ?)`,
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'draft', ?, ?, ?, ?, ?, ?, ?)`,
     [input.slug, input.title, input.category, input.excerpt, input.heroImage, input.heroAlt || input.title,
-      input.authorName, input.authorRole, input.authorBio || null, input.readMinutes,
+      input.authorName, input.authorRole, input.authorBio || null, input.authorId || null, input.readMinutes,
       JSON.stringify(input.makeTags), JSON.stringify(input.body), input.serviceCta,
       input.metaTitle, input.metaDescription, input.isFeatured ? 1 : 0, actorId || null],
   );
+  await setPostTags(result.insertId, input.tagSlugs);
   await recordRevision({ entity: 'post', entityId: result.insertId, slug: input.slug, title: input.title, status: 'draft', snapshot: input, note: 'Created', actorId });
   await audit({ actorId, action: 'cms.post.create', entity: 'post', entityId: result.insertId, detail: { slug: input.slug, title: input.title } });
   return { ok: true, id: result.insertId, slug: input.slug };
@@ -298,14 +331,15 @@ async function updatePost(id, input, { actorId, note = null } = {}) {
   await query(
     `UPDATE blog_posts
         SET slug = ?, title = ?, category = ?, excerpt = ?, hero_image = ?, hero_alt = ?,
-            author_name = ?, author_role = ?, author_bio = ?, read_minutes = ?, make_tags = ?,
+            author_name = ?, author_role = ?, author_bio = ?, author_id = ?, read_minutes = ?, make_tags = ?,
             body = ?, service_cta = ?, meta_title = ?, meta_description = ?, is_featured = ?, updated_by = ?
       WHERE id = ?`,
     [input.slug, input.title, input.category, input.excerpt, input.heroImage, input.heroAlt || input.title,
-      input.authorName, input.authorRole, input.authorBio || null, input.readMinutes,
+      input.authorName, input.authorRole, input.authorBio || null, input.authorId || null, input.readMinutes,
       JSON.stringify(input.makeTags), JSON.stringify(input.body), input.serviceCta,
       input.metaTitle, input.metaDescription, input.isFeatured ? 1 : 0, actorId || null, id],
   );
+  await setPostTags(id, input.tagSlugs);
   await audit({
     actorId,
     action: 'cms.post.update',
@@ -695,6 +729,7 @@ async function listingCounters() {
 }
 
 module.exports = {
+  setPostTags,
   WORKFLOW,
   STATUS_LABELS,
   ENTITIES,

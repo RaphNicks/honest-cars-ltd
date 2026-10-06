@@ -1076,3 +1076,23 @@ a.hire-cal__ref:hover { text-decoration: underline; }
 .hire-doc__row:last-child { border-bottom: 0; }
 .hire-doc__total { font-weight: var(--weight-bold, 700); border-top: 2px solid var(--colour-navy, #10233D); border-bottom: 0; margin-top: 4px; padding-top: 10px; }
 .hire-doc__terms { font-size: var(--text-12); color: var(--colour-slate, #5B6B7C); line-height: 1.55; }
+
+/* ==========================================================================
+   Editorial calendar (§6.9 “editorial calendar view in the CMS”, FR-35)
+   The same month grid the hire calendar uses, told from the writer's side:
+   one cell per day, each post a chip in its workflow colour.
+   ========================================================================== */
+.edcal { width: 100%; border-collapse: collapse; table-layout: fixed; }
+.edcal th { font-size: var(--text-12); color: var(--colour-slate, #5B6B7C); text-align: left; padding: 4px 6px; font-weight: var(--weight-medium, 500); }
+.edcal td { border: 1px solid var(--colour-line, #E3E8EF); vertical-align: top; height: 84px; padding: 4px 5px; }
+.edcal__day { font-size: var(--text-12); color: var(--colour-slate, #5B6B7C); }
+.edcal__post { display: block; margin-top: 3px; font-size: var(--text-12); line-height: 1.35; text-decoration: none; color: var(--colour-navy, #10233D); }
+.edcal__post:hover { text-decoration: underline; }
+.edcal__chip { display: inline-block; border-radius: 999px; padding: 0 6px; font-size: var(--text-12); margin-top: 3px; }
+.edcal__chip--published { background: #E9F7EF; color: #14683C; border: 1px solid #BFE4CE; }
+.edcal__chip--scheduled { background: #FFF6E5; color: #8A5B00; border: 1px solid #F0D9A8; }
+.edcal__chip--in_review { background: #EAF1FB; color: #1B4E8B; border: 1px solid #C3D8F2; }
+.edcal__chip--draft { background: #F1F3F6; color: #46566A; border: 1px solid #D8E0E8; }
+.edcal__empty { color: var(--colour-line, #C6D0DB); }
+.edcal__lead { background: #FAFBFC; }
+.cms-checks { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 6px 16px; margin-top: 6px; }

@@ -6,6 +6,7 @@
  * the §7.4 matrix (`cms.manage` → admin, marketing).
  *
  *   GET  /admin/cms                          hub: workflow board + everything the CMS owns
+ *   GET  /admin/cms/calendar                 editorial calendar, one month at a glance (FR-35)
  *   GET  /admin/cms/posts/new                new post
  *   POST /admin/cms/posts                    create (→ editor)
  *   GET  /admin/cms/posts/:id                editor: body, meta, house rules, history
@@ -49,6 +50,7 @@ const cms = db.cms;
 const HOME = '/admin/cms';
 const PATHS = {
   home: HOME,
+  calendar: `${HOME}/calendar`,
   posts: `${HOME}/posts`,
   pages: `${HOME}/pages`,
   faqs: `${HOME}/faqs`,
@@ -58,6 +60,7 @@ const PATHS = {
 
 const NAV = [
   { href: HOME, label: 'Hub', icon: 'fileCheck' },
+  { href: `${HOME}/calendar`, label: 'Calendar', icon: 'calendar' },
   { href: PATHS.pages, label: 'Pages', icon: 'link' },
   { href: PATHS.faqs, label: 'FAQs', icon: 'chat' },
   { href: PATHS.testimonials, label: 'Testimonials', icon: 'heart' },
@@ -164,6 +167,37 @@ router.use((req, res, next) => {
 });
 
 // ---------------------------------------------------------------------------
+// Editorial calendar — FR-35, §6.9 “editorial calendar view”
+// Registered before /posts/:id and /pages/:id so “calendar” is never an id.
+// ---------------------------------------------------------------------------
+router.get('/calendar', auth.requireStaff('cms.manage'), async (req, res, next) => {
+  try {
+    const month = /^\d{4}-\d{2}$/.test(String(req.query.month || '')) ? String(req.query.month) : null;
+    const calendar = await db.content.editorialCalendar(month);
+    const [authors, tags] = await Promise.all([
+      db.content.authorsWithCounts({ limit: 12 }),
+      db.content.blogTags({ limit: 60 }),
+    ]);
+
+    return await page(req, res, {
+      view: 'admin/cms-calendar',
+      active: PATHS.home,
+      title: `Editorial calendar — ${calendar.monthLabel}`,
+      description: 'What is due, what is out, and what is still a draft.',
+      data: {
+        calendar,
+        authors,
+        tags,
+        statusLabels: cms.STATUS_LABELS,
+        workflow: cms.WORKFLOW,
+      },
+    });
+  } catch (error) {
+    return next(error);
+  }
+});
+
+// ---------------------------------------------------------------------------
 // Hub — §7.3, the whole content estate on one screen
 // ---------------------------------------------------------------------------
 router.get('/', auth.requireStaff('cms.manage'), async (req, res, next) => {
@@ -218,12 +252,25 @@ async function editorLocals(id) {
     description: post.metaDescription || post.excerpt,
     links: post.links,
   });
+  const [authors, allTags] = await Promise.all([
+    db.content.authorsWithCounts({ limit: 40 }),
+    db.content.blogTags({ limit: 60 }),
+  ]);
+  const embedded = (post.body || []).filter((block) => block && block.type === 'listing' && block.slug);
+  const embedPreview = embedded.length
+    ? new Map((await Promise.all(embedded.map((block) => db.listings.findBySlug(block.slug).catch(() => null))))
+        .filter(Boolean)
+        .map((listing) => [listing.slug, listing]))
+    : new Map();
   return {
     post,
     preview: blocks.parse(post.markup).blocks,
+    embedPreview,
     check,
     found: blocks.linksFound(post.body),
     revisions: await cms.revisionsFor('post', id),
+    authors,
+    allTags,
     categories: CATEGORIES,
     markupReference: MARKUP_REFERENCE,
     workflow: cms.WORKFLOW,
@@ -244,9 +291,12 @@ router.get('/posts/new', auth.requireStaff('cms.manage'), async (req, res, next)
       data: {
         post: null,
         preview: [],
+        embedPreview: new Map(),
         check: null,
         found: [],
         revisions: [],
+        authors: await db.content.authorsWithCounts({ limit: 40 }),
+        allTags: await db.content.blogTags({ limit: 60 }),
         categories: CATEGORIES,
         markupReference: MARKUP_REFERENCE,
         workflow: cms.WORKFLOW,
@@ -303,7 +353,14 @@ router.post('/posts/:id', auth.requireStaff('cms.manage'), async (req, res, next
       note: validate.text(req.body.note, 240) || 'Saved from the editor',
     });
     if (!result.ok) return done(res, path, result.error, { error: true });
-    return savedAndRevalidated(res, path, { message: 'Saved.' }, 'post', parsed.input.slug);
+    // FR-35 — the saved post may have moved between tags or authors, so the
+    // shelves it left and the shelves it joined are all rebuilt.
+    const saved = await cms.postById(req.params.id);
+    return savedAndRevalidated(res, path, { message: 'Saved.' }, 'post', {
+      slug: parsed.input.slug,
+      tagSlugs: parsed.input.tagSlugs,
+      authorSlug: saved ? saved.authorSlug : null,
+    });
   } catch (error) {
     return next(error);
   }
@@ -319,7 +376,11 @@ router.post('/posts/:id/status', auth.requireStaff('cms.manage'), async (req, re
     if (!result.ok) return done(res, path, result.error, { error: true });
     if (result.revalidate) {
       const post = await cms.postById(req.params.id);
-      const build = await publish.afterChange('post', post ? post.slug : null);
+      const build = await publish.afterChange('post', {
+        slug: post ? post.slug : null,
+        tagSlugs: post ? post.tagSlugs : [],
+        authorSlug: post ? post.authorSlug : null,
+      });
       return done(res, path, `${result.message} ${build.message}`);
     }
     return done(res, path, result.message);

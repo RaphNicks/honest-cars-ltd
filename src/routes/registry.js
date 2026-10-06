@@ -16,7 +16,7 @@ const seo = require('../services/seo');
 const { buildHomeLocals, buildFacetLocals } = require('./public');
 const { buildServicesHubLocals, buildServiceLocals } = require('./services');
 const { buildFindMyCarLocals, buildSellSwapLocals, buildHireLocals } = require('./flow');
-const { buildBlogLocals, buildPostLocals } = require('./blog');
+const { buildBlogLocals, buildPostLocals, buildTagLocals, buildAuthorLocals } = require('./blog');
 const { buildShopLocals, buildProductLocals } = require('./shop');
 const {
   buildVerificationLocals,
@@ -105,6 +105,23 @@ async function blogRoutes({ db }) {
       view: 'post',
       build: () => buildPostLocals(post.slug),
     });
+  }
+
+  // FR-35 — the tag shelves and author pages are collections of published
+  // posts, so they are as stable as the posts themselves and prerender with
+  // them. A shelf with nothing published is skipped: an empty page is a thin
+  // page, and `authorsWithCounts`/`blogTags` already count only live posts.
+  const [tags, authors] = await Promise.all([
+    db.content.blogTags({ limit: 60 }),
+    db.content.authorsWithCounts({ limit: 40 }),
+  ]);
+  for (const tag of tags) {
+    if (!tag.count) continue;
+    routes.push({ path: tag.url, view: 'blog-tag', build: () => buildTagLocals(tag.slug) });
+  }
+  for (const author of authors) {
+    if (!author.count) continue;
+    routes.push({ path: author.url, view: 'blog-author', build: () => buildAuthorLocals(author.slug) });
   }
   return routes;
 }

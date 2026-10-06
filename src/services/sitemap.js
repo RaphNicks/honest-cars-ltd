@@ -94,6 +94,21 @@ async function buildSitemap(db, { siteUrl = config.siteUrl } = {}) {
     );
   }
 
+  // FR-35 — author pages and tag pages. Only shelves with a published post
+  // ship: an empty author page is a thin page and Google says so.
+  const [authors, tags] = await Promise.all([
+    db.content.authorsWithCounts({ limit: 24 }).catch(() => []),
+    db.content.blogTags({ limit: 40 }).catch(() => []),
+  ]);
+  for (const author of authors) {
+    if (!author.count) continue;
+    entries.push(urlEntry({ loc: `${siteUrl}${author.url}`, changefreq: 'monthly', priority: '0.4' }));
+  }
+  for (const tag of tags) {
+    if (!tag.count) continue;
+    entries.push(urlEntry({ loc: `${siteUrl}${tag.url}`, changefreq: 'weekly', priority: '0.5' }));
+  }
+
   // CMS pages that are cleared for indexing. Legal pages stay out until
   // counsel's wording replaces the placeholder text (pages.indexable = 0).
   for (const page of pages) {
