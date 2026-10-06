@@ -1,0 +1,51 @@
+<%#
+  FR-32 — the area switcher.
+  Locals: site.cities (governed list with live counts), site.city (the market the
+  page is about, or null), variant ('header' | 'drawer').
+
+  It is a plain list of links, so it works with JavaScript off. Where a prebuilt
+  static page cannot know the visitor's choice (the HTML is shared by everyone),
+  js/area.js reads the hc_city cookie and labels the control — the same cookie
+  the server has already applied on the server-rendered pages.
+%>
+<% var cities = (site && site.cities) || []; %>
+<% var currentCity = (site && site.city) || null; %>
+<% var variant = (typeof variant === 'undefined' ? 'header' : variant); %>
+<% if (cities.length > 1) { %>
+  <div class="area-switcher area-switcher--<%= variant %>" data-area-switcher>
+    <button class="area-switcher__toggle" type="button" aria-expanded="false"
+            aria-controls="area-switcher-panel-<%= variant %>" data-area-toggle>
+      <%- helpers.icon('mapPin', { size: 18 }) %>
+      <span class="area-switcher__label" data-area-label><%= currentCity ? currentCity.name : 'All cities' %></span>
+      <%- helpers.icon('chevronDown', { size: 14 }) %>
+    </button>
+    <div class="area-switcher__panel" id="area-switcher-panel-<%= variant %>" hidden data-area-panel>
+      <p class="area-switcher__hint">Show stock in</p>
+      <ul class="area-switcher__list">
+        <li>
+          <a class="area-switcher__item<%= currentCity ? '' : ' is-current' %>" href="/cars" data-area-option="all"
+             <%= currentCity ? '' : 'aria-current="true"' %>>
+            <span>All cities</span>
+            <span class="count"><%= cities.reduce(function (sum, city) { return sum + city.live; }, 0) %></span>
+          </a>
+        </li>
+        <% cities.forEach(function (city) { %>
+          <li>
+            <a class="area-switcher__item<%= currentCity && currentCity.slug === city.slug ? ' is-current' : '' %>"
+               href="/cars?city=<%= city.slug %>" data-area-option="<%= city.slug %>"
+               <%= currentCity && currentCity.slug === city.slug ? 'aria-current="true"' : '' %>>
+              <span>
+                <strong><%= city.name %></strong>
+                <span class="area-switcher__state"><%= city.state %> State</span>
+              </span>
+              <span class="count"><%= city.live %></span>
+            </a>
+          </li>
+        <% }); %>
+      </ul>
+      <p class="area-switcher__foot">
+        Live stock in each market. Picking one remembers it on this device.
+      </p>
+    </div>
+  </div>
+<% } %>

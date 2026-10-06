@@ -6,9 +6,9 @@
   <%- include('../partials/breadcrumbs', { crumbs: locals.crumbs || [{ label: 'Cars for sale' }] }) %>
 
   <div class="facet-hero">
-    <h1 class="facet-hero__h1"><%= locals.heading || 'Cars for sale in Port Harcourt' %></h1>
+    <h1 class="facet-hero__h1"><%= locals.heading || 'Cars for sale in Port Harcourt, Owerri, Aba & Benin City' %></h1>
     <p class="facet-hero__intro">
-      <%- locals.intro || 'Live stock from partner lots across Port Harcourt — with the mileage, documents status and verification grade shown before you travel. Prices are what the dealer is asking; we tell you where each one sits against the current market band.' %>
+      <%- locals.intro || 'Live stock from partner lots across four markets — Port Harcourt, Owerri, Aba and Benin City — with the mileage, documents status and verification grade shown before you travel. Prices are what the dealer is asking; we tell you where each one sits against the current market band.' %>
     </p>
     <div class="facet-links">
       <a class="chip" href="/cars/certified">HonestCars-Certified</a>
@@ -22,7 +22,7 @@
   <%- include('../partials/browse', {
         result: result, facets: facets, filters: filters, models: models,
         basePath: '/cars', queryString: queryString, activePills: activePills,
-        nearMatches: nearMatches, hiddenQuery: hiddenQuery, locationLabel: 'Port Harcourt'
+        nearMatches: nearMatches, hiddenQuery: hiddenQuery, locationLabel: locationLabel
       }) %>
 </section>
 

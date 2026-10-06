@@ -16,6 +16,7 @@ const db = require('../db');
 const seo = require('../services/seo');
 const compare = require('../services/compare');
 const listingQuery = require('../services/listing-query');
+const areaPref = require('../services/area-pref');
 const sitemap = require('../services/sitemap');
 const slice = require('../services/slice');
 const { sendPage, sendPrebuiltOrRender, CACHE } = require('../lib/respond');
@@ -90,10 +91,12 @@ router.get('/', async (req, res, next) => {
 // ---------------------------------------------------------------------------
 // /cars — server-rendered: filters, sort and pagination are per request (§12.4)
 // ---------------------------------------------------------------------------
-async function buildBrowseLocals({ routePath, filters, view, sort, page }) {
+async function buildBrowseLocals({ routePath, filters, view, sort, page, city = null }) {
   const [result, facets, models] = await Promise.all([
     db.listings.browse(filters, { page, perPage: listingQuery.PER_PAGE, sort }),
-    db.listings.filterFacets(),
+    // FR-32: the rail is scoped to the market being viewed, so its makes,
+    // areas and budget range are the ones this page can actually show.
+    db.listings.filterFacets({ city: city ? city.name : null }),
     view.make ? db.listings.modelCounts(view.make) : Promise.resolve([]),
   ]);
 
@@ -105,45 +108,100 @@ async function buildBrowseLocals({ routePath, filters, view, sort, page }) {
 router.get('/cars', async (req, res, next) => {
   try {
     const parsed = listingQuery.parseListingQuery(req.query);
+    // FR-32 — which market is this visitor looking at? An explicit ?city= wins,
+    // otherwise the remembered preference, otherwise the whole network. Either
+    // way the token is resolved against service_cities before it filters
+    // anything; a city we do not serve is dropped rather than applied.
+    const requested = parsed.view.city || null;
+    const remembered = requested ? null : areaPref.readCityPreference(req);
+    const city = await db.areas.cityByToken(requested || remembered);
+
+    if (city) {
+      parsed.filters.city = city.name;
+      parsed.view.city = city.slug;
+    } else {
+      delete parsed.filters.city;
+      delete parsed.view.city;
+    }
+    // An explicit choice becomes the preference; a city we do not serve clears
+    // a stale one instead of leaving it to mislead the next visit.
+    if (requested && city) areaPref.setCityPreference(res, city.slug);
+    if (requested && !city) areaPref.clearCityPreference(res);
+
+    // The preference case has no URL token for it, so the page is a variant of
+    // /cars: never cached publicly, never indexed as if it were the whole market.
+    const fromPreference = !requested && Boolean(city);
+
     const built = await buildBrowseLocals({
       routePath: '/cars',
       filters: parsed.filters,
       view: parsed.view,
       sort: parsed.sort,
       page: parsed.page,
+      city,
     });
 
-    // §14.1: raw filter combinations are never indexable — they canonicalise
-    // back to /cars and carry robots noindex,follow.
-    const raw = listingQuery.isRawFilterCombo(parsed.view);
+    // §14.1: raw filter combinations stay noindex — they canonicalise back to a
+    // crawlable page. A URL that carries nothing but the market is the one
+    // exception: it canonicalises onto that market's curated facet page, which
+    // is the page we actually want in the index.
+    const cityFacet = city ? await db.facets.findBySlug(city.slug) : null;
+    const otherFilters = Object.keys(parsed.view).filter((key) => key !== 'city');
+    const onlyCity = Boolean(city) && !fromPreference && otherFilters.length === 0;
+    const raw = listingQuery.isRawFilterCombo(parsed.view) && !onlyCity;
     const queryString = listingQuery.buildQueryString(parsed.view, { sort: parsed.sort });
-    const activePills = listingQuery.activeFilterPills(parsed.view, helpers());
+    const activePills = listingQuery.activeFilterPills(parsed.view, helpers()).map((pill) => (
+      // The URL carries `owerri`; a person reads “Owerri, Imo State”.
+      pill.key === 'city' && city ? { ...pill, value: `${city.name}, ${city.state} State` } : pill
+    ));
+
+    const locationLabel = city ? `${city.name}, ${city.state} State` : 'All markets';
+    // §6.2's hero copy follows the market: a buyer who filtered to Owerri should
+    // not read a Port Harcourt introduction.
+    const heading = city ? `Cars for sale in ${city.name}` : 'Cars for sale in Port Harcourt, Owerri, Aba & Benin City';
+    const intro = city
+      ? `Live stock from partner lots in ${city.name}, ${city.state} State — with the mileage, documents status and verification grade shown before you travel. Prices are what the dealer is asking; we tell you where each one sits against the current market band.`
+      : 'Live stock from partner lots across four markets — Port Harcourt, Owerri, Aba and Benin City — with the mileage, documents status and verification grade shown before you travel. Prices are what the dealer is asking; we tell you where each one sits against the current market band.';
 
     const data = {
       ...built,
+      heading,
+      intro,
       filters: parsed.view,
       activePills,
       basePath: '/cars',
       queryString,
       hiddenQuery: parsed.view,
-      locationLabel: 'Port Harcourt',
+      locationLabel,
+      serviceCity: city,
     };
 
     await sendPage(req, res, {
       routePath: '/cars',
       view: 'cars',
-      cache: CACHE.ssr,
+      cache: fromPreference ? CACHE.private : CACHE.ssr,
+      headers: fromPreference ? { Vary: 'Cookie' } : {},
       page: {
-        title: 'Cars for sale in Port Harcourt — all verified stock',
-        metaTitle: 'Cars for sale in Port Harcourt — verified stock',
-        description:
-          'Filter live verified stock in Port Harcourt by budget, make, body type, mileage and verification grade. Prices shown against the current market band.',
-        canonical: raw ? '/cars' : `/cars${queryString}`,
-        robots: raw ? 'noindex,follow' : 'index,follow',
-        jsonLd: [seo.itemListSchema(built.result.listings, { name: 'Cars for sale in Port Harcourt' })],
+        title: city ? `Cars for sale in ${city.name} — verified stock` : 'Cars for sale in Port Harcourt & South-East Nigeria',
+        metaTitle: city
+          ? `Cars for sale in ${city.name}, ${city.state} State — verified stock`
+          : 'Cars for sale in Port Harcourt & South-East Nigeria',
+        description: city
+          ? `Filter live verified stock in ${city.name}, ${city.state} State by budget, make, body type, mileage and verification grade. Prices shown against the current market band.`
+          : 'Filter live verified stock across Port Harcourt, Owerri, Aba and Benin City by budget, make, body type, mileage and verification grade. Prices shown against the current market band.',
+        canonical: onlyCity && cityFacet ? cityFacet.canonicalPath : raw || fromPreference ? '/cars' : `/cars${queryString}`,
+        robots: onlyCity && cityFacet ? 'index,follow' : raw || fromPreference ? 'noindex,follow' : 'index,follow',
+        jsonLd: [seo.itemListSchema(built.result.listings, {
+          name: city ? `Cars for sale in ${city.name}` : 'Cars for sale in Port Harcourt, Owerri, Aba and Benin City',
+        })],
         bodyClass: 'page-cars',
       },
-      data: { ...data, crumbs: [{ label: 'Cars for sale' }] },
+      data: {
+        ...data,
+        crumbs: city
+          ? [{ label: 'Cars for sale', href: '/cars' }, { label: `${city.name} cars` }]
+          : [{ label: 'Cars for sale' }],
+      },
     });
   } catch (error) {
     next(error);
@@ -156,9 +214,12 @@ router.get('/cars', async (req, res, next) => {
 async function buildFacetLocals(facet) {
   const facetFilters = db.listings.filtersFromFacet(facet);
   const parsed = listingQuery.parseListingQuery({});
+  // A city facet (§14.1) carries its market as a rule, not as a query string,
+  // so the rail and the chrome follow it the same way /cars does.
+  const city = facetFilters.city ? await db.areas.cityByName(facetFilters.city) : null;
   const [result, facets, models] = await Promise.all([
     db.listings.browse(facetFilters, { page: 1, perPage: listingQuery.PER_PAGE, sort: 'recommended' }),
-    db.listings.filterFacets(),
+    db.listings.filterFacets({ city: city ? city.name : null }),
     Promise.resolve([]),
   ]);
   const certified = result.listings.filter((l) => l.grade === 'certified').length;
@@ -171,7 +232,9 @@ async function buildFacetLocals(facet) {
   );
   const facetFaqs = await db.content.faqsForScope(`facet:${facet.slug}`);
   void parsed;
-  return { facet, result, facets, models, certifiedCount: certified, trail, siblings: siblings.slice(0, 8), facetFaqs };
+  return {
+    facet, result, facets, models, serviceCity: city, certifiedCount: certified, trail, siblings: siblings.slice(0, 8), facetFaqs,
+  };
 }
 
 /**
@@ -274,13 +337,17 @@ router.get('/cars/*', async (req, res, next) => {
         },
         data: {
           ...built,
-          filters: {},
+          // The rail still reads the selected market off `filters`, so a city
+          // facet's rail does not claim "All cities" while showing one.
+          filters: built.serviceCity ? { city: built.serviceCity.slug } : {},
           basePath: facet.canonicalPath,
           queryString: '',
           activePills: [],
           nearMatches: 0,
           hiddenQuery: {},
-          locationLabel: 'Port Harcourt',
+          locationLabel: built.serviceCity
+            ? `${built.serviceCity.name}, ${built.serviceCity.state} State`
+            : 'All markets',
         },
       });
     }
@@ -309,9 +376,9 @@ router.get('/cars/*', async (req, res, next) => {
           view: 'cars',
           cache: CACHE.ssr,
           page: {
-            title: `${label} cars for sale in Port Harcourt`,
-            metaTitle: `${label} cars for sale in Port Harcourt`,
-            description: `Every verified ${label} in Port Harcourt with its price position, documents and known faults checked. Browse live stock and compare before you buy.`,
+            title: `${label} cars for sale — verified stock`,
+            metaTitle: `${label} cars for sale — verified stock`,
+            description: `Every verified ${label} in stock with its price position, documents and known faults checked. Browse live stock and compare before you buy.`,
             canonical: '/cars',
             robots: 'noindex,follow',
             jsonLd: [
@@ -330,9 +397,9 @@ router.get('/cars/*', async (req, res, next) => {
             queryString: '',
             hiddenQuery: view,
             nearMatches: built.nearMatches,
-            locationLabel: 'Port Harcourt',
+            locationLabel: 'All markets',
             makeBrowse: { label, count: built.result.total },
-            heading: `${label} cars for sale in Port Harcourt`,
+            heading: `${label} cars for sale`,
             intro: `${built.result.total} verified ${label} cars in stock right now, each with its mileage, documents status and verification grade checked before it was listed. Prices are what the dealer is asking — we show where each sits against the market band.`,
             crumbs: [{ label: 'Cars for sale', href: '/cars' }, { label }],
           },

@@ -130,7 +130,9 @@ async function buildSitemap(db, { siteUrl = config.siteUrl } = {}) {
       urlEntry({
         loc: `${siteUrl}${facet.canonicalPath}`,
         changefreq: 'daily',
-        priority: facet.pageType === 'make' ? '0.8' : '0.7',
+        // A city page is a whole market's front door (FR-32) — as important
+        // to a crawler as a make page, and more important than a budget cut.
+        priority: ['make', 'city'].includes(facet.pageType) ? '0.8' : '0.7',
       }),
     );
   }

@@ -195,6 +195,12 @@ body.admin {
   color: var(--colour-slate, #5B6B7C);
 }
 
+/* FR-32 settings — a retired area stays on the screen, dimmed, with its stock
+   counts: hiding it is how an area list goes stale without anyone noticing. */
+.table tr.is-muted td { opacity: 0.6; }
+.tag--muted { color: var(--color-text-muted, #6B7684); }
+.panel--muted { opacity: 0.72; }
+
 /* ---------------------------------------------------------------- panels */
 .panel {
   background: #FFF;

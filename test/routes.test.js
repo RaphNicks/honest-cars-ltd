@@ -125,6 +125,46 @@ maybe('the suv-under-15m facet really only shows SUVs under ₦15m', async () =>
   }
 });
 
+maybe('a market URL filters to that city, canonicalises onto its facet and is remembered (FR-32)', async () => {
+  const { response, html } = await getHtml(ctx.baseUrl, '/cars?city=owerri');
+  assert.equal(response.status, 200);
+  assert.match(html, /cars in Owerri, Imo State/, 'the header says which market this is');
+  assert.match(html, /rel="canonical" href="https?:\/\/[^"]*\/cars\/owerri"/, 'the query URL points at the curated page');
+  assert.match(html, /name="robots" content="index,follow"/);
+  assert.match(response.headers.get('set-cookie') || '', /hc_city=owerri/, 'picking a market remembers it');
+  assert.match(html, /name="city" value="owerri" checked/, 'the rail shows the market that is applied');
+  assert.doesNotMatch(html, /name="city" value="port-harcourt" checked/);
+
+  // A city we do not serve is dropped: the grid is the whole network again.
+  const bogus = await getHtml(ctx.baseUrl, '/cars?city=lagoos');
+  assert.equal(bogus.response.status, 200);
+  assert.match(bogus.html, /cars in All markets/);
+  assert.doesNotMatch(bogus.html, /name="city" value="lagoos"/);
+});
+
+maybe('the remembered market applies without a URL token, privately and unindexed (FR-32)', async () => {
+  const url = `${ctx.baseUrl}/cars`;
+  const response = await fetch(url, { headers: { cookie: 'hc_city=aba' } });
+  const html = await response.text();
+  assert.equal(response.status, 200);
+  assert.match(html, /cars in Aba, Abia State/);
+  assert.match(html, /name="robots" content="noindex,follow"/, 'a variant of /cars is not the page we index');
+  assert.match(response.headers.get('cache-control') || '', /no-store/, 'a preference-shaped page is not shared');
+  assert.match(response.headers.get('vary') || '', /Cookie/i);
+});
+
+maybe('a curated city facet is scoped to its own market (FR-32)', async () => {
+  const { response, html } = await getHtml(ctx.baseUrl, '/cars/aba');
+  assert.equal(response.status, 200);
+  assert.match(html, /cars in Aba, Abia State/);
+  assert.match(html, /name="city" value="aba" checked/);
+  // Every area offered is an Aba one — no Port Harcourt neighbourhoods in the rail.
+  const areas = Array.from(html.matchAll(/name="area" value="([^"]+)"/g)).map((m) => m[1]);
+  assert.ok(areas.length > 0, 'Aba stock carries areas');
+  assert.ok(areas.every((area) => !/^(Woji|Rumuokoro|GRA Phase 2|Trans-Amadi)$/.test(area)), `Port Harcourt area in Aba rail: ${areas}`);
+  assert.match(html, /Aba is .*Abia State/, 'the page copy names the market');
+});
+
 maybe('VDP emits Vehicle+Offer JSON-LD, the stock number and a WhatsApp CTA', async () => {
   const { response, html } = await getHtml(ctx.baseUrl, `/cars/${slugs.live}`);
   assert.equal(response.status, 200);

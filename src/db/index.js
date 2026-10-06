@@ -31,6 +31,7 @@ const reports = require('./reports');
 const dealers = require('./dealers');
 const addons = require('./addons');
 const dealerKeys = require('./dealer-keys');
+const areas = require('./areas');
 const leads = require('./leads');
 const analytics = require('./analytics');
 const redirects = require('./redirects');
@@ -60,6 +61,7 @@ module.exports = {
   dealers,
   addons,
   dealerKeys,
+  areas,
   leads,
   analytics,
   redirects,

@@ -34,6 +34,7 @@
     </nav>
 
     <div class="header__actions">
+      <%- include('./area-switcher', { variant: 'header' }) %>
       <button class="header__search-toggle" type="button" aria-label="Search cars" data-search-toggle
               aria-controls="header-search">
         <%- helpers.icon('search', { size: 22 }) %>

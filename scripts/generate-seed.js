@@ -46,24 +46,85 @@ const millions = (value) => Math.round(value * 1_000_000 * 100); // kobo
 // ---------------------------------------------------------------------------
 // Reference data
 // ---------------------------------------------------------------------------
-const AREAS = [
-  'GRA Phase 2', 'Woji', 'Rumuokoro', 'Trans-Amadi', 'Aba Road', 'Peter Odili Road',
-  'Ada George', 'Elelenwo', 'Choba', 'Rukpokwu', 'Mgbuoba', 'Eliozu', 'Old GRA', 'Rumuola',
+/**
+ * FR-32 — the markets we cover, and the governed area list inside each.
+ *
+ * Port Harcourt is home: the majority of stock, the pilot lots, the areas the
+ * site was built around. Owerri, Aba and Benin City are the expansion markets
+ * the PRD names, each with its own partner lots and its own stock-number series
+ * (`stock_prefix`), so a car bought in Owerri is never numbered as if it were
+ * sitting in Port Harcourt.
+ *
+ * The area names are the ones a buyer in that city would recognise, because a
+ * filter that says "Woji" to someone in Benin City is noise. Ops can add,
+ * rename, retire and reorder any of them from the console (§5.1 settings) once
+ * the seed has put the lists in `service_areas`.
+ */
+const CITIES = [
+  {
+    slug: 'port-harcourt', name: 'Port Harcourt', state: 'Rivers', prefix: 'HC-PH',
+    blurb: 'Every market we cover today, our home one first: Port Harcourt lots inspected from Woji to Eliozu.',
+    areas: [
+      'GRA Phase 2', 'Woji', 'Rumuokoro', 'Trans-Amadi', 'Aba Road', 'Peter Odili Road',
+      'Ada George', 'Elelenwo', 'Choba', 'Rukpokwu', 'Mgbuoba', 'Eliozu', 'Old GRA', 'Rumuola',
+    ],
+  },
+  {
+    slug: 'owerri', name: 'Owerri', state: 'Imo', prefix: 'HC-OW',
+    blurb: 'Imo State stock from lots around New Owerri and Ikenegbu, verified to the same checklist as Port Harcourt.',
+    areas: ['New Owerri', 'Ikenegbu', 'Wetheral', 'Aladinma', 'Douglas Road', 'MCC Road', 'Orji', 'Amakohia', 'Nekede', 'Egbu Road'],
+  },
+  {
+    slug: 'aba', name: 'Aba', state: 'Abia', prefix: 'HC-AB',
+    blurb: 'Abia State stock from Ariaria and Ogbor Hill — spares are cheap here, so we grade the bodywork harder.',
+    areas: ['Ariaria', 'Ogbor Hill', 'Faulks Road', 'Ekeoha', 'Aba-Owerri Road', 'Etche Road', 'Uratta', 'Port Harcourt Road', 'Umungasi', 'Osisioma'],
+  },
+  {
+    slug: 'benin-city', name: 'Benin City', state: 'Edo', prefix: 'HC-BN',
+    blurb: 'Edo State stock along Sapele Road and Ugbowo, with the documents desk in Benin for title checks.',
+    areas: ['Ring Road', 'Sapele Road', 'Airport Road', 'Ugbowo', 'Ekenwan Road', 'Ikpoba Hill', 'Adesuwa Road', 'Uselu', 'GRA Benin', 'Oka'],
+  },
 ];
 
+const CITY_BY_NAME = Object.fromEntries(CITIES.map((city) => [city.name, city]));
+
+/**
+ * Which market a new listing belongs to. Port Harcourt keeps the majority —
+ * it is where the network is deepest — and the other three take one slot each
+ * per block, so every market ends up with real, browsable stock rather than a
+ * token listing.
+ */
+const CITY_CYCLE = [
+  'Port Harcourt', 'Port Harcourt', 'Port Harcourt', 'Port Harcourt', 'Port Harcourt', 'Port Harcourt',
+  'Owerri', 'Aba', 'Benin City',
+];
+
+const cityForIndex = (index) => CITY_CYCLE[(index - 1) % CITY_CYCLE.length];
+
 const DEALERS = [
-  { name: 'Aba Road Autos', slug: 'aba-road-autos', area: 'Aba Road', tier: 'pilot', verified: 1 },
-  { name: 'Trans-Amadi Motors', slug: 'trans-amadi-motors', area: 'Trans-Amadi', tier: 'premium', verified: 1 },
-  { name: 'Woji Car Mart', slug: 'woji-car-mart', area: 'Woji', tier: 'standard', verified: 1 },
-  { name: 'GRA Premium Motors', slug: 'gra-premium-motors', area: 'GRA Phase 2', tier: 'premium', verified: 1 },
-  { name: 'Rumuokoro Auto Hub', slug: 'rumuokoro-auto-hub', area: 'Rumuokoro', tier: 'pilot', verified: 1 },
-  { name: 'Peter Odili Motors', slug: 'peter-odili-motors', area: 'Peter Odili Road', tier: 'standard', verified: 1 },
-  { name: 'Elelenwo Autos', slug: 'elelenwo-autos', area: 'Elelenwo', tier: 'standard', verified: 1 },
-  { name: 'Choba Car Centre', slug: 'choba-car-centre', area: 'Choba', tier: 'pilot', verified: 1 },
-  { name: 'Ada George Motors', slug: 'ada-george-motors', area: 'Ada George', tier: 'standard', verified: 1 },
-  { name: 'Igwuruta Auto Sales', slug: 'igwuruta-auto-sales', area: 'Rukpokwu', tier: 'standard', verified: 1 },
-  { name: 'Mgbuoba Motorline', slug: 'mgbuoba-motorline', area: 'Mgbuoba', tier: 'standard', verified: 0 },
-  { name: 'Diobu Cars & Trucks', slug: 'diobu-cars-trucks', area: 'Old GRA', tier: 'pilot', verified: 1 },
+  // Port Harcourt — the original pilot network (ids 1–12; other seeds reference
+  // these ids, so the order is part of the fixture).
+  { name: 'Aba Road Autos', slug: 'aba-road-autos', area: 'Aba Road', tier: 'pilot', verified: 1, city: 'Port Harcourt' },
+  { name: 'Trans-Amadi Motors', slug: 'trans-amadi-motors', area: 'Trans-Amadi', tier: 'premium', verified: 1, city: 'Port Harcourt' },
+  { name: 'Woji Car Mart', slug: 'woji-car-mart', area: 'Woji', tier: 'standard', verified: 1, city: 'Port Harcourt' },
+  { name: 'GRA Premium Motors', slug: 'gra-premium-motors', area: 'GRA Phase 2', tier: 'premium', verified: 1, city: 'Port Harcourt' },
+  { name: 'Rumuokoro Auto Hub', slug: 'rumuokoro-auto-hub', area: 'Rumuokoro', tier: 'pilot', verified: 1, city: 'Port Harcourt' },
+  { name: 'Peter Odili Motors', slug: 'peter-odili-motors', area: 'Peter Odili Road', tier: 'standard', verified: 1, city: 'Port Harcourt' },
+  { name: 'Elelenwo Autos', slug: 'elelenwo-autos', area: 'Elelenwo', tier: 'standard', verified: 1, city: 'Port Harcourt' },
+  { name: 'Choba Car Centre', slug: 'choba-car-centre', area: 'Choba', tier: 'pilot', verified: 1, city: 'Port Harcourt' },
+  { name: 'Ada George Motors', slug: 'ada-george-motors', area: 'Ada George', tier: 'standard', verified: 1, city: 'Port Harcourt' },
+  { name: 'Igwuruta Auto Sales', slug: 'igwuruta-auto-sales', area: 'Rukpokwu', tier: 'standard', verified: 1, city: 'Port Harcourt' },
+  { name: 'Mgbuoba Motorline', slug: 'mgbuoba-motorline', area: 'Mgbuoba', tier: 'standard', verified: 0, city: 'Port Harcourt' },
+  { name: 'Diobu Cars & Trucks', slug: 'diobu-cars-trucks', area: 'Old GRA', tier: 'pilot', verified: 1, city: 'Port Harcourt' },
+  // Owerri — Imo State
+  { name: 'Owerri Motor Plaza', slug: 'owerri-motor-plaza', area: 'New Owerri', tier: 'standard', verified: 1, city: 'Owerri' },
+  { name: 'Ikenegbu Autos', slug: 'ikenegbu-autos', area: 'Ikenegbu', tier: 'pilot', verified: 1, city: 'Owerri' },
+  // Aba — Abia State
+  { name: 'Ariaria Auto Dealers', slug: 'ariaria-auto-dealers', area: 'Ariaria', tier: 'standard', verified: 1, city: 'Aba' },
+  { name: 'Ogbor Hill Motors', slug: 'ogbor-hill-motors', area: 'Ogbor Hill', tier: 'pilot', verified: 0, city: 'Aba' },
+  // Benin City — Edo State
+  { name: 'Sapele Road Motors', slug: 'sapele-road-motors', area: 'Sapele Road', tier: 'premium', verified: 1, city: 'Benin City' },
+  { name: 'Ugbowo Car Centre', slug: 'ugbowo-car-centre', area: 'Ugbowo', tier: 'standard', verified: 1, city: 'Benin City' },
 ];
 
 /**
@@ -270,8 +331,13 @@ function buildListing({ index, status, soldDaysAgo = null, upgraded = false, cat
   const canBeNew = year >= 2019;
   const condition = canBeNew && chance(0.14) ? 'new' : chance(0.62) ? 'tokunbo' : 'nigerian_used';
   const mileage = condition === 'new' ? int(10, 90) : Math.max(12_000, Math.round((2026 - year) * int(9_000, 22_000) * (chance(0.25) ? 0.55 : 1) / 500) * 500);
-  const area = pick(AREAS);
-  const dealer = pick(DEALERS);
+  // FR-32: a car belongs to the market its lot sits in, and it is filed under
+  // an area of that market — never a Port Harcourt neighbourhood with an
+  // Owerri price on it.
+  const cityName = cityForIndex(index);
+  const city = CITY_BY_NAME[cityName];
+  const area = pick(city.areas);
+  const dealer = pick(DEALERS.filter((d) => d.city === cityName));
   const trim = pick(cat.trims);
   const engine = pick(cat.engines);
 
@@ -296,7 +362,7 @@ function buildListing({ index, status, soldDaysAgo = null, upgraded = false, cat
       : new Date(publishedAt.getTime() + 14 * 86_400_000);
   const soldAt = soldDaysAgo === null ? null : new Date(Date.UTC(2026, 8, 30) - soldDaysAgo * 86_400_000);
 
-  const stockNo = `HC-PH-${String(index).padStart(4, '0')}`;
+  const stockNo = `${city.prefix}-${String(index).padStart(4, '0')}`;
   const slug = [year, slugify(cat.make), slugify(cat.model), slugify(trim), stockNo.toLowerCase()].join('-');
 
   const pricePosition = (() => {
@@ -330,7 +396,7 @@ function buildListing({ index, status, soldDaysAgo = null, upgraded = false, cat
     features: sample(FEATURES, int(6, 11)),
     price: millions(priceMillions),
     pricePosition,
-    city: 'Port Harcourt',
+    city: cityName,
     area,
     documents,
     floodCheck: chance(0.12) ? 'pass' : 'none',
@@ -416,7 +482,7 @@ function mediaRows(listing) {
       shotKey: shot.key,
       shotLabel: label,
       url: shot.url,
-      alt: `${listing.year} ${listing.make} ${listing.model} ${listing.trim} — ${label.toLowerCase()} (${listing.area}, Port Harcourt)`,
+      alt: `${listing.year} ${listing.make} ${listing.model} ${listing.trim} — ${label.toLowerCase()} (${listing.area}, ${listing.city})`,
       position: i,
       width: 1200,
       height: 900,
@@ -433,7 +499,7 @@ function mediaRows(listing) {
     shotKey: shot.key,
     shotLabel: shot.label,
     url: `/img/seed/${listing.body}-${shot.key}.svg`,
-    alt: `${listing.year} ${listing.make} ${listing.model} ${listing.trim} — ${shot.label.toLowerCase()} (${listing.area}, Port Harcourt)`,
+    alt: `${listing.year} ${listing.make} ${listing.model} ${listing.trim} — ${shot.label.toLowerCase()} (${listing.area}, ${listing.city})`,
     position: i,
     width: 1200,
     height: 900,
@@ -618,11 +684,22 @@ DELETE FROM faqs;
 DELETE FROM redirects;
 DELETE FROM dealer_addons;
 DELETE FROM dealers;
+-- FR-32: the markets and their area lists are seed-owned too.
+DELETE FROM service_areas;
+DELETE FROM service_cities;
 `);
+
+  out.push(insert('service_cities',
+    ['id', 'slug', 'name', 'state', 'stock_prefix', 'blurb', 'position', 'is_active'],
+    CITIES.map((c, i) => [i + 1, c.slug, c.name, c.state, c.prefix, c.blurb, (i + 1) * 10, 1])));
+
+  out.push(insert('service_areas',
+    ['id', 'city_id', 'name', 'position', 'is_active'],
+    CITIES.flatMap((c, ci) => c.areas.map((name, ai) => [(ci * 100) + ai + 1, ci + 1, name, (ai + 1) * 10, 1]))));
 
   out.push(insert('dealers',
     ['id', 'name', 'slug', 'lot_area', 'city', 'tier', 'verified', 'agreement_signed'],
-    DEALERS.map((d, i) => [i + 1, d.name, d.slug, d.area, 'Port Harcourt', d.tier, d.verified, new Date(Date.UTC(2026, 5, 1 + i))])));
+    DEALERS.map((d, i) => [i + 1, d.name, d.slug, d.area, d.city, d.tier, d.verified, new Date(Date.UTC(2026, 5, 1 + i))])));
 
   // FR-18 — the add-on catalogue the dealer portal sells from (§7.2). Each
   // `effect` is delivered by services/addons.applyPurchase when the money
@@ -756,6 +833,35 @@ DELETE FROM dealers;
       'Every HonestCars-Certified car in Port Harcourt: OBD2 scan, documents sighted, road test, honest condition note. Browse the fully inspected stock.',
       { grade: 'certified' }, '/cars/certified', 1, 50],
   ];
+  // FR-32 — one curated, indexable page per market. These are hand-built like
+  // every other facet here: a city page that is really a filter combination
+  // would be the thin page §14.1 keeps out of the index.
+  const cityFacets = [
+    ['port-harcourt', 'Port Harcourt', 'Rivers',
+      'the biggest lot network we have — Woji, Rumuokoro, GRA, Trans-Amadi',
+      'Every Port Harcourt car on the site: inspected lots from Woji to Eliozu, with mileage, documents and the grade our inspectors gave each one.'],
+    ['owerri', 'Owerri', 'Imo',
+      'Imo State lots around New Owerri, Ikenegbu and Douglas Road',
+      'Owerri stock, graded to the same checklist as Port Harcourt. Ask for the inspection note on any car and we will send what we found, faults included.'],
+    ['aba', 'Aba', 'Abia',
+      'Abia State lots at Ariaria and Ogbor Hill',
+      'Aba is spares country, which makes an honest bodywork grade matter more. Every car here has been photographed in full and checked for accident repairs.'],
+    ['benin-city', 'Benin City', 'Edo',
+      'Edo State lots along Sapele Road and Ugbowo',
+      'Benin City stock with the documents desk in Benin, so title and customs checks happen before the car is listed rather than after you have paid.'],
+  ];
+  for (const [slug, name, state, where, intro] of cityFacets) {
+    facets.unshift([
+      slug, 'city', null,
+      `Cars for sale in ${name}`,
+      `Cars in ${name}`,
+      `${name} is ${where}. ${intro}`,
+      `Cars for Sale in ${name}, ${state} State | HonestCars`,
+      `Verified cars for sale in ${name}, ${state} State — honest prices, inspection grades and document status on every listing. Compare before you travel.`,
+      { city: name }, `/cars/${slug}`, 1, 5,
+    ]);
+  }
+
   out.push(insert('facets',
     ['slug', 'page_type', 'parent_slug', 'h1', 'title', 'intro_copy', 'meta_title', 'meta_description', 'rules', 'canonical_path', 'indexable', 'position'],
     facets));

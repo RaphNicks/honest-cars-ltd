@@ -5,6 +5,7 @@
 
 import { bindDeclarativeEvents, observeImpressions, observeReadDepth, track, applySaveData, initBlurUp, saveData } from './events.js';
 import { initHeader } from './header.js';
+import { initAreaSwitcher } from './area.js';
 import {
   initTabs,
   initAccordions,
@@ -37,6 +38,7 @@ function boot() {
   initFormDrafts();
   initOutbox();
   initHeader();
+  initAreaSwitcher();
   initTabs();
   initAccordions();
   initInfoTips();

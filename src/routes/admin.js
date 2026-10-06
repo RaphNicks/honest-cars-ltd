@@ -67,6 +67,7 @@ const PATHS = {
   marketing: `${HOME}/marketing`,
   staff: `${HOME}/staff`,
   audit: `${HOME}/audit`,
+  settings: `${HOME}/settings`,
 };
 
 /** Navigation, filtered by what this role may actually open (§7.4). */
@@ -90,6 +91,7 @@ const NAV = [
   { href: `${HOME}/cms`, label: 'Content', icon: 'fileCheck', capability: 'cms.manage' },
   { href: PATHS.staff, label: 'Staff & roles', icon: 'account', capability: 'users.manage' },
   { href: PATHS.audit, label: 'Audit log', icon: 'shield', capability: 'users.manage' },
+  { href: PATHS.settings, label: 'Settings', icon: 'cog', capability: 'settings.manage' },
 ];
 
 function navFor(user) {
@@ -2074,6 +2076,127 @@ router.post('/marketing/spend', auth.requireStaff('marketing.spend'), auth.sameO
     });
 
     return done(res, back, `${saved.updated ? 'Updated' : 'Recorded'} ${channel} spend for ${periodStart} → ${periodEnd}.`);
+  } catch (error) {
+    return next(error);
+  }
+});
+
+// ---------------------------------------------------------------------------
+// Settings — markets & service areas (FR-32, §5.1's settings screen)
+//
+// The PRD's data model says the area list is admin-managed, and this is that
+// management: which markets exist, which neighbourhoods sit inside each, in what
+// order the storefront offers them. Retiring an area never deletes the history
+// that mentions it — listings keep the name they were filed under, and the desk
+// is told how many are affected when a rename leaves them behind.
+// ---------------------------------------------------------------------------
+router.get('/settings', auth.requireStaff('settings.manage'), async (req, res, next) => {
+  try {
+    const [cities, areas, unmanaged] = await Promise.all([
+      db.areas.cities({ includeInactive: true }),
+      db.areas.areas({ includeInactive: true }),
+      db.areas.unmanagedAreas(),
+    ]);
+    return await page(req, res, {
+      view: 'admin/settings',
+      active: PATHS.settings,
+      title: 'Settings',
+      description: 'The markets we cover and the area list buyers filter by.',
+      data: {
+        cities: cities.map((city) => ({
+          ...city,
+          areas: areas.filter((area) => area.cityId === city.id),
+        })),
+        unmanaged,
+        areaCount: areas.length,
+      },
+    });
+  } catch (error) {
+    return next(error);
+  }
+});
+
+router.post('/settings/areas', auth.requireStaff('settings.manage'), auth.sameOriginOnly, async (req, res, next) => {
+  const back = PATHS.settings;
+  try {
+    const cityId = Number.parseInt(req.body.city_id, 10);
+    const name = validate.text(req.body.name, 80);
+    if (!Number.isFinite(cityId)) return done(res, back, 'Which market is this area in?', { error: true });
+    if (!name) return done(res, back, 'An area needs a name.', { error: true });
+
+    const result = await db.areas.addArea(cityId, name);
+    if (!result.ok) return done(res, back, result.error, { error: true });
+
+    await admin.recordAudit({
+      actorId: req.user.id,
+      action: result.restored ? 'service_area.restored' : 'service_area.added',
+      entity: 'service_area',
+      entityId: result.area.id,
+      detail: `${result.area.name} — ${result.area.cityName}, ${result.area.citySlug}`,
+    });
+    return done(res, back, result.restored
+      ? `${result.area.name} is back in the ${result.area.cityName} list.`
+      : `${result.area.name} added to ${result.area.cityName}.`);
+  } catch (error) {
+    return next(error);
+  }
+});
+
+router.post('/settings/areas/:id', auth.requireStaff('settings.manage'), auth.sameOriginOnly, async (req, res, next) => {
+  const back = PATHS.settings;
+  try {
+    const id = Number.parseInt(req.params.id, 10);
+    const name = validate.text(req.body.name, 80) || undefined;
+    const active = req.body.active === undefined ? undefined : Boolean(req.body.active);
+
+    const result = await db.areas.updateArea(id, { name, active });
+    if (!result.ok) return done(res, back, result.error, { error: true });
+
+    const changed = [];
+    if (result.previousName && result.previousName !== result.area.name) {
+      changed.push(`renamed ${result.previousName} → ${result.area.name}`);
+    }
+    if (active !== undefined) changed.push(active ? 'restored' : 'retired');
+    if (!changed.length) changed.push('saved');
+
+    await admin.recordAudit({
+      actorId: req.user.id,
+      action: active === undefined ? 'service_area.renamed' : (active ? 'service_area.restored' : 'service_area.retired'),
+      entity: 'service_area',
+      entityId: result.area.id,
+      detail: `${result.area.name} — ${result.area.cityName}`,
+    });
+
+    // A rename is not retroactive. Say how many listings still carry the old
+    // spelling instead of letting the storefront quietly lose them.
+    const stale = result.staleListings
+      ? ` ${result.staleListings} listing${result.staleListings === 1 ? '' : 's'} still filed under “${result.previousName}”.`
+      : '';
+    return done(res, back, `Area ${changed.join(', ')}.${stale}`);
+  } catch (error) {
+    return next(error);
+  }
+});
+
+router.post('/settings/areas/:id/move', auth.requireStaff('settings.manage'), auth.sameOriginOnly, async (req, res, next) => {
+  const back = PATHS.settings;
+  try {
+    const id = Number.parseInt(req.params.id, 10);
+    const direction = req.body.direction === 'up' ? 'up' : 'down';
+    const result = await db.areas.moveArea(id, direction);
+    if (!result.ok) return done(res, back, result.error, { error: true });
+    if (result.moved) {
+      await admin.recordAudit({
+        actorId: req.user.id,
+        action: 'service_area.reordered',
+        entity: 'service_area',
+        entityId: id,
+        detail: `${result.area.name} moved ${direction}`,
+      });
+    }
+    return done(res, back, result.moved
+      ? `${result.area.name} moved ${direction}.`
+      : `${result.area.name} is already at the ${direction === 'up' ? 'top' : 'bottom'} of its list.`);
   } catch (error) {
     return next(error);
   }

@@ -142,11 +142,19 @@ var shots = shots || [];
         <input class="input" type="number" name="mileage_km" min="0" max="900000"
                value="<%= value('mileage_km') %>" placeholder="98000">
       </label>
+      <% var market = (typeof market === 'undefined' ? null : market); %>
+      <% var areaOptions = (typeof areaOptions === 'undefined' ? [] : areaOptions); %>
       <label class="field">
-        <span class="field__label">Area in Port Harcourt</span>
-        <input class="input" type="text" name="area" maxlength="80"
-               value="<%= value('area') || 'Port Harcourt' %>" placeholder="Woji">
+        <span class="field__label">Area in <%= market ? market.city : 'the market' %></span>
+        <input class="input" type="text" name="area" maxlength="80" list="area-options"
+               value="<%= value('area') %>" placeholder="<%= areaOptions[0] || 'Woji' %>">
+        <span class="field__hint">Where the car is parked. Leave it blank and it is filed under <%= market ? market.city : 'your city' %> generally.</span>
       </label>
+      <% if (areaOptions.length) { %>
+        <datalist id="area-options">
+          <% areaOptions.forEach(function (name) { %><option value="<%= name %>"></option><% }); %>
+        </datalist>
+      <% } %>
       <label class="field">
         <span class="field__label">Asking price (₦) <span aria-hidden="true">*</span></span>
         <input class="input" type="text" name="asking_price" inputmode="numeric" required

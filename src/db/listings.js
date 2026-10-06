@@ -51,6 +51,7 @@ const FILTER_KEYS = [
   'fuel_type',
   'mileage_max',
   'grade',
+  'city',
   'area',
   'colour',
   'customs_verified',
@@ -106,6 +107,18 @@ function buildWhere(filters = {}, { alias = 'l', liveScoped = true } = {}) {
     clauses.push('l.model = ?');
     params.push(String(filters.model));
   }
+  if (filters.city) {
+    // A city reaches this point already resolved against `service_cities`
+    // (db.areas.cityByToken) — the URL carries the slug, the column holds the
+    // name. The shape check is the second gate: whatever the caller did, a
+    // value that is not a plain place name is dropped rather than queried.
+    const city = String(filters.city).trim().slice(0, 80);
+    if (/^[A-Za-z][A-Za-z0-9 .'\-]{0,79}$/.test(city)) {
+      clauses.push('l.city = ?');
+      params.push(city);
+    }
+  }
+
   if (filters.area) {
     clauses.push('l.area = ?');
     params.push(String(filters.area));
@@ -156,6 +169,7 @@ function buildWhere(filters = {}, { alias = 'l', liveScoped = true } = {}) {
 function filtersFromFacet(facet) {
   const rules = parseJson(facet.rules, {}) || {};
   const filters = {};
+  if (rules.city) filters.city = rules.city;
   if (rules.make) filters.make = rules.make;
   if (rules.model) filters.model = rules.model;
   if (rules.body_type) filters.body_type = rules.body_type;
@@ -549,44 +563,83 @@ async function countNearMatches(filters = {}) {
   return row ? Number(row.total) : 0;
 }
 
-/** Filter-rail facets with live counts — 400-series across the network. */
-async function filterFacets() {
-  const [makes, bodyTypes, conditions, grades, areas, transmissions, fuels, priceStats] =
-    await Promise.all([
-      query(
-        `SELECT make AS value, COUNT(*) AS count FROM vehicle_listings l
-          ${buildWhere({}).sql} GROUP BY make ORDER BY count DESC, make ASC`,
-      ),
-      query(
-        `SELECT body_type AS value, COUNT(*) AS count FROM vehicle_listings l
-          ${buildWhere({}).sql} GROUP BY body_type ORDER BY count DESC`,
-      ),
-      query(
-        `SELECT \`condition\` AS value, COUNT(*) AS count FROM vehicle_listings l
-          ${buildWhere({}).sql} GROUP BY \`condition\` ORDER BY count DESC`,
-      ),
-      query(
-        `SELECT verification_grade AS value, COUNT(*) AS count FROM vehicle_listings l
-          ${buildWhere({}).sql} GROUP BY verification_grade ORDER BY count DESC`,
-      ),
-      query(
-        `SELECT area AS value, COUNT(*) AS count FROM vehicle_listings l
-          ${buildWhere({}).sql} GROUP BY area ORDER BY count DESC, area ASC`,
-      ),
-      query(
-        `SELECT transmission AS value, COUNT(*) AS count FROM vehicle_listings l
-          ${buildWhere({}).sql} GROUP BY transmission ORDER BY count DESC`,
-      ),
-      query(
-        `SELECT fuel_type AS value, COUNT(*) AS count FROM vehicle_listings l
-          ${buildWhere({}).sql} GROUP BY fuel_type ORDER BY count DESC`,
-      ),
-      queryOne(
-        `SELECT MIN(asking_price_kobo) AS min_price, MAX(asking_price_kobo) AS max_price,
-                MIN(year) AS min_year, MAX(year) AS max_year, MAX(mileage_km) AS max_mileage
-           FROM vehicle_listings l ${buildWhere({}).sql}`,
-      ),
-    ]);
+/**
+ * Filter-rail facets with live counts — 400-series across the network.
+ *
+ * `city` is a governed name from `service_cities` (or null for the whole
+ * network), and it narrows every count in the rail — makes, areas, budgets —
+ * so the panel can never offer a filter the current view cannot show. Note the
+ * params being passed through: the WHERE fragment carries the city as a
+ * placeholder, and a placeholder with no argument is a 1210, not a filter.
+ */
+async function filterFacets({ city = null } = {}) {
+  const where = buildWhere(city ? { city } : {});
+  const [
+    makes, bodyTypes, conditions, grades, areas, cities, transmissions, fuels, priceStats,
+  ] = await Promise.all([
+    query(
+      `SELECT make AS value, COUNT(*) AS count FROM vehicle_listings l
+        ${where.sql} GROUP BY make ORDER BY count DESC, make ASC`,
+      where.params,
+    ),
+    query(
+      `SELECT body_type AS value, COUNT(*) AS count FROM vehicle_listings l
+        ${where.sql} GROUP BY body_type ORDER BY count DESC`,
+      where.params,
+    ),
+    query(
+      `SELECT \`condition\` AS value, COUNT(*) AS count FROM vehicle_listings l
+        ${where.sql} GROUP BY \`condition\` ORDER BY count DESC`,
+      where.params,
+    ),
+    query(
+      `SELECT verification_grade AS value, COUNT(*) AS count FROM vehicle_listings l
+        ${where.sql} GROUP BY verification_grade ORDER BY count DESC`,
+      where.params,
+    ),
+    query(
+      `SELECT area AS value, city, COUNT(*) AS count FROM vehicle_listings l
+        ${where.sql} GROUP BY city, area ORDER BY count DESC, area ASC`,
+      where.params,
+    ),
+    query(
+      // The governed list, in ops order, so the rail never invents a market and
+      // a market with no stock still shows as a real 0 instead of quietly
+      // disappearing from the site. The live rule is buildWhere's own, rewritten
+      // for this alias.
+      `SELECT slug AS value, name, state, stock_prefix, position,
+              (SELECT COUNT(*) FROM vehicle_listings l2
+                WHERE l2.city = c.name
+                  AND ((l2.status IN ('live','reserved') AND (l2.expires_at IS NULL OR l2.expires_at > UTC_TIMESTAMP()))
+                    OR (l2.status = 'sold' AND l2.sold_at IS NOT NULL AND l2.sold_at > DATE_SUB(UTC_TIMESTAMP(), INTERVAL 7 DAY)))) AS count
+         FROM service_cities c WHERE c.is_active = 1
+        ORDER BY c.position ASC, c.name ASC`,
+    ),
+    query(
+      `SELECT transmission AS value, COUNT(*) AS count FROM vehicle_listings l
+        ${where.sql} GROUP BY transmission ORDER BY count DESC`,
+      where.params,
+    ),
+    query(
+      `SELECT fuel_type AS value, COUNT(*) AS count FROM vehicle_listings l
+        ${where.sql} GROUP BY fuel_type ORDER BY count DESC`,
+      where.params,
+    ),
+    queryOne(
+      `SELECT MIN(asking_price_kobo) AS min_price, MAX(asking_price_kobo) AS max_price,
+              MIN(year) AS min_year, MAX(year) AS max_year, MAX(mileage_km) AS max_mileage
+         FROM vehicle_listings l ${where.sql}`,
+      where.params,
+    ),
+  ]);
+
+  // §6.2's rail groups areas under their market: fourteen Port Harcourt
+  // neighbourhoods plus ten Owerri ones would be an unreadable wall of radios.
+  const groups = new Map();
+  for (const row of areas) {
+    if (!groups.has(row.city)) groups.set(row.city, []);
+    groups.get(row.city).push(row);
+  }
 
   return {
     makes,
@@ -594,6 +647,19 @@ async function filterFacets() {
     conditions,
     grades,
     areas,
+    // Ordered the way ops ordered the markets, not by whichever happens to
+    // have the most stock this week.
+    areaGroups: cities
+      .map((row) => ({ city: row.name, areas: groups.get(row.name) || [] }))
+      .filter((group) => group.areas.length),
+    cities: cities.map((row) => ({
+      value: row.value,
+      slug: row.value,
+      name: row.name,
+      state: row.state,
+      count: Number(row.count || 0),
+      stockPrefix: row.stock_prefix || 'HC-PH',
+    })),
     transmissions,
     fuels,
     range: {

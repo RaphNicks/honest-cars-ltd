@@ -111,7 +111,13 @@ var moveLabels = {
         </label>
         <label class="field">
           <span class="field__label">Area</span>
-          <input class="input" type="text" name="area" maxlength="80" value="<%= listing.area %>">
+          <% var areaOptions = (typeof areaOptions === 'undefined' ? [] : areaOptions); %>
+          <input class="input" type="text" name="area" maxlength="80" list="area-options" value="<%= listing.area %>">
+          <% if (areaOptions.length) { %>
+            <datalist id="area-options">
+              <% areaOptions.forEach(function (name) { %><option value="<%= name %>"></option><% }); %>
+            </datalist>
+          <% } %>
         </label>
         <label class="field">
           <span class="field__label">Exterior colour</span>

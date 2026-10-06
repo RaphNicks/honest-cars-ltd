@@ -487,6 +487,101 @@
   .header__cta { display: inline-flex; }
 }
 
+/* --------------------------------------------------------------------------
+   FR-32 — area switcher: which market's stock are we looking at?
+   Pill + panel in the header (≥1025px); the drawer carries its own copy for
+   phones. Links first, script second — js/area.js only adds the memory.
+   -------------------------------------------------------------------------- */
+.area-switcher { position: relative; }
+
+.area-switcher--header { display: none; }
+
+@media (min-width: 1025px) {
+  .area-switcher--header { display: block; }
+}
+
+.area-switcher__toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-05);
+  height: 44px;
+  padding-inline: var(--space-1);
+  border-radius: var(--radius);
+  font-size: var(--text-14);
+  font-weight: var(--weight-medium);
+  color: var(--honest-navy);
+}
+
+.area-switcher__toggle:hover { background: var(--surface); }
+.area-switcher__label { white-space: nowrap; }
+
+.area-switcher__panel {
+  position: absolute;
+  top: calc(100% + var(--space-1));
+  right: 0;
+  z-index: 60;
+  width: min(300px, 88vw);
+  padding: var(--space-2);
+  background: var(--white);
+  border: var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-raised);
+}
+
+.area-switcher__panel[hidden] { display: none; }
+
+.area-switcher__hint {
+  font-size: var(--text-12);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--ink-muted, var(--ink));
+  opacity: 0.7;
+  margin-bottom: var(--space-05);
+}
+
+.area-switcher__list { display: grid; gap: 2px; margin: 0; padding: 0; list-style: none; }
+
+.area-switcher__item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-1);
+  padding: var(--space-1);
+  border-radius: var(--radius-sm);
+  color: var(--ink);
+  font-size: var(--text-14);
+}
+
+.area-switcher__item:hover { background: var(--surface); text-decoration: none; }
+.area-switcher__item.is-current { background: var(--surface); font-weight: var(--weight-semibold); }
+.area-switcher__state { display: block; font-size: var(--text-12); opacity: 0.7; }
+.area-switcher__item .count { font-size: var(--text-12); opacity: 0.75; font-variant-numeric: tabular-nums; }
+
+.area-switcher__foot {
+  margin-top: var(--space-1);
+  padding-top: var(--space-1);
+  border-top: var(--border);
+  font-size: var(--text-12);
+  opacity: 0.75;
+}
+
+/* In the drawer the panel is part of the column, not a popover. */
+.area-switcher--drawer { width: 100%; margin-bottom: var(--space-2); }
+
+.area-switcher--drawer .area-switcher__toggle {
+  width: 100%;
+  justify-content: flex-start;
+  border: var(--border);
+  background: var(--white);
+}
+
+.area-switcher--drawer .area-switcher__panel {
+  position: static;
+  width: 100%;
+  margin-top: var(--space-05);
+  box-shadow: none;
+}
+
 /* Mega-menu (Services ▾) — desktop */
 .mega {
   position: relative;
@@ -821,6 +916,18 @@
 }
 
 .filter-rail__list { display: flex; flex-direction: column; gap: 2px; max-height: 224px; overflow-y: auto; }
+
+/* FR-32 — the market heading above each block of areas. */
+.filter-rail__caption {
+  margin: var(--space-05) 0 2px;
+  font-size: var(--text-12);
+  font-weight: var(--weight-semibold);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--color-text-muted);
+}
+
+.filter-rail__caption:first-of-type { margin-top: 0; }
 
 .filter-rail__option {
   display: flex;

@@ -278,7 +278,7 @@ CREATE TABLE IF NOT EXISTS `saved_searches` (
 CREATE TABLE IF NOT EXISTS facets (
   id                INT UNSIGNED  NOT NULL AUTO_INCREMENT,
   slug              VARCHAR(160)  NOT NULL,                  -- 'toyota' | 'toyota/camry' | 'suv-under-15m'
-  page_type         ENUM('make','model','body_budget','tag') NOT NULL,
+  page_type         ENUM('make','model','body_budget','tag','city') NOT NULL,
   parent_slug       VARCHAR(160)  NULL,
   h1                VARCHAR(200)  NOT NULL,
   title             VARCHAR(200)  NOT NULL,
@@ -1065,6 +1065,42 @@ CREATE TABLE IF NOT EXISTS dealer_ledger (
   CONSTRAINT fk_ledger_listing FOREIGN KEY (listing_id) REFERENCES vehicle_listings (id) ON DELETE SET NULL,
   CONSTRAINT fk_ledger_payment FOREIGN KEY (payment_id) REFERENCES payments (id) ON DELETE SET NULL,
   CONSTRAINT fk_ledger_actor   FOREIGN KEY (created_by) REFERENCES `users` (id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ---------------------------------------------------------------------------
+-- service_cities · service_areas — FR-32: the markets we cover, and the
+-- neighbourhoods inside them. "city / area enum/str ✓ Default Port Harcourt;
+-- area list admin-managed" (§ data model). Listings keep their own city/area
+-- text; these tables are what the site offers, sorts and counts.
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS `service_cities` (
+  id         INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  slug       VARCHAR(60)  NOT NULL,
+  name       VARCHAR(80)  NOT NULL,
+  state      VARCHAR(60)  NOT NULL,
+  stock_prefix VARCHAR(8) NOT NULL DEFAULT 'HC-PH',
+  blurb      VARCHAR(200) NULL,
+  position   TINYINT      NOT NULL DEFAULT 0,
+  is_active  TINYINT(1)   NOT NULL DEFAULT 1,
+  created_at TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  UNIQUE KEY uq_city_slug (slug),
+  KEY idx_city_active (is_active, position)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `service_areas` (
+  id         INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  city_id    INT UNSIGNED NOT NULL,
+  name       VARCHAR(80)  NOT NULL,
+  position   SMALLINT     NOT NULL DEFAULT 0,
+  is_active  TINYINT(1)   NOT NULL DEFAULT 1,
+  created_at TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  UNIQUE KEY uq_area_city_name (city_id, name),
+  KEY idx_area_city (city_id, is_active, position),
+  CONSTRAINT fk_area_city FOREIGN KEY (city_id) REFERENCES service_cities (id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ---------------------------------------------------------------------------

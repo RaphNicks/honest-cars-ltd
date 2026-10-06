@@ -306,7 +306,11 @@ async function listingForDealer(dealerId, listingId) {
 // Writes — all scoped, all audited by the caller
 // ---------------------------------------------------------------------------
 async function createListing(dealerId, input) {
-  const stockNo = await nextStockNo();
+  // A listing inherits its lot's market — the dealer never picks it, so a car
+  // cannot be filed under a city its lot does not sit in. An empty area falls
+  // back to the market name rather than to Port Harcourt.
+  const market = await marketFor(dealerId);
+  const stockNo = await nextStockNo(market.prefix);
   const slug = await uniqueSlug(`${input.year}-${input.make}-${input.model}`, stockNo);
   const result = await query(
     `INSERT INTO vehicle_listings
@@ -317,7 +321,7 @@ async function createListing(dealerId, input) {
     [stockNo, dealerId, input.make, input.model, input.year, input.trim || null, input.bodyType,
       input.transmission, input.fuelType, input.engineSize || null, input.drivetrain || null,
       input.extColour || null, input.condition, input.mileageKm, JSON.stringify(input.features || []),
-      input.priceKobo, input.negotiable ? 1 : 0, 'Port Harcourt', input.area,
+      input.priceKobo, input.negotiable ? 1 : 0, market.city, input.area || market.city,
       JSON.stringify(input.documents || {}), input.description || null, slug],
   );
   return { id: result.insertId, stockNo, slug };
@@ -571,10 +575,36 @@ async function statements(dealerId, { limit = 50 } = {}) {
 // ---------------------------------------------------------------------------
 // Small helpers
 // ---------------------------------------------------------------------------
-async function nextStockNo() {
-  const row = await queryOne("SELECT stock_no FROM vehicle_listings WHERE stock_no LIKE 'HC-PH-%' ORDER BY id DESC LIMIT 1");
-  const last = row ? Number(String(row.stock_no).replace('HC-PH-', '')) : 0;
-  return `HC-PH-${String(last + 1).padStart(4, '0')}`;
+/**
+ * The market a lot trades in, and the stock-number series that goes with it.
+ *
+ * FR-32: numbers run per market — HC-PH-0001, HC-OW-0001 — so a buyer reading
+ * the VDP of an Owerri car is not told the car is a Port Harcourt one. The
+ * dealers table keeps the city as a name; `service_cities` is the governed list
+ * that decides whether that market exists and what its prefix is. A lot whose
+ * city is not in the list still works: it simply stays on the home series.
+ */
+async function marketFor(dealerId) {
+  const row = await queryOne(
+    `SELECT d.city AS lot_city, c.name AS city_name, c.stock_prefix
+       FROM dealers d
+       LEFT JOIN service_cities c ON c.name = d.city
+      WHERE d.id = ? LIMIT 1`,
+    [dealerId],
+  );
+  if (row && row.city_name) return { city: row.city_name, prefix: row.stock_prefix || 'HC-PH' };
+  return { city: (row && row.lot_city) || 'Port Harcourt', prefix: 'HC-PH' };
+}
+
+/** The next number in that market's series. */
+async function nextStockNo(prefix = 'HC-PH') {
+  const row = await queryOne(
+    `SELECT MAX(CAST(SUBSTRING(stock_no, CHAR_LENGTH(?) + 2) AS UNSIGNED)) AS last
+       FROM vehicle_listings WHERE stock_no LIKE ?`,
+    [prefix, `${prefix}-%`],
+  );
+  const last = row && row.last ? Number(row.last) : 0;
+  return `${prefix}-${String(last + 1).padStart(4, '0')}`;
 }
 
 /** [+2348032220001] → [+234•••0001]: enough to recognise a caller, not to leak. */
@@ -684,6 +714,7 @@ module.exports = {
   maskPhone,
   linkUser,
   unlinkUser,
+  marketFor,
   nextStockNo,
   slugify,
 };

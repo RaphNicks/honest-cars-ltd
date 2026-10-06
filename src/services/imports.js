@@ -129,7 +129,7 @@ function splitList(value, separator = /[,;|]/) {
  * One row in, one listing input (or a list of refusals) out. Identical rules to
  * the wizard: the same enums, the same price floor, the same mileage ceiling.
  */
-function normalise(values, { line }) {
+function normalise(values, { line, market = null } = {}) {
   const errors = [];
   const warnings = [];
   const add = (column, message) => errors.push({ column, message });
@@ -195,6 +195,7 @@ function normalise(values, { line }) {
     warnings.push({ column: 'make', message: 'This looks like the template’s example row — delete it before importing.' });
   }
 
+
   const input = {
     make,
     model,
@@ -211,7 +212,9 @@ function normalise(values, { line }) {
     features,
     priceKobo,
     negotiable: flags.negotiable,
-    area: validate.text(values.area, 80) || 'Port Harcourt',
+    // No area becomes the lot's own market (createListing fills it in) —
+    // never a hard-coded Port Harcourt.
+    area: validate.text(values.area, 80) || null,
     documents: {
       customs_verified: flags.customs_verified,
       registration: flags.registration,
@@ -222,6 +225,20 @@ function normalise(values, { line }) {
     honestNote: validate.text(values.honest_note, 1000),
   };
 
+  // FR-32: the area has to exist in the lot's own market, or the car lands in a
+  // filter no buyer can reach. A warning, not a refusal — ops can add the area,
+  // and the listing is still worth having.
+  if (market) {
+    if (!input.area) {
+      warnings.push({ column: 'area', message: `No area on this row — the car will be filed under ${market.city} generally until you name a neighbourhood.` });
+    } else if (market.names.size && !market.names.has(input.area)) {
+      warnings.push({
+        column: 'area',
+        message: `“${input.area}” is not one of the areas we list in ${market.city}. It still imports, but buyers filtering by area will not find it — ask ops to add the area.`,
+      });
+    }
+  }
+
   return { line, input, photos, errors, warnings };
 }
 
@@ -231,6 +248,7 @@ function normalise(values, { line }) {
  */
 async function validateText(text, { dealerId } = {}) {
   const { columns, rows } = csv.table(text);
+  const market = dealerId ? await marketAreas(dealerId) : null;
   const fileErrors = [];
 
   if (!columns.length) {
@@ -254,7 +272,7 @@ async function validateText(text, { dealerId } = {}) {
 
   const fatal = Boolean(missing.length) || rows.length > MAX_ROWS;
   const analysed = rows.map((row) => {
-    const result = normalise(row.values, { line: row.line });
+    const result = normalise(row.values, { line: row.line, market });
     if (row.extra.length) {
       result.errors.push({ column: 'row', message: `${row.extra.length} extra value(s) after the last column — check for a stray comma: “${row.extra.join('”, “')}”.` });
     }
@@ -310,6 +328,21 @@ async function validateText(text, { dealerId } = {}) {
     rows: analysed,
     limit: MAX_ROWS,
   };
+}
+
+/**
+ * The area list the lot's own market offers (FR-32). A lookup failure must
+ * never be the reason an import fails, so this degrades to null — the import
+ * still validates, it just cannot say anything about the area.
+ */
+async function marketAreas(dealerId) {
+  try {
+    const market = await db.dealers.marketFor(dealerId);
+    const areas = await db.areas.areas({ cityName: market.city });
+    return { city: market.city, names: new Set(areas.map((area) => area.name)) };
+  } catch (error) {
+    return null;
+  }
 }
 
 function zeroCounts() {

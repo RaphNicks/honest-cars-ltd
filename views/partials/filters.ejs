@@ -145,18 +145,52 @@
     </label>
   </div>
 
-  <%# Location — PH areas %>
+  <%# FR-32 — Market: the whole network, or one city. The value is the city
+      slug; /cars resolves it against service_cities before it filters. %>
+  <% var cities = facets.cities || []; %>
+  <% if (cities.length > 1) { %>
+    <div class="filter-rail__group">
+      <h3 class="filter-rail__title">Market</h3>
+      <div class="filter-rail__list">
+        <label class="filter-rail__option">
+          <input type="radio" name="city" value="" <%= filters.city ? '' : 'checked' %>>
+          <span>All cities</span>
+          <span class="count"><%= cities.reduce(function (sum, row) { return sum + (row.count || 0); }, 0) %></span>
+        </label>
+        <% cities.forEach(function (row) { %>
+          <label class="filter-rail__option">
+            <input type="radio" name="city" value="<%= row.slug %>" <%= filters.city === row.slug ? 'checked' : '' %>>
+            <span><%= row.name %></span>
+            <span class="count"><%= row.count %></span>
+          </label>
+        <% }); %>
+      </div>
+    </div>
+  <% } %>
+
+  <%# Location — areas, grouped under their market. With one market in view the
+      groups collapse to a plain list; across the network (or all cities) a
+      heading separates Port Harcourt's neighbourhoods from Owerri's. %>
   <div class="filter-rail__group">
     <h3 class="filter-rail__title">Area</h3>
-    <div class="filter-rail__list">
-      <% facets.areas.forEach(function (row) { %>
-        <label class="filter-rail__option">
-          <input type="radio" name="area" value="<%= row.value %>" <%= filters.area === row.value ? 'checked' : '' %>>
-          <span><%= row.value %></span>
-          <span class="count"><%= row.count %></span>
-        </label>
-      <% }); %>
-    </div>
+    <% var areaGroups = (facets.areaGroups || []).filter(function (group) { return group.areas.length; }); %>
+    <% if (!areaGroups.length) { %>
+      <p class="field__hint">No live stock in this market yet — pick another city, or ask the concierge desk to find one for you.</p>
+    <% } %>
+    <% areaGroups.forEach(function (group) { %>
+      <% if (areaGroups.length > 1) { %>
+        <p class="filter-rail__caption"><%= group.city %></p>
+      <% } %>
+      <div class="filter-rail__list">
+        <% group.areas.forEach(function (row) { %>
+          <label class="filter-rail__option">
+            <input type="radio" name="area" value="<%= row.value %>" <%= filters.area === row.value ? 'checked' : '' %>>
+            <span><%= row.value %></span>
+            <span class="count"><%= row.count %></span>
+          </label>
+        <% }); %>
+      </div>
+    <% }); %>
   </div>
 
   <%# Documents %>

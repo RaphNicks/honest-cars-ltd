@@ -467,13 +467,25 @@ router.get('/posts', rateLimit({ windowMs: 60_000, max: 60 }), async (req, res, 
 router.get('/listings', rateLimit({ windowMs: 60_000, max: 90 }), async (req, res, next) => {
   try {
     const parsed = listingQuery.parseListingQuery(req.query);
+    // FR-32: the filter rail posts the market as a slug (`city=owerri`), and the
+    // grid refresh has to resolve it against service_cities exactly as /cars
+    // does — otherwise the AJAX update would quietly show an empty grid.
+    const city = await db.areas.cityByToken(parsed.view.city);
+    if (city) {
+      parsed.filters.city = city.name;
+      parsed.view.city = city.slug;
+    } else {
+      delete parsed.filters.city;
+      delete parsed.view.city;
+    }
+
     const [result, facets, models] = await Promise.all([
       db.listings.browse(parsed.filters, {
         page: parsed.page,
         perPage: listingQuery.PER_PAGE,
         sort: parsed.sort,
       }),
-      db.listings.filterFacets(),
+      db.listings.filterFacets({ city: city ? city.name : null }),
       parsed.view.make ? db.listings.modelCounts(parsed.view.make) : Promise.resolve([]),
     ]);
 

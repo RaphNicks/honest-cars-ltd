@@ -119,9 +119,18 @@ function localBusinessSchema() {
     image: absolute('/og/default.png'),
     logo: absolute('/img/logo.svg'),
     priceRange: '₦₦',
+    // FR-32: we run in four markets, and the markup says so. The address is
+    // still Port Harcourt — that is where the business sits — while the service
+    // area is the network the stock comes from.
     areaServed: [
       { '@type': 'City', name: 'Port Harcourt' },
+      { '@type': 'City', name: 'Owerri' },
+      { '@type': 'City', name: 'Aba' },
+      { '@type': 'City', name: 'Benin City' },
       { '@type': 'State', name: 'Rivers State' },
+      { '@type': 'State', name: 'Imo State' },
+      { '@type': 'State', name: 'Abia State' },
+      { '@type': 'State', name: 'Edo State' },
       { '@type': 'Country', name: 'Nigeria' },
     ],
     address: {
@@ -296,7 +305,7 @@ function webSiteSchema() {
  * suite and is what Google wants for priced services). Prices are kobo in the
  * DB, naira in markup.
  */
-function serviceSchema(service, { areaServed = ['Port Harcourt', 'Rivers State'] } = {}) {
+function serviceSchema(service, { areaServed = ['Port Harcourt', 'Owerri', 'Aba', 'Benin City', 'Rivers State', 'Imo State', 'Abia State', 'Edo State'] } = {}) {
   const offers = (service.pricing || [])
     .filter((tier) => tier.price_kobo)
     .map((tier) => ({

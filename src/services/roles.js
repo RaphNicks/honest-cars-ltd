@@ -44,6 +44,12 @@ const MATRIX = {
   // desk that runs partner onboarding (admin/ops), not finance reading the books.
   'dealers.manage': ['admin', 'ops'],
   'users.manage': ['admin'],                       // staff accounts, roles, audit log
+  // §5.1's console sitemap ends at **settings**: the things ops owns about the
+  // shape of the business rather than one listing or one order. What lives here
+  // today is the market/area list (FR-32), because the PRD makes the area list
+  // admin-managed — a neighbourhood that is not in this table cannot be
+  // filtered for. Admin and ops hold it; marketing curates content, not markets.
+  'settings.manage': ['admin', 'ops'],
   'reports.view': ['admin', 'ops', 'finance', 'marketing'],
   // §15.2 marketing dashboard. Read is the CMS-and-marketing column of §7.4
   // (admin, ops, marketing); entering spend is the marketing desk's own job, so

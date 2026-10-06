@@ -56,13 +56,15 @@ async function facetRoutes({ db }) {
         },
         data: {
           ...built,
-          filters: {},
+          filters: built.serviceCity ? { city: built.serviceCity.slug } : {},
           basePath: facet.canonicalPath,
           queryString: '',
           activePills: [],
           nearMatches: 0,
           hiddenQuery: {},
-          locationLabel: 'Port Harcourt',
+          locationLabel: built.serviceCity
+            ? `${built.serviceCity.name}, ${built.serviceCity.state} State`
+            : 'All markets',
         },
       };
     },

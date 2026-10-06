@@ -285,8 +285,20 @@ router.get('/listings', requireDealer, async (req, res, next) => {
   }
 });
 
+/**
+ * FR-32 — the lot's own market and the areas inside it, for the area field.
+ * A dealer in Aba is offered Aba's neighbourhoods, spelled the way the filter
+ * rail spells them, so a car is filed where buyers will actually look for it.
+ */
+async function lotAreaOptions(lotId) {
+  const market = await dealers.marketFor(lotId);
+  const areas = await db.areas.areas({ cityName: market.city });
+  return { market, areaNames: areas.map((area) => area.name) };
+}
+
 router.get('/listings/new', requireDealer, async (req, res, next) => {
   try {
+    const { market, areaNames } = await lotAreaOptions(req.lot.id);
     return await page(req, res, {
       view: 'dealer/listing-new',
       active: PATHS.newListing,
@@ -297,6 +309,8 @@ router.get('/listings/new', requireDealer, async (req, res, next) => {
         draft: null,
         form: {},
         step: validate.integer(req.query.step, { min: 1, max: 3, fallback: 1 }),
+        market,
+        areaOptions: areaNames,
       },
     });
   } catch (error) {
@@ -326,7 +340,7 @@ function listingInput(body) {
       .slice(0, 12),
     priceKobo: validate.kobo(body.asking_price),
     negotiable: String(body.negotiable || '') === '1',
-    area: validate.text(body.area, 80) || 'Port Harcourt',
+    area: validate.text(body.area, 80) || null,
     documents: {
       customs_verified: Boolean(body.customs_verified),
       registration: Boolean(body.registration),
@@ -375,12 +389,13 @@ router.get('/listings/:id', requireDealer, async (req, res, next) => {
   try {
     const listing = await dealers.listingForDealer(req.lot.id, validate.integer(req.params.id, { min: 1, fallback: 0 }));
     if (!listing) return done(res, PATHS.listings, 'That listing is not one of yours.', { error: true });
+    const { market, areaNames } = await lotAreaOptions(req.lot.id);
     return await page(req, res, {
       view: 'dealer/listing',
       active: PATHS.listings,
       title: `${listing.stockNo} · ${listing.title}`,
       description: 'Price, mileage, copy, photos and the documents checklist.',
-      data: { listing, shots: SHOT_LIST, rules: dealers.DEALER_STATUS_RULES },
+      data: { listing, shots: SHOT_LIST, rules: dealers.DEALER_STATUS_RULES, market, areaOptions: areaNames },
     });
   } catch (error) {
     return next(error);

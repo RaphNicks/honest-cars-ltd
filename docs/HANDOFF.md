@@ -1,6 +1,6 @@
 # Handoff — where this build is, and how to continue it
 
-**Written 2026-10-06 at commit `a6ba608` on branch `arena/01a0f7df-honest-cars-ltd`.**
+**Written 2026-10-06, updated for FR-32, on branch `arena/01a0f7df-honest-cars-ltd`.**
 If you are picking this up (a person or an agent in a new session), read this file
 first, then `docs/GAPS.md` for the row-by-row list of what is left.
 
@@ -31,8 +31,8 @@ Run it:
 
 ```bash
 bash scripts/sandbox/recover.sh     # after a sandbox wipe: deps, MySQL, .env, head
-npm run db:seed                     # 79 listings, 8 posts, staff + customer accounts
-npm run build:static                # 68 static pages into dist/
+npm run db:seed                     # 79 listings across 4 markets, 8 posts, staff + customer accounts
+npm run build:static                # 72 static pages into dist/
 npm start                           # http://localhost:3000
 ```
 
@@ -48,6 +48,9 @@ Every **§9 MUST is built.** The commit trail, most recent first:
 
 | Commit | What it delivered |
 |---|---|
+| *this commit* | **FR-32** multi-city inventory + area switcher + `/admin/settings` area manager |
+| `e78fd4c` | **FR-33** dealer CSV/API import + API keys |
+| `9d1b4d8` | **FR-18** dealer add-ons + commission statements |
 | `9cd3b66` | **FR-35** blog: author pages, governed tags, listing embeds, editorial calendar |
 | `b809f8c` / `be55e36` | FR-35 groundwork — migration 021, `content.js`, tag/author routes |
 | `f4f0a01` / `f1fbba4` / `c51946a` / `0f424bc` | **FR-22** hire management + docs |
@@ -94,7 +97,71 @@ embedded videos. All four clips total 726 KB.
 
 ---
 
-## 3. Just finished: FR-35 blog enhancements
+## 3. Just finished: FR-32 multi-city inventory
+
+**Built in this commit.** FR-32 is *"Multi-city inventory structure (Owerri/Aba/
+Benin) with area switcher"*, COULD/P3 — but the PRD's data model already decided
+the important part: *"city / area enum/str ✓ Default Port Harcourt; area list
+admin-managed"*. So this is two things: a city dimension through the inventory,
+and an area list ops owns.
+
+What it does:
+
+- **Markets are rows, not strings.** `service_cities` (slug, name, state,
+  `stock_prefix`, blurb, position, active) and `service_areas` (city, name,
+  position, active), migration **024**. A retired area is `is_active = 0`; the
+  listings that mention it keep mentioning it.
+- **Seeded to be real, not a token listing.** 79 cars now split 43 / 7 / 6 / 7
+  (Port Harcourt / Owerri / Aba / Benin City) across 18 lots — two new lots per
+  expansion market, and the new-city cars are filed under that city's own
+  neighbourhoods. Each market has 10 areas.
+- **Stock numbers run per market:** `HC-PH-0079`, `HC-OW-0080`, `HC-AB-0072`,
+  `HC-BN-0073`. A listing inherits its lot's market (`db.dealers.marketFor`), so
+  a lot can never file a car in a city it does not sit in, and an area-less car
+  falls back to its market, not to Port Harcourt.
+- **The city is governed, never free text.** `?city=owerri` is parsed as a slug,
+  resolved against `service_cities` (`db.areas.cityByToken`) and only then used
+  as a filter; anything else is dropped — `?city=lagoos` is the whole network
+  again, and a hand-edited `<script>` value never reaches SQL.
+- **The rail follows the market.** `db.listings.filterFacets({city})` scopes
+  makes, areas, budget range and counts to the market in view; areas render
+  grouped under a market caption when the whole network is on screen.
+- **Four indexable market pages** (`/cars/port-harcourt`, `/cars/owerri`,
+  `/cars/aba`, `/cars/benin-city`) are curated facets (`page_type = 'city'`,
+  added to the enum), statically built and in the sitemap at priority 0.8. A
+  `?city=owerri` URL with nothing else canonicalises onto `/cars/owerri`.
+- **The switcher** is in the header on every page (drawer copy for phones), with
+  live counts per market. Picking one writes the `hc_city` cookie: the server
+  applies it on /cars when no `?city=` is given (private cache, `Vary: Cookie`,
+  noindex — a preference-shaped page is not the page we index), and
+  `public/js/area.js` labels the control on prebuilt static pages, where Node
+  never runs. No cookie-parser in this build — it is hand-read like
+  `auth.readSessionToken`.
+- **Ops owns the list** at `/admin/settings` (§5.1's settings screen, capability
+  `settings.manage`, admin/ops): add, rename, retire, restore and reorder areas
+  per market, every change audited. A rename is **not** retroactive — the cars
+  keep the old spelling and the desk is told how many — and a separate panel
+  lists cars filed under areas the list does not know about, with a one-click
+  "add to <market>".
+- **Dealer side:** the wizard and edit form suggest the lot's own market's
+  areas, and FR-33's CSV import leaves the area blank rather than assuming Port
+  Harcourt — and warns when a row's area is not on the lot's market list.
+
+Where the code is: `db/migrations/024-service-areas.sql`, `src/db/areas.js`,
+`src/services/area-pref.js`, `views/partials/area-switcher.ejs`,
+`views/pages/admin/settings.ejs`, `public/js/area.js`, plus `city` in
+`src/db/listings.js`, `src/services/listing-query.js`, `src/db/dealers.js`,
+`src/services/imports.js`, `src/routes/{public,api,admin,dealer}.js`,
+`test/areas.test.js` (15 tests) and three route tests in `test/routes.test.js`.
+
+**A latent bug found on the way:** `db.listings.filterFacets` interpolated
+`buildWhere().sql` into eight queries but never passed `buildWhere().params` —
+harmless while every filter in it was empty, and a 1210 the moment a real filter
+(city) arrived. It now takes the WHERE fragment and its params together.
+
+---
+
+## 3b. FR-35 blog enhancements
 
 **Built in this commit.** §6.9 asked for five things on top of the blog that
 existed — author pages, a governed tag taxonomy, a smarter related-posts
@@ -139,8 +206,10 @@ Where the code is: `db/migrations/021-blog-authors-tags.sql`, `src/db/content.js
 migration 020 adds the same objects after the targets exist — which is exactly
 why nobody had seen it.
 
-**Next in order:** FR-28/29/30/31/32/34 (P3) → the remaining admin screen
-(settings). `docs/GAPS.md` is canonical: 25 rows, each with what “done” means.
+**Next in order:** FR-28 referrals reporting → FR-29 instant valuation → FR-30 PWA
+→ FR-34 financing handoff, then the rest of the `/admin/settings` groups
+(§18.3 privacy requests and §12.2 admin MFA are the other buildable rows).
+`docs/GAPS.md` is canonical: 23 rows, each with what “done” means.
 
 ## 4. Conventions that are not negotiable
 

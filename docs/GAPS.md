@@ -6,7 +6,25 @@ integrations §11, NFRs §12, sitemap §5.1, acceptance §18.3).
 Line references below point at the code that exists. Where an item is missing, the
 note says what "done" would mean, so the work can be scoped without re-reading the PRD.
 
-**Status at this commit:** FR-33 is built — the dealer portal imports a
+**Status at this commit:** FR-32 is built — the network covers four markets
+(Port Harcourt, Owerri, Aba and Benin City). Cities and their areas are tables
+(`service_cities`, `service_areas`, migration 024) rather than a hard-coded list,
+because the PRD's data model says the area list is admin-managed: ops adds,
+renames, retires, restores and reorders areas at `/admin/settings`, which is also
+the §5.1 **settings** screen. Stock carries its market, each market has its own
+stock-number series (`HC-PH-`, `HC-OW-`, `HC-AB-`, `HC-BN-`; a lot's listings
+inherit its market and can never be filed in a city its lot is not in), the filter
+rail is scoped to the market in view, each market has a curated indexable page
+(`/cars/owerri` and friends) in the sitemap, and the header carries an area
+switcher whose choice is remembered in an `hc_city` cookie — applied server-side
+on /cars, labelled client-side on the prebuilt static pages. A city URL with
+nothing else canonicalises onto the market's curated page; a page filtered only by
+the remembered market is private and noindex. Two rows leave the list: FR-32, and
+the §5.1 "settings has no screen" row — what remains of settings is scoped in row
+§5.1 below. The list is now **23 rows** (8 buildable here, 8 blocked on an
+account, 7 with no home in this sandbox).
+
+**Status at `e78fd4c`:** FR-33 is built — the dealer portal imports a
 spreadsheet. `/dealer/imports` takes CSV (picked or pasted, read in the browser)
 and always shows the dry run first: line by line, what would be created, what
 was refused and which column was wrong, with warnings rather than silence for a
@@ -31,7 +49,8 @@ a subscription the FR-20 renewal queue collects. Statements are per month per lo
 the month's entries = closing, which is checked against the ledger and said out
 loud on the page when it does not. `/admin/dealers` is the §5.1 dealers screen —
 every lot's stock, commission and paid add-ons, with the same statement PDFs.
-Only the **settings** screen is still missing from the §5.1 sitemap.
+Only the **settings** screen was still missing from the §5.1 sitemap (FR-32 has
+since built it — see the top of this file).
 
 **Status at `9cd3b66`:** FR-35 is built — a byline is now a person with a page
 (`/blog/author/{slug}`) and a bio written once, tags are a governed list with
@@ -71,9 +90,8 @@ No external account needed. These are real gaps against the PRD.
 | FR-28 | Referral module — links, attribution, reward status (§7.1) | `referral_code` + `referred_by` exist (`users`), a link and code render on `/account`, and sign-up records the referrer. | Attribution reporting (who came from whom) and a reward status per referral. |
 | FR-29 | Instant valuation widget from price-intel data (§6.6) | `/sell-swap` promises a human valuation within 24h; `price_bands` (FR-23) holds exactly the data a widget needs. | Make/model/year/condition/mileage in, an indicative band out, with the same "sample size" honesty the VDP indicator uses. |
 | FR-30 | PWA — installable, offline shell, web push | Mobile-first responsive site; no manifest, no service worker. | Manifest + service worker + install prompt; push is a bigger call (needs VAPID keys). |
-| FR-32 | Multi-city inventory (Owerri/Aba/Benin) with area switcher | Single-city: `city` is a column, but there is no area filter or switcher anywhere. | City dimension through inventory, facets, sitemap and the area switcher in the header. |
 | FR-34 | Financing-lead partner handoff | Nothing. | A financing enquiry that captures intent and hands off, with the partner recorded on the lead. |
-| §5.1 | Admin screen named in the sitemap but absent: **settings** (the **dealers**, **subscriptions** and **hire** screens now exist) | `/admin/dealers` lists every lot with its stock, commission and paid add-ons, and opens each lot's ledger, statements and purchases. Settings has no screen. | A settings screen (business facts, thresholds, channels) — the last of the §5.1 sitemap. |
+| §5.1 | **settings** screen: the market/area manager exists, the rest of the group does not | `/admin/settings` (FR-32) manages markets and their area lists with audit rows, and shows cars filed under areas the list does not know. Business facts, thresholds, fee tables, channels and SLAs are still config-only. | Bring the remaining §5.1 settings groups onto `/admin/settings` so the screen is the console's answer to "where do I change that?" |
 | §18.3 | "Privacy requests actionable in admin" (NDPA) | Self-service works: `/account/export` and account deletion, with the record anonymised (`DELETED-…`). | An admin view of data-subject requests and their handling, so the duty is discharged, not just offered. |
 | §12.2 | MFA for admin roles | Sign-in is phone OTP — one factor, however strong. | TOTP (or WebAuthn) as a second factor for `admin`/`finance`, with recovery codes. |
 | §11 | Turnstile/reCAPTCHA on public forms | Rate limits per route (`src/lib/rate-limit.js`) and server-side validation; no bot challenge. | A site-key-gated invisible challenge, degrading to the current behaviour when unset. |

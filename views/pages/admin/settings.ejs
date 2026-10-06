@@ -1,0 +1,166 @@
+<%#
+  /admin/settings — §5.1's settings screen, and the FR-32 area manager.
+
+  The PRD's data model says the area list is admin-managed. This is that
+  management: the markets we cover, the neighbourhoods inside each, and the
+  order the storefront offers them in. Nothing here renames a listing — a
+  rename leaves the cars filed under the old spelling where they are, and says
+  how many that was so the desk can decide.
+
+  Locals: cities (each with its areas), areas, unmanaged, areaCount
+%>
+
+<section class="panel" aria-labelledby="markets-h">
+  <div class="panel__head">
+    <div>
+      <h2 class="panel__title" id="markets-h">Markets &amp; service areas</h2>
+      <p class="cms-hint">
+        <%= cities.length %> market<%= cities.length === 1 ? '' : 's' %> ·
+        <%= areaCount %> area<%= areaCount === 1 ? '' : 's' %>.
+        A buyer filters by these; an area that is not on this list cannot be filtered for,
+        and a retired one stops being offered without losing the cars already filed under it.
+      </p>
+    </div>
+  </div>
+
+  <div class="admin-grid admin-grid--2">
+    <% cities.forEach(function (city) { %>
+      <section class="panel<%= city.active ? '' : ' panel--muted' %>" aria-labelledby="city-<%= city.id %>">
+        <div class="panel__head">
+          <div>
+            <h3 class="panel__title" id="city-<%= city.id %>">
+              <%= city.name %> <span class="muted"><%= city.state %> State</span>
+            </h3>
+            <p class="cms-hint">
+              <span class="tabular"><%= city.live %></span> live ·
+              <span class="tabular"><%= city.cars %></span> in the 7-day sold window ·
+              series <code><%= city.stockPrefix %></code>
+            </p>
+          </div>
+        </div>
+
+        <% if (!city.areas.length) { %>
+          <p class="empty-line">No neighbourhoods listed for this market yet. Add the first one below — until then buyers can only filter the whole city.</p>
+        <% } else { %>
+          <div class="table-wrap">
+            <table class="table">
+              <thead>
+                <tr>
+                  <th scope="col">Area</th>
+                  <th scope="col" class="tabular">Live</th>
+                  <th scope="col" class="tabular">All stock</th>
+                  <th scope="col">Order</th>
+                  <th scope="col">Rename / retire</th>
+                </tr>
+              </thead>
+              <tbody>
+                <% city.areas.forEach(function (area, index) { %>
+                  <tr<%= area.active ? '' : ' class="is-muted"' %>>
+                    <td>
+                      <strong><%= area.name %></strong>
+                      <% if (!area.active) { %><span class="tag tag--muted">retired</span><% } %>
+                    </td>
+                    <td class="tabular"><%= area.cars %></td>
+                    <td class="tabular"><%= area.stock %></td>
+                    <td>
+                      <form method="post" action="/admin/settings/areas/<%= area.id %>/move" class="inline-form">
+                        <input type="hidden" name="direction" value="up">
+                        <button class="btn btn--ghost btn--sm" type="submit"
+                                <%= index === 0 ? 'disabled' : '' %>
+                                aria-label="Move <%= area.name %> up">↑</button>
+                      </form>
+                      <form method="post" action="/admin/settings/areas/<%= area.id %>/move" class="inline-form">
+                        <input type="hidden" name="direction" value="down">
+                        <button class="btn btn--ghost btn--sm" type="submit"
+                                <%= index === city.areas.length - 1 ? 'disabled' : '' %>
+                                aria-label="Move <%= area.name %> down">↓</button>
+                      </form>
+                    </td>
+                    <td>
+                      <form method="post" action="/admin/settings/areas/<%= area.id %>" class="inline-form">
+                        <label class="visually-hidden" for="area-name-<%= area.id %>">Area name</label>
+                        <input class="input input--compact" id="area-name-<%= area.id %>" name="name"
+                               value="<%= area.name %>" maxlength="80">
+                        <button class="btn btn--secondary btn--sm" type="submit">Save</button>
+                      </form>
+                      <form method="post" action="/admin/settings/areas/<%= area.id %>" class="inline-form">
+                        <input type="hidden" name="active" value="<%= area.active ? '' : '1' %>">
+                        <button class="btn btn--ghost btn--sm" type="submit">
+                          <%= area.active ? 'Retire' : 'Restore' %>
+                        </button>
+                      </form>
+                    </td>
+                  </tr>
+                <% }); %>
+              </tbody>
+            </table>
+          </div>
+        <% } %>
+
+        <form method="post" action="/admin/settings/areas" class="admin-inline-form mt-2">
+          <input type="hidden" name="city_id" value="<%= city.id %>">
+          <label class="visually-hidden" for="new-area-<%= city.id %>">New area in <%= city.name %></label>
+          <input class="input input--compact" id="new-area-<%= city.id %>" name="name"
+                 placeholder="e.g. <%= city.areas.length ? 'another neighbourhood' : 'New Owerri' %>" maxlength="80" required>
+          <button class="btn btn--primary btn--sm" type="submit">Add area</button>
+        </form>
+      </section>
+    <% }); %>
+  </div>
+</section>
+
+<% if (unmanaged.length) { %>
+  <section class="panel mt-2" aria-labelledby="unmanaged-h">
+    <h2 class="panel__title" id="unmanaged-h">Filed under areas we do not list</h2>
+    <p class="cms-hint">
+      Cars carrying a neighbourhood that is not on the market's list — a dealer typed
+      something we have never offered, or an import arrived before it was added. They are
+      live and sellable; a buyer simply cannot filter for them. Add the ones worth keeping.
+    </p>
+    <div class="table-wrap mt-2">
+      <table class="table">
+        <thead>
+          <tr>
+            <th scope="col">Market</th>
+            <th scope="col">Area as filed</th>
+            <th scope="col" class="tabular">Live</th>
+            <th scope="col" class="tabular">All stock</th>
+            <th scope="col">Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% unmanaged.forEach(function (row) { %>
+            <tr>
+              <td><%= row.city %></td>
+              <td><strong><%= row.area %></strong></td>
+              <td class="tabular"><%= row.live %></td>
+              <td class="tabular"><%= row.cars %></td>
+              <td>
+                <% var city = cities.find(function (c) { return c.name === row.city; }); %>
+                <% if (city) { %>
+                  <form method="post" action="/admin/settings/areas" class="inline-form">
+                    <input type="hidden" name="city_id" value="<%= city.id %>">
+                    <input type="hidden" name="name" value="<%= row.area %>">
+                    <button class="btn btn--secondary btn--sm" type="submit">Add to <%= city.name %></button>
+                  </form>
+                <% } else { %>
+                  <span class="muted">No market named “<%= row.city %>” — the lot's own city is off the list too.</span>
+                <% } %>
+              </td>
+            </tr>
+          <% }); %>
+        </tbody>
+      </table>
+    </div>
+  </section>
+<% } %>
+
+<section class="panel mt-2" aria-labelledby="settings-rest-h">
+  <h2 class="panel__title" id="settings-rest-h">What else lives here</h2>
+  <p class="cms-hint">
+    Settings is the home for what ops owns about the shape of the business rather than
+    one listing or one order. Today that is the market and area list above; the other §5.1
+    groups — fee tables, SLAs and the numbers the offers are priced from — still live in
+    configuration and are read-only, and are tracked in <code>docs/GAPS.md</code>.
+  </p>
+</section>

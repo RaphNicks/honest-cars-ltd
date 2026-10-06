@@ -483,7 +483,12 @@ maybe('a linked dealer account gets its own lot, and only its own lot', async ()
   }
 
   // Another lot's car is not reachable, and the refusal is a sentence.
-  const foreign = await db.queryOne('SELECT id, stock_no FROM vehicle_listings WHERE dealer_id = ? LIMIT 1', [3]);
+  // A *live* car of another lot: the assertion below is that this write changed
+  // nothing, so the fixture has to be something the write could have changed.
+  const foreign = await db.queryOne(
+    "SELECT id, stock_no FROM vehicle_listings WHERE dealer_id = ? AND status = 'live' LIMIT 1",
+    [3],
+  );
   const peek = await web.request(`/dealer/listings/${foreign.id}`);
   assert.equal(peek.status, 303, 'not found is answered by a redirect back to the inbox');
   assert.match(decodeURIComponent(peek.location), /not one of yours/i);

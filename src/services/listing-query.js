@@ -20,6 +20,7 @@ const PARAM_MAP = {
   transmission: 'transmission',
   condition: 'condition',
   grade: 'grade',
+  city: 'city',
   area: 'area',
   colour: 'colour',
   year_min: 'year_min',
@@ -44,6 +45,9 @@ const SORT_MAP = {
 const SORT_TO_TOKEN = Object.fromEntries(Object.entries(SORT_MAP).map(([token, key]) => [key, token]));
 
 const FILTER_PARAMS = [...Object.keys(PARAM_MAP), 'min', 'max'];
+
+/** A city token: `owerri`, `benin-city`, or the name as ops spells it. */
+const CITY_TOKEN = /^[A-Za-z][A-Za-z0-9 .'\-]{1,59}$/;
 
 /** Params that must be plain integers; anything else is dropped in parsing. */
 const NUMERIC_PARAMS = new Set(['year_min', 'year_max', 'mileage_max']);
@@ -95,6 +99,10 @@ function parseListingQuery(query = {}) {
     // Two gates: the parser drops malformed values, and buildWhere validates
     // enums again before anything reaches SQL.
     if (NUMERIC_PARAMS.has(param) && !/^\d{1,7}$/.test(value)) continue;
+    // §6.2 city URLs are slugs; a facet rule may name the city directly. Either
+    // way it has to look like a place, and the repository resolves it against
+    // service_cities before it is ever used as a filter.
+    if (param === 'city' && !CITY_TOKEN.test(value)) continue;
     filters[column] = param === 'customs' ? '1' : value;
     view[param] = value;
   }
@@ -108,7 +116,7 @@ function parseListingQuery(query = {}) {
 /** Rebuild a querystring from the view object (+ sort/page), dropping defaults. */
 function buildQueryString(view = {}, { sort = 'recommended', page = 1, includeSort = true } = {}) {
   const params = new URLSearchParams();
-  const ordered = ['q', 'make', 'model', 'body', 'fuel', 'transmission', 'condition', 'grade', 'area', 'colour', 'min', 'max', 'year_min', 'year_max', 'mileage_max', 'customs'];
+  const ordered = ['q', 'city', 'make', 'model', 'body', 'fuel', 'transmission', 'condition', 'grade', 'area', 'colour', 'min', 'max', 'year_min', 'year_max', 'mileage_max', 'customs'];
   for (const key of ordered) {
     const value = view[key];
     if (value === undefined || value === null || value === '') continue;
@@ -141,6 +149,9 @@ function activeFilterPills(view = {}, helpers) {
   if (view.condition) add('condition', 'Condition', helpers.CONDITION_LABELS[view.condition] || view.condition);
   if (view.transmission) add('transmission', 'Transmission', helpers.TRANSMISSION_LABELS[view.transmission] || view.transmission);
   if (view.fuel) add('fuel', 'Fuel', helpers.FUEL_LABELS[view.fuel] || view.fuel);
+  // `view.city` is the URL token (a slug); the label is filled in by the route
+  // once the city has been resolved against service_cities.
+  if (view.city) add('city', 'City', view.city);
   if (view.area) add('area', 'Area', view.area);
   if (view.grade) add('grade', 'Grade', 'Certified only');
   if (view.customs) add('customs', 'Documents', 'Customs verified');

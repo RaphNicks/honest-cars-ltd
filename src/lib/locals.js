@@ -27,11 +27,15 @@ const CHROME_TTL_MS = 60_000;
 
 async function siteChrome() {
   if (chromeCache.data && Date.now() - chromeCache.at < CHROME_TTL_MS) return chromeCache.data;
-  const [services, counters] = await Promise.all([
+  const [services, counters, cities] = await Promise.all([
     db.content.serviceSuite(),
     db.listings.networkCounters(),
+    // FR-32: the markets we cover, in ops order with live counts — the header
+    // switcher is on every page, static ones included, so this has to live in
+    // the shared chrome rather than in one route.
+    db.areas.cities(),
   ]);
-  const data = { services, counters };
+  const data = { services, counters, cities };
   chromeCache = { at: Date.now(), data };
   return data;
 }
@@ -178,6 +182,11 @@ async function buildLocals(routePath, page = {}, extra = {}) {
       services: chrome.services,
       megaMenu: megaMenuItems(chrome.services),
       counters: chrome.counters,
+      cities: chrome.cities,
+      // The market this particular page is about, when the route knows one
+      // (a city facet, or /cars filtered to a market). Null means “the whole
+      // network”, and the client fills the label from the visitor's cookie.
+      city: extra.serviceCity || null,
       analytics: config.analytics,
       currentPath: routePath,
       saveData,
