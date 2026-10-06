@@ -6,7 +6,32 @@ integrations §11, NFRs §12, sitemap §5.1, acceptance §18.3).
 Line references below point at the code that exists. Where an item is missing, the
 note says what "done" would mean, so the work can be scoped without re-reading the PRD.
 
-**Status at this commit:** FR-28 is built — the referral module, end to end.
+**Status at this commit:** FR-29 is built — the instant estimate on /sell-swap.
+§6.6 asks for "a rough band from pricing DB with 'confirm with free human
+valuation' CTA", so that is exactly what it is, and the honesty is in the
+answer's shape:
+
+- The band comes from `price_bands` (§7.3) by the **same matching rule the price
+  badge on a listing uses** — exact condition beats `any`, most evidence wins a
+  tie — so the widget and the VDP cannot describe the same model differently.
+- Every answer carries its **sample size and its age**. A band past §7.3's
+  weekly refresh renders in amber with the caveat beside it rather than reading
+  as current.
+- **Mileage is described, never applied.** We have no mileage curve, so the
+  widget prints the median mileage of the live comparable stock beside the
+  seller's figure, says which way that usually moves the price, and states that
+  the human valuation is what decides.
+- **No band is a real answer**, not a guess: the reply names the year range we do
+  cover, or the models of that make we hold, and hands over to the free human
+  valuation.
+- `GET /api/valuation` (rate-limited, name-shape validated) is the whole
+  contract; the page's three-step intake still works with JavaScript off, and
+  the widget's CTA carries what was typed into the intake form below.
+
+One row left the list. That took it to **21 rows** (6 buildable here, 8 blocked
+on an account, 7 with no home in this sandbox).
+
+**Status at `d1b1da0`:** FR-28 is built — the referral module, end to end.
 The link and the attribution have existed since migration 007 (`users.referral_code`
 / `referred_by`, the card on /account); what was missing was the **reward
 status** §7.1 asks for. Migration 025 adds `users.referral_qualified_at` and a
@@ -31,8 +56,8 @@ without the site ever promising a figure:
 - The seed carries all four states (pending, paid, uncounted, and a link nobody
   used), so every renderer is exercised on a fresh database.
 
-One row leaves the list. The list is now **22 rows** (7 buildable here, 8 blocked
-on an account, 7 with no home in this sandbox).
+One row left the list there. That took it to 22 rows (7 buildable here, 8
+blocked on an account, 7 with no home in this sandbox).
 
 **Status at `c974792`:** FR-32 is built — the network covers four markets
 (Port Harcourt, Owerri, Aba and Benin City). Cities and their areas are tables
@@ -115,7 +140,6 @@ No external account needed. These are real gaps against the PRD.
 
 | ID | Requirement | What is actually there | What "done" means |
 |---|---|---|---|
-| FR-29 | Instant valuation widget from price-intel data (§6.6) | `/sell-swap` promises a human valuation within 24h; `price_bands` (FR-23) holds exactly the data a widget needs. | Make/model/year/condition/mileage in, an indicative band out, with the same "sample size" honesty the VDP indicator uses. |
 | FR-30 | PWA — installable, offline shell, web push | Mobile-first responsive site; no manifest, no service worker. | Manifest + service worker + install prompt; push is a bigger call (needs VAPID keys). |
 | FR-34 | Financing-lead partner handoff | Nothing. | A financing enquiry that captures intent and hands off, with the partner recorded on the lead. |
 | §5.1 | **settings** screen: the market/area manager exists, the rest of the group does not | `/admin/settings` (FR-32) manages markets and their area lists with audit rows, and shows cars filed under areas the list does not know. Business facts, thresholds, fee tables, channels and SLAs are still config-only. | Bring the remaining §5.1 settings groups onto `/admin/settings` so the screen is the console's answer to "where do I change that?" |

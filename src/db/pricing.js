@@ -251,6 +251,81 @@ async function refreshBand(id, { actorId = null } = {}) {
   return { ok: true, band: await bandById(existing.id) };
 }
 
+/**
+ * The band for one car — FR-29's lookup.
+ *
+ * Same matching rule as the VDP indicator (`pickBand` in db/listings.js): exact
+ * condition beats `any`, and the row with the most evidence behind it wins a
+ * tie. If this ever disagrees with the badge on a listing, the widget and the
+ * page would be telling two different stories about the same model.
+ */
+async function findBand({ make, model, year, condition = 'any' } = {}) {
+  if (!make || !model || !year) return null;
+  const rows = await query(
+    `SELECT * FROM price_bands
+      WHERE make = ? AND model = ?
+        AND ? BETWEEN year_from AND year_to
+        AND (\`condition\` = ? OR \`condition\` = 'any')`,
+    [String(make), String(model), Number(year), String(condition)],
+  );
+  if (!rows.length) return null;
+  const best = rows.sort((a, b) => {
+    const exact = Number(b.condition === condition) - Number(a.condition === condition);
+    if (exact) return exact;
+    return Number(b.sample_size) - Number(a.sample_size);
+  })[0];
+  return shapeBand(best);
+}
+
+/**
+ * What we *do* hold for a make/model, so "no band for that one" can be followed
+ * by "here is the range we cover" instead of a dead end. Returns nulls when the
+ * model is unknown to the table entirely.
+ */
+async function coverageFor({ make, model = null } = {}) {
+  if (!make) return null;
+  const row = await queryOne(
+    `SELECT COUNT(*) AS bands,
+            MIN(year_from) AS year_from, MAX(year_to) AS year_to,
+            MIN(refreshed_at) AS oldest_refresh, MAX(refreshed_at) AS newest_refresh,
+            SUM(sample_size) AS samples
+       FROM price_bands
+      WHERE make = ? ${model ? 'AND model = ?' : ''}`,
+    model ? [String(make), String(model)] : [String(make)],
+  );
+  if (!row || !Number(row.bands)) return null;
+  return {
+    make,
+    model,
+    bands: Number(row.bands),
+    yearFrom: Number(row.year_from),
+    yearTo: Number(row.year_to),
+    samples: Number(row.samples || 0),
+    oldestRefresh: row.oldest_refresh,
+    newestRefresh: row.newest_refresh,
+  };
+}
+
+/** Other models of the same make we hold bands for — the suggestion list. */
+async function modelsFor({ make, excludeModel = null, limit = 6 } = {}) {
+  if (!make) return [];
+  const params = [String(make)];
+  let sql = 'SELECT model, MIN(year_from) AS year_from, MAX(year_to) AS year_to, SUM(sample_size) AS samples FROM price_bands WHERE make = ?';
+  if (excludeModel) {
+    sql += ' AND model <> ?';
+    params.push(String(excludeModel));
+  }
+  sql += ' GROUP BY model ORDER BY samples DESC, model ASC LIMIT ?';
+  params.push(Math.min(20, Math.max(1, Number(limit) || 6)));
+  const rows = await query(sql, params);
+  return rows.map((row) => ({
+    model: row.model,
+    yearFrom: Number(row.year_from),
+    yearTo: Number(row.year_to),
+    samples: Number(row.samples || 0),
+  }));
+}
+
 module.exports = {
   CONDITIONS,
   CONDITION_LABELS,
@@ -258,6 +333,9 @@ module.exports = {
   shapeBand,
   bands,
   bandById,
+  findBand,
+  coverageFor,
+  modelsFor,
   gaps,
   coverage,
   upsertBand,

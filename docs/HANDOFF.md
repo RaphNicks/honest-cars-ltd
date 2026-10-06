@@ -1,6 +1,6 @@
 # Handoff — where this build is, and how to continue it
 
-**Written 2026-10-06, updated for FR-28, on branch `arena/01a0f7df-honest-cars-ltd`.**
+**Written 2026-10-06, updated for FR-29, on branch `arena/01a0f7df-honest-cars-ltd`.**
 If you are picking this up (a person or an agent in a new session), read this file
 first, then `docs/GAPS.md` for the row-by-row list of what is left.
 
@@ -48,7 +48,8 @@ Every **§9 MUST is built.** The commit trail, most recent first:
 
 | Commit | What it delivered |
 |---|---|
-| *this commit* | **FR-28** referrals: who came from whom, and the reward status behind it |
+| *this commit* | **FR-29** instant valuation widget on /sell-swap, from the price-intel bands |
+| `d1b1da0` | **FR-28** referrals: who came from whom, and the reward status behind it |
 | `c974792` | **FR-32** multi-city inventory + area switcher + `/admin/settings` area manager |
 | `e78fd4c` | **FR-33** dealer CSV/API import + API keys |
 | `9d1b4d8` | **FR-18** dealer add-ons + commission statements |
@@ -98,7 +99,45 @@ embedded videos. All four clips total 726 KB.
 
 ---
 
-## 3. Just finished: FR-28 referrals
+## 3. Just finished: FR-29 instant valuation
+
+**Built in this commit.** §6.6's last line: *"Instant estimate widget COULD:
+rough band from pricing DB with 'confirm with free human valuation' CTA."*
+
+What it does:
+
+- **The band is the one the site already trusts.** `src/services/valuation.js`
+  reads `price_bands` (§7.3) through `db.pricing.findBand`, which applies the
+  same rule as the VDP price badge in `db/listings.js` — exact condition beats
+  `any`, most evidence wins a tie. One band, two screens, no drift.
+- **Every answer carries its evidence and its age** — sample size, year range and
+  how long since the refresh are all in the sentence. A band past §7.3's weekly
+  refresh renders in amber with the caveat beside the number.
+- **Mileage is described, never applied.** There is no mileage curve in this
+  database, so the widget prints the median mileage of the live comparable stock
+  (`db.listings.comparablesFor`) beside the seller's figure, says which way that
+  usually moves the price, and says out loud that the human valuation decides.
+- **"No band" is a real answer.** The reply names the year range we do cover, or
+  the models of that make we hold, then hands over to the human valuation. It
+  never invents a number.
+- **One endpoint, one page.** `GET /api/valuation` (rate-limited 30/min,
+  name-shape validated, JSON only) answers; `public/js/valuation.js` renders it
+  with `textContent`; the CTA carries make/model/year/mileage into the intake
+  form below and selects the matching condition radio. The three-step intake
+  still works with JavaScript off — the widget is an upgrade, not the mechanism.
+- **Nothing new is recorded in analytics.** §15.1 has no valuation event and this
+  build does not invent event names; the lead the widget produces does record.
+
+Where the code is: `src/services/valuation.js`, `src/db/pricing.js`
+(`findBand`/`coverageFor`/`modelsFor`), `src/db/listings.js`
+(`comparablesFor`), `src/routes/api.js`, `public/js/valuation.js`,
+`views/pages/sell-swap.ejs`, `public/css/sections.css`, and
+`test/valuation.test.js` (10 tests, each with its own invented model so a fixture
+from one test can never answer another's question).
+
+---
+
+## 3b. Just finished: FR-28 referrals
 
 **Built in this commit.** §7.1 asked for *"Referrals (personal link + reward
 status)"*. The link and the attribution have existed since migration 007 — the
@@ -148,7 +187,7 @@ happen in the same minute and the queue still gains one row per person.
 
 ---
 
-## 3b. FR-32 multi-city inventory
+## 3c. FR-32 multi-city inventory
 
 **Built in this commit.** FR-32 is *"Multi-city inventory structure (Owerri/Aba/
 Benin) with area switcher"*, COULD/P3 — but the PRD's data model already decided
@@ -212,7 +251,7 @@ harmless while every filter in it was empty, and a 1210 the moment a real filter
 
 ---
 
-## 3c. FR-35 blog enhancements
+## 3d. FR-35 blog enhancements
 
 **Built in this commit.** §6.9 asked for five things on top of the blog that
 existed — author pages, a governed tag taxonomy, a smarter related-posts
@@ -257,10 +296,10 @@ Where the code is: `db/migrations/021-blog-authors-tags.sql`, `src/db/content.js
 migration 020 adds the same objects after the targets exist — which is exactly
 why nobody had seen it.
 
-**Next in order:** FR-29 instant valuation → FR-30 PWA → FR-34 financing
-handoff, then the rest of the `/admin/settings` groups (§18.3 privacy requests
-and §12.2 admin MFA are the other buildable rows).
-`docs/GAPS.md` is canonical: 22 rows, each with what “done” means.
+**Next in order:** FR-30 PWA → FR-34 financing handoff, then the rest of the
+`/admin/settings` groups (§18.3 privacy requests and §12.2 admin MFA are the
+other buildable rows).
+`docs/GAPS.md` is canonical: 21 rows, each with what “done” means.
 
 ## 4. Conventions that are not negotiable
 
@@ -286,8 +325,8 @@ and §12.2 admin MFA are the other buildable rows).
 ## 5. Gates before any commit
 
 ```bash
-npm test          # 379/379 (15 areas, 16 imports, 12 blog-tags, 11 referrals …)
-npm run lint      # type ladder + 15 ES modules / 75 event references
+npm test          # 389/389 (15 areas, 16 imports, 12 blog-tags, 11 referrals, 10 valuation …)
+npm run lint      # type ladder + 16 ES modules / 75 event references
 npm run build:static && npm run crawl && npm run audit:pages
 npm run smoke && npm run smoke:cms      # role matrix + CMS round trip
 npm run images:check && npm run videos:check

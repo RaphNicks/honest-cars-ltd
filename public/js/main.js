@@ -23,6 +23,7 @@ import { initFilters } from './filters.js';
 import { initViewingModal, initInlineLeadForms } from './leads.js';
 import { initServiceForms } from './service-forms.js';
 import { initFlows } from './flow.js';
+import { initValuation } from './valuation.js';
 import { initAddToCart, initCartPage, initCheckoutPage, initComparePage } from './cart.js';
 import { initLoadMore, initVideoFacades, initTableOfContents, initHelpful } from './blog.js';
 import { initLogin, initSaveButtons, initAccount, initSaveSearch } from './account.js';
@@ -50,6 +51,7 @@ function boot() {
   initInlineLeadForms();
   initServiceForms();
   initFlows();
+  initValuation();
   initAddToCart();
   initCartPage();
   initCheckoutPage();

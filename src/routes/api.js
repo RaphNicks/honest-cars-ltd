@@ -10,6 +10,7 @@
  *   POST /api/orders             §6.8 guest checkout → orders + items (+ tracker subscriptions)
  *   POST /api/contact            §6.10 contact form → leads
  *   GET  /api/listings           filtered results for the AJAX filter update (§6.2)
+ *   GET  /api/valuation          FR-29 instant estimate from the price-intel table
  *   GET  /api/listings/compare   the ≤3 cars on /cars/compare (§6.4)
  *   GET  /api/posts              next 9 blog cards for “load more” (§6.9)
  *   POST /api/dealer/listings    bulk listing import for a lot, by API key (FR-33)
@@ -29,6 +30,7 @@ const seo = require('../services/seo');
 const og = require('../services/og');
 const listingQuery = require('../services/listing-query');
 const imports = require('../services/imports');
+const valuation = require('../services/valuation');
 const dealerApi = require('../services/dealer-api');
 const render = require('../lib/render');
 const { sendJson, sendFragment, personalise, wantsLessData } = require('../lib/respond');
@@ -464,6 +466,34 @@ router.get('/posts', rateLimit({ windowMs: 60_000, max: 60 }), async (req, res, 
 // AJAX filter results (§6.2 “filters update via lightweight fetch”).
 // Returns the same card markup the SSR page uses — one template, two callers.
 // ---------------------------------------------------------------------------
+/**
+ * FR-29 — the instant estimate (§6.6).
+ *
+ * A read, and a cheap one: two queries against `price_bands` plus the live
+ * comparables. Rate-limited like the other public JSON endpoints, because the
+ * same endpoint is what a scraper would use to map our bands.
+ *
+ * The shape of the answer is deliberate: `found: false` is a 200, not a 404 —
+ * "we do not hold data for that car yet" is a real answer to the question, and
+ * the widget renders it with the same honesty as a band. Only a malformed
+ * request is a 400.
+ */
+router.get('/valuation', rateLimit({ windowMs: 60_000, max: 30 }), async (req, res, next) => {
+  try {
+    const result = await valuation.estimate({
+      make: req.query.make,
+      model: req.query.model,
+      year: req.query.year,
+      condition: req.query.condition,
+      mileageKm: req.query.mileage_km,
+    });
+    if (!result.ok) return sendJson(res, { ok: false, error: result.error }, { status: 400 });
+    return sendJson(res, result);
+  } catch (error) {
+    return next(error);
+  }
+});
+
 router.get('/listings', rateLimit({ windowMs: 60_000, max: 90 }), async (req, res, next) => {
   try {
     const parsed = listingQuery.parseListingQuery(req.query);

@@ -673,6 +673,62 @@ async function filterFacets({ city = null } = {}) {
 }
 
 /** Dependent make → model selects (§6.2), with counts. */
+/**
+ * The live cars that sit behind a band — FR-29's "why this number".
+ *
+ * A band is an opinion about a model, a year window and a condition; these are
+ * the cars on the site right now that make it checkable. Medians rather than
+ * means, because one optimistic seller should not move what we tell somebody
+ * their car is worth. The rows come back bounded and the medians are computed
+ * here — MySQL 5.7 has no window functions, and the counts are small.
+ */
+async function comparablesFor({ make, model, yearFrom = null, yearTo = null, limit = 200 } = {}) {
+  if (!make || !model) return null;
+  const where = ["l.make = ?", 'l.model = ?', "(l.status IN ('live','reserved') AND (l.expires_at IS NULL OR l.expires_at > UTC_TIMESTAMP()))"];
+  const params = [String(make), String(model)];
+  if (yearFrom) {
+    where.push('l.year >= ?');
+    params.push(Number(yearFrom));
+  }
+  if (yearTo) {
+    where.push('l.year <= ?');
+    params.push(Number(yearTo));
+  }
+  const rows = await query(
+    `SELECT l.id, l.year, l.mileage_km, l.asking_price_kobo, l.seo_slug, l.area, l.verification_grade
+       FROM vehicle_listings l
+      WHERE ${where.join(' AND ')}
+      ORDER BY l.asking_price_kobo ASC
+      LIMIT ?`,
+    [...params, Math.min(500, Math.max(1, Number(limit) || 200))],
+  );
+  if (!rows.length) {
+    return { count: 0, priced: 0, medianPriceKobo: null, medianMileageKm: null, minPriceKobo: null, maxPriceKobo: null, sampleUrl: null, yearFrom: null, yearTo: null };
+  }
+
+  const median = (values) => {
+    const sorted = [...values].sort((a, b) => a - b);
+    const mid = Math.floor(sorted.length / 2);
+    return sorted.length % 2 ? sorted[mid] : Math.round((sorted[mid - 1] + sorted[mid]) / 2);
+  };
+  const prices = rows.map((row) => Number(row.asking_price_kobo)).filter((value) => value > 0);
+  const mileages = rows.map((row) => Number(row.mileage_km)).filter((value) => Number.isFinite(value) && value > 0);
+  const middle = rows[Math.floor(rows.length / 2)];
+
+  return {
+    count: rows.length,
+    priced: prices.length,
+    medianPriceKobo: prices.length ? median(prices) : null,
+    medianMileageKm: mileages.length ? median(mileages) : null,
+    minPriceKobo: prices.length ? Math.min(...prices) : null,
+    maxPriceKobo: prices.length ? Math.max(...prices) : null,
+    yearFrom: Math.min(...rows.map((row) => Number(row.year))),
+    yearTo: Math.max(...rows.map((row) => Number(row.year))),
+    sampleUrl: middle ? `/cars/${middle.seo_slug}` : null,
+    sampleArea: middle ? middle.area : null,
+  };
+}
+
 async function modelCounts(make) {
   return query(
     `SELECT model AS value, COUNT(*) AS count FROM vehicle_listings l
@@ -835,6 +891,7 @@ module.exports = {
   findSimilar,
   countNearMatches,
   filterFacets,
+  comparablesFor,
   modelCounts,
   networkCounters,
   findPriceBand,

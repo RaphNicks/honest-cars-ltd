@@ -405,3 +405,45 @@ body:has(.sticky-cta) main { padding-bottom: var(--space-8); }
 /* Replaced by the real player once the visitor taps. */
 .video-facade video { width: 100%; height: 100%; display: block; background: #000; }
 .video-facade__frame--playing { border: 0; }
+
+/* ---------------------------------------------------------------------------
+   FR-29 — instant valuation widget (§6.6)
+
+   It sits above the sell intake, inside the same tab, and borrows the page's
+   own card language: navy for the band, amber when the band is past its weekly
+   refresh, muted when we hold no band at all. The range is the loudest thing on
+   the card, because that is what the visitor came for — and the caveat line
+   stays with it rather than waiting at the bottom of the page.
+   --------------------------------------------------------------------------- */
+.valuation {
+  display: grid;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  margin-bottom: var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  background: var(--color-bg-subtle);
+}
+.valuation__intro { display: grid; gap: var(--space-05); }
+.valuation__intro h2 { font-size: var(--text-24); margin: 0; }
+.valuation__lead { margin: 0; font-size: var(--text-14); color: var(--color-text-muted); max-width: 62ch; }
+.valuation__form { margin-top: var(--space-1); }
+.valuation__status { margin: 0; min-height: 1.2em; font-size: var(--text-12); color: var(--color-text-muted); }
+.valuation__status[data-tone="error"] { color: var(--danger); }
+.valuation__result {
+  display: grid;
+  gap: var(--space-1);
+  padding: var(--space-3);
+  border-radius: var(--radius);
+  border-left: 4px solid var(--honest-navy);
+  background: var(--white);
+}
+.valuation__result[data-tone="amber"] { border-left-color: var(--honest-amber); background: var(--amber-08); }
+.valuation__result[data-tone="muted"] { border-left-color: var(--color-border); }
+.valuation__headline { margin: 0; font-size: var(--text-16); font-weight: var(--weight-semibold); color: var(--color-brand); }
+.valuation__range { margin: 0; font-size: var(--text-24); font-weight: var(--weight-bold); color: var(--honest-navy); }
+.valuation__detail, .valuation__note { margin: 0; font-size: var(--text-14); color: var(--color-text-muted); }
+.valuation__note--warn { color: var(--ink); font-weight: var(--weight-medium); }
+.valuation__link { font-size: var(--text-14); font-weight: var(--weight-medium); }
+.valuation__cta { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-1) var(--space-2); margin-top: var(--space-1); }
+.valuation__cta .valuation__note { flex: 1 1 260px; }

@@ -35,7 +35,59 @@
 
     <%# ------------------------------------------------------------ Tab 1: sell %>
     <div id="panel-sell" role="tabpanel" aria-labelledby="tab-sell" data-feed-panel="sell">
-      <div class="flow" data-flow="sell" data-endpoint="/api/service-requests" data-storage-key="hc-sell-intake">
+      <%#
+        FR-29 — the instant estimate (§6.6). It reads the same price-intel table
+        the price badge on a listing reads, and it says what it does not know:
+        no band, an old band, and no mileage curve are all stated rather than
+        smoothed over. The human valuation below is still the promise.
+      %>
+      <section class="valuation" data-valuation aria-labelledby="valuation-h">
+        <div class="valuation__intro">
+          <p class="eyebrow">Instant estimate</p>
+          <h2 id="valuation-h">What is it likely worth?</h2>
+          <p class="valuation__lead">
+            A rough band from the same price data that labels every car on the site, in seconds. It is
+            not an offer and not a promise: the free human valuation below confirms it inside 24 hours,
+            with the comparables written down.
+          </p>
+        </div>
+
+        <form class="valuation__form form-grid" data-valuation-form novalidate>
+          <div class="field">
+            <label class="field__label" for="val-make">Make</label>
+            <input class="input" id="val-make" name="make" type="text" placeholder="Toyota" required autocomplete="off">
+          </div>
+          <div class="field">
+            <label class="field__label" for="val-model">Model</label>
+            <input class="input" id="val-model" name="model" type="text" placeholder="Camry" required autocomplete="off">
+          </div>
+          <div class="field">
+            <label class="field__label" for="val-year">Year</label>
+            <input class="input" id="val-year" name="year" type="number" inputmode="numeric" min="1980" max="2030" placeholder="2015" required>
+          </div>
+          <div class="field">
+            <label class="field__label" for="val-condition">Condition</label>
+            <select class="select" id="val-condition" name="condition">
+              <option value="any">Let us assume</option>
+              <option value="nigerian_used">Nigerian-used</option>
+              <option value="tokunbo">Tokunbo (imported used)</option>
+              <option value="new">New</option>
+            </select>
+          </div>
+          <div class="field">
+            <label class="field__label" for="val-mileage">Mileage (km, optional)</label>
+            <input class="input" id="val-mileage" name="mileage_km" type="number" inputmode="numeric" min="0" step="1000" placeholder="120000">
+          </div>
+          <div class="field field--action full-width">
+            <button class="btn btn--primary" type="submit">Show me the band</button>
+          </div>
+        </form>
+
+        <p class="valuation__status" data-valuation-status role="status" aria-live="polite"></p>
+        <div class="valuation__result" data-valuation-result hidden></div>
+      </section>
+
+      <div class="flow" id="sell-intake" data-flow="sell" data-endpoint="/api/service-requests" data-storage-key="hc-sell-intake">
         <div class="flow__progress">
           <div class="flow__bar" aria-hidden="true">
             <span data-state="current"></span><span></span><span></span>
