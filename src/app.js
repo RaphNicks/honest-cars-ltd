@@ -80,6 +80,19 @@ function createApp() {
   // (it would bypass routing, headers and the dynamic routes entirely). Only
   // the public/ assets are static.
   const publicDir = path.join(__dirname, '..', 'public');
+
+  // The service worker (FR-30) is served deliberately, not by express.static:
+  // a worker script must be revalidated on every visit or a new version can sit
+  // unnoticed for the whole of its 24-hour cache ceiling, and its scope is
+  // decided by the path it is served from — root, so it can handle the whole
+  // site. `Service-Worker-Allowed` makes that explicit rather than accidental.
+  app.get('/sw.js', (req, res) => {
+    res.set('Content-Type', 'text/javascript; charset=utf-8');
+    res.set('Cache-Control', 'no-cache, no-store, must-revalidate');
+    res.set('Service-Worker-Allowed', '/');
+    res.sendFile(path.join(publicDir, 'sw.js'));
+  });
+
   app.use(
     express.static(publicDir, {
       maxAge: config.isProduction ? '30d' : 0,

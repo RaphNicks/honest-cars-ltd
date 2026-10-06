@@ -6,7 +6,28 @@ integrations §11, NFRs §12, sitemap §5.1, acceptance §18.3).
 Line references below point at the code that exists. Where an item is missing, the
 note says what "done" would mean, so the work can be scoped without re-reading the PRD.
 
-**Status at this commit:** FR-29 is built — the instant estimate on /sell-swap.
+**Status at this commit:** FR-30 is built — the installable, offline-tolerant
+half of the PWA.
+
+What shipped: a generated icon set, a real web app manifest, a service worker
+with an honest cache policy, an `/offline` fallback that says what still works,
+and an install control that stays hidden until the browser itself offers the
+install (no nagging, and never a button that does nothing).
+
+What it deliberately does **not** do: cache anything the server marked `private`
+or `no-store`, touch `/api/`, the console, the portal or checkout — or hold a
+second copy of a queued enquiry. `public/js/drafts.js` has held failed sends
+since §13.2, and a second invisible queue is a second place for a lead to go
+missing.
+
+**Push moves to the blocked table below.** FR-30 also names "push via web
+notifications"; that half needs VAPID keys, a push service and a consented
+reason to send. It cannot be honestly built here, so the row stays in the list,
+in the bucket where every other account-dependent seam lives. The list is still
+**21 rows**: 5 buildable here, 9 blocked on an account, 7 with no home in this
+sandbox.
+
+**Status at `c680d51`:** FR-29 is built — the instant estimate on /sell-swap.
 §6.6 asks for "a rough band from pricing DB with 'confirm with free human
 valuation' CTA", so that is exactly what it is, and the honesty is in the
 answer's shape:
@@ -28,8 +49,8 @@ answer's shape:
   contract; the page's three-step intake still works with JavaScript off, and
   the widget's CTA carries what was typed into the intake form below.
 
-One row left the list. That took it to **21 rows** (6 buildable here, 8 blocked
-on an account, 7 with no home in this sandbox).
+One row left the list there. That took it to 21 rows (6 buildable, 8 blocked,
+7 with no home).
 
 **Status at `d1b1da0`:** FR-28 is built — the referral module, end to end.
 The link and the attribution have existed since migration 007 (`users.referral_code`
@@ -140,7 +161,6 @@ No external account needed. These are real gaps against the PRD.
 
 | ID | Requirement | What is actually there | What "done" means |
 |---|---|---|---|
-| FR-30 | PWA — installable, offline shell, web push | Mobile-first responsive site; no manifest, no service worker. | Manifest + service worker + install prompt; push is a bigger call (needs VAPID keys). |
 | FR-34 | Financing-lead partner handoff | Nothing. | A financing enquiry that captures intent and hands off, with the partner recorded on the lead. |
 | §5.1 | **settings** screen: the market/area manager exists, the rest of the group does not | `/admin/settings` (FR-32) manages markets and their area lists with audit rows, and shows cars filed under areas the list does not know. Business facts, thresholds, fee tables, channels and SLAs are still config-only. | Bring the remaining §5.1 settings groups onto `/admin/settings` so the screen is the console's answer to "where do I change that?" |
 | §18.3 | "Privacy requests actionable in admin" (NDPA) | Self-service works: `/account/export` and account deletion, with the record anonymised (`DELETED-…`). | An admin view of data-subject requests and their handling, so the duty is discharged, not just offered. |
@@ -162,6 +182,7 @@ to have done anything. Each needs an account, keys and (usually) webhook config.
 | §11 | Storage + CDN (S3-compatible) | Images are prepared locally by `scripts/prepare-images.js` (sharp, WebP variants) and served from `/public`. | Bucket + CDN; the media pipeline becomes an upload path rather than a build step. |
 | §11 | Telematics partner portal (P2) | Subscription rows carry `device_state`; nothing connects to a partner. | Partner API or a manual-sync screen. |
 | §11 | Google Maps/Places (P2) | Delivery areas and inspection locations are curated lists, which works offline and on low data. | Places autocomplete + map pins for inspection meets. |
+| FR-30 | Web push notifications (the push half of the PWA) | Installable app, offline shell and install prompt are built; there is no push subscription, no VAPID key pair and no consent record for one. | VAPID keys, a push service and a consented reason to send — the consent banner row above is a prerequisite, not a nicety. |
 
 ## 3. Infrastructure with no home in this sandbox
 

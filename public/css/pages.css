@@ -286,3 +286,35 @@
 /* Receipts keep the event trail visible — it is the honest part of the page. */
 .receipt-trail { margin: 0; padding-left: var(--space-2); font-size: var(--text-14); }
 .receipt-trail li { margin-bottom: 6px; }
+
+/* --------------------------------------------------------------------------
+   /offline — FR-30 fallback page
+   Plain by design: the visitor may be on the last bar of signal. One column,
+   no imagery, no interaction beyond the retry button.
+   -------------------------------------------------------------------------- */
+.offline { padding-block: var(--space-6); }
+.offline__inner { max-width: 640px; }
+.offline__grid {
+  display: grid;
+  gap: var(--space-2);
+  margin-block: var(--space-3);
+}
+@media (min-width: 769px) { .offline__grid { grid-template-columns: 1fr 1fr; } }
+.offline__card {
+  background: var(--surface);
+  border: var(--border);
+  border-radius: var(--radius);
+  padding: var(--space-2);
+}
+.offline__card h2 { font-size: var(--text-16); margin-bottom: var(--space-1); }
+.offline__card ul { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 6px; font-size: var(--text-14); color: var(--color-text-muted); }
+.offline__note {
+  padding: var(--space-2);
+  border-left: 3px solid var(--honest-green);
+  background: var(--green-08);
+  border-radius: var(--radius-sm);
+  font-size: var(--text-14);
+  margin-bottom: var(--space-3);
+}
+.offline__actions { display: flex; flex-wrap: wrap; gap: var(--space-1); }
+.offline__small { margin-top: var(--space-2); font-size: var(--text-12); color: var(--color-text-muted); }

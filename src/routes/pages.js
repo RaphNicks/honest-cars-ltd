@@ -215,6 +215,36 @@ router.get('/guide', async (req, res, next) => {
 });
 
 // ---------------------------------------------------------------------------
+// /offline — FR-30 fallback page
+// ---------------------------------------------------------------------------
+/**
+ * The page the service worker shows when a navigation fails and nothing for that
+ * URL is saved. It exists as a real, buildable page rather than a string inside
+ * the worker so that it is designed, linked, tested and — when someone visits it
+ * with a connection — a normal part of the site. Deliberately noindex: nobody
+ * should ever arrive from a search result telling them they are offline.
+ */
+function buildOfflineLocals() {
+  const trail = [{ label: 'Offline' }];
+  return {
+    view: 'offline',
+    page: {
+      title: 'You are offline',
+      metaTitle: 'Offline — HonestCars',
+      titleSuffix: true,
+      description:
+        'This page is saved on your device. Pages you have already opened still work offline, and enquiries you typed send themselves when you are back online.',
+      canonical: '/offline',
+      robots: 'noindex,follow',
+      breadcrumbs: trail,
+      bodyClass: 'page-offline',
+      jsonLd: [],
+    },
+    data: { trail },
+  };
+}
+
+// ---------------------------------------------------------------------------
 // /faq — searchable, grouped (§6.10)
 // ---------------------------------------------------------------------------
 const FAQ_GROUPS = [
@@ -467,6 +497,18 @@ for (const slug of LEGAL_SLUGS) {
 }
 
 // ---------------------------------------------------------------------------
+// /offline (FR-30)
+// ---------------------------------------------------------------------------
+router.get('/offline', async (req, res, next) => {
+  try {
+    const locals = buildOfflineLocals();
+    return await sendPrebuiltOrRender(req, res, { routePath: '/offline', ...locals });
+  } catch (error) {
+    return next(error);
+  }
+});
+
+// ---------------------------------------------------------------------------
 // Account / portal entry points — §7.1 lives in routes/account.js, the §7.2
 // dealer portal in routes/dealer.js, and the §7.3 console in routes/admin.js.
 // Nothing is stubbed here any more.
@@ -481,6 +523,7 @@ module.exports = {
   buildContactLocals,
   buildAboutLocals,
   buildPartnerLocals,
+  buildOfflineLocals,
   buildLegalLocals,
   LEGAL_SLUGS,
   FAQ_GROUPS,

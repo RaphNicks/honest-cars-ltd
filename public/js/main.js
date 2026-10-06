@@ -24,6 +24,7 @@ import { initViewingModal, initInlineLeadForms } from './leads.js';
 import { initServiceForms } from './service-forms.js';
 import { initFlows } from './flow.js';
 import { initValuation } from './valuation.js';
+import { initPWA } from './pwa.js';
 import { initAddToCart, initCartPage, initCheckoutPage, initComparePage } from './cart.js';
 import { initLoadMore, initVideoFacades, initTableOfContents, initHelpful } from './blog.js';
 import { initLogin, initSaveButtons, initAccount, initSaveSearch } from './account.js';
@@ -52,6 +53,9 @@ function boot() {
   initServiceForms();
   initFlows();
   initValuation();
+  // FR-30 — register the service worker, and offer install only if the
+  // browser says the app is installable (§13.3: no nagging).
+  initPWA();
   initAddToCart();
   initCartPage();
   initCheckoutPage();

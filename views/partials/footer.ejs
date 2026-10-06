@@ -54,6 +54,12 @@
 
     <div class="footer__bottom">
       <span><%= site.business.cacLine %></span>
+      <%# FR-30 — the install control is hidden until the browser says the app
+          can actually be installed (see public/js/pwa.js). No nagging: it
+          appears in the footer, once installable, and nowhere else. %>
+      <button class="footer__install" type="button" data-install-app hidden>
+        <%- helpers.icon('plus', { size: 16 }) %> Install the HonestCars app
+      </button>
       <span class="footer__pays" aria-label="Payment partners">
         <span class="footer__pay">Paystack</span>
         <span class="footer__pay">Flutterwave</span>

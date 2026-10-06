@@ -26,6 +26,7 @@ const {
   buildContactLocals,
   buildAboutLocals,
   buildPartnerLocals,
+  buildOfflineLocals,
   buildLegalLocals,
   LEGAL_SLUGS,
 } = require('./pages');
@@ -154,6 +155,9 @@ function trustRoutes() {
     { path: '/find-my-car', view: 'find-my-car', build: () => buildFindMyCarLocals() },
     { path: '/sell-swap', view: 'sell-swap', build: () => buildSellSwapLocals() },
     { path: '/hire', view: 'hire', build: () => buildHireLocals() },
+    // FR-30 — precached by the service worker, and noindex: nobody should reach
+    // "you are offline" from a search result.
+    { path: '/offline', view: 'offline', build: () => buildOfflineLocals() },
     ...LEGAL_SLUGS.map((slug) => ({
       path: `/${slug}`,
       view: 'page',

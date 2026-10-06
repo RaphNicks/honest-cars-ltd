@@ -1600,6 +1600,26 @@ body[data-scroll-locked='true'] { overflow: hidden; }
   color: var(--navy-08);
 }
 .footer__pays { display: flex; gap: var(--space-1); align-items: center; }
+/* FR-30 install control. Hidden until the browser fires beforeinstallprompt,
+   so it is never a button that does nothing. Text button, not a CTA: the one
+   action colour belongs to buying a car, not to installing this site. */
+.footer__install {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 44px;
+  padding: 0 var(--space-1);
+  background: none;
+  border: 0;
+  color: var(--white);
+  font: inherit;
+  font-weight: var(--weight-medium);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+.footer__install[hidden] { display: none; }
+.footer__install:focus-visible { outline: 2px solid var(--white); outline-offset: 2px; border-radius: var(--radius-sm); }
 .footer__pay {
   padding: 2px var(--space-1);
   border: 1px solid rgba(255, 255, 255, 0.24);
