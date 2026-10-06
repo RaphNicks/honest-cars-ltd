@@ -6,6 +6,14 @@ integrations §11, NFRs §12, sitemap §5.1, acceptance §18.3).
 Line references below point at the code that exists. Where an item is missing, the
 note says what "done" would mean, so the work can be scoped without re-reading the PRD.
 
+**Status at `0f424bc`:** FR-22 is built — the hire pool is a registry of
+real units with their papers and trackers, availability is computed per unit per
+day (a car with no insurance is *there* and not available), the booking lifecycle
+runs quote → accept → pay → out → back with every out-of-order step refused in a
+sentence, the incident log costs and charges separately, and a hire's invoice is
+a PDF that bills what was quoted. §7.4 gains two rows (`hire.view` for
+admin/ops/finance, `hire.manage` for admin/ops) and the smoke test proves them.
+
 **Status at `3f01527`:** FR-20 is built — tracker subscriptions run a real
 lifecycle (derived state, activation checklist, online renewals paid by transfer
 until a PSP exists) with a 30/7/1-day reminder sweep that is safe to run every
@@ -26,7 +34,6 @@ No external account needed. These are real gaps against the PRD.
 
 | ID | Requirement | What is actually there | What "done" means |
 |---|---|---|---|
-| FR-22 | Hire management — pool registry, calendar, booking records (§7.3) | Public `/hire` quotes per class (`hire_classes`); a hire enquiry lands in the leads inbox. No pool, no availability, no hire-specific records. | Admin registry of hireable vehicles, an availability calendar, and hire bookings distinct from service requests. |
 | FR-28 | Referral module — links, attribution, reward status (§7.1) | `referral_code` + `referred_by` exist (`users`), a link and code render on `/account`, and sign-up records the referrer. | Attribution reporting (who came from whom) and a reward status per referral. |
 | FR-29 | Instant valuation widget from price-intel data (§6.6) | `/sell-swap` promises a human valuation within 24h; `price_bands` (FR-23) holds exactly the data a widget needs. | Make/model/year/condition/mileage in, an indicative band out, with the same "sample size" honesty the VDP indicator uses. |
 | FR-30 | PWA — installable, offline shell, web push | Mobile-first responsive site; no manifest, no service worker. | Manifest + service worker + install prompt; push is a bigger call (needs VAPID keys). |
@@ -34,7 +41,7 @@ No external account needed. These are real gaps against the PRD.
 | FR-33 | Dealer bulk CSV/API listing import | One-listing-at-a-time via the dealer wizard and `/admin/listings/new`. | A CSV template, a validating importer with a dry-run report, and an API key per lot. |
 | FR-34 | Financing-lead partner handoff | Nothing. | A financing enquiry that captures intent and hands off, with the partner recorded on the lead. |
 | FR-35 | Blog enhancements (§6.9) | Categories, RSS, per-post author byline, hero, Article schema, related-by-category, service CTA. | Author pages, tag taxonomy with listing auto-suggestions, a related-posts engine, dynamic listing embeds, and an editorial calendar view in the CMS. |
-| §5.1 | Admin screens named in the sitemap but absent: **dealers**, **subscriptions**, **hire calendar**, **settings** | Dealer accounts are managed from `/admin/staff` (link/unlink); everything else has no screen. | One screen per item; the dealers one is the natural home for FR-18 statements and FR-33 imports. |
+| §5.1 | Admin screens named in the sitemap but absent: **dealers**, **settings** (the **subscriptions** and **hire** screens now exist) | Dealer accounts are managed from `/admin/staff` (link/unlink); settings has no screen. | One screen per item; the dealers one is the natural home for FR-18 statements and FR-33 imports. |
 | §18.3 | "Privacy requests actionable in admin" (NDPA) | Self-service works: `/account/export` and account deletion, with the record anonymised (`DELETED-…`). | An admin view of data-subject requests and their handling, so the duty is discharged, not just offered. |
 | §12.2 | MFA for admin roles | Sign-in is phone OTP — one factor, however strong. | TOTP (or WebAuthn) as a second factor for `admin`/`finance`, with recovery codes. |
 | §11 | Turnstile/reCAPTCHA on public forms | Rate limits per route (`src/lib/rate-limit.js`) and server-side validation; no bot challenge. | A site-key-gated invisible challenge, degrading to the current behaviour when unset. |
