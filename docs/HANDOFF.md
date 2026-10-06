@@ -1,6 +1,6 @@
 # Handoff — where this build is, and how to continue it
 
-**Written 2026-10-05 at commit `8c53572` on branch `arena/01a0f7df-honest-cars-ltd`.**
+**Written 2026-10-06 at commit `a6ba608` on branch `arena/01a0f7df-honest-cars-ltd`.**
 If you are picking this up (a person or an agent in a new session), read this file
 first, then `docs/GAPS.md` for the row-by-row list of what is left.
 
@@ -48,7 +48,10 @@ Every **§9 MUST is built.** The commit trail, most recent first:
 
 | Commit | What it delivered |
 |---|---|
-| `8c53572` | **WIP** FR-20 — migration 019, `src/db/subscriptions.js`, `src/services/renewals.js` (see §3) |
+| `a6ba608` | `docs/GAPS.md` retired FR-20 (27 left) |
+| `3f01527` | **FR-20** tracker subscriptions: renewals, reminders, dealer retainers |
+| `a834c71` | `docs/HANDOFF.md` (this file) |
+| `8c53572` | FR-20 groundwork — migration 019, `src/db/subscriptions.js`, `src/services/renewals.js` |
 | `88a2882` | `docs/GAPS.md` retired §13.2 + FR-24 rows (28 left) |
 | `6a2e989` | §13.2 low-bandwidth set + FR-24/§16 video |
 | `eeb409e` | `docs/GAPS.md` retired the §15.2 row |
@@ -87,58 +90,46 @@ embedded videos. All four clips total 726 KB.
 
 ---
 
-## 3. In flight: FR-20 tracking subscriptions (the next thing to finish)
+## 3. Just finished: FR-20 tracking subscriptions
 
-Parked deliberately mid-way, **with nothing broken on the site** — the renew
-action on `/account` renders as plain text until its route exists.
+**Built and pushed in `3f01527`.** §7.3 asks for three things — the subscription
+records, a renewal queue with 30/7/1-day reminders, and dealer retainer
+management — and all three exist.
 
-Done (`8c53572`):
+What it does:
 
-- **`db/migrations/019-subscriptions-renewals.sql`** — adds `kind`
-  (`tracker` | `dealer_retainer`), `dealer_id`, `unit_label`, `plan_name`,
-  `amount_kobo`, `period_months` to `subscriptions`; creates
-  `subscription_reminders` with `UNIQUE (subscription_id, window_days)`; adds
-  `payments.subscription_id`. Mirrored in `db/schema.sql`. Applied.
-- **`src/db/subscriptions.js`** — the whole lifecycle. State is *derived*
-  (`effectiveState`): `lapsed` past a 7-day grace window, `renewal_due` inside the
-  30-day window, otherwise the checklist. Reads (`byId`, `forPhone`, `queue`,
-  `summary`, `dueForReminders`, `sentWindows`), writes (`setChecklist`,
-  `cancel`, `createRetainer`, `renewalQuote`, `recordReminder`, `sweepLapsed`),
-  and `applyRenewal(conn, payment)`.
-- **`src/services/renewals.js`** — `queue()`, `register()`, `runReminders()`
-  with the 30/7/1-day wording and per-window dedupe (re-running is a no-op).
-- **`src/db/payments.js`** — `subscription_id` plumbed through `createPayment`
-  and `shapePayment`; `markPaid` calls `applyRenewal` **inside its transaction**,
-  so money and entitlement cannot come apart on any path (webhook, console, manual).
-- **`notify.js`** — `subscription_renewal` template; **`config.js`** — its channel.
-- **`account.ejs`** — the tracked-vehicles block now shows plan, unit, days to go,
-  derived state pill and the renewal price.
+- **State is derived, not stored.** `effectiveState()` in `src/db/subscriptions.js`
+  reads the renewal date: past a 7-day grace window it is `lapsed`, inside 30 days
+  `renewal_due`, otherwise whatever the activation checklist recorded. A customer
+  who stopped paying cannot sit in the console looking active, and `cancelled`
+  stays cancelled because that is a decision, not a date.
+- **Online renewals** — `POST /account/subscriptions/:id/renew` raises a payment
+  and `/account/renewals/:reference` shows how to pay it (bank transfer until a
+  PSP exists, and it says so). The year is granted by `applyRenewal(conn, payment)`
+  **inside the transaction that marks the payment paid**, so no path can take a
+  renewal without extending the subscription and none can extend it twice.
+  Renewing early adds the period to the existing date, so nobody loses days.
+- **The sweep** — `npm run renewals [--dry-run]`, or the button on
+  `/admin/subscriptions`. One reminder per 30/7/1-day window, deduped by a unique
+  key in `subscription_reminders`, so a daily cron is safe. The wording follows
+  the days actually left (a six-day-late renewal says so; it does not say
+  “expires tomorrow”). An undeliverable reminder is still recorded with its text
+  for the desk to send by hand.
+- **Dealer retainers** share the table and the queue; the summary keeps them
+  separate.
+- **§7.4** — the queue is `payments.view` (admin, finance); the checklist,
+  retainer form and sweep are `payments.approve`. Ops and marketing are refused
+  and `npm run smoke` asserts it.
 
-Still to do:
+Where the code is: `db/migrations/019-subscriptions-renewals.sql`,
+`src/db/subscriptions.js`, `src/services/renewals.js`, `scripts/renewals.js`,
+`views/pages/renewal.ejs`, `views/pages/admin/subscriptions.ejs`,
+`test/subscriptions.test.js` (19 tests).
 
-1. `POST /account/subscriptions/:id/renew` — quote via `renewalQuote()`, then
-   `payments.initiate({ purpose: 'subscription', subscriptionId })`, then show the
-   bank-transfer instructions (the same honest path `/order/:orderNo` uses).
-2. A way to *finish* paying that renewal — a mirror of `/order/:orderNo`'s pending
-   payment block, or reuse it.
-3. `/admin/subscriptions` — the renewal queue + register + activation checklist
-   POSTs + `createRetainer` for a dealer, plus a "run reminders now" button and the
-   sweep report. Capability `payments.view` (queue) / `payments.approve` (checklist).
-4. `npm run renewals` script (`scripts/renewals.js`) — cron entry point.
-5. Seed: three tracker subscriptions (one activating, one renewing in 9 days, one
-   lapsed) and two dealer retainers, plus a pending renewal payment.
-6. Tests (`test/subscriptions.test.js`): derived state at the window edges, the
-   sweep firing each window once and not twice, `applyRenewal` extending from the
-   future date when early and from today when lapsed, reminder rows written even
-   when delivery is `skipped`.
-7. Retire the FR-20 row in `docs/GAPS.md`.
-
-**Then in order:** FR-22 (hire management: pool registry, availability calendar,
-dispatch board, incident log) → FR-35 (blog extras) → FR-18 (add-on purchases)
-→ FR-28/29/30/31/32/33/34 (P3). The full list, with "what done means" per row,
-is `docs/GAPS.md` — that file is canonical, keep it updated with each retirement.
-
----
+**Next in order:** FR-22 (hire management — pool registry, availability calendar,
+booking records, incident log; the public `/hire` page and its enquiry already
+exist) → FR-35 (blog extras) → FR-18 (add-on purchases) → FR-28/29/30/31/32/33/34
+(P3). `docs/GAPS.md` is canonical: 27 rows, each with what “done” means.
 
 ## 4. Conventions that are not negotiable
 
@@ -164,7 +155,7 @@ is `docs/GAPS.md` — that file is canonical, keep it updated with each retireme
 ## 5. Gates before any commit
 
 ```bash
-npm test          # 254/254 at 6a2e989
+npm test          # 273/273 at 3f01527
 npm run lint      # type ladder + 14 ES modules / 75 event references
 npm run build:static && npm run crawl && npm run audit:pages
 npm run smoke && npm run smoke:cms      # role matrix + CMS round trip
