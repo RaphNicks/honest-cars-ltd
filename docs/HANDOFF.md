@@ -32,7 +32,7 @@ Run it:
 ```bash
 bash scripts/sandbox/recover.sh     # after a sandbox wipe: deps, MySQL, .env, head
 npm run db:seed                     # 79 listings, 8 posts, staff + customer accounts
-npm run build:static                # 53 static pages into dist/
+npm run build:static                # 68 static pages into dist/
 npm start                           # http://localhost:3000
 ```
 
@@ -48,6 +48,9 @@ Every **§9 MUST is built.** The commit trail, most recent first:
 
 | Commit | What it delivered |
 |---|---|
+| `9cd3b66` | **FR-35** blog: author pages, governed tags, listing embeds, editorial calendar |
+| `b809f8c` / `be55e36` | FR-35 groundwork — migration 021, `content.js`, tag/author routes |
+| `f4f0a01` / `f1fbba4` / `c51946a` / `0f424bc` | **FR-22** hire management + docs |
 | `a6ba608` | `docs/GAPS.md` retired FR-20 (27 left) |
 | `0f424bc` | **FR-22** hire management: pool, availability, bookings, incidents, invoice PDF |
 | `3f01527` | **FR-20** tracker subscriptions: renewals, reminders, dealer retainers |
@@ -91,61 +94,54 @@ embedded videos. All four clips total 726 KB.
 
 ---
 
-## 3. Just finished: FR-22 hire management
+## 3. Just finished: FR-35 blog enhancements
 
-**Built in this commit.** §7.3 asks for three things — a vehicle pool registry
-with documents and tracker state, an availability calendar, and booking records
-with an incident log — and acceptance scenario J6 asks for the corporate path
-end to end: RFQ → quote → client accepts and pays → the car is on the calendar →
-completion and an invoice PDF.
+**Built in this commit.** §6.9 asked for five things on top of the blog that
+existed — author pages, a governed tag taxonomy, a smarter related-posts
+engine, dynamic listing embeds, and an editorial calendar in the CMS.
 
 What it does:
 
-- **The pool is real cars, not classes.** `hire_vehicles` is a row per plate with
-  `owner` (ours or a partner's), `documents_state` + `documents_due`, and
-  `tracker_state`. Two Corollas are two rows; `hire_classes` still supplies the
-  price.
-- **Availability is computed, per unit per day.** `db.hire.availability()`
-  returns `free` / `out` / `held` / `service` / `invalid` / `retired` for every
-  day in a window. A unit is not available if it is in the workshop, already
-  booked on overlapping dates, or if its papers are missing or lapsed — *and the
-  label follows the date, not the column*, so a row that says “current” with an
-  expiry three months gone reads `Lapsed` and cannot be allocated.
-- **The lifecycle runs one way**, and every out-of-order step is refused in a
-  sentence: a car cannot go out on an unpaid hire, a hire that is out cannot be
-  cancelled, a hire that never left cannot be completed, a closed hire cannot be
-  reopened.
-- **Allocation has three guards**: the unit must be free on those dates
-  (overlap is `pickup_at <= dropoff AND dropoff_at >= pickup`, inclusive both
-  ends), must have valid papers, and must be *of the class that was quoted* —
-  putting a sedan on an SUV quote would bill the client for a car they are not
-  getting.
-- **Paying a hire confirms it** — `hire.confirmFromPayment(conn, payment)` runs
-  inside the transaction that marks the money paid, the same shape as FR-20's
-  renewals. `payments.purpose` gained `'hire'` in migration 020 so the receipt
-  says what it is.
-- **The incident log separates cost from charge** (`cost_kobo` vs
-  `charged_kobo`; the difference is what the desk argues about). Anything above
-  minor parks the unit until the incident is closed; a hire's incident takes its
-  vehicle from the booking, never from the form.
-- **The invoice bills what was quoted**, never the current rate card, adds any
-  incident charges, and releases the deposit at handover. `services/invoice.js`
-  builds one object and both renders it twice — the page and a real A4 PDF.
-- **§7.4** — two new rows: `hire.view` (admin, ops, finance — finance needs the
-  hire revenue and the invoices) and `hire.manage` (admin, ops — the same desk
-  that runs bookings and dispatch). Marketing holds neither, and `npm run smoke`
-  asserts all of it.
+- **A byline is a person.** `blog_authors` is an entity with one bio, so a role
+  change is one edit rather than one per post, and `/blog/author/{slug}` exists
+  to link to. Deleting an author never deletes their work — the FK is ON DELETE
+  SET NULL and the post keeps the printed byline it was published with.
+- **Tags are governed, not free text.** `blog_tags` + `blog_post_tags` sit
+  beside (not on top of) `make_tags`: make tags pull live listings into an
+  article, tags say what the article is *about*. `/blog/tag/{slug}` is a real
+  shelf, and an unused tag is still listed in the console — it is a decision
+  that was made, not a gap.
+- **Related posts rank by what they share** — a shared tag beats a shared
+  category, a shared make beats recency, recency breaks the tie.
+- **`[listing:slug]`** puts one named car into the body as a real card, and
+  renders nothing at all when that car has sold. A dead card is worse than no
+  card.
+- **The editorial calendar** (`/admin/cms/calendar`) is a month at a glance:
+  every post on the day it is due, in its workflow colour, one click into the
+  editor. Publishing twice on a Monday morning is the mistake it prevents.
+- **Saving rebuilds the shelves.** A post that moves between tags or changes
+  author changes three or four pages; `publish.TOUCHES.post` takes
+  `{slug, tagSlugs, authorSlug}` and the console passes all three.
+- **The shelves are static.** Tag and author pages are collections of published
+  posts, so they are exactly as stable as the posts: 53 pages → 68. An empty
+  shelf is skipped, and so is an empty author page in the sitemap.
 
-Where the code is: `db/migrations/020-hire-management.sql`, `src/db/hire.js`,
-`src/services/hire.js`, `src/services/invoice.js`, `views/pages/admin/hire.ejs`,
-`views/pages/admin/hire-invoice.ejs`, `views/pages/hire-booking.ejs`,
-`test/hire.test.js` (33 tests). The demo pool is ten units (two partner-owned,
-one with no papers, one expiring, one tracker on order, one in the workshop) and
-the hire book holds every state the lifecycle can be in.
+Where the code is: `db/migrations/021-blog-authors-tags.sql`, `src/db/content.js`,
+`src/db/cms.js`, `src/routes/blog.js`, `src/routes/admin-cms.js`,
+`src/services/blocks.js`, `src/services/sitemap.js`, `src/services/publish.js`,
+`views/pages/blog-tag.ejs`, `views/pages/blog-author.ejs`,
+`views/pages/admin/cms-calendar.ejs`, `test/blog-tags.test.js` (12 tests).
 
-**Next in order:** FR-35 (blog extras) → FR-18 (add-on purchases) →
-FR-28/29/30/31/32/33/34 (P3) → the remaining admin screens (dealers, settings).
-`docs/GAPS.md` is canonical: 27 rows, each with what “done” means.
+**Also fixed, found by building a database from empty for the first time:**
+`db/schema.sql` created `hire_bookings` before `service_requests` and
+`hire_incidents` before `payments`, so a fresh `npm run db:setup` failed with
+`ER_CANNOT_ADD_FOREIGN`. Every existing database was unaffected because
+migration 020 adds the same objects after the targets exist — which is exactly
+why nobody had seen it.
+
+**Next in order:** FR-18 (add-on purchases) → FR-28/29/30/31/32/33/34 (P3) →
+the remaining admin screens (dealers, settings). `docs/GAPS.md` is canonical:
+26 rows, each with what “done” means.
 
 ## 4. Conventions that are not negotiable
 
@@ -171,7 +167,7 @@ FR-28/29/30/31/32/33/34 (P3) → the remaining admin screens (dealers, settings)
 ## 5. Gates before any commit
 
 ```bash
-npm test          # 306/306 (33 of them hire, in test/hire.test.js)
+npm test          # 318/318 (33 hire, 12 blog-tags)
 npm run lint      # type ladder + 14 ES modules / 75 event references
 npm run build:static && npm run crawl && npm run audit:pages
 npm run smoke && npm run smoke:cms      # role matrix + CMS round trip
