@@ -145,7 +145,7 @@ the hire book holds every state the lifecycle can be in.
 
 **Next in order:** FR-35 (blog extras) → FR-18 (add-on purchases) →
 FR-28/29/30/31/32/33/34 (P3) → the remaining admin screens (dealers, settings).
-`docs/GAPS.md` is canonical: 28 rows, each with what “done” means.
+`docs/GAPS.md` is canonical: 27 rows, each with what “done” means.
 
 ## 4. Conventions that are not negotiable
 
