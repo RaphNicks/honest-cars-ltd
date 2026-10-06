@@ -596,7 +596,10 @@ DELETE FROM price_bands;
 DELETE FROM facets;
 DELETE FROM services;
 DELETE FROM testimonials;
+DELETE FROM blog_post_tags;
 DELETE FROM blog_posts;
+DELETE FROM blog_tags;
+DELETE FROM blog_authors;
 DELETE FROM homepage_modules;
 DELETE FROM content_revisions;
 DELETE FROM faqs;
@@ -839,19 +842,73 @@ DELETE FROM dealers;
       'Twelve seconds of the 45-minute checklist every car goes through before it reaches you.',
       'An inspector filming the walkaround on a silver sedan', 'Raph Nicks', 'Head of Inspections', 3, 0],
   ];
+  // FR-35 — the byline as an entity (§6.9 “author card ... E-E-A-T”). One row
+  // per writer: the post keeps `author_name/role/bio` as the printed byline,
+  // `author_id` is the link that makes /blog/author/{slug} possible.
+  const AUTHORS = [
+    ['raph-nicks', 'Raph Nicks', 'Head of Inspections',
+      'Raph leads HonestCars inspections in Port Harcourt. He has inspected more than 600 used cars and has talked more buyers out of bad ones than into them.'],
+    ['ada-george', 'Ada George', 'Market Analyst',
+      'Ada runs market intelligence at HonestCars, building the price bands behind every listing.'],
+    ['chinelo-u', 'Chinelo U.', 'Documentation Lead',
+      'Chinelo leads documentation at HonestCars, handling customs verification, registration and permits across Rivers State.'],
+  ];
+  out.push(insert('blog_authors', ['id', 'slug', 'name', 'role', 'bio'], AUTHORS.map((row, i) => [i + 1, ...row])));
+
+  // FR-35 — the governed tag list (“categories fixed, tags governed”). Make
+  // tags match `make_tags` so a tag page and the live-listing module agree.
+  const TAGS = [
+    ['buying', 'Buying', 'topic', 'Choosing a car, reading a seller, and the questions to ask before money moves.'],
+    ['inspection', 'Inspection', 'topic', 'What our inspectors look at, in the order they look at it — and what a report can miss.'],
+    ['paperwork', 'Paperwork & customs', 'topic', 'Customs duty, registration, change of ownership and the order of operations.'],
+    ['running-costs', 'Running costs', 'topic', 'Fuel, servicing, insurance and what a car really costs per year in Port Harcourt.'],
+    ['mileage', 'Mileage & odometer', 'topic', 'Reading wear instead of believing a number on a dashboard.'],
+    ['tyres', 'Tyres', 'topic', 'The fastest read on how a car has been driven and maintained.'],
+    ['first-car', 'First car', 'topic', 'Buying your first car in Nigeria without a story to tell afterwards.'],
+    ['maintenance', 'Maintenance', 'topic', 'Keeping a Nigerian used car on the road.'],
+    ['toyota', 'Toyota', 'make', 'Toyotas we have inspected, priced and written about — the safest default in this market.'],
+    ['honda', 'Honda', 'make', 'Hondas in Port Harcourt: what holds value and what to check.'],
+    ['lexus', 'Lexus', 'make', 'Lexus SUVs and sedans: the running costs nobody mentions at the point of sale.'],
+    ['video-guide', 'Video guides', 'format', 'Short clips from real inspections — the checks, run on a real car.'],
+    ['market-report', 'Market reports', 'format', 'What the Port Harcourt market is actually doing this quarter, priced from live deals.'],
+  ];
+  out.push(insert('blog_tags', ['id', 'slug', 'label', 'kind', 'description'], TAGS.map((row, i) => [i + 1, ...row])));
+
+  // post slug → the authors and tags it carries.
+  const POST_BYLINE = {
+    '2015-toyota-camry-honest-buyers-guide': ['raph-nicks', ['toyota', 'buying', 'maintenance']],
+    'tokunbo-vs-nigerian-used-ph': ['ada-george', ['buying', 'paperwork', 'market-report']],
+    'odometer-fraud-check-yourself': ['raph-nicks', ['mileage', 'inspection']],
+    'customs-papers-explained': ['chinelo-u', ['paperwork', 'buying']],
+    'ph-fuel-cost-by-model': ['ada-george', ['running-costs', 'toyota', 'honda', 'market-report']],
+    'tyres-you-should-walk-away-from': ['raph-nicks', ['tyres', 'inspection']],
+    'first-car-under-10m-port-harcourt': ['ada-george', ['first-car', 'buying', 'market-report']],
+    'inspection-walkaround-video': ['raph-nicks', ['inspection', 'video-guide']],
+  };
+
   out.push(insert('blog_posts',
-    ['slug', 'title', 'category', 'excerpt', 'hero_image', 'hero_alt', 'author_name', 'author_role', 'read_minutes',
-      'status', 'published_at', 'is_featured', 'make_tags', 'body', 'service_cta', 'author_bio',
+    ['id', 'slug', 'title', 'category', 'excerpt', 'hero_image', 'hero_alt', 'author_name', 'author_role', 'read_minutes',
+      'status', 'published_at', 'is_featured', 'make_tags', 'body', 'service_cta', 'author_bio', 'author_id',
       'meta_title', 'meta_description'],
     posts.map((p, i) => {
       const content = CONTENT.POST_BODIES[p[0]] || {};
       const hero = seedMedia.blogHero(p[0]) || '/img/seed/og-default.svg';
-      return [p[0], p[1], p[2], p[3], hero, p[4], p[5], p[6], p[7], 'published',
+      const byline = POST_BYLINE[p[0]] || ['raph-nicks', []];
+      return [i + 1, p[0], p[1], p[2], p[3], hero, p[4], p[5], p[6], p[7], 'published',
         new Date(Date.UTC(2026, 8, 28) - i * 4 * 86_400_000), p[8],
         JSON.stringify(p[2] === 'market_intel' ? ['Toyota', 'Honda'] : ['Toyota']),
         content.body || [], content.serviceCta || null, content.authorBio || null,
+        AUTHORS.findIndex((row) => row[0] === byline[0]) + 1,
         content.metaTitle || null, content.metaDescription || null];
     })));
+
+  // FR-35 — which posts carry which tags.
+  const tagRows = [];
+  posts.forEach((p, i) => {
+    const byline = POST_BYLINE[p[0]] || ['raph-nicks', []];
+    for (const slug of byline[1]) tagRows.push([i + 1, TAGS.findIndex((row) => row[0] === slug) + 1]);
+  });
+  out.push(insert('blog_post_tags', ['post_id', 'tag_id'], tagRows));
 
   // §7.3 CMS: the homepage modules the console owns. Counters hold labels,
   // never numbers, so a published figure can never go stale.

@@ -13,6 +13,7 @@ SET time_zone = '+00:00';
 SET @NOW = UTC_TIMESTAMP();
 
 DELETE FROM analytics_events;
+DELETE FROM marketing_spend;
 -- Payments first: payment_events and dealer_ledger point at orders, bookings,
 -- requests and listings, so they must go before any of those.
 DELETE FROM payment_events;
@@ -24,11 +25,15 @@ DELETE FROM saved_cars;
 DELETE FROM saved_searches;
 DELETE FROM leads;
 DELETE FROM listing_media;
+DELETE FROM subscription_reminders;
 DELETE FROM subscriptions;
 DELETE FROM delivery_areas;
 DELETE FROM order_items;
 DELETE FROM orders;
 DELETE FROM bookings;
+DELETE FROM hire_incidents;
+DELETE FROM hire_bookings;
+DELETE FROM hire_vehicles;
 DELETE FROM service_requests;
 DELETE FROM products;
 DELETE FROM hire_classes;
@@ -38,7 +43,10 @@ DELETE FROM price_bands;
 DELETE FROM facets;
 DELETE FROM services;
 DELETE FROM testimonials;
+DELETE FROM blog_post_tags;
 DELETE FROM blog_posts;
+DELETE FROM blog_tags;
+DELETE FROM blog_authors;
 DELETE FROM homepage_modules;
 DELETE FROM content_revisions;
 DELETE FROM faqs;
@@ -146,664 +154,666 @@ INSERT INTO vehicle_listings (`id`, `stock_no`, `dealer_id`, `status`, `verifica
   (79, 'HC-PH-0079', 6, 'live', 'network_listed', 'Toyota', 'Corolla', 2015, 'S', 'sedan', 'automatic', 'petrol', '1.8L I4', 'rwd', 'Grey', 'Black fabric', 'nigerian_used', 57500, 0, '["Heated seats","Fog lights","Sunroof","Bluetooth","Third-row seats","Keyless entry","Reverse camera","Parking sensors","USB charging","Apple CarPlay"]', 1100000000, 1, 'within', 'Port Harcourt', 'Mgbuoba', '{"customs_verified":false,"registration":true,"duty_sighted":true,"tinted_permit":true}', 'none', 'none', 'Low-mileage Corolla with tidy interior and no accident history on record. Papers are ready for a same-week transfer. Viewing slots available any weekday.', NULL, NULL, '2015-toyota-corolla-s-hc-ph-0079', 2379, 17, 25, '2026-09-08 15:00:00', DATE_ADD(UTC_TIMESTAMP(), INTERVAL 14 DAY), NULL, 0);
 
 
--- listing_media: 553 rows
-INSERT INTO listing_media (`id`, `listing_id`, `type`, `shot_label`, `url`, `alt_text`, `position`, `width`, `height`) VALUES
-  (1, 1, 'image', 'Front three-quarter', '/img/cars/lexus-rx350-grey.jpg', '2012 Lexus RX 350 F Sport — front three-quarter (Ada George, Port Harcourt)', 0, 1200, 900),
-  (2, 1, 'image', 'Interior', '/img/details/interior.jpg', '2012 Lexus RX 350 F Sport — interior (Ada George, Port Harcourt)', 1, 1200, 900),
-  (3, 1, 'image', 'Dashboard', '/img/details/dashboard.jpg', '2012 Lexus RX 350 F Sport — dashboard (Ada George, Port Harcourt)', 2, 1200, 900),
-  (4, 1, 'image', 'Engine bay', '/img/details/engine-bay.jpg', '2012 Lexus RX 350 F Sport — engine bay (Ada George, Port Harcourt)', 3, 1200, 900),
-  (5, 1, 'image', 'Tyres & tread', '/img/details/tyres.jpg', '2012 Lexus RX 350 F Sport — tyres & tread (Ada George, Port Harcourt)', 4, 1200, 900),
-  (6, 1, 'image', 'Boot', '/img/details/boot.jpg', '2012 Lexus RX 350 F Sport — boot (Ada George, Port Harcourt)', 5, 1200, 900),
-  (7, 1, 'image', 'Odometer close-up', '/img/details/odometer.jpg', '2012 Lexus RX 350 F Sport — odometer close-up (Ada George, Port Harcourt)', 6, 1200, 900),
-  (8, 2, 'image', 'Front three-quarter', '/img/cars/toyota-rav4-silver.jpg', '2013 Toyota RAV4 Limited — front three-quarter (Rumuokoro, Port Harcourt)', 0, 1200, 900),
-  (9, 2, 'image', 'Interior', '/img/details/interior.jpg', '2013 Toyota RAV4 Limited — interior (Rumuokoro, Port Harcourt)', 1, 1200, 900),
-  (10, 2, 'image', 'Dashboard', '/img/details/dashboard.jpg', '2013 Toyota RAV4 Limited — dashboard (Rumuokoro, Port Harcourt)', 2, 1200, 900),
-  (11, 2, 'image', 'Engine bay', '/img/details/engine-bay.jpg', '2013 Toyota RAV4 Limited — engine bay (Rumuokoro, Port Harcourt)', 3, 1200, 900),
-  (12, 2, 'image', 'Tyres & tread', '/img/details/tyres.jpg', '2013 Toyota RAV4 Limited — tyres & tread (Rumuokoro, Port Harcourt)', 4, 1200, 900),
-  (13, 2, 'image', 'Boot', '/img/details/boot.jpg', '2013 Toyota RAV4 Limited — boot (Rumuokoro, Port Harcourt)', 5, 1200, 900),
-  (14, 2, 'image', 'Odometer close-up', '/img/details/odometer.jpg', '2013 Toyota RAV4 Limited — odometer close-up (Rumuokoro, Port Harcourt)', 6, 1200, 900),
-  (15, 3, 'image', 'Front three-quarter', '/img/cars/lexus-rx350-grey.jpg', '2014 Lexus GX 460 Premium — front three-quarter (Woji, Port Harcourt)', 0, 1200, 900),
-  (16, 3, 'image', 'Interior', '/img/details/interior.jpg', '2014 Lexus GX 460 Premium — interior (Woji, Port Harcourt)', 1, 1200, 900),
-  (17, 3, 'image', 'Dashboard', '/img/details/dashboard.jpg', '2014 Lexus GX 460 Premium — dashboard (Woji, Port Harcourt)', 2, 1200, 900),
-  (18, 3, 'image', 'Engine bay', '/img/details/engine-bay.jpg', '2014 Lexus GX 460 Premium — engine bay (Woji, Port Harcourt)', 3, 1200, 900),
-  (19, 3, 'image', 'Tyres & tread', '/img/details/tyres.jpg', '2014 Lexus GX 460 Premium — tyres & tread (Woji, Port Harcourt)', 4, 1200, 900),
-  (20, 3, 'image', 'Boot', '/img/details/boot.jpg', '2014 Lexus GX 460 Premium — boot (Woji, Port Harcourt)', 5, 1200, 900),
-  (21, 3, 'image', 'Odometer close-up', '/img/details/odometer.jpg', '2014 Lexus GX 460 Premium — odometer close-up (Woji, Port Harcourt)', 6, 1200, 900),
-  (22, 4, 'image', 'Front three-quarter', '/img/cars/ford-explorer-blue.jpg', '2016 Infiniti QX60 Base — front three-quarter (Woji, Port Harcourt)', 0, 1200, 900),
-  (23, 4, 'image', 'Interior', '/img/details/interior.jpg', '2016 Infiniti QX60 Base — interior (Woji, Port Harcourt)', 1, 1200, 900),
-  (24, 4, 'image', 'Dashboard', '/img/details/dashboard.jpg', '2016 Infiniti QX60 Base — dashboard (Woji, Port Harcourt)', 2, 1200, 900),
-  (25, 4, 'image', 'Engine bay', '/img/details/engine-bay.jpg', '2016 Infiniti QX60 Base — engine bay (Woji, Port Harcourt)', 3, 1200, 900),
-  (26, 4, 'image', 'Tyres & tread', '/img/details/tyres.jpg', '2016 Infiniti QX60 Base — tyres & tread (Woji, Port Harcourt)', 4, 1200, 900),
-  (27, 4, 'image', 'Boot', '/img/details/boot.jpg', '2016 Infiniti QX60 Base — boot (Woji, Port Harcourt)', 5, 1200, 900),
-  (28, 4, 'image', 'Odometer close-up', '/img/details/odometer.jpg', '2016 Infiniti QX60 Base — odometer close-up (Woji, Port Harcourt)', 6, 1200, 900),
-  (29, 5, 'image', 'Front three-quarter', '/img/cars/ford-explorer-blue.jpg', '2019 Kia Sportage LX — front three-quarter (Eliozu, Port Harcourt)', 0, 1200, 900),
-  (30, 5, 'image', 'Interior', '/img/details/interior.jpg', '2019 Kia Sportage LX — interior (Eliozu, Port Harcourt)', 1, 1200, 900),
-  (31, 5, 'image', 'Dashboard', '/img/details/dashboard.jpg', '2019 Kia Sportage LX — dashboard (Eliozu, Port Harcourt)', 2, 1200, 900),
-  (32, 5, 'image', 'Engine bay', '/img/details/engine-bay.jpg', '2019 Kia Sportage LX — engine bay (Eliozu, Port Harcourt)', 3, 1200, 900),
-  (33, 5, 'image', 'Tyres & tread', '/img/details/tyres.jpg', '2019 Kia Sportage LX — tyres & tread (Eliozu, Port Harcourt)', 4, 1200, 900),
-  (34, 5, 'image', 'Boot', '/img/details/boot.jpg', '2019 Kia Sportage LX — boot (Eliozu, Port Harcourt)', 5, 1200, 900),
-  (35, 5, 'image', 'Odometer close-up', '/img/details/odometer.jpg', '2019 Kia Sportage LX — odometer close-up (Eliozu, Port Harcourt)', 6, 1200, 900),
-  (36, 6, 'image', 'Front three-quarter', '/img/cars/mazda-cx5-red.jpg', '2015 Mazda CX-5 Touring — front three-quarter (Trans-Amadi, Port Harcourt)', 0, 1200, 900),
-  (37, 6, 'image', 'Interior', '/img/details/interior.jpg', '2015 Mazda CX-5 Touring — interior (Trans-Amadi, Port Harcourt)', 1, 1200, 900),
-  (38, 6, 'image', 'Dashboard', '/img/details/dashboard.jpg', '2015 Mazda CX-5 Touring — dashboard (Trans-Amadi, Port Harcourt)', 2, 1200, 900),
-  (39, 6, 'image', 'Engine bay', '/img/details/engine-bay.jpg', '2015 Mazda CX-5 Touring — engine bay (Trans-Amadi, Port Harcourt)', 3, 1200, 900),
-  (40, 6, 'image', 'Tyres & tread', '/img/details/tyres.jpg', '2015 Mazda CX-5 Touring — tyres & tread (Trans-Amadi, Port Harcourt)', 4, 1200, 900);
-INSERT INTO listing_media (`id`, `listing_id`, `type`, `shot_label`, `url`, `alt_text`, `position`, `width`, `height`) VALUES
-  (41, 6, 'image', 'Boot', '/img/details/boot.jpg', '2015 Mazda CX-5 Touring — boot (Trans-Amadi, Port Harcourt)', 5, 1200, 900),
-  (42, 6, 'image', 'Odometer close-up', '/img/details/odometer.jpg', '2015 Mazda CX-5 Touring — odometer close-up (Trans-Amadi, Port Harcourt)', 6, 1200, 900),
-  (43, 7, 'image', 'Front three-quarter', '/img/cars/honda-accord-black.jpg', '2016 Lexus ES 350 Base — front three-quarter (Rumuokoro, Port Harcourt)', 0, 1200, 900),
-  (44, 7, 'image', 'Interior', '/img/details/interior.jpg', '2016 Lexus ES 350 Base — interior (Rumuokoro, Port Harcourt)', 1, 1200, 900),
-  (45, 7, 'image', 'Dashboard', '/img/details/dashboard.jpg', '2016 Lexus ES 350 Base — dashboard (Rumuokoro, Port Harcourt)', 2, 1200, 900),
-  (46, 7, 'image', 'Engine bay', '/img/details/engine-bay.jpg', '2016 Lexus ES 350 Base — engine bay (Rumuokoro, Port Harcourt)', 3, 1200, 900),
-  (47, 7, 'image', 'Tyres & tread', '/img/details/tyres.jpg', '2016 Lexus ES 350 Base — tyres & tread (Rumuokoro, Port Harcourt)', 4, 1200, 900),
-  (48, 7, 'image', 'Boot', '/img/details/boot.jpg', '2016 Lexus ES 350 Base — boot (Rumuokoro, Port Harcourt)', 5, 1200, 900),
-  (49, 7, 'image', 'Odometer close-up', '/img/details/odometer.jpg', '2016 Lexus ES 350 Base — odometer close-up (Rumuokoro, Port Harcourt)', 6, 1200, 900),
-  (50, 8, 'image', 'Front three-quarter', '/img/cars/ford-explorer-blue.jpg', '2014 Mitsubishi Pajero GLX — front three-quarter (Eliozu, Port Harcourt)', 0, 1200, 900),
-  (51, 8, 'image', 'Interior', '/img/details/interior.jpg', '2014 Mitsubishi Pajero GLX — interior (Eliozu, Port Harcourt)', 1, 1200, 900),
-  (52, 8, 'image', 'Dashboard', '/img/details/dashboard.jpg', '2014 Mitsubishi Pajero GLX — dashboard (Eliozu, Port Harcourt)', 2, 1200, 900),
-  (53, 8, 'image', 'Engine bay', '/img/details/engine-bay.jpg', '2014 Mitsubishi Pajero GLX — engine bay (Eliozu, Port Harcourt)', 3, 1200, 900),
-  (54, 8, 'image', 'Tyres & tread', '/img/details/tyres.jpg', '2014 Mitsubishi Pajero GLX — tyres & tread (Eliozu, Port Harcourt)', 4, 1200, 900),
-  (55, 8, 'image', 'Boot', '/img/details/boot.jpg', '2014 Mitsubishi Pajero GLX — boot (Eliozu, Port Harcourt)', 5, 1200, 900),
-  (56, 8, 'image', 'Odometer close-up', '/img/details/odometer.jpg', '2014 Mitsubishi Pajero GLX — odometer close-up (Eliozu, Port Harcourt)', 6, 1200, 900),
-  (57, 9, 'image', 'Front three-quarter', '/img/cars/ford-explorer-blue.jpg', '2017 Infiniti QX60 Base — front three-quarter (Rumuokoro, Port Harcourt)', 0, 1200, 900),
-  (58, 9, 'image', 'Interior', '/img/details/interior.jpg', '2017 Infiniti QX60 Base — interior (Rumuokoro, Port Harcourt)', 1, 1200, 900),
-  (59, 9, 'image', 'Dashboard', '/img/details/dashboard.jpg', '2017 Infiniti QX60 Base — dashboard (Rumuokoro, Port Harcourt)', 2, 1200, 900),
-  (60, 9, 'image', 'Engine bay', '/img/details/engine-bay.jpg', '2017 Infiniti QX60 Base — engine bay (Rumuokoro, Port Harcourt)', 3, 1200, 900),
-  (61, 9, 'image', 'Tyres & tread', '/img/details/tyres.jpg', '2017 Infiniti QX60 Base — tyres & tread (Rumuokoro, Port Harcourt)', 4, 1200, 900),
-  (62, 9, 'image', 'Boot', '/img/details/boot.jpg', '2017 Infiniti QX60 Base — boot (Rumuokoro, Port Harcourt)', 5, 1200, 900),
-  (63, 9, 'image', 'Odometer close-up', '/img/details/odometer.jpg', '2017 Infiniti QX60 Base — odometer close-up (Rumuokoro, Port Harcourt)', 6, 1200, 900),
-  (64, 10, 'image', 'Front three-quarter', '/img/cars/toyota-corolla-white.jpg', '2017 Kia Rio LX — front three-quarter (Rukpokwu, Port Harcourt)', 0, 1200, 900),
-  (65, 10, 'image', 'Interior', '/img/details/interior.jpg', '2017 Kia Rio LX — interior (Rukpokwu, Port Harcourt)', 1, 1200, 900),
-  (66, 10, 'image', 'Dashboard', '/img/details/dashboard.jpg', '2017 Kia Rio LX — dashboard (Rukpokwu, Port Harcourt)', 2, 1200, 900),
-  (67, 10, 'image', 'Engine bay', '/img/details/engine-bay.jpg', '2017 Kia Rio LX — engine bay (Rukpokwu, Port Harcourt)', 3, 1200, 900),
-  (68, 10, 'image', 'Tyres & tread', '/img/details/tyres.jpg', '2017 Kia Rio LX — tyres & tread (Rukpokwu, Port Harcourt)', 4, 1200, 900),
-  (69, 10, 'image', 'Boot', '/img/details/boot.jpg', '2017 Kia Rio LX — boot (Rukpokwu, Port Harcourt)', 5, 1200, 900),
-  (70, 10, 'image', 'Odometer close-up', '/img/details/odometer.jpg', '2017 Kia Rio LX — odometer close-up (Rukpokwu, Port Harcourt)', 6, 1200, 900),
-  (71, 11, 'image', 'Front three-quarter', '/img/cars/nissan-xtrail-grey.jpg', '2018 Nissan X-Trail SL — front three-quarter (Elelenwo, Port Harcourt)', 0, 1200, 900),
-  (72, 11, 'image', 'Interior', '/img/details/interior.jpg', '2018 Nissan X-Trail SL — interior (Elelenwo, Port Harcourt)', 1, 1200, 900),
-  (73, 11, 'image', 'Dashboard', '/img/details/dashboard.jpg', '2018 Nissan X-Trail SL — dashboard (Elelenwo, Port Harcourt)', 2, 1200, 900),
-  (74, 11, 'image', 'Engine bay', '/img/details/engine-bay.jpg', '2018 Nissan X-Trail SL — engine bay (Elelenwo, Port Harcourt)', 3, 1200, 900),
-  (75, 11, 'image', 'Tyres & tread', '/img/details/tyres.jpg', '2018 Nissan X-Trail SL — tyres & tread (Elelenwo, Port Harcourt)', 4, 1200, 900),
-  (76, 11, 'image', 'Boot', '/img/details/boot.jpg', '2018 Nissan X-Trail SL — boot (Elelenwo, Port Harcourt)', 5, 1200, 900),
-  (77, 11, 'image', 'Odometer close-up', '/img/details/odometer.jpg', '2018 Nissan X-Trail SL — odometer close-up (Elelenwo, Port Harcourt)', 6, 1200, 900),
-  (78, 12, 'image', 'Front three-quarter', '/img/cars/ford-explorer-blue.jpg', '2016 Hyundai Tucson Limited — front three-quarter (Rumuola, Port Harcourt)', 0, 1200, 900),
-  (79, 12, 'image', 'Interior', '/img/details/interior.jpg', '2016 Hyundai Tucson Limited — interior (Rumuola, Port Harcourt)', 1, 1200, 900),
-  (80, 12, 'image', 'Dashboard', '/img/details/dashboard.jpg', '2016 Hyundai Tucson Limited — dashboard (Rumuola, Port Harcourt)', 2, 1200, 900);
-INSERT INTO listing_media (`id`, `listing_id`, `type`, `shot_label`, `url`, `alt_text`, `position`, `width`, `height`) VALUES
-  (81, 12, 'image', 'Engine bay', '/img/details/engine-bay.jpg', '2016 Hyundai Tucson Limited — engine bay (Rumuola, Port Harcourt)', 3, 1200, 900),
-  (82, 12, 'image', 'Tyres & tread', '/img/details/tyres.jpg', '2016 Hyundai Tucson Limited — tyres & tread (Rumuola, Port Harcourt)', 4, 1200, 900),
-  (83, 12, 'image', 'Boot', '/img/details/boot.jpg', '2016 Hyundai Tucson Limited — boot (Rumuola, Port Harcourt)', 5, 1200, 900),
-  (84, 12, 'image', 'Odometer close-up', '/img/details/odometer.jpg', '2016 Hyundai Tucson Limited — odometer close-up (Rumuola, Port Harcourt)', 6, 1200, 900),
-  (85, 13, 'image', 'Front three-quarter', '/img/cars/honda-civic-silver.jpg', '2017 Honda Civic Sport — front three-quarter (Rumuola, Port Harcourt)', 0, 1200, 900),
-  (86, 13, 'image', 'Interior', '/img/details/interior.jpg', '2017 Honda Civic Sport — interior (Rumuola, Port Harcourt)', 1, 1200, 900),
-  (87, 13, 'image', 'Dashboard', '/img/details/dashboard.jpg', '2017 Honda Civic Sport — dashboard (Rumuola, Port Harcourt)', 2, 1200, 900),
-  (88, 13, 'image', 'Engine bay', '/img/details/engine-bay.jpg', '2017 Honda Civic Sport — engine bay (Rumuola, Port Harcourt)', 3, 1200, 900),
-  (89, 13, 'image', 'Tyres & tread', '/img/details/tyres.jpg', '2017 Honda Civic Sport — tyres & tread (Rumuola, Port Harcourt)', 4, 1200, 900),
-  (90, 13, 'image', 'Boot', '/img/details/boot.jpg', '2017 Honda Civic Sport — boot (Rumuola, Port Harcourt)', 5, 1200, 900),
-  (91, 13, 'image', 'Odometer close-up', '/img/details/odometer.jpg', '2017 Honda Civic Sport — odometer close-up (Rumuola, Port Harcourt)', 6, 1200, 900),
-  (92, 14, 'image', 'Front three-quarter', '/img/cars/ford-explorer-blue.jpg', '2015 Kia Sportage LX — front three-quarter (Mgbuoba, Port Harcourt)', 0, 1200, 900),
-  (93, 14, 'image', 'Interior', '/img/details/interior.jpg', '2015 Kia Sportage LX — interior (Mgbuoba, Port Harcourt)', 1, 1200, 900),
-  (94, 14, 'image', 'Dashboard', '/img/details/dashboard.jpg', '2015 Kia Sportage LX — dashboard (Mgbuoba, Port Harcourt)', 2, 1200, 900),
-  (95, 14, 'image', 'Engine bay', '/img/details/engine-bay.jpg', '2015 Kia Sportage LX — engine bay (Mgbuoba, Port Harcourt)', 3, 1200, 900),
-  (96, 14, 'image', 'Tyres & tread', '/img/details/tyres.jpg', '2015 Kia Sportage LX — tyres & tread (Mgbuoba, Port Harcourt)', 4, 1200, 900),
-  (97, 14, 'image', 'Boot', '/img/details/boot.jpg', '2015 Kia Sportage LX — boot (Mgbuoba, Port Harcourt)', 5, 1200, 900),
-  (98, 14, 'image', 'Odometer close-up', '/img/details/odometer.jpg', '2015 Kia Sportage LX — odometer close-up (Mgbuoba, Port Harcourt)', 6, 1200, 900),
-  (99, 15, 'image', 'Front three-quarter', '/img/cars/nissan-xtrail-grey.jpg', '2016 Nissan Rogue S — front three-quarter (Eliozu, Port Harcourt)', 0, 1200, 900),
-  (100, 15, 'image', 'Interior', '/img/details/interior.jpg', '2016 Nissan Rogue S — interior (Eliozu, Port Harcourt)', 1, 1200, 900),
-  (101, 15, 'image', 'Dashboard', '/img/details/dashboard.jpg', '2016 Nissan Rogue S — dashboard (Eliozu, Port Harcourt)', 2, 1200, 900),
-  (102, 15, 'image', 'Engine bay', '/img/details/engine-bay.jpg', '2016 Nissan Rogue S — engine bay (Eliozu, Port Harcourt)', 3, 1200, 900),
-  (103, 15, 'image', 'Tyres & tread', '/img/details/tyres.jpg', '2016 Nissan Rogue S — tyres & tread (Eliozu, Port Harcourt)', 4, 1200, 900),
-  (104, 15, 'image', 'Boot', '/img/details/boot.jpg', '2016 Nissan Rogue S — boot (Eliozu, Port Harcourt)', 5, 1200, 900),
-  (105, 15, 'image', 'Odometer close-up', '/img/details/odometer.jpg', '2016 Nissan Rogue S — odometer close-up (Eliozu, Port Harcourt)', 6, 1200, 900),
-  (106, 16, 'image', 'Front three-quarter', '/img/cars/mercedes-eclass-grey.jpg', '2017 Mercedes-Benz E-Class E300 — front three-quarter (Elelenwo, Port Harcourt)', 0, 1200, 900),
-  (107, 16, 'image', 'Interior', '/img/details/interior.jpg', '2017 Mercedes-Benz E-Class E300 — interior (Elelenwo, Port Harcourt)', 1, 1200, 900),
-  (108, 16, 'image', 'Dashboard', '/img/details/dashboard.jpg', '2017 Mercedes-Benz E-Class E300 — dashboard (Elelenwo, Port Harcourt)', 2, 1200, 900),
-  (109, 16, 'image', 'Engine bay', '/img/details/engine-bay.jpg', '2017 Mercedes-Benz E-Class E300 — engine bay (Elelenwo, Port Harcourt)', 3, 1200, 900),
-  (110, 16, 'image', 'Tyres & tread', '/img/details/tyres.jpg', '2017 Mercedes-Benz E-Class E300 — tyres & tread (Elelenwo, Port Harcourt)', 4, 1200, 900),
-  (111, 16, 'image', 'Boot', '/img/details/boot.jpg', '2017 Mercedes-Benz E-Class E300 — boot (Elelenwo, Port Harcourt)', 5, 1200, 900),
-  (112, 16, 'image', 'Odometer close-up', '/img/details/odometer.jpg', '2017 Mercedes-Benz E-Class E300 — odometer close-up (Elelenwo, Port Harcourt)', 6, 1200, 900),
-  (113, 17, 'image', 'Front three-quarter', '/img/cars/lexus-rx350-grey.jpg', '2017 Lexus RX 350 Luxury — front three-quarter (GRA Phase 2, Port Harcourt)', 0, 1200, 900),
-  (114, 17, 'image', 'Interior', '/img/details/interior.jpg', '2017 Lexus RX 350 Luxury — interior (GRA Phase 2, Port Harcourt)', 1, 1200, 900),
-  (115, 17, 'image', 'Dashboard', '/img/details/dashboard.jpg', '2017 Lexus RX 350 Luxury — dashboard (GRA Phase 2, Port Harcourt)', 2, 1200, 900),
-  (116, 17, 'image', 'Engine bay', '/img/details/engine-bay.jpg', '2017 Lexus RX 350 Luxury — engine bay (GRA Phase 2, Port Harcourt)', 3, 1200, 900),
-  (117, 17, 'image', 'Tyres & tread', '/img/details/tyres.jpg', '2017 Lexus RX 350 Luxury — tyres & tread (GRA Phase 2, Port Harcourt)', 4, 1200, 900),
-  (118, 17, 'image', 'Boot', '/img/details/boot.jpg', '2017 Lexus RX 350 Luxury — boot (GRA Phase 2, Port Harcourt)', 5, 1200, 900),
-  (119, 17, 'image', 'Odometer close-up', '/img/details/odometer.jpg', '2017 Lexus RX 350 Luxury — odometer close-up (GRA Phase 2, Port Harcourt)', 6, 1200, 900),
-  (120, 18, 'image', 'Front three-quarter', '/img/cars/ford-explorer-blue.jpg', '2018 Hyundai Santa Fe Limited — front three-quarter (Peter Odili Road, Port Harcourt)', 0, 1200, 900);
-INSERT INTO listing_media (`id`, `listing_id`, `type`, `shot_label`, `url`, `alt_text`, `position`, `width`, `height`) VALUES
-  (121, 18, 'image', 'Interior', '/img/details/interior.jpg', '2018 Hyundai Santa Fe Limited — interior (Peter Odili Road, Port Harcourt)', 1, 1200, 900),
-  (122, 18, 'image', 'Dashboard', '/img/details/dashboard.jpg', '2018 Hyundai Santa Fe Limited — dashboard (Peter Odili Road, Port Harcourt)', 2, 1200, 900),
-  (123, 18, 'image', 'Engine bay', '/img/details/engine-bay.jpg', '2018 Hyundai Santa Fe Limited — engine bay (Peter Odili Road, Port Harcourt)', 3, 1200, 900),
-  (124, 18, 'image', 'Tyres & tread', '/img/details/tyres.jpg', '2018 Hyundai Santa Fe Limited — tyres & tread (Peter Odili Road, Port Harcourt)', 4, 1200, 900),
-  (125, 18, 'image', 'Boot', '/img/details/boot.jpg', '2018 Hyundai Santa Fe Limited — boot (Peter Odili Road, Port Harcourt)', 5, 1200, 900),
-  (126, 18, 'image', 'Odometer close-up', '/img/details/odometer.jpg', '2018 Hyundai Santa Fe Limited — odometer close-up (Peter Odili Road, Port Harcourt)', 6, 1200, 900),
-  (127, 19, 'image', 'Front three-quarter', '/img/cars/toyota-corolla-white.jpg', '2015 Kia Rio LX — front three-quarter (Rumuokoro, Port Harcourt)', 0, 1200, 900),
-  (128, 19, 'image', 'Interior', '/img/details/interior.jpg', '2015 Kia Rio LX — interior (Rumuokoro, Port Harcourt)', 1, 1200, 900),
-  (129, 19, 'image', 'Dashboard', '/img/details/dashboard.jpg', '2015 Kia Rio LX — dashboard (Rumuokoro, Port Harcourt)', 2, 1200, 900),
-  (130, 19, 'image', 'Engine bay', '/img/details/engine-bay.jpg', '2015 Kia Rio LX — engine bay (Rumuokoro, Port Harcourt)', 3, 1200, 900),
-  (131, 19, 'image', 'Tyres & tread', '/img/details/tyres.jpg', '2015 Kia Rio LX — tyres & tread (Rumuokoro, Port Harcourt)', 4, 1200, 900),
-  (132, 19, 'image', 'Boot', '/img/details/boot.jpg', '2015 Kia Rio LX — boot (Rumuokoro, Port Harcourt)', 5, 1200, 900),
-  (133, 19, 'image', 'Odometer close-up', '/img/details/odometer.jpg', '2015 Kia Rio LX — odometer close-up (Rumuokoro, Port Harcourt)', 6, 1200, 900),
-  (134, 20, 'image', 'Front three-quarter', '/img/cars/ford-explorer-blue.jpg', '2016 Acura MDX Base — front three-quarter (Elelenwo, Port Harcourt)', 0, 1200, 900),
-  (135, 20, 'image', 'Interior', '/img/details/interior.jpg', '2016 Acura MDX Base — interior (Elelenwo, Port Harcourt)', 1, 1200, 900),
-  (136, 20, 'image', 'Dashboard', '/img/details/dashboard.jpg', '2016 Acura MDX Base — dashboard (Elelenwo, Port Harcourt)', 2, 1200, 900),
-  (137, 20, 'image', 'Engine bay', '/img/details/engine-bay.jpg', '2016 Acura MDX Base — engine bay (Elelenwo, Port Harcourt)', 3, 1200, 900),
-  (138, 20, 'image', 'Tyres & tread', '/img/details/tyres.jpg', '2016 Acura MDX Base — tyres & tread (Elelenwo, Port Harcourt)', 4, 1200, 900),
-  (139, 20, 'image', 'Boot', '/img/details/boot.jpg', '2016 Acura MDX Base — boot (Elelenwo, Port Harcourt)', 5, 1200, 900),
-  (140, 20, 'image', 'Odometer close-up', '/img/details/odometer.jpg', '2016 Acura MDX Base — odometer close-up (Elelenwo, Port Harcourt)', 6, 1200, 900),
-  (141, 21, 'image', 'Front three-quarter', '/img/cars/ford-explorer-blue.jpg', '2013 Acura MDX Tech — front three-quarter (Eliozu, Port Harcourt)', 0, 1200, 900),
-  (142, 21, 'image', 'Interior', '/img/details/interior.jpg', '2013 Acura MDX Tech — interior (Eliozu, Port Harcourt)', 1, 1200, 900),
-  (143, 21, 'image', 'Dashboard', '/img/details/dashboard.jpg', '2013 Acura MDX Tech — dashboard (Eliozu, Port Harcourt)', 2, 1200, 900),
-  (144, 21, 'image', 'Engine bay', '/img/details/engine-bay.jpg', '2013 Acura MDX Tech — engine bay (Eliozu, Port Harcourt)', 3, 1200, 900),
-  (145, 21, 'image', 'Tyres & tread', '/img/details/tyres.jpg', '2013 Acura MDX Tech — tyres & tread (Eliozu, Port Harcourt)', 4, 1200, 900),
-  (146, 21, 'image', 'Boot', '/img/details/boot.jpg', '2013 Acura MDX Tech — boot (Eliozu, Port Harcourt)', 5, 1200, 900),
-  (147, 21, 'image', 'Odometer close-up', '/img/details/odometer.jpg', '2013 Acura MDX Tech — odometer close-up (Eliozu, Port Harcourt)', 6, 1200, 900),
-  (148, 22, 'image', 'Front three-quarter', '/img/cars/mazda-cx5-red.jpg', '2017 Mazda CX-5 Grand Touring — front three-quarter (Trans-Amadi, Port Harcourt)', 0, 1200, 900),
-  (149, 22, 'image', 'Interior', '/img/details/interior.jpg', '2017 Mazda CX-5 Grand Touring — interior (Trans-Amadi, Port Harcourt)', 1, 1200, 900),
-  (150, 22, 'image', 'Dashboard', '/img/details/dashboard.jpg', '2017 Mazda CX-5 Grand Touring — dashboard (Trans-Amadi, Port Harcourt)', 2, 1200, 900),
-  (151, 22, 'image', 'Engine bay', '/img/details/engine-bay.jpg', '2017 Mazda CX-5 Grand Touring — engine bay (Trans-Amadi, Port Harcourt)', 3, 1200, 900),
-  (152, 22, 'image', 'Tyres & tread', '/img/details/tyres.jpg', '2017 Mazda CX-5 Grand Touring — tyres & tread (Trans-Amadi, Port Harcourt)', 4, 1200, 900),
-  (153, 22, 'image', 'Boot', '/img/details/boot.jpg', '2017 Mazda CX-5 Grand Touring — boot (Trans-Amadi, Port Harcourt)', 5, 1200, 900),
-  (154, 22, 'image', 'Odometer close-up', '/img/details/odometer.jpg', '2017 Mazda CX-5 Grand Touring — odometer close-up (Trans-Amadi, Port Harcourt)', 6, 1200, 900),
-  (155, 23, 'image', 'Front three-quarter', '/img/cars/lexus-rx350-grey.jpg', '2013 Lexus RX 350 Base — front three-quarter (Mgbuoba, Port Harcourt)', 0, 1200, 900),
-  (156, 23, 'image', 'Interior', '/img/details/interior.jpg', '2013 Lexus RX 350 Base — interior (Mgbuoba, Port Harcourt)', 1, 1200, 900),
-  (157, 23, 'image', 'Dashboard', '/img/details/dashboard.jpg', '2013 Lexus RX 350 Base — dashboard (Mgbuoba, Port Harcourt)', 2, 1200, 900),
-  (158, 23, 'image', 'Engine bay', '/img/details/engine-bay.jpg', '2013 Lexus RX 350 Base — engine bay (Mgbuoba, Port Harcourt)', 3, 1200, 900),
-  (159, 23, 'image', 'Tyres & tread', '/img/details/tyres.jpg', '2013 Lexus RX 350 Base — tyres & tread (Mgbuoba, Port Harcourt)', 4, 1200, 900),
-  (160, 23, 'image', 'Boot', '/img/details/boot.jpg', '2013 Lexus RX 350 Base — boot (Mgbuoba, Port Harcourt)', 5, 1200, 900);
-INSERT INTO listing_media (`id`, `listing_id`, `type`, `shot_label`, `url`, `alt_text`, `position`, `width`, `height`) VALUES
-  (161, 23, 'image', 'Odometer close-up', '/img/details/odometer.jpg', '2013 Lexus RX 350 Base — odometer close-up (Mgbuoba, Port Harcourt)', 6, 1200, 900),
-  (162, 24, 'image', 'Front three-quarter', '/img/cars/honda-crv-silver.jpg', '2018 Honda Pilot Touring — front three-quarter (Aba Road, Port Harcourt)', 0, 1200, 900),
-  (163, 24, 'image', 'Interior', '/img/details/interior.jpg', '2018 Honda Pilot Touring — interior (Aba Road, Port Harcourt)', 1, 1200, 900),
-  (164, 24, 'image', 'Dashboard', '/img/details/dashboard.jpg', '2018 Honda Pilot Touring — dashboard (Aba Road, Port Harcourt)', 2, 1200, 900),
-  (165, 24, 'image', 'Engine bay', '/img/details/engine-bay.jpg', '2018 Honda Pilot Touring — engine bay (Aba Road, Port Harcourt)', 3, 1200, 900),
-  (166, 24, 'image', 'Tyres & tread', '/img/details/tyres.jpg', '2018 Honda Pilot Touring — tyres & tread (Aba Road, Port Harcourt)', 4, 1200, 900),
-  (167, 24, 'image', 'Boot', '/img/details/boot.jpg', '2018 Honda Pilot Touring — boot (Aba Road, Port Harcourt)', 5, 1200, 900),
-  (168, 24, 'image', 'Odometer close-up', '/img/details/odometer.jpg', '2018 Honda Pilot Touring — odometer close-up (Aba Road, Port Harcourt)', 6, 1200, 900),
-  (169, 25, 'image', 'Front three-quarter', '/img/cars/honda-accord-black.jpg', '2017 Hyundai Elantra Limited — front three-quarter (Ada George, Port Harcourt)', 0, 1200, 900),
-  (170, 25, 'image', 'Interior', '/img/details/interior.jpg', '2017 Hyundai Elantra Limited — interior (Ada George, Port Harcourt)', 1, 1200, 900),
-  (171, 25, 'image', 'Dashboard', '/img/details/dashboard.jpg', '2017 Hyundai Elantra Limited — dashboard (Ada George, Port Harcourt)', 2, 1200, 900),
-  (172, 25, 'image', 'Engine bay', '/img/details/engine-bay.jpg', '2017 Hyundai Elantra Limited — engine bay (Ada George, Port Harcourt)', 3, 1200, 900),
-  (173, 25, 'image', 'Tyres & tread', '/img/details/tyres.jpg', '2017 Hyundai Elantra Limited — tyres & tread (Ada George, Port Harcourt)', 4, 1200, 900),
-  (174, 25, 'image', 'Boot', '/img/details/boot.jpg', '2017 Hyundai Elantra Limited — boot (Ada George, Port Harcourt)', 5, 1200, 900),
-  (175, 25, 'image', 'Odometer close-up', '/img/details/odometer.jpg', '2017 Hyundai Elantra Limited — odometer close-up (Ada George, Port Harcourt)', 6, 1200, 900),
-  (176, 26, 'image', 'Front three-quarter', '/img/cars/ford-explorer-blue.jpg', '2020 Ford Ranger XLT — front three-quarter (Rumuola, Port Harcourt)', 0, 1200, 900),
-  (177, 26, 'image', 'Interior', '/img/details/interior.jpg', '2020 Ford Ranger XLT — interior (Rumuola, Port Harcourt)', 1, 1200, 900),
-  (178, 26, 'image', 'Dashboard', '/img/details/dashboard.jpg', '2020 Ford Ranger XLT — dashboard (Rumuola, Port Harcourt)', 2, 1200, 900),
-  (179, 26, 'image', 'Engine bay', '/img/details/engine-bay.jpg', '2020 Ford Ranger XLT — engine bay (Rumuola, Port Harcourt)', 3, 1200, 900),
-  (180, 26, 'image', 'Tyres & tread', '/img/details/tyres.jpg', '2020 Ford Ranger XLT — tyres & tread (Rumuola, Port Harcourt)', 4, 1200, 900),
-  (181, 26, 'image', 'Boot', '/img/details/boot.jpg', '2020 Ford Ranger XLT — boot (Rumuola, Port Harcourt)', 5, 1200, 900),
-  (182, 26, 'image', 'Odometer close-up', '/img/details/odometer.jpg', '2020 Ford Ranger XLT — odometer close-up (Rumuola, Port Harcourt)', 6, 1200, 900),
-  (183, 27, 'image', 'Front three-quarter', '/img/cars/honda-crv-silver.jpg', '2014 Honda CR-V EX-L — front three-quarter (Woji, Port Harcourt)', 0, 1200, 900),
-  (184, 27, 'image', 'Interior', '/img/details/interior.jpg', '2014 Honda CR-V EX-L — interior (Woji, Port Harcourt)', 1, 1200, 900),
-  (185, 27, 'image', 'Dashboard', '/img/details/dashboard.jpg', '2014 Honda CR-V EX-L — dashboard (Woji, Port Harcourt)', 2, 1200, 900),
-  (186, 27, 'image', 'Engine bay', '/img/details/engine-bay.jpg', '2014 Honda CR-V EX-L — engine bay (Woji, Port Harcourt)', 3, 1200, 900),
-  (187, 27, 'image', 'Tyres & tread', '/img/details/tyres.jpg', '2014 Honda CR-V EX-L — tyres & tread (Woji, Port Harcourt)', 4, 1200, 900),
-  (188, 27, 'image', 'Boot', '/img/details/boot.jpg', '2014 Honda CR-V EX-L — boot (Woji, Port Harcourt)', 5, 1200, 900),
-  (189, 27, 'image', 'Odometer close-up', '/img/details/odometer.jpg', '2014 Honda CR-V EX-L — odometer close-up (Woji, Port Harcourt)', 6, 1200, 900),
-  (190, 28, 'image', 'Front three-quarter', '/img/cars/ford-explorer-blue.jpg', '2015 Kia Sorento LX — front three-quarter (Rukpokwu, Port Harcourt)', 0, 1200, 900),
-  (191, 28, 'image', 'Interior', '/img/details/interior.jpg', '2015 Kia Sorento LX — interior (Rukpokwu, Port Harcourt)', 1, 1200, 900),
-  (192, 28, 'image', 'Dashboard', '/img/details/dashboard.jpg', '2015 Kia Sorento LX — dashboard (Rukpokwu, Port Harcourt)', 2, 1200, 900),
-  (193, 28, 'image', 'Engine bay', '/img/details/engine-bay.jpg', '2015 Kia Sorento LX — engine bay (Rukpokwu, Port Harcourt)', 3, 1200, 900),
-  (194, 28, 'image', 'Tyres & tread', '/img/details/tyres.jpg', '2015 Kia Sorento LX — tyres & tread (Rukpokwu, Port Harcourt)', 4, 1200, 900),
-  (195, 28, 'image', 'Boot', '/img/details/boot.jpg', '2015 Kia Sorento LX — boot (Rukpokwu, Port Harcourt)', 5, 1200, 900),
-  (196, 28, 'image', 'Odometer close-up', '/img/details/odometer.jpg', '2015 Kia Sorento LX — odometer close-up (Rukpokwu, Port Harcourt)', 6, 1200, 900),
-  (197, 29, 'image', 'Front three-quarter', '/img/cars/honda-accord-black.jpg', '2018 Lexus ES 350 Luxury — front three-quarter (Ada George, Port Harcourt)', 0, 1200, 900),
-  (198, 29, 'image', 'Interior', '/img/details/interior.jpg', '2018 Lexus ES 350 Luxury — interior (Ada George, Port Harcourt)', 1, 1200, 900),
-  (199, 29, 'image', 'Dashboard', '/img/details/dashboard.jpg', '2018 Lexus ES 350 Luxury — dashboard (Ada George, Port Harcourt)', 2, 1200, 900),
-  (200, 29, 'image', 'Engine bay', '/img/details/engine-bay.jpg', '2018 Lexus ES 350 Luxury — engine bay (Ada George, Port Harcourt)', 3, 1200, 900);
-INSERT INTO listing_media (`id`, `listing_id`, `type`, `shot_label`, `url`, `alt_text`, `position`, `width`, `height`) VALUES
-  (201, 29, 'image', 'Tyres & tread', '/img/details/tyres.jpg', '2018 Lexus ES 350 Luxury — tyres & tread (Ada George, Port Harcourt)', 4, 1200, 900),
-  (202, 29, 'image', 'Boot', '/img/details/boot.jpg', '2018 Lexus ES 350 Luxury — boot (Ada George, Port Harcourt)', 5, 1200, 900),
-  (203, 29, 'image', 'Odometer close-up', '/img/details/odometer.jpg', '2018 Lexus ES 350 Luxury — odometer close-up (Ada George, Port Harcourt)', 6, 1200, 900),
-  (204, 30, 'image', 'Front three-quarter', '/img/cars/toyota-prado-white.jpg', '2014 Toyota Highlander XLE — front three-quarter (Mgbuoba, Port Harcourt)', 0, 1200, 900),
-  (205, 30, 'image', 'Interior', '/img/details/interior.jpg', '2014 Toyota Highlander XLE — interior (Mgbuoba, Port Harcourt)', 1, 1200, 900),
-  (206, 30, 'image', 'Dashboard', '/img/details/dashboard.jpg', '2014 Toyota Highlander XLE — dashboard (Mgbuoba, Port Harcourt)', 2, 1200, 900),
-  (207, 30, 'image', 'Engine bay', '/img/details/engine-bay.jpg', '2014 Toyota Highlander XLE — engine bay (Mgbuoba, Port Harcourt)', 3, 1200, 900),
-  (208, 30, 'image', 'Tyres & tread', '/img/details/tyres.jpg', '2014 Toyota Highlander XLE — tyres & tread (Mgbuoba, Port Harcourt)', 4, 1200, 900),
-  (209, 30, 'image', 'Boot', '/img/details/boot.jpg', '2014 Toyota Highlander XLE — boot (Mgbuoba, Port Harcourt)', 5, 1200, 900),
-  (210, 30, 'image', 'Odometer close-up', '/img/details/odometer.jpg', '2014 Toyota Highlander XLE — odometer close-up (Mgbuoba, Port Harcourt)', 6, 1200, 900),
-  (211, 31, 'image', 'Front three-quarter', '/img/cars/ford-explorer-blue.jpg', '2017 Infiniti QX60 Base — front three-quarter (GRA Phase 2, Port Harcourt)', 0, 1200, 900),
-  (212, 31, 'image', 'Interior', '/img/details/interior.jpg', '2017 Infiniti QX60 Base — interior (GRA Phase 2, Port Harcourt)', 1, 1200, 900),
-  (213, 31, 'image', 'Dashboard', '/img/details/dashboard.jpg', '2017 Infiniti QX60 Base — dashboard (GRA Phase 2, Port Harcourt)', 2, 1200, 900),
-  (214, 31, 'image', 'Engine bay', '/img/details/engine-bay.jpg', '2017 Infiniti QX60 Base — engine bay (GRA Phase 2, Port Harcourt)', 3, 1200, 900),
-  (215, 31, 'image', 'Tyres & tread', '/img/details/tyres.jpg', '2017 Infiniti QX60 Base — tyres & tread (GRA Phase 2, Port Harcourt)', 4, 1200, 900),
-  (216, 31, 'image', 'Boot', '/img/details/boot.jpg', '2017 Infiniti QX60 Base — boot (GRA Phase 2, Port Harcourt)', 5, 1200, 900),
-  (217, 31, 'image', 'Odometer close-up', '/img/details/odometer.jpg', '2017 Infiniti QX60 Base — odometer close-up (GRA Phase 2, Port Harcourt)', 6, 1200, 900),
-  (218, 32, 'image', 'Front three-quarter', '/img/cars/toyota-camry-silver.jpg', '2010 Toyota Camry LE — front three-quarter (Choba, Port Harcourt)', 0, 1200, 900),
-  (219, 32, 'image', 'Interior', '/img/details/interior.jpg', '2010 Toyota Camry LE — interior (Choba, Port Harcourt)', 1, 1200, 900),
-  (220, 32, 'image', 'Dashboard', '/img/details/dashboard.jpg', '2010 Toyota Camry LE — dashboard (Choba, Port Harcourt)', 2, 1200, 900),
-  (221, 32, 'image', 'Engine bay', '/img/details/engine-bay.jpg', '2010 Toyota Camry LE — engine bay (Choba, Port Harcourt)', 3, 1200, 900),
-  (222, 32, 'image', 'Tyres & tread', '/img/details/tyres.jpg', '2010 Toyota Camry LE — tyres & tread (Choba, Port Harcourt)', 4, 1200, 900),
-  (223, 32, 'image', 'Boot', '/img/details/boot.jpg', '2010 Toyota Camry LE — boot (Choba, Port Harcourt)', 5, 1200, 900),
-  (224, 32, 'image', 'Odometer close-up', '/img/details/odometer.jpg', '2010 Toyota Camry LE — odometer close-up (Choba, Port Harcourt)', 6, 1200, 900),
-  (225, 33, 'image', 'Front three-quarter', '/img/cars/toyota-hilux-silver.jpg', '2019 Toyota Hilux SR — front three-quarter (Choba, Port Harcourt)', 0, 1200, 900),
-  (226, 33, 'image', 'Interior', '/img/details/interior.jpg', '2019 Toyota Hilux SR — interior (Choba, Port Harcourt)', 1, 1200, 900),
-  (227, 33, 'image', 'Dashboard', '/img/details/dashboard.jpg', '2019 Toyota Hilux SR — dashboard (Choba, Port Harcourt)', 2, 1200, 900),
-  (228, 33, 'image', 'Engine bay', '/img/details/engine-bay.jpg', '2019 Toyota Hilux SR — engine bay (Choba, Port Harcourt)', 3, 1200, 900),
-  (229, 33, 'image', 'Tyres & tread', '/img/details/tyres.jpg', '2019 Toyota Hilux SR — tyres & tread (Choba, Port Harcourt)', 4, 1200, 900),
-  (230, 33, 'image', 'Boot', '/img/details/boot.jpg', '2019 Toyota Hilux SR — boot (Choba, Port Harcourt)', 5, 1200, 900),
-  (231, 33, 'image', 'Odometer close-up', '/img/details/odometer.jpg', '2019 Toyota Hilux SR — odometer close-up (Choba, Port Harcourt)', 6, 1200, 900),
-  (232, 34, 'image', 'Front three-quarter', '/img/cars/ford-explorer-blue.jpg', '2018 Ford Ranger XL — front three-quarter (Rukpokwu, Port Harcourt)', 0, 1200, 900),
-  (233, 34, 'image', 'Interior', '/img/details/interior.jpg', '2018 Ford Ranger XL — interior (Rukpokwu, Port Harcourt)', 1, 1200, 900),
-  (234, 34, 'image', 'Dashboard', '/img/details/dashboard.jpg', '2018 Ford Ranger XL — dashboard (Rukpokwu, Port Harcourt)', 2, 1200, 900),
-  (235, 34, 'image', 'Engine bay', '/img/details/engine-bay.jpg', '2018 Ford Ranger XL — engine bay (Rukpokwu, Port Harcourt)', 3, 1200, 900),
-  (236, 34, 'image', 'Tyres & tread', '/img/details/tyres.jpg', '2018 Ford Ranger XL — tyres & tread (Rukpokwu, Port Harcourt)', 4, 1200, 900),
-  (237, 34, 'image', 'Boot', '/img/details/boot.jpg', '2018 Ford Ranger XL — boot (Rukpokwu, Port Harcourt)', 5, 1200, 900),
-  (238, 34, 'image', 'Odometer close-up', '/img/details/odometer.jpg', '2018 Ford Ranger XL — odometer close-up (Rukpokwu, Port Harcourt)', 6, 1200, 900),
-  (239, 35, 'image', 'Front three-quarter', '/img/cars/ford-explorer-blue.jpg', '2015 Ford Explorer Sport — front three-quarter (Rumuola, Port Harcourt)', 0, 1200, 900),
-  (240, 35, 'image', 'Interior', '/img/details/interior.jpg', '2015 Ford Explorer Sport — interior (Rumuola, Port Harcourt)', 1, 1200, 900);
-INSERT INTO listing_media (`id`, `listing_id`, `type`, `shot_label`, `url`, `alt_text`, `position`, `width`, `height`) VALUES
-  (241, 35, 'image', 'Dashboard', '/img/details/dashboard.jpg', '2015 Ford Explorer Sport — dashboard (Rumuola, Port Harcourt)', 2, 1200, 900),
-  (242, 35, 'image', 'Engine bay', '/img/details/engine-bay.jpg', '2015 Ford Explorer Sport — engine bay (Rumuola, Port Harcourt)', 3, 1200, 900),
-  (243, 35, 'image', 'Tyres & tread', '/img/details/tyres.jpg', '2015 Ford Explorer Sport — tyres & tread (Rumuola, Port Harcourt)', 4, 1200, 900),
-  (244, 35, 'image', 'Boot', '/img/details/boot.jpg', '2015 Ford Explorer Sport — boot (Rumuola, Port Harcourt)', 5, 1200, 900),
-  (245, 35, 'image', 'Odometer close-up', '/img/details/odometer.jpg', '2015 Ford Explorer Sport — odometer close-up (Rumuola, Port Harcourt)', 6, 1200, 900),
-  (246, 36, 'image', 'Front three-quarter', '/img/cars/toyota-hilux-silver.jpg', '2019 Toyota Hilux SR — front three-quarter (Ada George, Port Harcourt)', 0, 1200, 900),
-  (247, 36, 'image', 'Interior', '/img/details/interior.jpg', '2019 Toyota Hilux SR — interior (Ada George, Port Harcourt)', 1, 1200, 900),
-  (248, 36, 'image', 'Dashboard', '/img/details/dashboard.jpg', '2019 Toyota Hilux SR — dashboard (Ada George, Port Harcourt)', 2, 1200, 900),
-  (249, 36, 'image', 'Engine bay', '/img/details/engine-bay.jpg', '2019 Toyota Hilux SR — engine bay (Ada George, Port Harcourt)', 3, 1200, 900),
-  (250, 36, 'image', 'Tyres & tread', '/img/details/tyres.jpg', '2019 Toyota Hilux SR — tyres & tread (Ada George, Port Harcourt)', 4, 1200, 900),
-  (251, 36, 'image', 'Boot', '/img/details/boot.jpg', '2019 Toyota Hilux SR — boot (Ada George, Port Harcourt)', 5, 1200, 900),
-  (252, 36, 'image', 'Odometer close-up', '/img/details/odometer.jpg', '2019 Toyota Hilux SR — odometer close-up (Ada George, Port Harcourt)', 6, 1200, 900),
-  (253, 37, 'image', 'Front three-quarter', '/img/cars/toyota-camry-silver.jpg', '2016 Toyota Avalon XLE — front three-quarter (Aba Road, Port Harcourt)', 0, 1200, 900),
-  (254, 37, 'image', 'Interior', '/img/details/interior.jpg', '2016 Toyota Avalon XLE — interior (Aba Road, Port Harcourt)', 1, 1200, 900),
-  (255, 37, 'image', 'Dashboard', '/img/details/dashboard.jpg', '2016 Toyota Avalon XLE — dashboard (Aba Road, Port Harcourt)', 2, 1200, 900),
-  (256, 37, 'image', 'Engine bay', '/img/details/engine-bay.jpg', '2016 Toyota Avalon XLE — engine bay (Aba Road, Port Harcourt)', 3, 1200, 900),
-  (257, 37, 'image', 'Tyres & tread', '/img/details/tyres.jpg', '2016 Toyota Avalon XLE — tyres & tread (Aba Road, Port Harcourt)', 4, 1200, 900),
-  (258, 37, 'image', 'Boot', '/img/details/boot.jpg', '2016 Toyota Avalon XLE — boot (Aba Road, Port Harcourt)', 5, 1200, 900),
-  (259, 37, 'image', 'Odometer close-up', '/img/details/odometer.jpg', '2016 Toyota Avalon XLE — odometer close-up (Aba Road, Port Harcourt)', 6, 1200, 900),
-  (260, 38, 'image', 'Front three-quarter', '/img/cars/mercedes-gle-white.jpg', '2018 Mercedes-Benz GLE GLE 400 — front three-quarter (Ada George, Port Harcourt)', 0, 1200, 900),
-  (261, 38, 'image', 'Interior', '/img/details/interior.jpg', '2018 Mercedes-Benz GLE GLE 400 — interior (Ada George, Port Harcourt)', 1, 1200, 900),
-  (262, 38, 'image', 'Dashboard', '/img/details/dashboard.jpg', '2018 Mercedes-Benz GLE GLE 400 — dashboard (Ada George, Port Harcourt)', 2, 1200, 900),
-  (263, 38, 'image', 'Engine bay', '/img/details/engine-bay.jpg', '2018 Mercedes-Benz GLE GLE 400 — engine bay (Ada George, Port Harcourt)', 3, 1200, 900),
-  (264, 38, 'image', 'Tyres & tread', '/img/details/tyres.jpg', '2018 Mercedes-Benz GLE GLE 400 — tyres & tread (Ada George, Port Harcourt)', 4, 1200, 900),
-  (265, 38, 'image', 'Boot', '/img/details/boot.jpg', '2018 Mercedes-Benz GLE GLE 400 — boot (Ada George, Port Harcourt)', 5, 1200, 900),
-  (266, 38, 'image', 'Odometer close-up', '/img/details/odometer.jpg', '2018 Mercedes-Benz GLE GLE 400 — odometer close-up (Ada George, Port Harcourt)', 6, 1200, 900),
-  (267, 39, 'image', 'Front three-quarter', '/img/cars/toyota-hilux-silver.jpg', '2015 Toyota Hilux SR — front three-quarter (Choba, Port Harcourt)', 0, 1200, 900),
-  (268, 39, 'image', 'Interior', '/img/details/interior.jpg', '2015 Toyota Hilux SR — interior (Choba, Port Harcourt)', 1, 1200, 900),
-  (269, 39, 'image', 'Dashboard', '/img/details/dashboard.jpg', '2015 Toyota Hilux SR — dashboard (Choba, Port Harcourt)', 2, 1200, 900),
-  (270, 39, 'image', 'Engine bay', '/img/details/engine-bay.jpg', '2015 Toyota Hilux SR — engine bay (Choba, Port Harcourt)', 3, 1200, 900),
-  (271, 39, 'image', 'Tyres & tread', '/img/details/tyres.jpg', '2015 Toyota Hilux SR — tyres & tread (Choba, Port Harcourt)', 4, 1200, 900),
-  (272, 39, 'image', 'Boot', '/img/details/boot.jpg', '2015 Toyota Hilux SR — boot (Choba, Port Harcourt)', 5, 1200, 900),
-  (273, 39, 'image', 'Odometer close-up', '/img/details/odometer.jpg', '2015 Toyota Hilux SR — odometer close-up (Choba, Port Harcourt)', 6, 1200, 900),
-  (274, 40, 'image', 'Front three-quarter', '/img/cars/ford-explorer-blue.jpg', '2014 Acura MDX Advance — front three-quarter (Rumuola, Port Harcourt)', 0, 1200, 900),
-  (275, 40, 'image', 'Interior', '/img/details/interior.jpg', '2014 Acura MDX Advance — interior (Rumuola, Port Harcourt)', 1, 1200, 900),
-  (276, 40, 'image', 'Dashboard', '/img/details/dashboard.jpg', '2014 Acura MDX Advance — dashboard (Rumuola, Port Harcourt)', 2, 1200, 900),
-  (277, 40, 'image', 'Engine bay', '/img/details/engine-bay.jpg', '2014 Acura MDX Advance — engine bay (Rumuola, Port Harcourt)', 3, 1200, 900),
-  (278, 40, 'image', 'Tyres & tread', '/img/details/tyres.jpg', '2014 Acura MDX Advance — tyres & tread (Rumuola, Port Harcourt)', 4, 1200, 900),
-  (279, 40, 'image', 'Boot', '/img/details/boot.jpg', '2014 Acura MDX Advance — boot (Rumuola, Port Harcourt)', 5, 1200, 900),
-  (280, 40, 'image', 'Odometer close-up', '/img/details/odometer.jpg', '2014 Acura MDX Advance — odometer close-up (Rumuola, Port Harcourt)', 6, 1200, 900);
-INSERT INTO listing_media (`id`, `listing_id`, `type`, `shot_label`, `url`, `alt_text`, `position`, `width`, `height`) VALUES
-  (281, 41, 'image', 'Front three-quarter', '/img/cars/ford-explorer-blue.jpg', '2017 Hyundai Tucson SE — front three-quarter (Choba, Port Harcourt)', 0, 1200, 900),
-  (282, 41, 'image', 'Interior', '/img/details/interior.jpg', '2017 Hyundai Tucson SE — interior (Choba, Port Harcourt)', 1, 1200, 900),
-  (283, 41, 'image', 'Dashboard', '/img/details/dashboard.jpg', '2017 Hyundai Tucson SE — dashboard (Choba, Port Harcourt)', 2, 1200, 900),
-  (284, 41, 'image', 'Engine bay', '/img/details/engine-bay.jpg', '2017 Hyundai Tucson SE — engine bay (Choba, Port Harcourt)', 3, 1200, 900),
-  (285, 41, 'image', 'Tyres & tread', '/img/details/tyres.jpg', '2017 Hyundai Tucson SE — tyres & tread (Choba, Port Harcourt)', 4, 1200, 900),
-  (286, 41, 'image', 'Boot', '/img/details/boot.jpg', '2017 Hyundai Tucson SE — boot (Choba, Port Harcourt)', 5, 1200, 900),
-  (287, 41, 'image', 'Odometer close-up', '/img/details/odometer.jpg', '2017 Hyundai Tucson SE — odometer close-up (Choba, Port Harcourt)', 6, 1200, 900),
-  (288, 42, 'image', 'Front three-quarter', '/img/cars/ford-explorer-blue.jpg', '2016 BMW X5 xDrive35i — front three-quarter (Aba Road, Port Harcourt)', 0, 1200, 900),
-  (289, 42, 'image', 'Interior', '/img/details/interior.jpg', '2016 BMW X5 xDrive35i — interior (Aba Road, Port Harcourt)', 1, 1200, 900),
-  (290, 42, 'image', 'Dashboard', '/img/details/dashboard.jpg', '2016 BMW X5 xDrive35i — dashboard (Aba Road, Port Harcourt)', 2, 1200, 900),
-  (291, 42, 'image', 'Engine bay', '/img/details/engine-bay.jpg', '2016 BMW X5 xDrive35i — engine bay (Aba Road, Port Harcourt)', 3, 1200, 900),
-  (292, 42, 'image', 'Tyres & tread', '/img/details/tyres.jpg', '2016 BMW X5 xDrive35i — tyres & tread (Aba Road, Port Harcourt)', 4, 1200, 900),
-  (293, 42, 'image', 'Boot', '/img/details/boot.jpg', '2016 BMW X5 xDrive35i — boot (Aba Road, Port Harcourt)', 5, 1200, 900),
-  (294, 42, 'image', 'Odometer close-up', '/img/details/odometer.jpg', '2016 BMW X5 xDrive35i — odometer close-up (Aba Road, Port Harcourt)', 6, 1200, 900),
-  (295, 43, 'image', 'Front three-quarter', '/img/cars/mercedes-gle-white.jpg', '2019 Mercedes-Benz GLE GLE 350 — front three-quarter (Choba, Port Harcourt)', 0, 1200, 900),
-  (296, 43, 'image', 'Interior', '/img/details/interior.jpg', '2019 Mercedes-Benz GLE GLE 350 — interior (Choba, Port Harcourt)', 1, 1200, 900),
-  (297, 43, 'image', 'Dashboard', '/img/details/dashboard.jpg', '2019 Mercedes-Benz GLE GLE 350 — dashboard (Choba, Port Harcourt)', 2, 1200, 900),
-  (298, 43, 'image', 'Engine bay', '/img/details/engine-bay.jpg', '2019 Mercedes-Benz GLE GLE 350 — engine bay (Choba, Port Harcourt)', 3, 1200, 900),
-  (299, 43, 'image', 'Tyres & tread', '/img/details/tyres.jpg', '2019 Mercedes-Benz GLE GLE 350 — tyres & tread (Choba, Port Harcourt)', 4, 1200, 900),
-  (300, 43, 'image', 'Boot', '/img/details/boot.jpg', '2019 Mercedes-Benz GLE GLE 350 — boot (Choba, Port Harcourt)', 5, 1200, 900),
-  (301, 43, 'image', 'Odometer close-up', '/img/details/odometer.jpg', '2019 Mercedes-Benz GLE GLE 350 — odometer close-up (Choba, Port Harcourt)', 6, 1200, 900),
-  (302, 44, 'image', 'Front three-quarter', '/img/cars/lexus-rx350-grey.jpg', '2016 Lexus RX 350 Base — front three-quarter (Eliozu, Port Harcourt)', 0, 1200, 900),
-  (303, 44, 'image', 'Interior', '/img/details/interior.jpg', '2016 Lexus RX 350 Base — interior (Eliozu, Port Harcourt)', 1, 1200, 900),
-  (304, 44, 'image', 'Dashboard', '/img/details/dashboard.jpg', '2016 Lexus RX 350 Base — dashboard (Eliozu, Port Harcourt)', 2, 1200, 900),
-  (305, 44, 'image', 'Engine bay', '/img/details/engine-bay.jpg', '2016 Lexus RX 350 Base — engine bay (Eliozu, Port Harcourt)', 3, 1200, 900),
-  (306, 44, 'image', 'Tyres & tread', '/img/details/tyres.jpg', '2016 Lexus RX 350 Base — tyres & tread (Eliozu, Port Harcourt)', 4, 1200, 900),
-  (307, 44, 'image', 'Boot', '/img/details/boot.jpg', '2016 Lexus RX 350 Base — boot (Eliozu, Port Harcourt)', 5, 1200, 900),
-  (308, 44, 'image', 'Odometer close-up', '/img/details/odometer.jpg', '2016 Lexus RX 350 Base — odometer close-up (Eliozu, Port Harcourt)', 6, 1200, 900),
-  (309, 45, 'image', 'Front three-quarter', '/img/cars/ford-explorer-blue.jpg', '2018 Infiniti QX60 Premium — front three-quarter (Aba Road, Port Harcourt)', 0, 1200, 900),
-  (310, 45, 'image', 'Interior', '/img/details/interior.jpg', '2018 Infiniti QX60 Premium — interior (Aba Road, Port Harcourt)', 1, 1200, 900),
-  (311, 45, 'image', 'Dashboard', '/img/details/dashboard.jpg', '2018 Infiniti QX60 Premium — dashboard (Aba Road, Port Harcourt)', 2, 1200, 900),
-  (312, 45, 'image', 'Engine bay', '/img/details/engine-bay.jpg', '2018 Infiniti QX60 Premium — engine bay (Aba Road, Port Harcourt)', 3, 1200, 900),
-  (313, 45, 'image', 'Tyres & tread', '/img/details/tyres.jpg', '2018 Infiniti QX60 Premium — tyres & tread (Aba Road, Port Harcourt)', 4, 1200, 900),
-  (314, 45, 'image', 'Boot', '/img/details/boot.jpg', '2018 Infiniti QX60 Premium — boot (Aba Road, Port Harcourt)', 5, 1200, 900),
-  (315, 45, 'image', 'Odometer close-up', '/img/details/odometer.jpg', '2018 Infiniti QX60 Premium — odometer close-up (Aba Road, Port Harcourt)', 6, 1200, 900),
-  (316, 46, 'image', 'Front three-quarter', '/img/cars/toyota-camry-silver.jpg', '2015 Toyota Avalon XLE — front three-quarter (Old GRA, Port Harcourt)', 0, 1200, 900),
-  (317, 46, 'image', 'Interior', '/img/details/interior.jpg', '2015 Toyota Avalon XLE — interior (Old GRA, Port Harcourt)', 1, 1200, 900),
-  (318, 46, 'image', 'Dashboard', '/img/details/dashboard.jpg', '2015 Toyota Avalon XLE — dashboard (Old GRA, Port Harcourt)', 2, 1200, 900),
-  (319, 46, 'image', 'Engine bay', '/img/details/engine-bay.jpg', '2015 Toyota Avalon XLE — engine bay (Old GRA, Port Harcourt)', 3, 1200, 900),
-  (320, 46, 'image', 'Tyres & tread', '/img/details/tyres.jpg', '2015 Toyota Avalon XLE — tyres & tread (Old GRA, Port Harcourt)', 4, 1200, 900);
-INSERT INTO listing_media (`id`, `listing_id`, `type`, `shot_label`, `url`, `alt_text`, `position`, `width`, `height`) VALUES
-  (321, 46, 'image', 'Boot', '/img/details/boot.jpg', '2015 Toyota Avalon XLE — boot (Old GRA, Port Harcourt)', 5, 1200, 900),
-  (322, 46, 'image', 'Odometer close-up', '/img/details/odometer.jpg', '2015 Toyota Avalon XLE — odometer close-up (Old GRA, Port Harcourt)', 6, 1200, 900),
-  (323, 47, 'image', 'Front three-quarter', '/img/cars/toyota-corolla-white.jpg', '2013 Toyota Corolla LE — front three-quarter (Rumuokoro, Port Harcourt)', 0, 1200, 900),
-  (324, 47, 'image', 'Interior', '/img/details/interior.jpg', '2013 Toyota Corolla LE — interior (Rumuokoro, Port Harcourt)', 1, 1200, 900),
-  (325, 47, 'image', 'Dashboard', '/img/details/dashboard.jpg', '2013 Toyota Corolla LE — dashboard (Rumuokoro, Port Harcourt)', 2, 1200, 900),
-  (326, 47, 'image', 'Engine bay', '/img/details/engine-bay.jpg', '2013 Toyota Corolla LE — engine bay (Rumuokoro, Port Harcourt)', 3, 1200, 900),
-  (327, 47, 'image', 'Tyres & tread', '/img/details/tyres.jpg', '2013 Toyota Corolla LE — tyres & tread (Rumuokoro, Port Harcourt)', 4, 1200, 900),
-  (328, 47, 'image', 'Boot', '/img/details/boot.jpg', '2013 Toyota Corolla LE — boot (Rumuokoro, Port Harcourt)', 5, 1200, 900),
-  (329, 47, 'image', 'Odometer close-up', '/img/details/odometer.jpg', '2013 Toyota Corolla LE — odometer close-up (Rumuokoro, Port Harcourt)', 6, 1200, 900),
-  (330, 48, 'image', 'Front three-quarter', '/img/cars/honda-accord-black.jpg', '2017 Lexus ES 350 Base — front three-quarter (Rukpokwu, Port Harcourt)', 0, 1200, 900),
-  (331, 48, 'image', 'Interior', '/img/details/interior.jpg', '2017 Lexus ES 350 Base — interior (Rukpokwu, Port Harcourt)', 1, 1200, 900),
-  (332, 48, 'image', 'Dashboard', '/img/details/dashboard.jpg', '2017 Lexus ES 350 Base — dashboard (Rukpokwu, Port Harcourt)', 2, 1200, 900),
-  (333, 48, 'image', 'Engine bay', '/img/details/engine-bay.jpg', '2017 Lexus ES 350 Base — engine bay (Rukpokwu, Port Harcourt)', 3, 1200, 900),
-  (334, 48, 'image', 'Tyres & tread', '/img/details/tyres.jpg', '2017 Lexus ES 350 Base — tyres & tread (Rukpokwu, Port Harcourt)', 4, 1200, 900),
-  (335, 48, 'image', 'Boot', '/img/details/boot.jpg', '2017 Lexus ES 350 Base — boot (Rukpokwu, Port Harcourt)', 5, 1200, 900),
-  (336, 48, 'image', 'Odometer close-up', '/img/details/odometer.jpg', '2017 Lexus ES 350 Base — odometer close-up (Rukpokwu, Port Harcourt)', 6, 1200, 900),
-  (337, 49, 'image', 'Front three-quarter', '/img/cars/mercedes-eclass-grey.jpg', '2016 Mercedes-Benz E-Class E350 — front three-quarter (Rumuokoro, Port Harcourt)', 0, 1200, 900),
-  (338, 49, 'image', 'Interior', '/img/details/interior.jpg', '2016 Mercedes-Benz E-Class E350 — interior (Rumuokoro, Port Harcourt)', 1, 1200, 900),
-  (339, 49, 'image', 'Dashboard', '/img/details/dashboard.jpg', '2016 Mercedes-Benz E-Class E350 — dashboard (Rumuokoro, Port Harcourt)', 2, 1200, 900),
-  (340, 49, 'image', 'Engine bay', '/img/details/engine-bay.jpg', '2016 Mercedes-Benz E-Class E350 — engine bay (Rumuokoro, Port Harcourt)', 3, 1200, 900),
-  (341, 49, 'image', 'Tyres & tread', '/img/details/tyres.jpg', '2016 Mercedes-Benz E-Class E350 — tyres & tread (Rumuokoro, Port Harcourt)', 4, 1200, 900),
-  (342, 49, 'image', 'Boot', '/img/details/boot.jpg', '2016 Mercedes-Benz E-Class E350 — boot (Rumuokoro, Port Harcourt)', 5, 1200, 900),
-  (343, 49, 'image', 'Odometer close-up', '/img/details/odometer.jpg', '2016 Mercedes-Benz E-Class E350 — odometer close-up (Rumuokoro, Port Harcourt)', 6, 1200, 900),
-  (344, 50, 'image', 'Front three-quarter', '/img/cars/honda-accord-black.jpg', '2018 Hyundai Elantra Limited — front three-quarter (Ada George, Port Harcourt)', 0, 1200, 900),
-  (345, 50, 'image', 'Interior', '/img/details/interior.jpg', '2018 Hyundai Elantra Limited — interior (Ada George, Port Harcourt)', 1, 1200, 900),
-  (346, 50, 'image', 'Dashboard', '/img/details/dashboard.jpg', '2018 Hyundai Elantra Limited — dashboard (Ada George, Port Harcourt)', 2, 1200, 900),
-  (347, 50, 'image', 'Engine bay', '/img/details/engine-bay.jpg', '2018 Hyundai Elantra Limited — engine bay (Ada George, Port Harcourt)', 3, 1200, 900),
-  (348, 50, 'image', 'Tyres & tread', '/img/details/tyres.jpg', '2018 Hyundai Elantra Limited — tyres & tread (Ada George, Port Harcourt)', 4, 1200, 900),
-  (349, 50, 'image', 'Boot', '/img/details/boot.jpg', '2018 Hyundai Elantra Limited — boot (Ada George, Port Harcourt)', 5, 1200, 900),
-  (350, 50, 'image', 'Odometer close-up', '/img/details/odometer.jpg', '2018 Hyundai Elantra Limited — odometer close-up (Ada George, Port Harcourt)', 6, 1200, 900),
-  (351, 51, 'image', 'Front three-quarter', '/img/cars/toyota-hilux-silver.jpg', '2016 Toyota Hilux SR — front three-quarter (Trans-Amadi, Port Harcourt)', 0, 1200, 900),
-  (352, 51, 'image', 'Interior', '/img/details/interior.jpg', '2016 Toyota Hilux SR — interior (Trans-Amadi, Port Harcourt)', 1, 1200, 900),
-  (353, 51, 'image', 'Dashboard', '/img/details/dashboard.jpg', '2016 Toyota Hilux SR — dashboard (Trans-Amadi, Port Harcourt)', 2, 1200, 900),
-  (354, 51, 'image', 'Engine bay', '/img/details/engine-bay.jpg', '2016 Toyota Hilux SR — engine bay (Trans-Amadi, Port Harcourt)', 3, 1200, 900),
-  (355, 51, 'image', 'Tyres & tread', '/img/details/tyres.jpg', '2016 Toyota Hilux SR — tyres & tread (Trans-Amadi, Port Harcourt)', 4, 1200, 900),
-  (356, 51, 'image', 'Boot', '/img/details/boot.jpg', '2016 Toyota Hilux SR — boot (Trans-Amadi, Port Harcourt)', 5, 1200, 900),
-  (357, 51, 'image', 'Odometer close-up', '/img/details/odometer.jpg', '2016 Toyota Hilux SR — odometer close-up (Trans-Amadi, Port Harcourt)', 6, 1200, 900),
-  (358, 52, 'image', 'Front three-quarter', '/img/cars/honda-accord-black.jpg', '2015 Nissan Altima SV — front three-quarter (Woji, Port Harcourt)', 0, 1200, 900),
-  (359, 52, 'image', 'Interior', '/img/details/interior.jpg', '2015 Nissan Altima SV — interior (Woji, Port Harcourt)', 1, 1200, 900),
-  (360, 52, 'image', 'Dashboard', '/img/details/dashboard.jpg', '2015 Nissan Altima SV — dashboard (Woji, Port Harcourt)', 2, 1200, 900);
-INSERT INTO listing_media (`id`, `listing_id`, `type`, `shot_label`, `url`, `alt_text`, `position`, `width`, `height`) VALUES
-  (361, 52, 'image', 'Engine bay', '/img/details/engine-bay.jpg', '2015 Nissan Altima SV — engine bay (Woji, Port Harcourt)', 3, 1200, 900),
-  (362, 52, 'image', 'Tyres & tread', '/img/details/tyres.jpg', '2015 Nissan Altima SV — tyres & tread (Woji, Port Harcourt)', 4, 1200, 900),
-  (363, 52, 'image', 'Boot', '/img/details/boot.jpg', '2015 Nissan Altima SV — boot (Woji, Port Harcourt)', 5, 1200, 900),
-  (364, 52, 'image', 'Odometer close-up', '/img/details/odometer.jpg', '2015 Nissan Altima SV — odometer close-up (Woji, Port Harcourt)', 6, 1200, 900),
-  (365, 53, 'image', 'Front three-quarter', '/img/cars/ford-explorer-blue.jpg', '2019 Ford Ranger Wildtrak — front three-quarter (Elelenwo, Port Harcourt)', 0, 1200, 900),
-  (366, 53, 'image', 'Interior', '/img/details/interior.jpg', '2019 Ford Ranger Wildtrak — interior (Elelenwo, Port Harcourt)', 1, 1200, 900),
-  (367, 53, 'image', 'Dashboard', '/img/details/dashboard.jpg', '2019 Ford Ranger Wildtrak — dashboard (Elelenwo, Port Harcourt)', 2, 1200, 900),
-  (368, 53, 'image', 'Engine bay', '/img/details/engine-bay.jpg', '2019 Ford Ranger Wildtrak — engine bay (Elelenwo, Port Harcourt)', 3, 1200, 900),
-  (369, 53, 'image', 'Tyres & tread', '/img/details/tyres.jpg', '2019 Ford Ranger Wildtrak — tyres & tread (Elelenwo, Port Harcourt)', 4, 1200, 900),
-  (370, 53, 'image', 'Boot', '/img/details/boot.jpg', '2019 Ford Ranger Wildtrak — boot (Elelenwo, Port Harcourt)', 5, 1200, 900),
-  (371, 53, 'image', 'Odometer close-up', '/img/details/odometer.jpg', '2019 Ford Ranger Wildtrak — odometer close-up (Elelenwo, Port Harcourt)', 6, 1200, 900),
-  (372, 54, 'image', 'Front three-quarter', '/img/cars/toyota-camry-silver.jpg', '2013 Toyota Camry SE — front three-quarter (Rumuokoro, Port Harcourt)', 0, 1200, 900),
-  (373, 54, 'image', 'Interior', '/img/details/interior.jpg', '2013 Toyota Camry SE — interior (Rumuokoro, Port Harcourt)', 1, 1200, 900),
-  (374, 54, 'image', 'Dashboard', '/img/details/dashboard.jpg', '2013 Toyota Camry SE — dashboard (Rumuokoro, Port Harcourt)', 2, 1200, 900),
-  (375, 54, 'image', 'Engine bay', '/img/details/engine-bay.jpg', '2013 Toyota Camry SE — engine bay (Rumuokoro, Port Harcourt)', 3, 1200, 900),
-  (376, 54, 'image', 'Tyres & tread', '/img/details/tyres.jpg', '2013 Toyota Camry SE — tyres & tread (Rumuokoro, Port Harcourt)', 4, 1200, 900),
-  (377, 54, 'image', 'Boot', '/img/details/boot.jpg', '2013 Toyota Camry SE — boot (Rumuokoro, Port Harcourt)', 5, 1200, 900),
-  (378, 54, 'image', 'Odometer close-up', '/img/details/odometer.jpg', '2013 Toyota Camry SE — odometer close-up (Rumuokoro, Port Harcourt)', 6, 1200, 900),
-  (379, 55, 'image', 'Front three-quarter', '/img/cars/toyota-corolla-white.jpg', '2018 Toyota Corolla S — front three-quarter (Choba, Port Harcourt)', 0, 1200, 900),
-  (380, 55, 'image', 'Interior', '/img/details/interior.jpg', '2018 Toyota Corolla S — interior (Choba, Port Harcourt)', 1, 1200, 900),
-  (381, 55, 'image', 'Dashboard', '/img/details/dashboard.jpg', '2018 Toyota Corolla S — dashboard (Choba, Port Harcourt)', 2, 1200, 900),
-  (382, 55, 'image', 'Engine bay', '/img/details/engine-bay.jpg', '2018 Toyota Corolla S — engine bay (Choba, Port Harcourt)', 3, 1200, 900),
-  (383, 55, 'image', 'Tyres & tread', '/img/details/tyres.jpg', '2018 Toyota Corolla S — tyres & tread (Choba, Port Harcourt)', 4, 1200, 900),
-  (384, 55, 'image', 'Boot', '/img/details/boot.jpg', '2018 Toyota Corolla S — boot (Choba, Port Harcourt)', 5, 1200, 900),
-  (385, 55, 'image', 'Odometer close-up', '/img/details/odometer.jpg', '2018 Toyota Corolla S — odometer close-up (Choba, Port Harcourt)', 6, 1200, 900),
-  (386, 56, 'image', 'Front three-quarter', '/img/cars/honda-crv-silver.jpg', '2015 Honda CR-V LX — front three-quarter (Rukpokwu, Port Harcourt)', 0, 1200, 900),
-  (387, 56, 'image', 'Interior', '/img/details/interior.jpg', '2015 Honda CR-V LX — interior (Rukpokwu, Port Harcourt)', 1, 1200, 900),
-  (388, 56, 'image', 'Dashboard', '/img/details/dashboard.jpg', '2015 Honda CR-V LX — dashboard (Rukpokwu, Port Harcourt)', 2, 1200, 900),
-  (389, 56, 'image', 'Engine bay', '/img/details/engine-bay.jpg', '2015 Honda CR-V LX — engine bay (Rukpokwu, Port Harcourt)', 3, 1200, 900),
-  (390, 56, 'image', 'Tyres & tread', '/img/details/tyres.jpg', '2015 Honda CR-V LX — tyres & tread (Rukpokwu, Port Harcourt)', 4, 1200, 900),
-  (391, 56, 'image', 'Boot', '/img/details/boot.jpg', '2015 Honda CR-V LX — boot (Rukpokwu, Port Harcourt)', 5, 1200, 900),
-  (392, 56, 'image', 'Odometer close-up', '/img/details/odometer.jpg', '2015 Honda CR-V LX — odometer close-up (Rukpokwu, Port Harcourt)', 6, 1200, 900),
-  (393, 57, 'image', 'Front three-quarter', '/img/cars/toyota-rav4-silver.jpg', '2014 Toyota RAV4 LE — front three-quarter (Woji, Port Harcourt)', 0, 1200, 900),
-  (394, 57, 'image', 'Interior', '/img/details/interior.jpg', '2014 Toyota RAV4 LE — interior (Woji, Port Harcourt)', 1, 1200, 900),
-  (395, 57, 'image', 'Dashboard', '/img/details/dashboard.jpg', '2014 Toyota RAV4 LE — dashboard (Woji, Port Harcourt)', 2, 1200, 900),
-  (396, 57, 'image', 'Engine bay', '/img/details/engine-bay.jpg', '2014 Toyota RAV4 LE — engine bay (Woji, Port Harcourt)', 3, 1200, 900),
-  (397, 57, 'image', 'Tyres & tread', '/img/details/tyres.jpg', '2014 Toyota RAV4 LE — tyres & tread (Woji, Port Harcourt)', 4, 1200, 900),
-  (398, 57, 'image', 'Boot', '/img/details/boot.jpg', '2014 Toyota RAV4 LE — boot (Woji, Port Harcourt)', 5, 1200, 900),
-  (399, 57, 'image', 'Odometer close-up', '/img/details/odometer.jpg', '2014 Toyota RAV4 LE — odometer close-up (Woji, Port Harcourt)', 6, 1200, 900),
-  (400, 58, 'image', 'Front three-quarter', '/img/cars/ford-explorer-blue.jpg', '2016 Kia Sportage LX — front three-quarter (Eliozu, Port Harcourt)', 0, 1200, 900);
-INSERT INTO listing_media (`id`, `listing_id`, `type`, `shot_label`, `url`, `alt_text`, `position`, `width`, `height`) VALUES
-  (401, 58, 'image', 'Interior', '/img/details/interior.jpg', '2016 Kia Sportage LX — interior (Eliozu, Port Harcourt)', 1, 1200, 900),
-  (402, 58, 'image', 'Dashboard', '/img/details/dashboard.jpg', '2016 Kia Sportage LX — dashboard (Eliozu, Port Harcourt)', 2, 1200, 900),
-  (403, 58, 'image', 'Engine bay', '/img/details/engine-bay.jpg', '2016 Kia Sportage LX — engine bay (Eliozu, Port Harcourt)', 3, 1200, 900),
-  (404, 58, 'image', 'Tyres & tread', '/img/details/tyres.jpg', '2016 Kia Sportage LX — tyres & tread (Eliozu, Port Harcourt)', 4, 1200, 900),
-  (405, 58, 'image', 'Boot', '/img/details/boot.jpg', '2016 Kia Sportage LX — boot (Eliozu, Port Harcourt)', 5, 1200, 900),
-  (406, 58, 'image', 'Odometer close-up', '/img/details/odometer.jpg', '2016 Kia Sportage LX — odometer close-up (Eliozu, Port Harcourt)', 6, 1200, 900),
-  (407, 59, 'image', 'Front three-quarter', '/img/cars/nissan-xtrail-grey.jpg', '2015 Nissan X-Trail SV — front three-quarter (Eliozu, Port Harcourt)', 0, 1200, 900),
-  (408, 59, 'image', 'Interior', '/img/details/interior.jpg', '2015 Nissan X-Trail SV — interior (Eliozu, Port Harcourt)', 1, 1200, 900),
-  (409, 59, 'image', 'Dashboard', '/img/details/dashboard.jpg', '2015 Nissan X-Trail SV — dashboard (Eliozu, Port Harcourt)', 2, 1200, 900),
-  (410, 59, 'image', 'Engine bay', '/img/details/engine-bay.jpg', '2015 Nissan X-Trail SV — engine bay (Eliozu, Port Harcourt)', 3, 1200, 900),
-  (411, 59, 'image', 'Tyres & tread', '/img/details/tyres.jpg', '2015 Nissan X-Trail SV — tyres & tread (Eliozu, Port Harcourt)', 4, 1200, 900),
-  (412, 59, 'image', 'Boot', '/img/details/boot.jpg', '2015 Nissan X-Trail SV — boot (Eliozu, Port Harcourt)', 5, 1200, 900),
-  (413, 59, 'image', 'Odometer close-up', '/img/details/odometer.jpg', '2015 Nissan X-Trail SV — odometer close-up (Eliozu, Port Harcourt)', 6, 1200, 900),
-  (414, 60, 'image', 'Front three-quarter', '/img/cars/toyota-camry-silver.jpg', '2014 Toyota Camry SE — front three-quarter (Elelenwo, Port Harcourt)', 0, 1200, 900),
-  (415, 60, 'image', 'Interior', '/img/details/interior.jpg', '2014 Toyota Camry SE — interior (Elelenwo, Port Harcourt)', 1, 1200, 900),
-  (416, 60, 'image', 'Dashboard', '/img/details/dashboard.jpg', '2014 Toyota Camry SE — dashboard (Elelenwo, Port Harcourt)', 2, 1200, 900),
-  (417, 60, 'image', 'Engine bay', '/img/details/engine-bay.jpg', '2014 Toyota Camry SE — engine bay (Elelenwo, Port Harcourt)', 3, 1200, 900),
-  (418, 60, 'image', 'Tyres & tread', '/img/details/tyres.jpg', '2014 Toyota Camry SE — tyres & tread (Elelenwo, Port Harcourt)', 4, 1200, 900),
-  (419, 60, 'image', 'Boot', '/img/details/boot.jpg', '2014 Toyota Camry SE — boot (Elelenwo, Port Harcourt)', 5, 1200, 900),
-  (420, 60, 'image', 'Odometer close-up', '/img/details/odometer.jpg', '2014 Toyota Camry SE — odometer close-up (Elelenwo, Port Harcourt)', 6, 1200, 900),
-  (421, 61, 'image', 'Front three-quarter', '/img/cars/toyota-corolla-white.jpg', '2015 Toyota Corolla S — front three-quarter (Choba, Port Harcourt)', 0, 1200, 900),
-  (422, 61, 'image', 'Interior', '/img/details/interior.jpg', '2015 Toyota Corolla S — interior (Choba, Port Harcourt)', 1, 1200, 900),
-  (423, 61, 'image', 'Dashboard', '/img/details/dashboard.jpg', '2015 Toyota Corolla S — dashboard (Choba, Port Harcourt)', 2, 1200, 900),
-  (424, 61, 'image', 'Engine bay', '/img/details/engine-bay.jpg', '2015 Toyota Corolla S — engine bay (Choba, Port Harcourt)', 3, 1200, 900),
-  (425, 61, 'image', 'Tyres & tread', '/img/details/tyres.jpg', '2015 Toyota Corolla S — tyres & tread (Choba, Port Harcourt)', 4, 1200, 900),
-  (426, 61, 'image', 'Boot', '/img/details/boot.jpg', '2015 Toyota Corolla S — boot (Choba, Port Harcourt)', 5, 1200, 900),
-  (427, 61, 'image', 'Odometer close-up', '/img/details/odometer.jpg', '2015 Toyota Corolla S — odometer close-up (Choba, Port Harcourt)', 6, 1200, 900),
-  (428, 62, 'image', 'Front three-quarter', '/img/cars/honda-crv-silver.jpg', '2015 Honda CR-V EX — front three-quarter (Peter Odili Road, Port Harcourt)', 0, 1200, 900),
-  (429, 62, 'image', 'Interior', '/img/details/interior.jpg', '2015 Honda CR-V EX — interior (Peter Odili Road, Port Harcourt)', 1, 1200, 900),
-  (430, 62, 'image', 'Dashboard', '/img/details/dashboard.jpg', '2015 Honda CR-V EX — dashboard (Peter Odili Road, Port Harcourt)', 2, 1200, 900),
-  (431, 62, 'image', 'Engine bay', '/img/details/engine-bay.jpg', '2015 Honda CR-V EX — engine bay (Peter Odili Road, Port Harcourt)', 3, 1200, 900),
-  (432, 62, 'image', 'Tyres & tread', '/img/details/tyres.jpg', '2015 Honda CR-V EX — tyres & tread (Peter Odili Road, Port Harcourt)', 4, 1200, 900),
-  (433, 62, 'image', 'Boot', '/img/details/boot.jpg', '2015 Honda CR-V EX — boot (Peter Odili Road, Port Harcourt)', 5, 1200, 900),
-  (434, 62, 'image', 'Odometer close-up', '/img/details/odometer.jpg', '2015 Honda CR-V EX — odometer close-up (Peter Odili Road, Port Harcourt)', 6, 1200, 900),
-  (435, 63, 'image', 'Front three-quarter', '/img/cars/toyota-rav4-silver.jpg', '2014 Toyota RAV4 LE — front three-quarter (Eliozu, Port Harcourt)', 0, 1200, 900),
-  (436, 63, 'image', 'Interior', '/img/details/interior.jpg', '2014 Toyota RAV4 LE — interior (Eliozu, Port Harcourt)', 1, 1200, 900),
-  (437, 63, 'image', 'Dashboard', '/img/details/dashboard.jpg', '2014 Toyota RAV4 LE — dashboard (Eliozu, Port Harcourt)', 2, 1200, 900),
-  (438, 63, 'image', 'Engine bay', '/img/details/engine-bay.jpg', '2014 Toyota RAV4 LE — engine bay (Eliozu, Port Harcourt)', 3, 1200, 900),
-  (439, 63, 'image', 'Tyres & tread', '/img/details/tyres.jpg', '2014 Toyota RAV4 LE — tyres & tread (Eliozu, Port Harcourt)', 4, 1200, 900),
-  (440, 63, 'image', 'Boot', '/img/details/boot.jpg', '2014 Toyota RAV4 LE — boot (Eliozu, Port Harcourt)', 5, 1200, 900);
-INSERT INTO listing_media (`id`, `listing_id`, `type`, `shot_label`, `url`, `alt_text`, `position`, `width`, `height`) VALUES
-  (441, 63, 'image', 'Odometer close-up', '/img/details/odometer.jpg', '2014 Toyota RAV4 LE — odometer close-up (Eliozu, Port Harcourt)', 6, 1200, 900),
-  (442, 64, 'image', 'Front three-quarter', '/img/cars/ford-explorer-blue.jpg', '2017 Kia Sportage EX — front three-quarter (Ada George, Port Harcourt)', 0, 1200, 900),
-  (443, 64, 'image', 'Interior', '/img/details/interior.jpg', '2017 Kia Sportage EX — interior (Ada George, Port Harcourt)', 1, 1200, 900),
-  (444, 64, 'image', 'Dashboard', '/img/details/dashboard.jpg', '2017 Kia Sportage EX — dashboard (Ada George, Port Harcourt)', 2, 1200, 900),
-  (445, 64, 'image', 'Engine bay', '/img/details/engine-bay.jpg', '2017 Kia Sportage EX — engine bay (Ada George, Port Harcourt)', 3, 1200, 900),
-  (446, 64, 'image', 'Tyres & tread', '/img/details/tyres.jpg', '2017 Kia Sportage EX — tyres & tread (Ada George, Port Harcourt)', 4, 1200, 900),
-  (447, 64, 'image', 'Boot', '/img/details/boot.jpg', '2017 Kia Sportage EX — boot (Ada George, Port Harcourt)', 5, 1200, 900),
-  (448, 64, 'image', 'Odometer close-up', '/img/details/odometer.jpg', '2017 Kia Sportage EX — odometer close-up (Ada George, Port Harcourt)', 6, 1200, 900),
-  (449, 65, 'image', 'Front three-quarter', '/img/cars/nissan-xtrail-grey.jpg', '2015 Nissan X-Trail SV — front three-quarter (Woji, Port Harcourt)', 0, 1200, 900),
-  (450, 65, 'image', 'Interior', '/img/details/interior.jpg', '2015 Nissan X-Trail SV — interior (Woji, Port Harcourt)', 1, 1200, 900),
-  (451, 65, 'image', 'Dashboard', '/img/details/dashboard.jpg', '2015 Nissan X-Trail SV — dashboard (Woji, Port Harcourt)', 2, 1200, 900),
-  (452, 65, 'image', 'Engine bay', '/img/details/engine-bay.jpg', '2015 Nissan X-Trail SV — engine bay (Woji, Port Harcourt)', 3, 1200, 900),
-  (453, 65, 'image', 'Tyres & tread', '/img/details/tyres.jpg', '2015 Nissan X-Trail SV — tyres & tread (Woji, Port Harcourt)', 4, 1200, 900),
-  (454, 65, 'image', 'Boot', '/img/details/boot.jpg', '2015 Nissan X-Trail SV — boot (Woji, Port Harcourt)', 5, 1200, 900),
-  (455, 65, 'image', 'Odometer close-up', '/img/details/odometer.jpg', '2015 Nissan X-Trail SV — odometer close-up (Woji, Port Harcourt)', 6, 1200, 900),
-  (456, 66, 'image', 'Front three-quarter', '/img/cars/toyota-camry-silver.jpg', '2017 Toyota Camry SE — front three-quarter (Rumuola, Port Harcourt)', 0, 1200, 900),
-  (457, 66, 'image', 'Interior', '/img/details/interior.jpg', '2017 Toyota Camry SE — interior (Rumuola, Port Harcourt)', 1, 1200, 900),
-  (458, 66, 'image', 'Dashboard', '/img/details/dashboard.jpg', '2017 Toyota Camry SE — dashboard (Rumuola, Port Harcourt)', 2, 1200, 900),
-  (459, 66, 'image', 'Engine bay', '/img/details/engine-bay.jpg', '2017 Toyota Camry SE — engine bay (Rumuola, Port Harcourt)', 3, 1200, 900),
-  (460, 66, 'image', 'Tyres & tread', '/img/details/tyres.jpg', '2017 Toyota Camry SE — tyres & tread (Rumuola, Port Harcourt)', 4, 1200, 900),
-  (461, 66, 'image', 'Boot', '/img/details/boot.jpg', '2017 Toyota Camry SE — boot (Rumuola, Port Harcourt)', 5, 1200, 900),
-  (462, 66, 'image', 'Odometer close-up', '/img/details/odometer.jpg', '2017 Toyota Camry SE — odometer close-up (Rumuola, Port Harcourt)', 6, 1200, 900),
-  (463, 67, 'image', 'Front three-quarter', '/img/cars/toyota-corolla-white.jpg', '2014 Toyota Corolla LE — front three-quarter (Choba, Port Harcourt)', 0, 1200, 900),
-  (464, 67, 'image', 'Interior', '/img/details/interior.jpg', '2014 Toyota Corolla LE — interior (Choba, Port Harcourt)', 1, 1200, 900),
-  (465, 67, 'image', 'Dashboard', '/img/details/dashboard.jpg', '2014 Toyota Corolla LE — dashboard (Choba, Port Harcourt)', 2, 1200, 900),
-  (466, 67, 'image', 'Engine bay', '/img/details/engine-bay.jpg', '2014 Toyota Corolla LE — engine bay (Choba, Port Harcourt)', 3, 1200, 900),
-  (467, 67, 'image', 'Tyres & tread', '/img/details/tyres.jpg', '2014 Toyota Corolla LE — tyres & tread (Choba, Port Harcourt)', 4, 1200, 900),
-  (468, 67, 'image', 'Boot', '/img/details/boot.jpg', '2014 Toyota Corolla LE — boot (Choba, Port Harcourt)', 5, 1200, 900),
-  (469, 67, 'image', 'Odometer close-up', '/img/details/odometer.jpg', '2014 Toyota Corolla LE — odometer close-up (Choba, Port Harcourt)', 6, 1200, 900),
-  (470, 68, 'image', 'Front three-quarter', '/img/cars/honda-crv-silver.jpg', '2015 Honda CR-V EX — front three-quarter (Trans-Amadi, Port Harcourt)', 0, 1200, 900),
-  (471, 68, 'image', 'Interior', '/img/details/interior.jpg', '2015 Honda CR-V EX — interior (Trans-Amadi, Port Harcourt)', 1, 1200, 900),
-  (472, 68, 'image', 'Dashboard', '/img/details/dashboard.jpg', '2015 Honda CR-V EX — dashboard (Trans-Amadi, Port Harcourt)', 2, 1200, 900),
-  (473, 68, 'image', 'Engine bay', '/img/details/engine-bay.jpg', '2015 Honda CR-V EX — engine bay (Trans-Amadi, Port Harcourt)', 3, 1200, 900),
-  (474, 68, 'image', 'Tyres & tread', '/img/details/tyres.jpg', '2015 Honda CR-V EX — tyres & tread (Trans-Amadi, Port Harcourt)', 4, 1200, 900),
-  (475, 68, 'image', 'Boot', '/img/details/boot.jpg', '2015 Honda CR-V EX — boot (Trans-Amadi, Port Harcourt)', 5, 1200, 900),
-  (476, 68, 'image', 'Odometer close-up', '/img/details/odometer.jpg', '2015 Honda CR-V EX — odometer close-up (Trans-Amadi, Port Harcourt)', 6, 1200, 900),
-  (477, 69, 'image', 'Front three-quarter', '/img/cars/toyota-rav4-silver.jpg', '2012 Toyota RAV4 XLE — front three-quarter (Eliozu, Port Harcourt)', 0, 1200, 900),
-  (478, 69, 'image', 'Interior', '/img/details/interior.jpg', '2012 Toyota RAV4 XLE — interior (Eliozu, Port Harcourt)', 1, 1200, 900),
-  (479, 69, 'image', 'Dashboard', '/img/details/dashboard.jpg', '2012 Toyota RAV4 XLE — dashboard (Eliozu, Port Harcourt)', 2, 1200, 900),
-  (480, 69, 'image', 'Engine bay', '/img/details/engine-bay.jpg', '2012 Toyota RAV4 XLE — engine bay (Eliozu, Port Harcourt)', 3, 1200, 900);
-INSERT INTO listing_media (`id`, `listing_id`, `type`, `shot_label`, `url`, `alt_text`, `position`, `width`, `height`) VALUES
-  (481, 69, 'image', 'Tyres & tread', '/img/details/tyres.jpg', '2012 Toyota RAV4 XLE — tyres & tread (Eliozu, Port Harcourt)', 4, 1200, 900),
-  (482, 69, 'image', 'Boot', '/img/details/boot.jpg', '2012 Toyota RAV4 XLE — boot (Eliozu, Port Harcourt)', 5, 1200, 900),
-  (483, 69, 'image', 'Odometer close-up', '/img/details/odometer.jpg', '2012 Toyota RAV4 XLE — odometer close-up (Eliozu, Port Harcourt)', 6, 1200, 900),
-  (484, 70, 'image', 'Front three-quarter', '/img/cars/ford-explorer-blue.jpg', '2015 Kia Sportage EX — front three-quarter (Choba, Port Harcourt)', 0, 1200, 900),
-  (485, 70, 'image', 'Interior', '/img/details/interior.jpg', '2015 Kia Sportage EX — interior (Choba, Port Harcourt)', 1, 1200, 900),
-  (486, 70, 'image', 'Dashboard', '/img/details/dashboard.jpg', '2015 Kia Sportage EX — dashboard (Choba, Port Harcourt)', 2, 1200, 900),
-  (487, 70, 'image', 'Engine bay', '/img/details/engine-bay.jpg', '2015 Kia Sportage EX — engine bay (Choba, Port Harcourt)', 3, 1200, 900),
-  (488, 70, 'image', 'Tyres & tread', '/img/details/tyres.jpg', '2015 Kia Sportage EX — tyres & tread (Choba, Port Harcourt)', 4, 1200, 900),
-  (489, 70, 'image', 'Boot', '/img/details/boot.jpg', '2015 Kia Sportage EX — boot (Choba, Port Harcourt)', 5, 1200, 900),
-  (490, 70, 'image', 'Odometer close-up', '/img/details/odometer.jpg', '2015 Kia Sportage EX — odometer close-up (Choba, Port Harcourt)', 6, 1200, 900),
-  (491, 71, 'image', 'Front three-quarter', '/img/cars/nissan-xtrail-grey.jpg', '2016 Nissan X-Trail SV — front three-quarter (Eliozu, Port Harcourt)', 0, 1200, 900),
-  (492, 71, 'image', 'Interior', '/img/details/interior.jpg', '2016 Nissan X-Trail SV — interior (Eliozu, Port Harcourt)', 1, 1200, 900),
-  (493, 71, 'image', 'Dashboard', '/img/details/dashboard.jpg', '2016 Nissan X-Trail SV — dashboard (Eliozu, Port Harcourt)', 2, 1200, 900),
-  (494, 71, 'image', 'Engine bay', '/img/details/engine-bay.jpg', '2016 Nissan X-Trail SV — engine bay (Eliozu, Port Harcourt)', 3, 1200, 900),
-  (495, 71, 'image', 'Tyres & tread', '/img/details/tyres.jpg', '2016 Nissan X-Trail SV — tyres & tread (Eliozu, Port Harcourt)', 4, 1200, 900),
-  (496, 71, 'image', 'Boot', '/img/details/boot.jpg', '2016 Nissan X-Trail SV — boot (Eliozu, Port Harcourt)', 5, 1200, 900),
-  (497, 71, 'image', 'Odometer close-up', '/img/details/odometer.jpg', '2016 Nissan X-Trail SV — odometer close-up (Eliozu, Port Harcourt)', 6, 1200, 900),
-  (498, 72, 'image', 'Front three-quarter', '/img/cars/toyota-camry-silver.jpg', '2015 Toyota Camry XLE — front three-quarter (Eliozu, Port Harcourt)', 0, 1200, 900),
-  (499, 72, 'image', 'Interior', '/img/details/interior.jpg', '2015 Toyota Camry XLE — interior (Eliozu, Port Harcourt)', 1, 1200, 900),
-  (500, 72, 'image', 'Dashboard', '/img/details/dashboard.jpg', '2015 Toyota Camry XLE — dashboard (Eliozu, Port Harcourt)', 2, 1200, 900),
-  (501, 72, 'image', 'Engine bay', '/img/details/engine-bay.jpg', '2015 Toyota Camry XLE — engine bay (Eliozu, Port Harcourt)', 3, 1200, 900),
-  (502, 72, 'image', 'Tyres & tread', '/img/details/tyres.jpg', '2015 Toyota Camry XLE — tyres & tread (Eliozu, Port Harcourt)', 4, 1200, 900),
-  (503, 72, 'image', 'Boot', '/img/details/boot.jpg', '2015 Toyota Camry XLE — boot (Eliozu, Port Harcourt)', 5, 1200, 900),
-  (504, 72, 'image', 'Odometer close-up', '/img/details/odometer.jpg', '2015 Toyota Camry XLE — odometer close-up (Eliozu, Port Harcourt)', 6, 1200, 900),
-  (505, 73, 'image', 'Front three-quarter', '/img/cars/toyota-corolla-white.jpg', '2014 Toyota Corolla LE — front three-quarter (GRA Phase 2, Port Harcourt)', 0, 1200, 900),
-  (506, 73, 'image', 'Interior', '/img/details/interior.jpg', '2014 Toyota Corolla LE — interior (GRA Phase 2, Port Harcourt)', 1, 1200, 900),
-  (507, 73, 'image', 'Dashboard', '/img/details/dashboard.jpg', '2014 Toyota Corolla LE — dashboard (GRA Phase 2, Port Harcourt)', 2, 1200, 900),
-  (508, 73, 'image', 'Engine bay', '/img/details/engine-bay.jpg', '2014 Toyota Corolla LE — engine bay (GRA Phase 2, Port Harcourt)', 3, 1200, 900),
-  (509, 73, 'image', 'Tyres & tread', '/img/details/tyres.jpg', '2014 Toyota Corolla LE — tyres & tread (GRA Phase 2, Port Harcourt)', 4, 1200, 900),
-  (510, 73, 'image', 'Boot', '/img/details/boot.jpg', '2014 Toyota Corolla LE — boot (GRA Phase 2, Port Harcourt)', 5, 1200, 900),
-  (511, 73, 'image', 'Odometer close-up', '/img/details/odometer.jpg', '2014 Toyota Corolla LE — odometer close-up (GRA Phase 2, Port Harcourt)', 6, 1200, 900),
-  (512, 74, 'image', 'Front three-quarter', '/img/cars/honda-crv-silver.jpg', '2016 Honda CR-V EX — front three-quarter (Eliozu, Port Harcourt)', 0, 1200, 900),
-  (513, 74, 'image', 'Interior', '/img/details/interior.jpg', '2016 Honda CR-V EX — interior (Eliozu, Port Harcourt)', 1, 1200, 900),
-  (514, 74, 'image', 'Dashboard', '/img/details/dashboard.jpg', '2016 Honda CR-V EX — dashboard (Eliozu, Port Harcourt)', 2, 1200, 900),
-  (515, 74, 'image', 'Engine bay', '/img/details/engine-bay.jpg', '2016 Honda CR-V EX — engine bay (Eliozu, Port Harcourt)', 3, 1200, 900),
-  (516, 74, 'image', 'Tyres & tread', '/img/details/tyres.jpg', '2016 Honda CR-V EX — tyres & tread (Eliozu, Port Harcourt)', 4, 1200, 900),
-  (517, 74, 'image', 'Boot', '/img/details/boot.jpg', '2016 Honda CR-V EX — boot (Eliozu, Port Harcourt)', 5, 1200, 900),
-  (518, 74, 'image', 'Odometer close-up', '/img/details/odometer.jpg', '2016 Honda CR-V EX — odometer close-up (Eliozu, Port Harcourt)', 6, 1200, 900),
-  (519, 75, 'image', 'Front three-quarter', '/img/cars/toyota-rav4-silver.jpg', '2014 Toyota RAV4 LE — front three-quarter (Peter Odili Road, Port Harcourt)', 0, 1200, 900),
-  (520, 75, 'image', 'Interior', '/img/details/interior.jpg', '2014 Toyota RAV4 LE — interior (Peter Odili Road, Port Harcourt)', 1, 1200, 900);
-INSERT INTO listing_media (`id`, `listing_id`, `type`, `shot_label`, `url`, `alt_text`, `position`, `width`, `height`) VALUES
-  (521, 75, 'image', 'Dashboard', '/img/details/dashboard.jpg', '2014 Toyota RAV4 LE — dashboard (Peter Odili Road, Port Harcourt)', 2, 1200, 900),
-  (522, 75, 'image', 'Engine bay', '/img/details/engine-bay.jpg', '2014 Toyota RAV4 LE — engine bay (Peter Odili Road, Port Harcourt)', 3, 1200, 900),
-  (523, 75, 'image', 'Tyres & tread', '/img/details/tyres.jpg', '2014 Toyota RAV4 LE — tyres & tread (Peter Odili Road, Port Harcourt)', 4, 1200, 900),
-  (524, 75, 'image', 'Boot', '/img/details/boot.jpg', '2014 Toyota RAV4 LE — boot (Peter Odili Road, Port Harcourt)', 5, 1200, 900),
-  (525, 75, 'image', 'Odometer close-up', '/img/details/odometer.jpg', '2014 Toyota RAV4 LE — odometer close-up (Peter Odili Road, Port Harcourt)', 6, 1200, 900),
-  (526, 76, 'image', 'Front three-quarter', '/img/cars/ford-explorer-blue.jpg', '2015 Kia Sportage EX — front three-quarter (Eliozu, Port Harcourt)', 0, 1200, 900),
-  (527, 76, 'image', 'Interior', '/img/details/interior.jpg', '2015 Kia Sportage EX — interior (Eliozu, Port Harcourt)', 1, 1200, 900),
-  (528, 76, 'image', 'Dashboard', '/img/details/dashboard.jpg', '2015 Kia Sportage EX — dashboard (Eliozu, Port Harcourt)', 2, 1200, 900),
-  (529, 76, 'image', 'Engine bay', '/img/details/engine-bay.jpg', '2015 Kia Sportage EX — engine bay (Eliozu, Port Harcourt)', 3, 1200, 900),
-  (530, 76, 'image', 'Tyres & tread', '/img/details/tyres.jpg', '2015 Kia Sportage EX — tyres & tread (Eliozu, Port Harcourt)', 4, 1200, 900),
-  (531, 76, 'image', 'Boot', '/img/details/boot.jpg', '2015 Kia Sportage EX — boot (Eliozu, Port Harcourt)', 5, 1200, 900),
-  (532, 76, 'image', 'Odometer close-up', '/img/details/odometer.jpg', '2015 Kia Sportage EX — odometer close-up (Eliozu, Port Harcourt)', 6, 1200, 900),
-  (533, 77, 'image', 'Front three-quarter', '/img/cars/nissan-xtrail-grey.jpg', '2017 Nissan X-Trail SV — front three-quarter (Rukpokwu, Port Harcourt)', 0, 1200, 900),
-  (534, 77, 'image', 'Interior', '/img/details/interior.jpg', '2017 Nissan X-Trail SV — interior (Rukpokwu, Port Harcourt)', 1, 1200, 900),
-  (535, 77, 'image', 'Dashboard', '/img/details/dashboard.jpg', '2017 Nissan X-Trail SV — dashboard (Rukpokwu, Port Harcourt)', 2, 1200, 900),
-  (536, 77, 'image', 'Engine bay', '/img/details/engine-bay.jpg', '2017 Nissan X-Trail SV — engine bay (Rukpokwu, Port Harcourt)', 3, 1200, 900),
-  (537, 77, 'image', 'Tyres & tread', '/img/details/tyres.jpg', '2017 Nissan X-Trail SV — tyres & tread (Rukpokwu, Port Harcourt)', 4, 1200, 900),
-  (538, 77, 'image', 'Boot', '/img/details/boot.jpg', '2017 Nissan X-Trail SV — boot (Rukpokwu, Port Harcourt)', 5, 1200, 900),
-  (539, 77, 'image', 'Odometer close-up', '/img/details/odometer.jpg', '2017 Nissan X-Trail SV — odometer close-up (Rukpokwu, Port Harcourt)', 6, 1200, 900),
-  (540, 78, 'image', 'Front three-quarter', '/img/cars/toyota-camry-silver.jpg', '2015 Toyota Camry LE — front three-quarter (Ada George, Port Harcourt)', 0, 1200, 900),
-  (541, 78, 'image', 'Interior', '/img/details/interior.jpg', '2015 Toyota Camry LE — interior (Ada George, Port Harcourt)', 1, 1200, 900),
-  (542, 78, 'image', 'Dashboard', '/img/details/dashboard.jpg', '2015 Toyota Camry LE — dashboard (Ada George, Port Harcourt)', 2, 1200, 900),
-  (543, 78, 'image', 'Engine bay', '/img/details/engine-bay.jpg', '2015 Toyota Camry LE — engine bay (Ada George, Port Harcourt)', 3, 1200, 900),
-  (544, 78, 'image', 'Tyres & tread', '/img/details/tyres.jpg', '2015 Toyota Camry LE — tyres & tread (Ada George, Port Harcourt)', 4, 1200, 900),
-  (545, 78, 'image', 'Boot', '/img/details/boot.jpg', '2015 Toyota Camry LE — boot (Ada George, Port Harcourt)', 5, 1200, 900),
-  (546, 78, 'image', 'Odometer close-up', '/img/details/odometer.jpg', '2015 Toyota Camry LE — odometer close-up (Ada George, Port Harcourt)', 6, 1200, 900),
-  (547, 79, 'image', 'Front three-quarter', '/img/cars/toyota-corolla-white.jpg', '2015 Toyota Corolla S — front three-quarter (Mgbuoba, Port Harcourt)', 0, 1200, 900),
-  (548, 79, 'image', 'Interior', '/img/details/interior.jpg', '2015 Toyota Corolla S — interior (Mgbuoba, Port Harcourt)', 1, 1200, 900),
-  (549, 79, 'image', 'Dashboard', '/img/details/dashboard.jpg', '2015 Toyota Corolla S — dashboard (Mgbuoba, Port Harcourt)', 2, 1200, 900),
-  (550, 79, 'image', 'Engine bay', '/img/details/engine-bay.jpg', '2015 Toyota Corolla S — engine bay (Mgbuoba, Port Harcourt)', 3, 1200, 900),
-  (551, 79, 'image', 'Tyres & tread', '/img/details/tyres.jpg', '2015 Toyota Corolla S — tyres & tread (Mgbuoba, Port Harcourt)', 4, 1200, 900),
-  (552, 79, 'image', 'Boot', '/img/details/boot.jpg', '2015 Toyota Corolla S — boot (Mgbuoba, Port Harcourt)', 5, 1200, 900),
-  (553, 79, 'image', 'Odometer close-up', '/img/details/odometer.jpg', '2015 Toyota Corolla S — odometer close-up (Mgbuoba, Port Harcourt)', 6, 1200, 900);
+-- listing_media: 555 rows
+INSERT INTO listing_media (`id`, `listing_id`, `type`, `shot_label`, `duration_seconds`, `size_bytes`, `url`, `poster_url`, `alt_text`, `position`, `width`, `height`) VALUES
+  (1, 1, 'image', 'Front three-quarter', NULL, NULL, '/img/cars/lexus-rx350-grey.jpg', NULL, '2012 Lexus RX 350 F Sport — front three-quarter (Ada George, Port Harcourt)', 0, 1200, 900),
+  (2, 1, 'image', 'Interior', NULL, NULL, '/img/details/interior.jpg', NULL, '2012 Lexus RX 350 F Sport — interior (Ada George, Port Harcourt)', 1, 1200, 900),
+  (3, 1, 'image', 'Dashboard', NULL, NULL, '/img/details/dashboard.jpg', NULL, '2012 Lexus RX 350 F Sport — dashboard (Ada George, Port Harcourt)', 2, 1200, 900),
+  (4, 1, 'image', 'Engine bay', NULL, NULL, '/img/details/engine-bay.jpg', NULL, '2012 Lexus RX 350 F Sport — engine bay (Ada George, Port Harcourt)', 3, 1200, 900),
+  (5, 1, 'image', 'Tyres & tread', NULL, NULL, '/img/details/tyres.jpg', NULL, '2012 Lexus RX 350 F Sport — tyres & tread (Ada George, Port Harcourt)', 4, 1200, 900),
+  (6, 1, 'image', 'Boot', NULL, NULL, '/img/details/boot.jpg', NULL, '2012 Lexus RX 350 F Sport — boot (Ada George, Port Harcourt)', 5, 1200, 900),
+  (7, 1, 'image', 'Odometer close-up', NULL, NULL, '/img/details/odometer.jpg', NULL, '2012 Lexus RX 350 F Sport — odometer close-up (Ada George, Port Harcourt)', 6, 1200, 900),
+  (8, 2, 'image', 'Front three-quarter', NULL, NULL, '/img/cars/toyota-rav4-silver.jpg', NULL, '2013 Toyota RAV4 Limited — front three-quarter (Rumuokoro, Port Harcourt)', 0, 1200, 900),
+  (9, 2, 'image', 'Interior', NULL, NULL, '/img/details/interior.jpg', NULL, '2013 Toyota RAV4 Limited — interior (Rumuokoro, Port Harcourt)', 1, 1200, 900),
+  (10, 2, 'image', 'Dashboard', NULL, NULL, '/img/details/dashboard.jpg', NULL, '2013 Toyota RAV4 Limited — dashboard (Rumuokoro, Port Harcourt)', 2, 1200, 900),
+  (11, 2, 'image', 'Engine bay', NULL, NULL, '/img/details/engine-bay.jpg', NULL, '2013 Toyota RAV4 Limited — engine bay (Rumuokoro, Port Harcourt)', 3, 1200, 900),
+  (12, 2, 'image', 'Tyres & tread', NULL, NULL, '/img/details/tyres.jpg', NULL, '2013 Toyota RAV4 Limited — tyres & tread (Rumuokoro, Port Harcourt)', 4, 1200, 900),
+  (13, 2, 'image', 'Boot', NULL, NULL, '/img/details/boot.jpg', NULL, '2013 Toyota RAV4 Limited — boot (Rumuokoro, Port Harcourt)', 5, 1200, 900),
+  (14, 2, 'image', 'Odometer close-up', NULL, NULL, '/img/details/odometer.jpg', NULL, '2013 Toyota RAV4 Limited — odometer close-up (Rumuokoro, Port Harcourt)', 6, 1200, 900),
+  (15, 3, 'image', 'Front three-quarter', NULL, NULL, '/img/cars/lexus-rx350-grey.jpg', NULL, '2014 Lexus GX 460 Premium — front three-quarter (Woji, Port Harcourt)', 0, 1200, 900),
+  (16, 3, 'image', 'Interior', NULL, NULL, '/img/details/interior.jpg', NULL, '2014 Lexus GX 460 Premium — interior (Woji, Port Harcourt)', 1, 1200, 900),
+  (17, 3, 'image', 'Dashboard', NULL, NULL, '/img/details/dashboard.jpg', NULL, '2014 Lexus GX 460 Premium — dashboard (Woji, Port Harcourt)', 2, 1200, 900),
+  (18, 3, 'image', 'Engine bay', NULL, NULL, '/img/details/engine-bay.jpg', NULL, '2014 Lexus GX 460 Premium — engine bay (Woji, Port Harcourt)', 3, 1200, 900),
+  (19, 3, 'image', 'Tyres & tread', NULL, NULL, '/img/details/tyres.jpg', NULL, '2014 Lexus GX 460 Premium — tyres & tread (Woji, Port Harcourt)', 4, 1200, 900),
+  (20, 3, 'image', 'Boot', NULL, NULL, '/img/details/boot.jpg', NULL, '2014 Lexus GX 460 Premium — boot (Woji, Port Harcourt)', 5, 1200, 900),
+  (21, 3, 'image', 'Odometer close-up', NULL, NULL, '/img/details/odometer.jpg', NULL, '2014 Lexus GX 460 Premium — odometer close-up (Woji, Port Harcourt)', 6, 1200, 900),
+  (22, 4, 'image', 'Front three-quarter', NULL, NULL, '/img/cars/ford-explorer-blue.jpg', NULL, '2016 Infiniti QX60 Base — front three-quarter (Woji, Port Harcourt)', 0, 1200, 900),
+  (23, 4, 'image', 'Interior', NULL, NULL, '/img/details/interior.jpg', NULL, '2016 Infiniti QX60 Base — interior (Woji, Port Harcourt)', 1, 1200, 900),
+  (24, 4, 'image', 'Dashboard', NULL, NULL, '/img/details/dashboard.jpg', NULL, '2016 Infiniti QX60 Base — dashboard (Woji, Port Harcourt)', 2, 1200, 900),
+  (25, 4, 'image', 'Engine bay', NULL, NULL, '/img/details/engine-bay.jpg', NULL, '2016 Infiniti QX60 Base — engine bay (Woji, Port Harcourt)', 3, 1200, 900),
+  (26, 4, 'image', 'Tyres & tread', NULL, NULL, '/img/details/tyres.jpg', NULL, '2016 Infiniti QX60 Base — tyres & tread (Woji, Port Harcourt)', 4, 1200, 900),
+  (27, 4, 'image', 'Boot', NULL, NULL, '/img/details/boot.jpg', NULL, '2016 Infiniti QX60 Base — boot (Woji, Port Harcourt)', 5, 1200, 900),
+  (28, 4, 'image', 'Odometer close-up', NULL, NULL, '/img/details/odometer.jpg', NULL, '2016 Infiniti QX60 Base — odometer close-up (Woji, Port Harcourt)', 6, 1200, 900),
+  (29, 5, 'image', 'Front three-quarter', NULL, NULL, '/img/cars/ford-explorer-blue.jpg', NULL, '2019 Kia Sportage LX — front three-quarter (Eliozu, Port Harcourt)', 0, 1200, 900),
+  (30, 5, 'image', 'Interior', NULL, NULL, '/img/details/interior.jpg', NULL, '2019 Kia Sportage LX — interior (Eliozu, Port Harcourt)', 1, 1200, 900),
+  (31, 5, 'image', 'Dashboard', NULL, NULL, '/img/details/dashboard.jpg', NULL, '2019 Kia Sportage LX — dashboard (Eliozu, Port Harcourt)', 2, 1200, 900),
+  (32, 5, 'image', 'Engine bay', NULL, NULL, '/img/details/engine-bay.jpg', NULL, '2019 Kia Sportage LX — engine bay (Eliozu, Port Harcourt)', 3, 1200, 900),
+  (33, 5, 'image', 'Tyres & tread', NULL, NULL, '/img/details/tyres.jpg', NULL, '2019 Kia Sportage LX — tyres & tread (Eliozu, Port Harcourt)', 4, 1200, 900),
+  (34, 5, 'image', 'Boot', NULL, NULL, '/img/details/boot.jpg', NULL, '2019 Kia Sportage LX — boot (Eliozu, Port Harcourt)', 5, 1200, 900),
+  (35, 5, 'image', 'Odometer close-up', NULL, NULL, '/img/details/odometer.jpg', NULL, '2019 Kia Sportage LX — odometer close-up (Eliozu, Port Harcourt)', 6, 1200, 900),
+  (36, 6, 'image', 'Front three-quarter', NULL, NULL, '/img/cars/mazda-cx5-red.jpg', NULL, '2015 Mazda CX-5 Touring — front three-quarter (Trans-Amadi, Port Harcourt)', 0, 1200, 900),
+  (37, 6, 'image', 'Interior', NULL, NULL, '/img/details/interior.jpg', NULL, '2015 Mazda CX-5 Touring — interior (Trans-Amadi, Port Harcourt)', 1, 1200, 900),
+  (38, 6, 'image', 'Dashboard', NULL, NULL, '/img/details/dashboard.jpg', NULL, '2015 Mazda CX-5 Touring — dashboard (Trans-Amadi, Port Harcourt)', 2, 1200, 900),
+  (39, 6, 'image', 'Engine bay', NULL, NULL, '/img/details/engine-bay.jpg', NULL, '2015 Mazda CX-5 Touring — engine bay (Trans-Amadi, Port Harcourt)', 3, 1200, 900),
+  (40, 6, 'image', 'Tyres & tread', NULL, NULL, '/img/details/tyres.jpg', NULL, '2015 Mazda CX-5 Touring — tyres & tread (Trans-Amadi, Port Harcourt)', 4, 1200, 900);
+INSERT INTO listing_media (`id`, `listing_id`, `type`, `shot_label`, `duration_seconds`, `size_bytes`, `url`, `poster_url`, `alt_text`, `position`, `width`, `height`) VALUES
+  (41, 6, 'image', 'Boot', NULL, NULL, '/img/details/boot.jpg', NULL, '2015 Mazda CX-5 Touring — boot (Trans-Amadi, Port Harcourt)', 5, 1200, 900),
+  (42, 6, 'image', 'Odometer close-up', NULL, NULL, '/img/details/odometer.jpg', NULL, '2015 Mazda CX-5 Touring — odometer close-up (Trans-Amadi, Port Harcourt)', 6, 1200, 900),
+  (43, 7, 'image', 'Front three-quarter', NULL, NULL, '/img/cars/honda-accord-black.jpg', NULL, '2016 Lexus ES 350 Base — front three-quarter (Rumuokoro, Port Harcourt)', 0, 1200, 900),
+  (44, 7, 'image', 'Interior', NULL, NULL, '/img/details/interior.jpg', NULL, '2016 Lexus ES 350 Base — interior (Rumuokoro, Port Harcourt)', 1, 1200, 900),
+  (45, 7, 'image', 'Dashboard', NULL, NULL, '/img/details/dashboard.jpg', NULL, '2016 Lexus ES 350 Base — dashboard (Rumuokoro, Port Harcourt)', 2, 1200, 900),
+  (46, 7, 'image', 'Engine bay', NULL, NULL, '/img/details/engine-bay.jpg', NULL, '2016 Lexus ES 350 Base — engine bay (Rumuokoro, Port Harcourt)', 3, 1200, 900),
+  (47, 7, 'image', 'Tyres & tread', NULL, NULL, '/img/details/tyres.jpg', NULL, '2016 Lexus ES 350 Base — tyres & tread (Rumuokoro, Port Harcourt)', 4, 1200, 900),
+  (48, 7, 'image', 'Boot', NULL, NULL, '/img/details/boot.jpg', NULL, '2016 Lexus ES 350 Base — boot (Rumuokoro, Port Harcourt)', 5, 1200, 900),
+  (49, 7, 'image', 'Odometer close-up', NULL, NULL, '/img/details/odometer.jpg', NULL, '2016 Lexus ES 350 Base — odometer close-up (Rumuokoro, Port Harcourt)', 6, 1200, 900),
+  (50, 8, 'image', 'Front three-quarter', NULL, NULL, '/img/cars/ford-explorer-blue.jpg', NULL, '2014 Mitsubishi Pajero GLX — front three-quarter (Eliozu, Port Harcourt)', 0, 1200, 900),
+  (51, 8, 'image', 'Interior', NULL, NULL, '/img/details/interior.jpg', NULL, '2014 Mitsubishi Pajero GLX — interior (Eliozu, Port Harcourt)', 1, 1200, 900),
+  (52, 8, 'image', 'Dashboard', NULL, NULL, '/img/details/dashboard.jpg', NULL, '2014 Mitsubishi Pajero GLX — dashboard (Eliozu, Port Harcourt)', 2, 1200, 900),
+  (53, 8, 'image', 'Engine bay', NULL, NULL, '/img/details/engine-bay.jpg', NULL, '2014 Mitsubishi Pajero GLX — engine bay (Eliozu, Port Harcourt)', 3, 1200, 900),
+  (54, 8, 'image', 'Tyres & tread', NULL, NULL, '/img/details/tyres.jpg', NULL, '2014 Mitsubishi Pajero GLX — tyres & tread (Eliozu, Port Harcourt)', 4, 1200, 900),
+  (55, 8, 'image', 'Boot', NULL, NULL, '/img/details/boot.jpg', NULL, '2014 Mitsubishi Pajero GLX — boot (Eliozu, Port Harcourt)', 5, 1200, 900),
+  (56, 8, 'image', 'Odometer close-up', NULL, NULL, '/img/details/odometer.jpg', NULL, '2014 Mitsubishi Pajero GLX — odometer close-up (Eliozu, Port Harcourt)', 6, 1200, 900),
+  (57, 9, 'image', 'Front three-quarter', NULL, NULL, '/img/cars/ford-explorer-blue.jpg', NULL, '2017 Infiniti QX60 Base — front three-quarter (Rumuokoro, Port Harcourt)', 0, 1200, 900),
+  (58, 9, 'image', 'Interior', NULL, NULL, '/img/details/interior.jpg', NULL, '2017 Infiniti QX60 Base — interior (Rumuokoro, Port Harcourt)', 1, 1200, 900),
+  (59, 9, 'image', 'Dashboard', NULL, NULL, '/img/details/dashboard.jpg', NULL, '2017 Infiniti QX60 Base — dashboard (Rumuokoro, Port Harcourt)', 2, 1200, 900),
+  (60, 9, 'image', 'Engine bay', NULL, NULL, '/img/details/engine-bay.jpg', NULL, '2017 Infiniti QX60 Base — engine bay (Rumuokoro, Port Harcourt)', 3, 1200, 900),
+  (61, 9, 'image', 'Tyres & tread', NULL, NULL, '/img/details/tyres.jpg', NULL, '2017 Infiniti QX60 Base — tyres & tread (Rumuokoro, Port Harcourt)', 4, 1200, 900),
+  (62, 9, 'image', 'Boot', NULL, NULL, '/img/details/boot.jpg', NULL, '2017 Infiniti QX60 Base — boot (Rumuokoro, Port Harcourt)', 5, 1200, 900),
+  (63, 9, 'image', 'Odometer close-up', NULL, NULL, '/img/details/odometer.jpg', NULL, '2017 Infiniti QX60 Base — odometer close-up (Rumuokoro, Port Harcourt)', 6, 1200, 900),
+  (64, 10, 'image', 'Front three-quarter', NULL, NULL, '/img/cars/toyota-corolla-white.jpg', NULL, '2017 Kia Rio LX — front three-quarter (Rukpokwu, Port Harcourt)', 0, 1200, 900),
+  (65, 10, 'image', 'Interior', NULL, NULL, '/img/details/interior.jpg', NULL, '2017 Kia Rio LX — interior (Rukpokwu, Port Harcourt)', 1, 1200, 900),
+  (66, 10, 'image', 'Dashboard', NULL, NULL, '/img/details/dashboard.jpg', NULL, '2017 Kia Rio LX — dashboard (Rukpokwu, Port Harcourt)', 2, 1200, 900),
+  (67, 10, 'image', 'Engine bay', NULL, NULL, '/img/details/engine-bay.jpg', NULL, '2017 Kia Rio LX — engine bay (Rukpokwu, Port Harcourt)', 3, 1200, 900),
+  (68, 10, 'image', 'Tyres & tread', NULL, NULL, '/img/details/tyres.jpg', NULL, '2017 Kia Rio LX — tyres & tread (Rukpokwu, Port Harcourt)', 4, 1200, 900),
+  (69, 10, 'image', 'Boot', NULL, NULL, '/img/details/boot.jpg', NULL, '2017 Kia Rio LX — boot (Rukpokwu, Port Harcourt)', 5, 1200, 900),
+  (70, 10, 'image', 'Odometer close-up', NULL, NULL, '/img/details/odometer.jpg', NULL, '2017 Kia Rio LX — odometer close-up (Rukpokwu, Port Harcourt)', 6, 1200, 900),
+  (71, 11, 'image', 'Front three-quarter', NULL, NULL, '/img/cars/nissan-xtrail-grey.jpg', NULL, '2018 Nissan X-Trail SL — front three-quarter (Elelenwo, Port Harcourt)', 0, 1200, 900),
+  (72, 11, 'image', 'Interior', NULL, NULL, '/img/details/interior.jpg', NULL, '2018 Nissan X-Trail SL — interior (Elelenwo, Port Harcourt)', 1, 1200, 900),
+  (73, 11, 'image', 'Dashboard', NULL, NULL, '/img/details/dashboard.jpg', NULL, '2018 Nissan X-Trail SL — dashboard (Elelenwo, Port Harcourt)', 2, 1200, 900),
+  (74, 11, 'image', 'Engine bay', NULL, NULL, '/img/details/engine-bay.jpg', NULL, '2018 Nissan X-Trail SL — engine bay (Elelenwo, Port Harcourt)', 3, 1200, 900),
+  (75, 11, 'image', 'Tyres & tread', NULL, NULL, '/img/details/tyres.jpg', NULL, '2018 Nissan X-Trail SL — tyres & tread (Elelenwo, Port Harcourt)', 4, 1200, 900),
+  (76, 11, 'image', 'Boot', NULL, NULL, '/img/details/boot.jpg', NULL, '2018 Nissan X-Trail SL — boot (Elelenwo, Port Harcourt)', 5, 1200, 900),
+  (77, 11, 'image', 'Odometer close-up', NULL, NULL, '/img/details/odometer.jpg', NULL, '2018 Nissan X-Trail SL — odometer close-up (Elelenwo, Port Harcourt)', 6, 1200, 900),
+  (78, 12, 'image', 'Front three-quarter', NULL, NULL, '/img/cars/ford-explorer-blue.jpg', NULL, '2016 Hyundai Tucson Limited — front three-quarter (Rumuola, Port Harcourt)', 0, 1200, 900),
+  (79, 12, 'image', 'Interior', NULL, NULL, '/img/details/interior.jpg', NULL, '2016 Hyundai Tucson Limited — interior (Rumuola, Port Harcourt)', 1, 1200, 900),
+  (80, 12, 'image', 'Dashboard', NULL, NULL, '/img/details/dashboard.jpg', NULL, '2016 Hyundai Tucson Limited — dashboard (Rumuola, Port Harcourt)', 2, 1200, 900);
+INSERT INTO listing_media (`id`, `listing_id`, `type`, `shot_label`, `duration_seconds`, `size_bytes`, `url`, `poster_url`, `alt_text`, `position`, `width`, `height`) VALUES
+  (81, 12, 'image', 'Engine bay', NULL, NULL, '/img/details/engine-bay.jpg', NULL, '2016 Hyundai Tucson Limited — engine bay (Rumuola, Port Harcourt)', 3, 1200, 900),
+  (82, 12, 'image', 'Tyres & tread', NULL, NULL, '/img/details/tyres.jpg', NULL, '2016 Hyundai Tucson Limited — tyres & tread (Rumuola, Port Harcourt)', 4, 1200, 900),
+  (83, 12, 'image', 'Boot', NULL, NULL, '/img/details/boot.jpg', NULL, '2016 Hyundai Tucson Limited — boot (Rumuola, Port Harcourt)', 5, 1200, 900),
+  (84, 12, 'image', 'Odometer close-up', NULL, NULL, '/img/details/odometer.jpg', NULL, '2016 Hyundai Tucson Limited — odometer close-up (Rumuola, Port Harcourt)', 6, 1200, 900),
+  (85, 13, 'image', 'Front three-quarter', NULL, NULL, '/img/cars/honda-civic-silver.jpg', NULL, '2017 Honda Civic Sport — front three-quarter (Rumuola, Port Harcourt)', 0, 1200, 900),
+  (86, 13, 'image', 'Interior', NULL, NULL, '/img/details/interior.jpg', NULL, '2017 Honda Civic Sport — interior (Rumuola, Port Harcourt)', 1, 1200, 900),
+  (87, 13, 'image', 'Dashboard', NULL, NULL, '/img/details/dashboard.jpg', NULL, '2017 Honda Civic Sport — dashboard (Rumuola, Port Harcourt)', 2, 1200, 900),
+  (88, 13, 'image', 'Engine bay', NULL, NULL, '/img/details/engine-bay.jpg', NULL, '2017 Honda Civic Sport — engine bay (Rumuola, Port Harcourt)', 3, 1200, 900),
+  (89, 13, 'image', 'Tyres & tread', NULL, NULL, '/img/details/tyres.jpg', NULL, '2017 Honda Civic Sport — tyres & tread (Rumuola, Port Harcourt)', 4, 1200, 900),
+  (90, 13, 'image', 'Boot', NULL, NULL, '/img/details/boot.jpg', NULL, '2017 Honda Civic Sport — boot (Rumuola, Port Harcourt)', 5, 1200, 900),
+  (91, 13, 'image', 'Odometer close-up', NULL, NULL, '/img/details/odometer.jpg', NULL, '2017 Honda Civic Sport — odometer close-up (Rumuola, Port Harcourt)', 6, 1200, 900),
+  (92, 14, 'image', 'Front three-quarter', NULL, NULL, '/img/cars/ford-explorer-blue.jpg', NULL, '2015 Kia Sportage LX — front three-quarter (Mgbuoba, Port Harcourt)', 0, 1200, 900),
+  (93, 14, 'image', 'Interior', NULL, NULL, '/img/details/interior.jpg', NULL, '2015 Kia Sportage LX — interior (Mgbuoba, Port Harcourt)', 1, 1200, 900),
+  (94, 14, 'image', 'Dashboard', NULL, NULL, '/img/details/dashboard.jpg', NULL, '2015 Kia Sportage LX — dashboard (Mgbuoba, Port Harcourt)', 2, 1200, 900),
+  (95, 14, 'image', 'Engine bay', NULL, NULL, '/img/details/engine-bay.jpg', NULL, '2015 Kia Sportage LX — engine bay (Mgbuoba, Port Harcourt)', 3, 1200, 900),
+  (96, 14, 'image', 'Tyres & tread', NULL, NULL, '/img/details/tyres.jpg', NULL, '2015 Kia Sportage LX — tyres & tread (Mgbuoba, Port Harcourt)', 4, 1200, 900),
+  (97, 14, 'image', 'Boot', NULL, NULL, '/img/details/boot.jpg', NULL, '2015 Kia Sportage LX — boot (Mgbuoba, Port Harcourt)', 5, 1200, 900),
+  (98, 14, 'image', 'Odometer close-up', NULL, NULL, '/img/details/odometer.jpg', NULL, '2015 Kia Sportage LX — odometer close-up (Mgbuoba, Port Harcourt)', 6, 1200, 900),
+  (99, 15, 'image', 'Front three-quarter', NULL, NULL, '/img/cars/nissan-xtrail-grey.jpg', NULL, '2016 Nissan Rogue S — front three-quarter (Eliozu, Port Harcourt)', 0, 1200, 900),
+  (100, 15, 'image', 'Interior', NULL, NULL, '/img/details/interior.jpg', NULL, '2016 Nissan Rogue S — interior (Eliozu, Port Harcourt)', 1, 1200, 900),
+  (101, 15, 'image', 'Dashboard', NULL, NULL, '/img/details/dashboard.jpg', NULL, '2016 Nissan Rogue S — dashboard (Eliozu, Port Harcourt)', 2, 1200, 900),
+  (102, 15, 'image', 'Engine bay', NULL, NULL, '/img/details/engine-bay.jpg', NULL, '2016 Nissan Rogue S — engine bay (Eliozu, Port Harcourt)', 3, 1200, 900),
+  (103, 15, 'image', 'Tyres & tread', NULL, NULL, '/img/details/tyres.jpg', NULL, '2016 Nissan Rogue S — tyres & tread (Eliozu, Port Harcourt)', 4, 1200, 900),
+  (104, 15, 'image', 'Boot', NULL, NULL, '/img/details/boot.jpg', NULL, '2016 Nissan Rogue S — boot (Eliozu, Port Harcourt)', 5, 1200, 900),
+  (105, 15, 'image', 'Odometer close-up', NULL, NULL, '/img/details/odometer.jpg', NULL, '2016 Nissan Rogue S — odometer close-up (Eliozu, Port Harcourt)', 6, 1200, 900),
+  (106, 16, 'image', 'Front three-quarter', NULL, NULL, '/img/cars/mercedes-eclass-grey.jpg', NULL, '2017 Mercedes-Benz E-Class E300 — front three-quarter (Elelenwo, Port Harcourt)', 0, 1200, 900),
+  (107, 16, 'image', 'Interior', NULL, NULL, '/img/details/interior.jpg', NULL, '2017 Mercedes-Benz E-Class E300 — interior (Elelenwo, Port Harcourt)', 1, 1200, 900),
+  (108, 16, 'image', 'Dashboard', NULL, NULL, '/img/details/dashboard.jpg', NULL, '2017 Mercedes-Benz E-Class E300 — dashboard (Elelenwo, Port Harcourt)', 2, 1200, 900),
+  (109, 16, 'image', 'Engine bay', NULL, NULL, '/img/details/engine-bay.jpg', NULL, '2017 Mercedes-Benz E-Class E300 — engine bay (Elelenwo, Port Harcourt)', 3, 1200, 900),
+  (110, 16, 'image', 'Tyres & tread', NULL, NULL, '/img/details/tyres.jpg', NULL, '2017 Mercedes-Benz E-Class E300 — tyres & tread (Elelenwo, Port Harcourt)', 4, 1200, 900),
+  (111, 16, 'image', 'Boot', NULL, NULL, '/img/details/boot.jpg', NULL, '2017 Mercedes-Benz E-Class E300 — boot (Elelenwo, Port Harcourt)', 5, 1200, 900),
+  (112, 16, 'image', 'Odometer close-up', NULL, NULL, '/img/details/odometer.jpg', NULL, '2017 Mercedes-Benz E-Class E300 — odometer close-up (Elelenwo, Port Harcourt)', 6, 1200, 900),
+  (113, 17, 'image', 'Front three-quarter', NULL, NULL, '/img/cars/lexus-rx350-grey.jpg', NULL, '2017 Lexus RX 350 Luxury — front three-quarter (GRA Phase 2, Port Harcourt)', 0, 1200, 900),
+  (114, 17, 'image', 'Interior', NULL, NULL, '/img/details/interior.jpg', NULL, '2017 Lexus RX 350 Luxury — interior (GRA Phase 2, Port Harcourt)', 1, 1200, 900),
+  (115, 17, 'image', 'Dashboard', NULL, NULL, '/img/details/dashboard.jpg', NULL, '2017 Lexus RX 350 Luxury — dashboard (GRA Phase 2, Port Harcourt)', 2, 1200, 900),
+  (116, 17, 'image', 'Engine bay', NULL, NULL, '/img/details/engine-bay.jpg', NULL, '2017 Lexus RX 350 Luxury — engine bay (GRA Phase 2, Port Harcourt)', 3, 1200, 900),
+  (117, 17, 'image', 'Tyres & tread', NULL, NULL, '/img/details/tyres.jpg', NULL, '2017 Lexus RX 350 Luxury — tyres & tread (GRA Phase 2, Port Harcourt)', 4, 1200, 900),
+  (118, 17, 'image', 'Boot', NULL, NULL, '/img/details/boot.jpg', NULL, '2017 Lexus RX 350 Luxury — boot (GRA Phase 2, Port Harcourt)', 5, 1200, 900),
+  (119, 17, 'image', 'Odometer close-up', NULL, NULL, '/img/details/odometer.jpg', NULL, '2017 Lexus RX 350 Luxury — odometer close-up (GRA Phase 2, Port Harcourt)', 6, 1200, 900),
+  (120, 18, 'image', 'Front three-quarter', NULL, NULL, '/img/cars/ford-explorer-blue.jpg', NULL, '2018 Hyundai Santa Fe Limited — front three-quarter (Peter Odili Road, Port Harcourt)', 0, 1200, 900);
+INSERT INTO listing_media (`id`, `listing_id`, `type`, `shot_label`, `duration_seconds`, `size_bytes`, `url`, `poster_url`, `alt_text`, `position`, `width`, `height`) VALUES
+  (121, 18, 'image', 'Interior', NULL, NULL, '/img/details/interior.jpg', NULL, '2018 Hyundai Santa Fe Limited — interior (Peter Odili Road, Port Harcourt)', 1, 1200, 900),
+  (122, 18, 'image', 'Dashboard', NULL, NULL, '/img/details/dashboard.jpg', NULL, '2018 Hyundai Santa Fe Limited — dashboard (Peter Odili Road, Port Harcourt)', 2, 1200, 900),
+  (123, 18, 'image', 'Engine bay', NULL, NULL, '/img/details/engine-bay.jpg', NULL, '2018 Hyundai Santa Fe Limited — engine bay (Peter Odili Road, Port Harcourt)', 3, 1200, 900),
+  (124, 18, 'image', 'Tyres & tread', NULL, NULL, '/img/details/tyres.jpg', NULL, '2018 Hyundai Santa Fe Limited — tyres & tread (Peter Odili Road, Port Harcourt)', 4, 1200, 900),
+  (125, 18, 'image', 'Boot', NULL, NULL, '/img/details/boot.jpg', NULL, '2018 Hyundai Santa Fe Limited — boot (Peter Odili Road, Port Harcourt)', 5, 1200, 900),
+  (126, 18, 'image', 'Odometer close-up', NULL, NULL, '/img/details/odometer.jpg', NULL, '2018 Hyundai Santa Fe Limited — odometer close-up (Peter Odili Road, Port Harcourt)', 6, 1200, 900),
+  (127, 19, 'image', 'Front three-quarter', NULL, NULL, '/img/cars/toyota-corolla-white.jpg', NULL, '2015 Kia Rio LX — front three-quarter (Rumuokoro, Port Harcourt)', 0, 1200, 900),
+  (128, 19, 'image', 'Interior', NULL, NULL, '/img/details/interior.jpg', NULL, '2015 Kia Rio LX — interior (Rumuokoro, Port Harcourt)', 1, 1200, 900),
+  (129, 19, 'image', 'Dashboard', NULL, NULL, '/img/details/dashboard.jpg', NULL, '2015 Kia Rio LX — dashboard (Rumuokoro, Port Harcourt)', 2, 1200, 900),
+  (130, 19, 'image', 'Engine bay', NULL, NULL, '/img/details/engine-bay.jpg', NULL, '2015 Kia Rio LX — engine bay (Rumuokoro, Port Harcourt)', 3, 1200, 900),
+  (131, 19, 'image', 'Tyres & tread', NULL, NULL, '/img/details/tyres.jpg', NULL, '2015 Kia Rio LX — tyres & tread (Rumuokoro, Port Harcourt)', 4, 1200, 900),
+  (132, 19, 'image', 'Boot', NULL, NULL, '/img/details/boot.jpg', NULL, '2015 Kia Rio LX — boot (Rumuokoro, Port Harcourt)', 5, 1200, 900),
+  (133, 19, 'image', 'Odometer close-up', NULL, NULL, '/img/details/odometer.jpg', NULL, '2015 Kia Rio LX — odometer close-up (Rumuokoro, Port Harcourt)', 6, 1200, 900),
+  (134, 20, 'image', 'Front three-quarter', NULL, NULL, '/img/cars/ford-explorer-blue.jpg', NULL, '2016 Acura MDX Base — front three-quarter (Elelenwo, Port Harcourt)', 0, 1200, 900),
+  (135, 20, 'image', 'Interior', NULL, NULL, '/img/details/interior.jpg', NULL, '2016 Acura MDX Base — interior (Elelenwo, Port Harcourt)', 1, 1200, 900),
+  (136, 20, 'image', 'Dashboard', NULL, NULL, '/img/details/dashboard.jpg', NULL, '2016 Acura MDX Base — dashboard (Elelenwo, Port Harcourt)', 2, 1200, 900),
+  (137, 20, 'image', 'Engine bay', NULL, NULL, '/img/details/engine-bay.jpg', NULL, '2016 Acura MDX Base — engine bay (Elelenwo, Port Harcourt)', 3, 1200, 900),
+  (138, 20, 'image', 'Tyres & tread', NULL, NULL, '/img/details/tyres.jpg', NULL, '2016 Acura MDX Base — tyres & tread (Elelenwo, Port Harcourt)', 4, 1200, 900),
+  (139, 20, 'image', 'Boot', NULL, NULL, '/img/details/boot.jpg', NULL, '2016 Acura MDX Base — boot (Elelenwo, Port Harcourt)', 5, 1200, 900),
+  (140, 20, 'image', 'Odometer close-up', NULL, NULL, '/img/details/odometer.jpg', NULL, '2016 Acura MDX Base — odometer close-up (Elelenwo, Port Harcourt)', 6, 1200, 900),
+  (141, 21, 'image', 'Front three-quarter', NULL, NULL, '/img/cars/ford-explorer-blue.jpg', NULL, '2013 Acura MDX Tech — front three-quarter (Eliozu, Port Harcourt)', 0, 1200, 900),
+  (142, 21, 'image', 'Interior', NULL, NULL, '/img/details/interior.jpg', NULL, '2013 Acura MDX Tech — interior (Eliozu, Port Harcourt)', 1, 1200, 900),
+  (143, 21, 'image', 'Dashboard', NULL, NULL, '/img/details/dashboard.jpg', NULL, '2013 Acura MDX Tech — dashboard (Eliozu, Port Harcourt)', 2, 1200, 900),
+  (144, 21, 'image', 'Engine bay', NULL, NULL, '/img/details/engine-bay.jpg', NULL, '2013 Acura MDX Tech — engine bay (Eliozu, Port Harcourt)', 3, 1200, 900),
+  (145, 21, 'image', 'Tyres & tread', NULL, NULL, '/img/details/tyres.jpg', NULL, '2013 Acura MDX Tech — tyres & tread (Eliozu, Port Harcourt)', 4, 1200, 900),
+  (146, 21, 'image', 'Boot', NULL, NULL, '/img/details/boot.jpg', NULL, '2013 Acura MDX Tech — boot (Eliozu, Port Harcourt)', 5, 1200, 900),
+  (147, 21, 'image', 'Odometer close-up', NULL, NULL, '/img/details/odometer.jpg', NULL, '2013 Acura MDX Tech — odometer close-up (Eliozu, Port Harcourt)', 6, 1200, 900),
+  (148, 22, 'image', 'Front three-quarter', NULL, NULL, '/img/cars/mazda-cx5-red.jpg', NULL, '2017 Mazda CX-5 Grand Touring — front three-quarter (Trans-Amadi, Port Harcourt)', 0, 1200, 900),
+  (149, 22, 'image', 'Interior', NULL, NULL, '/img/details/interior.jpg', NULL, '2017 Mazda CX-5 Grand Touring — interior (Trans-Amadi, Port Harcourt)', 1, 1200, 900),
+  (150, 22, 'image', 'Dashboard', NULL, NULL, '/img/details/dashboard.jpg', NULL, '2017 Mazda CX-5 Grand Touring — dashboard (Trans-Amadi, Port Harcourt)', 2, 1200, 900),
+  (151, 22, 'image', 'Engine bay', NULL, NULL, '/img/details/engine-bay.jpg', NULL, '2017 Mazda CX-5 Grand Touring — engine bay (Trans-Amadi, Port Harcourt)', 3, 1200, 900),
+  (152, 22, 'image', 'Tyres & tread', NULL, NULL, '/img/details/tyres.jpg', NULL, '2017 Mazda CX-5 Grand Touring — tyres & tread (Trans-Amadi, Port Harcourt)', 4, 1200, 900),
+  (153, 22, 'image', 'Boot', NULL, NULL, '/img/details/boot.jpg', NULL, '2017 Mazda CX-5 Grand Touring — boot (Trans-Amadi, Port Harcourt)', 5, 1200, 900),
+  (154, 22, 'image', 'Odometer close-up', NULL, NULL, '/img/details/odometer.jpg', NULL, '2017 Mazda CX-5 Grand Touring — odometer close-up (Trans-Amadi, Port Harcourt)', 6, 1200, 900),
+  (155, 23, 'image', 'Front three-quarter', NULL, NULL, '/img/cars/lexus-rx350-grey.jpg', NULL, '2013 Lexus RX 350 Base — front three-quarter (Mgbuoba, Port Harcourt)', 0, 1200, 900),
+  (156, 23, 'image', 'Interior', NULL, NULL, '/img/details/interior.jpg', NULL, '2013 Lexus RX 350 Base — interior (Mgbuoba, Port Harcourt)', 1, 1200, 900),
+  (157, 23, 'image', 'Dashboard', NULL, NULL, '/img/details/dashboard.jpg', NULL, '2013 Lexus RX 350 Base — dashboard (Mgbuoba, Port Harcourt)', 2, 1200, 900),
+  (158, 23, 'image', 'Engine bay', NULL, NULL, '/img/details/engine-bay.jpg', NULL, '2013 Lexus RX 350 Base — engine bay (Mgbuoba, Port Harcourt)', 3, 1200, 900),
+  (159, 23, 'image', 'Tyres & tread', NULL, NULL, '/img/details/tyres.jpg', NULL, '2013 Lexus RX 350 Base — tyres & tread (Mgbuoba, Port Harcourt)', 4, 1200, 900),
+  (160, 23, 'image', 'Boot', NULL, NULL, '/img/details/boot.jpg', NULL, '2013 Lexus RX 350 Base — boot (Mgbuoba, Port Harcourt)', 5, 1200, 900);
+INSERT INTO listing_media (`id`, `listing_id`, `type`, `shot_label`, `duration_seconds`, `size_bytes`, `url`, `poster_url`, `alt_text`, `position`, `width`, `height`) VALUES
+  (161, 23, 'image', 'Odometer close-up', NULL, NULL, '/img/details/odometer.jpg', NULL, '2013 Lexus RX 350 Base — odometer close-up (Mgbuoba, Port Harcourt)', 6, 1200, 900),
+  (162, 24, 'image', 'Front three-quarter', NULL, NULL, '/img/cars/honda-crv-silver.jpg', NULL, '2018 Honda Pilot Touring — front three-quarter (Aba Road, Port Harcourt)', 0, 1200, 900),
+  (163, 24, 'image', 'Interior', NULL, NULL, '/img/details/interior.jpg', NULL, '2018 Honda Pilot Touring — interior (Aba Road, Port Harcourt)', 1, 1200, 900),
+  (164, 24, 'image', 'Dashboard', NULL, NULL, '/img/details/dashboard.jpg', NULL, '2018 Honda Pilot Touring — dashboard (Aba Road, Port Harcourt)', 2, 1200, 900),
+  (165, 24, 'image', 'Engine bay', NULL, NULL, '/img/details/engine-bay.jpg', NULL, '2018 Honda Pilot Touring — engine bay (Aba Road, Port Harcourt)', 3, 1200, 900),
+  (166, 24, 'image', 'Tyres & tread', NULL, NULL, '/img/details/tyres.jpg', NULL, '2018 Honda Pilot Touring — tyres & tread (Aba Road, Port Harcourt)', 4, 1200, 900),
+  (167, 24, 'image', 'Boot', NULL, NULL, '/img/details/boot.jpg', NULL, '2018 Honda Pilot Touring — boot (Aba Road, Port Harcourt)', 5, 1200, 900),
+  (168, 24, 'image', 'Odometer close-up', NULL, NULL, '/img/details/odometer.jpg', NULL, '2018 Honda Pilot Touring — odometer close-up (Aba Road, Port Harcourt)', 6, 1200, 900),
+  (169, 25, 'image', 'Front three-quarter', NULL, NULL, '/img/cars/honda-accord-black.jpg', NULL, '2017 Hyundai Elantra Limited — front three-quarter (Ada George, Port Harcourt)', 0, 1200, 900),
+  (170, 25, 'image', 'Interior', NULL, NULL, '/img/details/interior.jpg', NULL, '2017 Hyundai Elantra Limited — interior (Ada George, Port Harcourt)', 1, 1200, 900),
+  (171, 25, 'image', 'Dashboard', NULL, NULL, '/img/details/dashboard.jpg', NULL, '2017 Hyundai Elantra Limited — dashboard (Ada George, Port Harcourt)', 2, 1200, 900),
+  (172, 25, 'image', 'Engine bay', NULL, NULL, '/img/details/engine-bay.jpg', NULL, '2017 Hyundai Elantra Limited — engine bay (Ada George, Port Harcourt)', 3, 1200, 900),
+  (173, 25, 'image', 'Tyres & tread', NULL, NULL, '/img/details/tyres.jpg', NULL, '2017 Hyundai Elantra Limited — tyres & tread (Ada George, Port Harcourt)', 4, 1200, 900),
+  (174, 25, 'image', 'Boot', NULL, NULL, '/img/details/boot.jpg', NULL, '2017 Hyundai Elantra Limited — boot (Ada George, Port Harcourt)', 5, 1200, 900),
+  (175, 25, 'image', 'Odometer close-up', NULL, NULL, '/img/details/odometer.jpg', NULL, '2017 Hyundai Elantra Limited — odometer close-up (Ada George, Port Harcourt)', 6, 1200, 900),
+  (176, 26, 'image', 'Front three-quarter', NULL, NULL, '/img/cars/ford-explorer-blue.jpg', NULL, '2020 Ford Ranger XLT — front three-quarter (Rumuola, Port Harcourt)', 0, 1200, 900),
+  (177, 26, 'image', 'Interior', NULL, NULL, '/img/details/interior.jpg', NULL, '2020 Ford Ranger XLT — interior (Rumuola, Port Harcourt)', 1, 1200, 900),
+  (178, 26, 'image', 'Dashboard', NULL, NULL, '/img/details/dashboard.jpg', NULL, '2020 Ford Ranger XLT — dashboard (Rumuola, Port Harcourt)', 2, 1200, 900),
+  (179, 26, 'image', 'Engine bay', NULL, NULL, '/img/details/engine-bay.jpg', NULL, '2020 Ford Ranger XLT — engine bay (Rumuola, Port Harcourt)', 3, 1200, 900),
+  (180, 26, 'image', 'Tyres & tread', NULL, NULL, '/img/details/tyres.jpg', NULL, '2020 Ford Ranger XLT — tyres & tread (Rumuola, Port Harcourt)', 4, 1200, 900),
+  (181, 26, 'image', 'Boot', NULL, NULL, '/img/details/boot.jpg', NULL, '2020 Ford Ranger XLT — boot (Rumuola, Port Harcourt)', 5, 1200, 900),
+  (182, 26, 'image', 'Odometer close-up', NULL, NULL, '/img/details/odometer.jpg', NULL, '2020 Ford Ranger XLT — odometer close-up (Rumuola, Port Harcourt)', 6, 1200, 900),
+  (183, 27, 'image', 'Front three-quarter', NULL, NULL, '/img/cars/honda-crv-silver.jpg', NULL, '2014 Honda CR-V EX-L — front three-quarter (Woji, Port Harcourt)', 0, 1200, 900),
+  (184, 27, 'image', 'Interior', NULL, NULL, '/img/details/interior.jpg', NULL, '2014 Honda CR-V EX-L — interior (Woji, Port Harcourt)', 1, 1200, 900),
+  (185, 27, 'image', 'Dashboard', NULL, NULL, '/img/details/dashboard.jpg', NULL, '2014 Honda CR-V EX-L — dashboard (Woji, Port Harcourt)', 2, 1200, 900),
+  (186, 27, 'image', 'Engine bay', NULL, NULL, '/img/details/engine-bay.jpg', NULL, '2014 Honda CR-V EX-L — engine bay (Woji, Port Harcourt)', 3, 1200, 900),
+  (187, 27, 'image', 'Tyres & tread', NULL, NULL, '/img/details/tyres.jpg', NULL, '2014 Honda CR-V EX-L — tyres & tread (Woji, Port Harcourt)', 4, 1200, 900),
+  (188, 27, 'image', 'Boot', NULL, NULL, '/img/details/boot.jpg', NULL, '2014 Honda CR-V EX-L — boot (Woji, Port Harcourt)', 5, 1200, 900),
+  (189, 27, 'image', 'Odometer close-up', NULL, NULL, '/img/details/odometer.jpg', NULL, '2014 Honda CR-V EX-L — odometer close-up (Woji, Port Harcourt)', 6, 1200, 900),
+  (190, 28, 'image', 'Front three-quarter', NULL, NULL, '/img/cars/ford-explorer-blue.jpg', NULL, '2015 Kia Sorento LX — front three-quarter (Rukpokwu, Port Harcourt)', 0, 1200, 900),
+  (191, 28, 'image', 'Interior', NULL, NULL, '/img/details/interior.jpg', NULL, '2015 Kia Sorento LX — interior (Rukpokwu, Port Harcourt)', 1, 1200, 900),
+  (192, 28, 'image', 'Dashboard', NULL, NULL, '/img/details/dashboard.jpg', NULL, '2015 Kia Sorento LX — dashboard (Rukpokwu, Port Harcourt)', 2, 1200, 900),
+  (193, 28, 'image', 'Engine bay', NULL, NULL, '/img/details/engine-bay.jpg', NULL, '2015 Kia Sorento LX — engine bay (Rukpokwu, Port Harcourt)', 3, 1200, 900),
+  (194, 28, 'image', 'Tyres & tread', NULL, NULL, '/img/details/tyres.jpg', NULL, '2015 Kia Sorento LX — tyres & tread (Rukpokwu, Port Harcourt)', 4, 1200, 900),
+  (195, 28, 'image', 'Boot', NULL, NULL, '/img/details/boot.jpg', NULL, '2015 Kia Sorento LX — boot (Rukpokwu, Port Harcourt)', 5, 1200, 900),
+  (196, 28, 'image', 'Odometer close-up', NULL, NULL, '/img/details/odometer.jpg', NULL, '2015 Kia Sorento LX — odometer close-up (Rukpokwu, Port Harcourt)', 6, 1200, 900),
+  (197, 29, 'image', 'Front three-quarter', NULL, NULL, '/img/cars/honda-accord-black.jpg', NULL, '2018 Lexus ES 350 Luxury — front three-quarter (Ada George, Port Harcourt)', 0, 1200, 900),
+  (198, 29, 'image', 'Interior', NULL, NULL, '/img/details/interior.jpg', NULL, '2018 Lexus ES 350 Luxury — interior (Ada George, Port Harcourt)', 1, 1200, 900),
+  (199, 29, 'image', 'Dashboard', NULL, NULL, '/img/details/dashboard.jpg', NULL, '2018 Lexus ES 350 Luxury — dashboard (Ada George, Port Harcourt)', 2, 1200, 900),
+  (200, 29, 'image', 'Engine bay', NULL, NULL, '/img/details/engine-bay.jpg', NULL, '2018 Lexus ES 350 Luxury — engine bay (Ada George, Port Harcourt)', 3, 1200, 900);
+INSERT INTO listing_media (`id`, `listing_id`, `type`, `shot_label`, `duration_seconds`, `size_bytes`, `url`, `poster_url`, `alt_text`, `position`, `width`, `height`) VALUES
+  (201, 29, 'image', 'Tyres & tread', NULL, NULL, '/img/details/tyres.jpg', NULL, '2018 Lexus ES 350 Luxury — tyres & tread (Ada George, Port Harcourt)', 4, 1200, 900),
+  (202, 29, 'image', 'Boot', NULL, NULL, '/img/details/boot.jpg', NULL, '2018 Lexus ES 350 Luxury — boot (Ada George, Port Harcourt)', 5, 1200, 900),
+  (203, 29, 'image', 'Odometer close-up', NULL, NULL, '/img/details/odometer.jpg', NULL, '2018 Lexus ES 350 Luxury — odometer close-up (Ada George, Port Harcourt)', 6, 1200, 900),
+  (204, 30, 'image', 'Front three-quarter', NULL, NULL, '/img/cars/toyota-prado-white.jpg', NULL, '2014 Toyota Highlander XLE — front three-quarter (Mgbuoba, Port Harcourt)', 0, 1200, 900),
+  (205, 30, 'image', 'Interior', NULL, NULL, '/img/details/interior.jpg', NULL, '2014 Toyota Highlander XLE — interior (Mgbuoba, Port Harcourt)', 1, 1200, 900),
+  (206, 30, 'image', 'Dashboard', NULL, NULL, '/img/details/dashboard.jpg', NULL, '2014 Toyota Highlander XLE — dashboard (Mgbuoba, Port Harcourt)', 2, 1200, 900),
+  (207, 30, 'image', 'Engine bay', NULL, NULL, '/img/details/engine-bay.jpg', NULL, '2014 Toyota Highlander XLE — engine bay (Mgbuoba, Port Harcourt)', 3, 1200, 900),
+  (208, 30, 'image', 'Tyres & tread', NULL, NULL, '/img/details/tyres.jpg', NULL, '2014 Toyota Highlander XLE — tyres & tread (Mgbuoba, Port Harcourt)', 4, 1200, 900),
+  (209, 30, 'image', 'Boot', NULL, NULL, '/img/details/boot.jpg', NULL, '2014 Toyota Highlander XLE — boot (Mgbuoba, Port Harcourt)', 5, 1200, 900),
+  (210, 30, 'image', 'Odometer close-up', NULL, NULL, '/img/details/odometer.jpg', NULL, '2014 Toyota Highlander XLE — odometer close-up (Mgbuoba, Port Harcourt)', 6, 1200, 900),
+  (211, 31, 'image', 'Front three-quarter', NULL, NULL, '/img/cars/ford-explorer-blue.jpg', NULL, '2017 Infiniti QX60 Base — front three-quarter (GRA Phase 2, Port Harcourt)', 0, 1200, 900),
+  (212, 31, 'image', 'Interior', NULL, NULL, '/img/details/interior.jpg', NULL, '2017 Infiniti QX60 Base — interior (GRA Phase 2, Port Harcourt)', 1, 1200, 900),
+  (213, 31, 'image', 'Dashboard', NULL, NULL, '/img/details/dashboard.jpg', NULL, '2017 Infiniti QX60 Base — dashboard (GRA Phase 2, Port Harcourt)', 2, 1200, 900),
+  (214, 31, 'image', 'Engine bay', NULL, NULL, '/img/details/engine-bay.jpg', NULL, '2017 Infiniti QX60 Base — engine bay (GRA Phase 2, Port Harcourt)', 3, 1200, 900),
+  (215, 31, 'image', 'Tyres & tread', NULL, NULL, '/img/details/tyres.jpg', NULL, '2017 Infiniti QX60 Base — tyres & tread (GRA Phase 2, Port Harcourt)', 4, 1200, 900),
+  (216, 31, 'image', 'Boot', NULL, NULL, '/img/details/boot.jpg', NULL, '2017 Infiniti QX60 Base — boot (GRA Phase 2, Port Harcourt)', 5, 1200, 900),
+  (217, 31, 'image', 'Odometer close-up', NULL, NULL, '/img/details/odometer.jpg', NULL, '2017 Infiniti QX60 Base — odometer close-up (GRA Phase 2, Port Harcourt)', 6, 1200, 900),
+  (218, 32, 'image', 'Front three-quarter', NULL, NULL, '/img/cars/toyota-camry-silver.jpg', NULL, '2010 Toyota Camry LE — front three-quarter (Choba, Port Harcourt)', 0, 1200, 900),
+  (219, 32, 'image', 'Interior', NULL, NULL, '/img/details/interior.jpg', NULL, '2010 Toyota Camry LE — interior (Choba, Port Harcourt)', 1, 1200, 900),
+  (220, 32, 'image', 'Dashboard', NULL, NULL, '/img/details/dashboard.jpg', NULL, '2010 Toyota Camry LE — dashboard (Choba, Port Harcourt)', 2, 1200, 900),
+  (221, 32, 'image', 'Engine bay', NULL, NULL, '/img/details/engine-bay.jpg', NULL, '2010 Toyota Camry LE — engine bay (Choba, Port Harcourt)', 3, 1200, 900),
+  (222, 32, 'image', 'Tyres & tread', NULL, NULL, '/img/details/tyres.jpg', NULL, '2010 Toyota Camry LE — tyres & tread (Choba, Port Harcourt)', 4, 1200, 900),
+  (223, 32, 'image', 'Boot', NULL, NULL, '/img/details/boot.jpg', NULL, '2010 Toyota Camry LE — boot (Choba, Port Harcourt)', 5, 1200, 900),
+  (224, 32, 'image', 'Odometer close-up', NULL, NULL, '/img/details/odometer.jpg', NULL, '2010 Toyota Camry LE — odometer close-up (Choba, Port Harcourt)', 6, 1200, 900),
+  (225, 32, 'video', 'Walkaround video', 12, 243775, '/video/inspection-walkaround.mp4', '/video/inspection-walkaround-poster.jpg', '2010 Toyota Camry walkaround — video, 12 seconds', 99, 960, 540),
+  (226, 33, 'image', 'Front three-quarter', NULL, NULL, '/img/cars/toyota-hilux-silver.jpg', NULL, '2019 Toyota Hilux SR — front three-quarter (Choba, Port Harcourt)', 0, 1200, 900),
+  (227, 33, 'image', 'Interior', NULL, NULL, '/img/details/interior.jpg', NULL, '2019 Toyota Hilux SR — interior (Choba, Port Harcourt)', 1, 1200, 900),
+  (228, 33, 'image', 'Dashboard', NULL, NULL, '/img/details/dashboard.jpg', NULL, '2019 Toyota Hilux SR — dashboard (Choba, Port Harcourt)', 2, 1200, 900),
+  (229, 33, 'image', 'Engine bay', NULL, NULL, '/img/details/engine-bay.jpg', NULL, '2019 Toyota Hilux SR — engine bay (Choba, Port Harcourt)', 3, 1200, 900),
+  (230, 33, 'image', 'Tyres & tread', NULL, NULL, '/img/details/tyres.jpg', NULL, '2019 Toyota Hilux SR — tyres & tread (Choba, Port Harcourt)', 4, 1200, 900),
+  (231, 33, 'image', 'Boot', NULL, NULL, '/img/details/boot.jpg', NULL, '2019 Toyota Hilux SR — boot (Choba, Port Harcourt)', 5, 1200, 900),
+  (232, 33, 'image', 'Odometer close-up', NULL, NULL, '/img/details/odometer.jpg', NULL, '2019 Toyota Hilux SR — odometer close-up (Choba, Port Harcourt)', 6, 1200, 900),
+  (233, 34, 'image', 'Front three-quarter', NULL, NULL, '/img/cars/ford-explorer-blue.jpg', NULL, '2018 Ford Ranger XL — front three-quarter (Rukpokwu, Port Harcourt)', 0, 1200, 900),
+  (234, 34, 'image', 'Interior', NULL, NULL, '/img/details/interior.jpg', NULL, '2018 Ford Ranger XL — interior (Rukpokwu, Port Harcourt)', 1, 1200, 900),
+  (235, 34, 'image', 'Dashboard', NULL, NULL, '/img/details/dashboard.jpg', NULL, '2018 Ford Ranger XL — dashboard (Rukpokwu, Port Harcourt)', 2, 1200, 900),
+  (236, 34, 'image', 'Engine bay', NULL, NULL, '/img/details/engine-bay.jpg', NULL, '2018 Ford Ranger XL — engine bay (Rukpokwu, Port Harcourt)', 3, 1200, 900),
+  (237, 34, 'image', 'Tyres & tread', NULL, NULL, '/img/details/tyres.jpg', NULL, '2018 Ford Ranger XL — tyres & tread (Rukpokwu, Port Harcourt)', 4, 1200, 900),
+  (238, 34, 'image', 'Boot', NULL, NULL, '/img/details/boot.jpg', NULL, '2018 Ford Ranger XL — boot (Rukpokwu, Port Harcourt)', 5, 1200, 900),
+  (239, 34, 'image', 'Odometer close-up', NULL, NULL, '/img/details/odometer.jpg', NULL, '2018 Ford Ranger XL — odometer close-up (Rukpokwu, Port Harcourt)', 6, 1200, 900),
+  (240, 35, 'image', 'Front three-quarter', NULL, NULL, '/img/cars/ford-explorer-blue.jpg', NULL, '2015 Ford Explorer Sport — front three-quarter (Rumuola, Port Harcourt)', 0, 1200, 900);
+INSERT INTO listing_media (`id`, `listing_id`, `type`, `shot_label`, `duration_seconds`, `size_bytes`, `url`, `poster_url`, `alt_text`, `position`, `width`, `height`) VALUES
+  (241, 35, 'image', 'Interior', NULL, NULL, '/img/details/interior.jpg', NULL, '2015 Ford Explorer Sport — interior (Rumuola, Port Harcourt)', 1, 1200, 900),
+  (242, 35, 'image', 'Dashboard', NULL, NULL, '/img/details/dashboard.jpg', NULL, '2015 Ford Explorer Sport — dashboard (Rumuola, Port Harcourt)', 2, 1200, 900),
+  (243, 35, 'image', 'Engine bay', NULL, NULL, '/img/details/engine-bay.jpg', NULL, '2015 Ford Explorer Sport — engine bay (Rumuola, Port Harcourt)', 3, 1200, 900),
+  (244, 35, 'image', 'Tyres & tread', NULL, NULL, '/img/details/tyres.jpg', NULL, '2015 Ford Explorer Sport — tyres & tread (Rumuola, Port Harcourt)', 4, 1200, 900),
+  (245, 35, 'image', 'Boot', NULL, NULL, '/img/details/boot.jpg', NULL, '2015 Ford Explorer Sport — boot (Rumuola, Port Harcourt)', 5, 1200, 900),
+  (246, 35, 'image', 'Odometer close-up', NULL, NULL, '/img/details/odometer.jpg', NULL, '2015 Ford Explorer Sport — odometer close-up (Rumuola, Port Harcourt)', 6, 1200, 900),
+  (247, 36, 'image', 'Front three-quarter', NULL, NULL, '/img/cars/toyota-hilux-silver.jpg', NULL, '2019 Toyota Hilux SR — front three-quarter (Ada George, Port Harcourt)', 0, 1200, 900),
+  (248, 36, 'image', 'Interior', NULL, NULL, '/img/details/interior.jpg', NULL, '2019 Toyota Hilux SR — interior (Ada George, Port Harcourt)', 1, 1200, 900),
+  (249, 36, 'image', 'Dashboard', NULL, NULL, '/img/details/dashboard.jpg', NULL, '2019 Toyota Hilux SR — dashboard (Ada George, Port Harcourt)', 2, 1200, 900),
+  (250, 36, 'image', 'Engine bay', NULL, NULL, '/img/details/engine-bay.jpg', NULL, '2019 Toyota Hilux SR — engine bay (Ada George, Port Harcourt)', 3, 1200, 900),
+  (251, 36, 'image', 'Tyres & tread', NULL, NULL, '/img/details/tyres.jpg', NULL, '2019 Toyota Hilux SR — tyres & tread (Ada George, Port Harcourt)', 4, 1200, 900),
+  (252, 36, 'image', 'Boot', NULL, NULL, '/img/details/boot.jpg', NULL, '2019 Toyota Hilux SR — boot (Ada George, Port Harcourt)', 5, 1200, 900),
+  (253, 36, 'image', 'Odometer close-up', NULL, NULL, '/img/details/odometer.jpg', NULL, '2019 Toyota Hilux SR — odometer close-up (Ada George, Port Harcourt)', 6, 1200, 900),
+  (254, 37, 'image', 'Front three-quarter', NULL, NULL, '/img/cars/toyota-camry-silver.jpg', NULL, '2016 Toyota Avalon XLE — front three-quarter (Aba Road, Port Harcourt)', 0, 1200, 900),
+  (255, 37, 'image', 'Interior', NULL, NULL, '/img/details/interior.jpg', NULL, '2016 Toyota Avalon XLE — interior (Aba Road, Port Harcourt)', 1, 1200, 900),
+  (256, 37, 'image', 'Dashboard', NULL, NULL, '/img/details/dashboard.jpg', NULL, '2016 Toyota Avalon XLE — dashboard (Aba Road, Port Harcourt)', 2, 1200, 900),
+  (257, 37, 'image', 'Engine bay', NULL, NULL, '/img/details/engine-bay.jpg', NULL, '2016 Toyota Avalon XLE — engine bay (Aba Road, Port Harcourt)', 3, 1200, 900),
+  (258, 37, 'image', 'Tyres & tread', NULL, NULL, '/img/details/tyres.jpg', NULL, '2016 Toyota Avalon XLE — tyres & tread (Aba Road, Port Harcourt)', 4, 1200, 900),
+  (259, 37, 'image', 'Boot', NULL, NULL, '/img/details/boot.jpg', NULL, '2016 Toyota Avalon XLE — boot (Aba Road, Port Harcourt)', 5, 1200, 900),
+  (260, 37, 'image', 'Odometer close-up', NULL, NULL, '/img/details/odometer.jpg', NULL, '2016 Toyota Avalon XLE — odometer close-up (Aba Road, Port Harcourt)', 6, 1200, 900),
+  (261, 38, 'image', 'Front three-quarter', NULL, NULL, '/img/cars/mercedes-gle-white.jpg', NULL, '2018 Mercedes-Benz GLE GLE 400 — front three-quarter (Ada George, Port Harcourt)', 0, 1200, 900),
+  (262, 38, 'image', 'Interior', NULL, NULL, '/img/details/interior.jpg', NULL, '2018 Mercedes-Benz GLE GLE 400 — interior (Ada George, Port Harcourt)', 1, 1200, 900),
+  (263, 38, 'image', 'Dashboard', NULL, NULL, '/img/details/dashboard.jpg', NULL, '2018 Mercedes-Benz GLE GLE 400 — dashboard (Ada George, Port Harcourt)', 2, 1200, 900),
+  (264, 38, 'image', 'Engine bay', NULL, NULL, '/img/details/engine-bay.jpg', NULL, '2018 Mercedes-Benz GLE GLE 400 — engine bay (Ada George, Port Harcourt)', 3, 1200, 900),
+  (265, 38, 'image', 'Tyres & tread', NULL, NULL, '/img/details/tyres.jpg', NULL, '2018 Mercedes-Benz GLE GLE 400 — tyres & tread (Ada George, Port Harcourt)', 4, 1200, 900),
+  (266, 38, 'image', 'Boot', NULL, NULL, '/img/details/boot.jpg', NULL, '2018 Mercedes-Benz GLE GLE 400 — boot (Ada George, Port Harcourt)', 5, 1200, 900),
+  (267, 38, 'image', 'Odometer close-up', NULL, NULL, '/img/details/odometer.jpg', NULL, '2018 Mercedes-Benz GLE GLE 400 — odometer close-up (Ada George, Port Harcourt)', 6, 1200, 900),
+  (268, 39, 'image', 'Front three-quarter', NULL, NULL, '/img/cars/toyota-hilux-silver.jpg', NULL, '2015 Toyota Hilux SR — front three-quarter (Choba, Port Harcourt)', 0, 1200, 900),
+  (269, 39, 'image', 'Interior', NULL, NULL, '/img/details/interior.jpg', NULL, '2015 Toyota Hilux SR — interior (Choba, Port Harcourt)', 1, 1200, 900),
+  (270, 39, 'image', 'Dashboard', NULL, NULL, '/img/details/dashboard.jpg', NULL, '2015 Toyota Hilux SR — dashboard (Choba, Port Harcourt)', 2, 1200, 900),
+  (271, 39, 'image', 'Engine bay', NULL, NULL, '/img/details/engine-bay.jpg', NULL, '2015 Toyota Hilux SR — engine bay (Choba, Port Harcourt)', 3, 1200, 900),
+  (272, 39, 'image', 'Tyres & tread', NULL, NULL, '/img/details/tyres.jpg', NULL, '2015 Toyota Hilux SR — tyres & tread (Choba, Port Harcourt)', 4, 1200, 900),
+  (273, 39, 'image', 'Boot', NULL, NULL, '/img/details/boot.jpg', NULL, '2015 Toyota Hilux SR — boot (Choba, Port Harcourt)', 5, 1200, 900),
+  (274, 39, 'image', 'Odometer close-up', NULL, NULL, '/img/details/odometer.jpg', NULL, '2015 Toyota Hilux SR — odometer close-up (Choba, Port Harcourt)', 6, 1200, 900),
+  (275, 40, 'image', 'Front three-quarter', NULL, NULL, '/img/cars/ford-explorer-blue.jpg', NULL, '2014 Acura MDX Advance — front three-quarter (Rumuola, Port Harcourt)', 0, 1200, 900),
+  (276, 40, 'image', 'Interior', NULL, NULL, '/img/details/interior.jpg', NULL, '2014 Acura MDX Advance — interior (Rumuola, Port Harcourt)', 1, 1200, 900),
+  (277, 40, 'image', 'Dashboard', NULL, NULL, '/img/details/dashboard.jpg', NULL, '2014 Acura MDX Advance — dashboard (Rumuola, Port Harcourt)', 2, 1200, 900),
+  (278, 40, 'image', 'Engine bay', NULL, NULL, '/img/details/engine-bay.jpg', NULL, '2014 Acura MDX Advance — engine bay (Rumuola, Port Harcourt)', 3, 1200, 900),
+  (279, 40, 'image', 'Tyres & tread', NULL, NULL, '/img/details/tyres.jpg', NULL, '2014 Acura MDX Advance — tyres & tread (Rumuola, Port Harcourt)', 4, 1200, 900),
+  (280, 40, 'image', 'Boot', NULL, NULL, '/img/details/boot.jpg', NULL, '2014 Acura MDX Advance — boot (Rumuola, Port Harcourt)', 5, 1200, 900);
+INSERT INTO listing_media (`id`, `listing_id`, `type`, `shot_label`, `duration_seconds`, `size_bytes`, `url`, `poster_url`, `alt_text`, `position`, `width`, `height`) VALUES
+  (281, 40, 'image', 'Odometer close-up', NULL, NULL, '/img/details/odometer.jpg', NULL, '2014 Acura MDX Advance — odometer close-up (Rumuola, Port Harcourt)', 6, 1200, 900),
+  (282, 41, 'image', 'Front three-quarter', NULL, NULL, '/img/cars/ford-explorer-blue.jpg', NULL, '2017 Hyundai Tucson SE — front three-quarter (Choba, Port Harcourt)', 0, 1200, 900),
+  (283, 41, 'image', 'Interior', NULL, NULL, '/img/details/interior.jpg', NULL, '2017 Hyundai Tucson SE — interior (Choba, Port Harcourt)', 1, 1200, 900),
+  (284, 41, 'image', 'Dashboard', NULL, NULL, '/img/details/dashboard.jpg', NULL, '2017 Hyundai Tucson SE — dashboard (Choba, Port Harcourt)', 2, 1200, 900),
+  (285, 41, 'image', 'Engine bay', NULL, NULL, '/img/details/engine-bay.jpg', NULL, '2017 Hyundai Tucson SE — engine bay (Choba, Port Harcourt)', 3, 1200, 900),
+  (286, 41, 'image', 'Tyres & tread', NULL, NULL, '/img/details/tyres.jpg', NULL, '2017 Hyundai Tucson SE — tyres & tread (Choba, Port Harcourt)', 4, 1200, 900),
+  (287, 41, 'image', 'Boot', NULL, NULL, '/img/details/boot.jpg', NULL, '2017 Hyundai Tucson SE — boot (Choba, Port Harcourt)', 5, 1200, 900),
+  (288, 41, 'image', 'Odometer close-up', NULL, NULL, '/img/details/odometer.jpg', NULL, '2017 Hyundai Tucson SE — odometer close-up (Choba, Port Harcourt)', 6, 1200, 900),
+  (289, 42, 'image', 'Front three-quarter', NULL, NULL, '/img/cars/ford-explorer-blue.jpg', NULL, '2016 BMW X5 xDrive35i — front three-quarter (Aba Road, Port Harcourt)', 0, 1200, 900),
+  (290, 42, 'image', 'Interior', NULL, NULL, '/img/details/interior.jpg', NULL, '2016 BMW X5 xDrive35i — interior (Aba Road, Port Harcourt)', 1, 1200, 900),
+  (291, 42, 'image', 'Dashboard', NULL, NULL, '/img/details/dashboard.jpg', NULL, '2016 BMW X5 xDrive35i — dashboard (Aba Road, Port Harcourt)', 2, 1200, 900),
+  (292, 42, 'image', 'Engine bay', NULL, NULL, '/img/details/engine-bay.jpg', NULL, '2016 BMW X5 xDrive35i — engine bay (Aba Road, Port Harcourt)', 3, 1200, 900),
+  (293, 42, 'image', 'Tyres & tread', NULL, NULL, '/img/details/tyres.jpg', NULL, '2016 BMW X5 xDrive35i — tyres & tread (Aba Road, Port Harcourt)', 4, 1200, 900),
+  (294, 42, 'image', 'Boot', NULL, NULL, '/img/details/boot.jpg', NULL, '2016 BMW X5 xDrive35i — boot (Aba Road, Port Harcourt)', 5, 1200, 900),
+  (295, 42, 'image', 'Odometer close-up', NULL, NULL, '/img/details/odometer.jpg', NULL, '2016 BMW X5 xDrive35i — odometer close-up (Aba Road, Port Harcourt)', 6, 1200, 900),
+  (296, 43, 'image', 'Front three-quarter', NULL, NULL, '/img/cars/mercedes-gle-white.jpg', NULL, '2019 Mercedes-Benz GLE GLE 350 — front three-quarter (Choba, Port Harcourt)', 0, 1200, 900),
+  (297, 43, 'image', 'Interior', NULL, NULL, '/img/details/interior.jpg', NULL, '2019 Mercedes-Benz GLE GLE 350 — interior (Choba, Port Harcourt)', 1, 1200, 900),
+  (298, 43, 'image', 'Dashboard', NULL, NULL, '/img/details/dashboard.jpg', NULL, '2019 Mercedes-Benz GLE GLE 350 — dashboard (Choba, Port Harcourt)', 2, 1200, 900),
+  (299, 43, 'image', 'Engine bay', NULL, NULL, '/img/details/engine-bay.jpg', NULL, '2019 Mercedes-Benz GLE GLE 350 — engine bay (Choba, Port Harcourt)', 3, 1200, 900),
+  (300, 43, 'image', 'Tyres & tread', NULL, NULL, '/img/details/tyres.jpg', NULL, '2019 Mercedes-Benz GLE GLE 350 — tyres & tread (Choba, Port Harcourt)', 4, 1200, 900),
+  (301, 43, 'image', 'Boot', NULL, NULL, '/img/details/boot.jpg', NULL, '2019 Mercedes-Benz GLE GLE 350 — boot (Choba, Port Harcourt)', 5, 1200, 900),
+  (302, 43, 'image', 'Odometer close-up', NULL, NULL, '/img/details/odometer.jpg', NULL, '2019 Mercedes-Benz GLE GLE 350 — odometer close-up (Choba, Port Harcourt)', 6, 1200, 900),
+  (303, 44, 'image', 'Front three-quarter', NULL, NULL, '/img/cars/lexus-rx350-grey.jpg', NULL, '2016 Lexus RX 350 Base — front three-quarter (Eliozu, Port Harcourt)', 0, 1200, 900),
+  (304, 44, 'image', 'Interior', NULL, NULL, '/img/details/interior.jpg', NULL, '2016 Lexus RX 350 Base — interior (Eliozu, Port Harcourt)', 1, 1200, 900),
+  (305, 44, 'image', 'Dashboard', NULL, NULL, '/img/details/dashboard.jpg', NULL, '2016 Lexus RX 350 Base — dashboard (Eliozu, Port Harcourt)', 2, 1200, 900),
+  (306, 44, 'image', 'Engine bay', NULL, NULL, '/img/details/engine-bay.jpg', NULL, '2016 Lexus RX 350 Base — engine bay (Eliozu, Port Harcourt)', 3, 1200, 900),
+  (307, 44, 'image', 'Tyres & tread', NULL, NULL, '/img/details/tyres.jpg', NULL, '2016 Lexus RX 350 Base — tyres & tread (Eliozu, Port Harcourt)', 4, 1200, 900),
+  (308, 44, 'image', 'Boot', NULL, NULL, '/img/details/boot.jpg', NULL, '2016 Lexus RX 350 Base — boot (Eliozu, Port Harcourt)', 5, 1200, 900),
+  (309, 44, 'image', 'Odometer close-up', NULL, NULL, '/img/details/odometer.jpg', NULL, '2016 Lexus RX 350 Base — odometer close-up (Eliozu, Port Harcourt)', 6, 1200, 900),
+  (310, 45, 'image', 'Front three-quarter', NULL, NULL, '/img/cars/ford-explorer-blue.jpg', NULL, '2018 Infiniti QX60 Premium — front three-quarter (Aba Road, Port Harcourt)', 0, 1200, 900),
+  (311, 45, 'image', 'Interior', NULL, NULL, '/img/details/interior.jpg', NULL, '2018 Infiniti QX60 Premium — interior (Aba Road, Port Harcourt)', 1, 1200, 900),
+  (312, 45, 'image', 'Dashboard', NULL, NULL, '/img/details/dashboard.jpg', NULL, '2018 Infiniti QX60 Premium — dashboard (Aba Road, Port Harcourt)', 2, 1200, 900),
+  (313, 45, 'image', 'Engine bay', NULL, NULL, '/img/details/engine-bay.jpg', NULL, '2018 Infiniti QX60 Premium — engine bay (Aba Road, Port Harcourt)', 3, 1200, 900),
+  (314, 45, 'image', 'Tyres & tread', NULL, NULL, '/img/details/tyres.jpg', NULL, '2018 Infiniti QX60 Premium — tyres & tread (Aba Road, Port Harcourt)', 4, 1200, 900),
+  (315, 45, 'image', 'Boot', NULL, NULL, '/img/details/boot.jpg', NULL, '2018 Infiniti QX60 Premium — boot (Aba Road, Port Harcourt)', 5, 1200, 900),
+  (316, 45, 'image', 'Odometer close-up', NULL, NULL, '/img/details/odometer.jpg', NULL, '2018 Infiniti QX60 Premium — odometer close-up (Aba Road, Port Harcourt)', 6, 1200, 900),
+  (317, 46, 'image', 'Front three-quarter', NULL, NULL, '/img/cars/toyota-camry-silver.jpg', NULL, '2015 Toyota Avalon XLE — front three-quarter (Old GRA, Port Harcourt)', 0, 1200, 900),
+  (318, 46, 'image', 'Interior', NULL, NULL, '/img/details/interior.jpg', NULL, '2015 Toyota Avalon XLE — interior (Old GRA, Port Harcourt)', 1, 1200, 900),
+  (319, 46, 'image', 'Dashboard', NULL, NULL, '/img/details/dashboard.jpg', NULL, '2015 Toyota Avalon XLE — dashboard (Old GRA, Port Harcourt)', 2, 1200, 900),
+  (320, 46, 'image', 'Engine bay', NULL, NULL, '/img/details/engine-bay.jpg', NULL, '2015 Toyota Avalon XLE — engine bay (Old GRA, Port Harcourt)', 3, 1200, 900);
+INSERT INTO listing_media (`id`, `listing_id`, `type`, `shot_label`, `duration_seconds`, `size_bytes`, `url`, `poster_url`, `alt_text`, `position`, `width`, `height`) VALUES
+  (321, 46, 'image', 'Tyres & tread', NULL, NULL, '/img/details/tyres.jpg', NULL, '2015 Toyota Avalon XLE — tyres & tread (Old GRA, Port Harcourt)', 4, 1200, 900),
+  (322, 46, 'image', 'Boot', NULL, NULL, '/img/details/boot.jpg', NULL, '2015 Toyota Avalon XLE — boot (Old GRA, Port Harcourt)', 5, 1200, 900),
+  (323, 46, 'image', 'Odometer close-up', NULL, NULL, '/img/details/odometer.jpg', NULL, '2015 Toyota Avalon XLE — odometer close-up (Old GRA, Port Harcourt)', 6, 1200, 900),
+  (324, 47, 'image', 'Front three-quarter', NULL, NULL, '/img/cars/toyota-corolla-white.jpg', NULL, '2013 Toyota Corolla LE — front three-quarter (Rumuokoro, Port Harcourt)', 0, 1200, 900),
+  (325, 47, 'image', 'Interior', NULL, NULL, '/img/details/interior.jpg', NULL, '2013 Toyota Corolla LE — interior (Rumuokoro, Port Harcourt)', 1, 1200, 900),
+  (326, 47, 'image', 'Dashboard', NULL, NULL, '/img/details/dashboard.jpg', NULL, '2013 Toyota Corolla LE — dashboard (Rumuokoro, Port Harcourt)', 2, 1200, 900),
+  (327, 47, 'image', 'Engine bay', NULL, NULL, '/img/details/engine-bay.jpg', NULL, '2013 Toyota Corolla LE — engine bay (Rumuokoro, Port Harcourt)', 3, 1200, 900),
+  (328, 47, 'image', 'Tyres & tread', NULL, NULL, '/img/details/tyres.jpg', NULL, '2013 Toyota Corolla LE — tyres & tread (Rumuokoro, Port Harcourt)', 4, 1200, 900),
+  (329, 47, 'image', 'Boot', NULL, NULL, '/img/details/boot.jpg', NULL, '2013 Toyota Corolla LE — boot (Rumuokoro, Port Harcourt)', 5, 1200, 900),
+  (330, 47, 'image', 'Odometer close-up', NULL, NULL, '/img/details/odometer.jpg', NULL, '2013 Toyota Corolla LE — odometer close-up (Rumuokoro, Port Harcourt)', 6, 1200, 900),
+  (331, 48, 'image', 'Front three-quarter', NULL, NULL, '/img/cars/honda-accord-black.jpg', NULL, '2017 Lexus ES 350 Base — front three-quarter (Rukpokwu, Port Harcourt)', 0, 1200, 900),
+  (332, 48, 'image', 'Interior', NULL, NULL, '/img/details/interior.jpg', NULL, '2017 Lexus ES 350 Base — interior (Rukpokwu, Port Harcourt)', 1, 1200, 900),
+  (333, 48, 'image', 'Dashboard', NULL, NULL, '/img/details/dashboard.jpg', NULL, '2017 Lexus ES 350 Base — dashboard (Rukpokwu, Port Harcourt)', 2, 1200, 900),
+  (334, 48, 'image', 'Engine bay', NULL, NULL, '/img/details/engine-bay.jpg', NULL, '2017 Lexus ES 350 Base — engine bay (Rukpokwu, Port Harcourt)', 3, 1200, 900),
+  (335, 48, 'image', 'Tyres & tread', NULL, NULL, '/img/details/tyres.jpg', NULL, '2017 Lexus ES 350 Base — tyres & tread (Rukpokwu, Port Harcourt)', 4, 1200, 900),
+  (336, 48, 'image', 'Boot', NULL, NULL, '/img/details/boot.jpg', NULL, '2017 Lexus ES 350 Base — boot (Rukpokwu, Port Harcourt)', 5, 1200, 900),
+  (337, 48, 'image', 'Odometer close-up', NULL, NULL, '/img/details/odometer.jpg', NULL, '2017 Lexus ES 350 Base — odometer close-up (Rukpokwu, Port Harcourt)', 6, 1200, 900),
+  (338, 49, 'image', 'Front three-quarter', NULL, NULL, '/img/cars/mercedes-eclass-grey.jpg', NULL, '2016 Mercedes-Benz E-Class E350 — front three-quarter (Rumuokoro, Port Harcourt)', 0, 1200, 900),
+  (339, 49, 'image', 'Interior', NULL, NULL, '/img/details/interior.jpg', NULL, '2016 Mercedes-Benz E-Class E350 — interior (Rumuokoro, Port Harcourt)', 1, 1200, 900),
+  (340, 49, 'image', 'Dashboard', NULL, NULL, '/img/details/dashboard.jpg', NULL, '2016 Mercedes-Benz E-Class E350 — dashboard (Rumuokoro, Port Harcourt)', 2, 1200, 900),
+  (341, 49, 'image', 'Engine bay', NULL, NULL, '/img/details/engine-bay.jpg', NULL, '2016 Mercedes-Benz E-Class E350 — engine bay (Rumuokoro, Port Harcourt)', 3, 1200, 900),
+  (342, 49, 'image', 'Tyres & tread', NULL, NULL, '/img/details/tyres.jpg', NULL, '2016 Mercedes-Benz E-Class E350 — tyres & tread (Rumuokoro, Port Harcourt)', 4, 1200, 900),
+  (343, 49, 'image', 'Boot', NULL, NULL, '/img/details/boot.jpg', NULL, '2016 Mercedes-Benz E-Class E350 — boot (Rumuokoro, Port Harcourt)', 5, 1200, 900),
+  (344, 49, 'image', 'Odometer close-up', NULL, NULL, '/img/details/odometer.jpg', NULL, '2016 Mercedes-Benz E-Class E350 — odometer close-up (Rumuokoro, Port Harcourt)', 6, 1200, 900),
+  (345, 50, 'image', 'Front three-quarter', NULL, NULL, '/img/cars/honda-accord-black.jpg', NULL, '2018 Hyundai Elantra Limited — front three-quarter (Ada George, Port Harcourt)', 0, 1200, 900),
+  (346, 50, 'image', 'Interior', NULL, NULL, '/img/details/interior.jpg', NULL, '2018 Hyundai Elantra Limited — interior (Ada George, Port Harcourt)', 1, 1200, 900),
+  (347, 50, 'image', 'Dashboard', NULL, NULL, '/img/details/dashboard.jpg', NULL, '2018 Hyundai Elantra Limited — dashboard (Ada George, Port Harcourt)', 2, 1200, 900),
+  (348, 50, 'image', 'Engine bay', NULL, NULL, '/img/details/engine-bay.jpg', NULL, '2018 Hyundai Elantra Limited — engine bay (Ada George, Port Harcourt)', 3, 1200, 900),
+  (349, 50, 'image', 'Tyres & tread', NULL, NULL, '/img/details/tyres.jpg', NULL, '2018 Hyundai Elantra Limited — tyres & tread (Ada George, Port Harcourt)', 4, 1200, 900),
+  (350, 50, 'image', 'Boot', NULL, NULL, '/img/details/boot.jpg', NULL, '2018 Hyundai Elantra Limited — boot (Ada George, Port Harcourt)', 5, 1200, 900),
+  (351, 50, 'image', 'Odometer close-up', NULL, NULL, '/img/details/odometer.jpg', NULL, '2018 Hyundai Elantra Limited — odometer close-up (Ada George, Port Harcourt)', 6, 1200, 900),
+  (352, 51, 'image', 'Front three-quarter', NULL, NULL, '/img/cars/toyota-hilux-silver.jpg', NULL, '2016 Toyota Hilux SR — front three-quarter (Trans-Amadi, Port Harcourt)', 0, 1200, 900),
+  (353, 51, 'image', 'Interior', NULL, NULL, '/img/details/interior.jpg', NULL, '2016 Toyota Hilux SR — interior (Trans-Amadi, Port Harcourt)', 1, 1200, 900),
+  (354, 51, 'image', 'Dashboard', NULL, NULL, '/img/details/dashboard.jpg', NULL, '2016 Toyota Hilux SR — dashboard (Trans-Amadi, Port Harcourt)', 2, 1200, 900),
+  (355, 51, 'image', 'Engine bay', NULL, NULL, '/img/details/engine-bay.jpg', NULL, '2016 Toyota Hilux SR — engine bay (Trans-Amadi, Port Harcourt)', 3, 1200, 900),
+  (356, 51, 'image', 'Tyres & tread', NULL, NULL, '/img/details/tyres.jpg', NULL, '2016 Toyota Hilux SR — tyres & tread (Trans-Amadi, Port Harcourt)', 4, 1200, 900),
+  (357, 51, 'image', 'Boot', NULL, NULL, '/img/details/boot.jpg', NULL, '2016 Toyota Hilux SR — boot (Trans-Amadi, Port Harcourt)', 5, 1200, 900),
+  (358, 51, 'image', 'Odometer close-up', NULL, NULL, '/img/details/odometer.jpg', NULL, '2016 Toyota Hilux SR — odometer close-up (Trans-Amadi, Port Harcourt)', 6, 1200, 900),
+  (359, 52, 'image', 'Front three-quarter', NULL, NULL, '/img/cars/honda-accord-black.jpg', NULL, '2015 Nissan Altima SV — front three-quarter (Woji, Port Harcourt)', 0, 1200, 900),
+  (360, 52, 'image', 'Interior', NULL, NULL, '/img/details/interior.jpg', NULL, '2015 Nissan Altima SV — interior (Woji, Port Harcourt)', 1, 1200, 900);
+INSERT INTO listing_media (`id`, `listing_id`, `type`, `shot_label`, `duration_seconds`, `size_bytes`, `url`, `poster_url`, `alt_text`, `position`, `width`, `height`) VALUES
+  (361, 52, 'image', 'Dashboard', NULL, NULL, '/img/details/dashboard.jpg', NULL, '2015 Nissan Altima SV — dashboard (Woji, Port Harcourt)', 2, 1200, 900),
+  (362, 52, 'image', 'Engine bay', NULL, NULL, '/img/details/engine-bay.jpg', NULL, '2015 Nissan Altima SV — engine bay (Woji, Port Harcourt)', 3, 1200, 900),
+  (363, 52, 'image', 'Tyres & tread', NULL, NULL, '/img/details/tyres.jpg', NULL, '2015 Nissan Altima SV — tyres & tread (Woji, Port Harcourt)', 4, 1200, 900),
+  (364, 52, 'image', 'Boot', NULL, NULL, '/img/details/boot.jpg', NULL, '2015 Nissan Altima SV — boot (Woji, Port Harcourt)', 5, 1200, 900),
+  (365, 52, 'image', 'Odometer close-up', NULL, NULL, '/img/details/odometer.jpg', NULL, '2015 Nissan Altima SV — odometer close-up (Woji, Port Harcourt)', 6, 1200, 900),
+  (366, 53, 'image', 'Front three-quarter', NULL, NULL, '/img/cars/ford-explorer-blue.jpg', NULL, '2019 Ford Ranger Wildtrak — front three-quarter (Elelenwo, Port Harcourt)', 0, 1200, 900),
+  (367, 53, 'image', 'Interior', NULL, NULL, '/img/details/interior.jpg', NULL, '2019 Ford Ranger Wildtrak — interior (Elelenwo, Port Harcourt)', 1, 1200, 900),
+  (368, 53, 'image', 'Dashboard', NULL, NULL, '/img/details/dashboard.jpg', NULL, '2019 Ford Ranger Wildtrak — dashboard (Elelenwo, Port Harcourt)', 2, 1200, 900),
+  (369, 53, 'image', 'Engine bay', NULL, NULL, '/img/details/engine-bay.jpg', NULL, '2019 Ford Ranger Wildtrak — engine bay (Elelenwo, Port Harcourt)', 3, 1200, 900),
+  (370, 53, 'image', 'Tyres & tread', NULL, NULL, '/img/details/tyres.jpg', NULL, '2019 Ford Ranger Wildtrak — tyres & tread (Elelenwo, Port Harcourt)', 4, 1200, 900),
+  (371, 53, 'image', 'Boot', NULL, NULL, '/img/details/boot.jpg', NULL, '2019 Ford Ranger Wildtrak — boot (Elelenwo, Port Harcourt)', 5, 1200, 900),
+  (372, 53, 'image', 'Odometer close-up', NULL, NULL, '/img/details/odometer.jpg', NULL, '2019 Ford Ranger Wildtrak — odometer close-up (Elelenwo, Port Harcourt)', 6, 1200, 900),
+  (373, 54, 'image', 'Front three-quarter', NULL, NULL, '/img/cars/toyota-camry-silver.jpg', NULL, '2013 Toyota Camry SE — front three-quarter (Rumuokoro, Port Harcourt)', 0, 1200, 900),
+  (374, 54, 'image', 'Interior', NULL, NULL, '/img/details/interior.jpg', NULL, '2013 Toyota Camry SE — interior (Rumuokoro, Port Harcourt)', 1, 1200, 900),
+  (375, 54, 'image', 'Dashboard', NULL, NULL, '/img/details/dashboard.jpg', NULL, '2013 Toyota Camry SE — dashboard (Rumuokoro, Port Harcourt)', 2, 1200, 900),
+  (376, 54, 'image', 'Engine bay', NULL, NULL, '/img/details/engine-bay.jpg', NULL, '2013 Toyota Camry SE — engine bay (Rumuokoro, Port Harcourt)', 3, 1200, 900),
+  (377, 54, 'image', 'Tyres & tread', NULL, NULL, '/img/details/tyres.jpg', NULL, '2013 Toyota Camry SE — tyres & tread (Rumuokoro, Port Harcourt)', 4, 1200, 900),
+  (378, 54, 'image', 'Boot', NULL, NULL, '/img/details/boot.jpg', NULL, '2013 Toyota Camry SE — boot (Rumuokoro, Port Harcourt)', 5, 1200, 900),
+  (379, 54, 'image', 'Odometer close-up', NULL, NULL, '/img/details/odometer.jpg', NULL, '2013 Toyota Camry SE — odometer close-up (Rumuokoro, Port Harcourt)', 6, 1200, 900),
+  (380, 55, 'image', 'Front three-quarter', NULL, NULL, '/img/cars/toyota-corolla-white.jpg', NULL, '2018 Toyota Corolla S — front three-quarter (Choba, Port Harcourt)', 0, 1200, 900),
+  (381, 55, 'image', 'Interior', NULL, NULL, '/img/details/interior.jpg', NULL, '2018 Toyota Corolla S — interior (Choba, Port Harcourt)', 1, 1200, 900),
+  (382, 55, 'image', 'Dashboard', NULL, NULL, '/img/details/dashboard.jpg', NULL, '2018 Toyota Corolla S — dashboard (Choba, Port Harcourt)', 2, 1200, 900),
+  (383, 55, 'image', 'Engine bay', NULL, NULL, '/img/details/engine-bay.jpg', NULL, '2018 Toyota Corolla S — engine bay (Choba, Port Harcourt)', 3, 1200, 900),
+  (384, 55, 'image', 'Tyres & tread', NULL, NULL, '/img/details/tyres.jpg', NULL, '2018 Toyota Corolla S — tyres & tread (Choba, Port Harcourt)', 4, 1200, 900),
+  (385, 55, 'image', 'Boot', NULL, NULL, '/img/details/boot.jpg', NULL, '2018 Toyota Corolla S — boot (Choba, Port Harcourt)', 5, 1200, 900),
+  (386, 55, 'image', 'Odometer close-up', NULL, NULL, '/img/details/odometer.jpg', NULL, '2018 Toyota Corolla S — odometer close-up (Choba, Port Harcourt)', 6, 1200, 900),
+  (387, 56, 'image', 'Front three-quarter', NULL, NULL, '/img/cars/honda-crv-silver.jpg', NULL, '2015 Honda CR-V LX — front three-quarter (Rukpokwu, Port Harcourt)', 0, 1200, 900),
+  (388, 56, 'image', 'Interior', NULL, NULL, '/img/details/interior.jpg', NULL, '2015 Honda CR-V LX — interior (Rukpokwu, Port Harcourt)', 1, 1200, 900),
+  (389, 56, 'image', 'Dashboard', NULL, NULL, '/img/details/dashboard.jpg', NULL, '2015 Honda CR-V LX — dashboard (Rukpokwu, Port Harcourt)', 2, 1200, 900),
+  (390, 56, 'image', 'Engine bay', NULL, NULL, '/img/details/engine-bay.jpg', NULL, '2015 Honda CR-V LX — engine bay (Rukpokwu, Port Harcourt)', 3, 1200, 900),
+  (391, 56, 'image', 'Tyres & tread', NULL, NULL, '/img/details/tyres.jpg', NULL, '2015 Honda CR-V LX — tyres & tread (Rukpokwu, Port Harcourt)', 4, 1200, 900),
+  (392, 56, 'image', 'Boot', NULL, NULL, '/img/details/boot.jpg', NULL, '2015 Honda CR-V LX — boot (Rukpokwu, Port Harcourt)', 5, 1200, 900),
+  (393, 56, 'image', 'Odometer close-up', NULL, NULL, '/img/details/odometer.jpg', NULL, '2015 Honda CR-V LX — odometer close-up (Rukpokwu, Port Harcourt)', 6, 1200, 900),
+  (394, 57, 'image', 'Front three-quarter', NULL, NULL, '/img/cars/toyota-rav4-silver.jpg', NULL, '2014 Toyota RAV4 LE — front three-quarter (Woji, Port Harcourt)', 0, 1200, 900),
+  (395, 57, 'image', 'Interior', NULL, NULL, '/img/details/interior.jpg', NULL, '2014 Toyota RAV4 LE — interior (Woji, Port Harcourt)', 1, 1200, 900),
+  (396, 57, 'image', 'Dashboard', NULL, NULL, '/img/details/dashboard.jpg', NULL, '2014 Toyota RAV4 LE — dashboard (Woji, Port Harcourt)', 2, 1200, 900),
+  (397, 57, 'image', 'Engine bay', NULL, NULL, '/img/details/engine-bay.jpg', NULL, '2014 Toyota RAV4 LE — engine bay (Woji, Port Harcourt)', 3, 1200, 900),
+  (398, 57, 'image', 'Tyres & tread', NULL, NULL, '/img/details/tyres.jpg', NULL, '2014 Toyota RAV4 LE — tyres & tread (Woji, Port Harcourt)', 4, 1200, 900),
+  (399, 57, 'image', 'Boot', NULL, NULL, '/img/details/boot.jpg', NULL, '2014 Toyota RAV4 LE — boot (Woji, Port Harcourt)', 5, 1200, 900),
+  (400, 57, 'image', 'Odometer close-up', NULL, NULL, '/img/details/odometer.jpg', NULL, '2014 Toyota RAV4 LE — odometer close-up (Woji, Port Harcourt)', 6, 1200, 900);
+INSERT INTO listing_media (`id`, `listing_id`, `type`, `shot_label`, `duration_seconds`, `size_bytes`, `url`, `poster_url`, `alt_text`, `position`, `width`, `height`) VALUES
+  (401, 58, 'image', 'Front three-quarter', NULL, NULL, '/img/cars/ford-explorer-blue.jpg', NULL, '2016 Kia Sportage LX — front three-quarter (Eliozu, Port Harcourt)', 0, 1200, 900),
+  (402, 58, 'image', 'Interior', NULL, NULL, '/img/details/interior.jpg', NULL, '2016 Kia Sportage LX — interior (Eliozu, Port Harcourt)', 1, 1200, 900),
+  (403, 58, 'image', 'Dashboard', NULL, NULL, '/img/details/dashboard.jpg', NULL, '2016 Kia Sportage LX — dashboard (Eliozu, Port Harcourt)', 2, 1200, 900),
+  (404, 58, 'image', 'Engine bay', NULL, NULL, '/img/details/engine-bay.jpg', NULL, '2016 Kia Sportage LX — engine bay (Eliozu, Port Harcourt)', 3, 1200, 900),
+  (405, 58, 'image', 'Tyres & tread', NULL, NULL, '/img/details/tyres.jpg', NULL, '2016 Kia Sportage LX — tyres & tread (Eliozu, Port Harcourt)', 4, 1200, 900),
+  (406, 58, 'image', 'Boot', NULL, NULL, '/img/details/boot.jpg', NULL, '2016 Kia Sportage LX — boot (Eliozu, Port Harcourt)', 5, 1200, 900),
+  (407, 58, 'image', 'Odometer close-up', NULL, NULL, '/img/details/odometer.jpg', NULL, '2016 Kia Sportage LX — odometer close-up (Eliozu, Port Harcourt)', 6, 1200, 900),
+  (408, 59, 'image', 'Front three-quarter', NULL, NULL, '/img/cars/nissan-xtrail-grey.jpg', NULL, '2015 Nissan X-Trail SV — front three-quarter (Eliozu, Port Harcourt)', 0, 1200, 900),
+  (409, 59, 'image', 'Interior', NULL, NULL, '/img/details/interior.jpg', NULL, '2015 Nissan X-Trail SV — interior (Eliozu, Port Harcourt)', 1, 1200, 900),
+  (410, 59, 'image', 'Dashboard', NULL, NULL, '/img/details/dashboard.jpg', NULL, '2015 Nissan X-Trail SV — dashboard (Eliozu, Port Harcourt)', 2, 1200, 900),
+  (411, 59, 'image', 'Engine bay', NULL, NULL, '/img/details/engine-bay.jpg', NULL, '2015 Nissan X-Trail SV — engine bay (Eliozu, Port Harcourt)', 3, 1200, 900),
+  (412, 59, 'image', 'Tyres & tread', NULL, NULL, '/img/details/tyres.jpg', NULL, '2015 Nissan X-Trail SV — tyres & tread (Eliozu, Port Harcourt)', 4, 1200, 900),
+  (413, 59, 'image', 'Boot', NULL, NULL, '/img/details/boot.jpg', NULL, '2015 Nissan X-Trail SV — boot (Eliozu, Port Harcourt)', 5, 1200, 900),
+  (414, 59, 'image', 'Odometer close-up', NULL, NULL, '/img/details/odometer.jpg', NULL, '2015 Nissan X-Trail SV — odometer close-up (Eliozu, Port Harcourt)', 6, 1200, 900),
+  (415, 60, 'image', 'Front three-quarter', NULL, NULL, '/img/cars/toyota-camry-silver.jpg', NULL, '2014 Toyota Camry SE — front three-quarter (Elelenwo, Port Harcourt)', 0, 1200, 900),
+  (416, 60, 'image', 'Interior', NULL, NULL, '/img/details/interior.jpg', NULL, '2014 Toyota Camry SE — interior (Elelenwo, Port Harcourt)', 1, 1200, 900),
+  (417, 60, 'image', 'Dashboard', NULL, NULL, '/img/details/dashboard.jpg', NULL, '2014 Toyota Camry SE — dashboard (Elelenwo, Port Harcourt)', 2, 1200, 900),
+  (418, 60, 'image', 'Engine bay', NULL, NULL, '/img/details/engine-bay.jpg', NULL, '2014 Toyota Camry SE — engine bay (Elelenwo, Port Harcourt)', 3, 1200, 900),
+  (419, 60, 'image', 'Tyres & tread', NULL, NULL, '/img/details/tyres.jpg', NULL, '2014 Toyota Camry SE — tyres & tread (Elelenwo, Port Harcourt)', 4, 1200, 900),
+  (420, 60, 'image', 'Boot', NULL, NULL, '/img/details/boot.jpg', NULL, '2014 Toyota Camry SE — boot (Elelenwo, Port Harcourt)', 5, 1200, 900),
+  (421, 60, 'image', 'Odometer close-up', NULL, NULL, '/img/details/odometer.jpg', NULL, '2014 Toyota Camry SE — odometer close-up (Elelenwo, Port Harcourt)', 6, 1200, 900),
+  (422, 61, 'image', 'Front three-quarter', NULL, NULL, '/img/cars/toyota-corolla-white.jpg', NULL, '2015 Toyota Corolla S — front three-quarter (Choba, Port Harcourt)', 0, 1200, 900),
+  (423, 61, 'image', 'Interior', NULL, NULL, '/img/details/interior.jpg', NULL, '2015 Toyota Corolla S — interior (Choba, Port Harcourt)', 1, 1200, 900),
+  (424, 61, 'image', 'Dashboard', NULL, NULL, '/img/details/dashboard.jpg', NULL, '2015 Toyota Corolla S — dashboard (Choba, Port Harcourt)', 2, 1200, 900),
+  (425, 61, 'image', 'Engine bay', NULL, NULL, '/img/details/engine-bay.jpg', NULL, '2015 Toyota Corolla S — engine bay (Choba, Port Harcourt)', 3, 1200, 900),
+  (426, 61, 'image', 'Tyres & tread', NULL, NULL, '/img/details/tyres.jpg', NULL, '2015 Toyota Corolla S — tyres & tread (Choba, Port Harcourt)', 4, 1200, 900),
+  (427, 61, 'image', 'Boot', NULL, NULL, '/img/details/boot.jpg', NULL, '2015 Toyota Corolla S — boot (Choba, Port Harcourt)', 5, 1200, 900),
+  (428, 61, 'image', 'Odometer close-up', NULL, NULL, '/img/details/odometer.jpg', NULL, '2015 Toyota Corolla S — odometer close-up (Choba, Port Harcourt)', 6, 1200, 900),
+  (429, 62, 'image', 'Front three-quarter', NULL, NULL, '/img/cars/honda-crv-silver.jpg', NULL, '2015 Honda CR-V EX — front three-quarter (Peter Odili Road, Port Harcourt)', 0, 1200, 900),
+  (430, 62, 'image', 'Interior', NULL, NULL, '/img/details/interior.jpg', NULL, '2015 Honda CR-V EX — interior (Peter Odili Road, Port Harcourt)', 1, 1200, 900),
+  (431, 62, 'image', 'Dashboard', NULL, NULL, '/img/details/dashboard.jpg', NULL, '2015 Honda CR-V EX — dashboard (Peter Odili Road, Port Harcourt)', 2, 1200, 900),
+  (432, 62, 'image', 'Engine bay', NULL, NULL, '/img/details/engine-bay.jpg', NULL, '2015 Honda CR-V EX — engine bay (Peter Odili Road, Port Harcourt)', 3, 1200, 900),
+  (433, 62, 'image', 'Tyres & tread', NULL, NULL, '/img/details/tyres.jpg', NULL, '2015 Honda CR-V EX — tyres & tread (Peter Odili Road, Port Harcourt)', 4, 1200, 900),
+  (434, 62, 'image', 'Boot', NULL, NULL, '/img/details/boot.jpg', NULL, '2015 Honda CR-V EX — boot (Peter Odili Road, Port Harcourt)', 5, 1200, 900),
+  (435, 62, 'image', 'Odometer close-up', NULL, NULL, '/img/details/odometer.jpg', NULL, '2015 Honda CR-V EX — odometer close-up (Peter Odili Road, Port Harcourt)', 6, 1200, 900),
+  (436, 63, 'image', 'Front three-quarter', NULL, NULL, '/img/cars/toyota-rav4-silver.jpg', NULL, '2014 Toyota RAV4 LE — front three-quarter (Eliozu, Port Harcourt)', 0, 1200, 900),
+  (437, 63, 'image', 'Interior', NULL, NULL, '/img/details/interior.jpg', NULL, '2014 Toyota RAV4 LE — interior (Eliozu, Port Harcourt)', 1, 1200, 900),
+  (438, 63, 'image', 'Dashboard', NULL, NULL, '/img/details/dashboard.jpg', NULL, '2014 Toyota RAV4 LE — dashboard (Eliozu, Port Harcourt)', 2, 1200, 900),
+  (439, 63, 'image', 'Engine bay', NULL, NULL, '/img/details/engine-bay.jpg', NULL, '2014 Toyota RAV4 LE — engine bay (Eliozu, Port Harcourt)', 3, 1200, 900),
+  (440, 63, 'image', 'Tyres & tread', NULL, NULL, '/img/details/tyres.jpg', NULL, '2014 Toyota RAV4 LE — tyres & tread (Eliozu, Port Harcourt)', 4, 1200, 900);
+INSERT INTO listing_media (`id`, `listing_id`, `type`, `shot_label`, `duration_seconds`, `size_bytes`, `url`, `poster_url`, `alt_text`, `position`, `width`, `height`) VALUES
+  (441, 63, 'image', 'Boot', NULL, NULL, '/img/details/boot.jpg', NULL, '2014 Toyota RAV4 LE — boot (Eliozu, Port Harcourt)', 5, 1200, 900),
+  (442, 63, 'image', 'Odometer close-up', NULL, NULL, '/img/details/odometer.jpg', NULL, '2014 Toyota RAV4 LE — odometer close-up (Eliozu, Port Harcourt)', 6, 1200, 900),
+  (443, 64, 'image', 'Front three-quarter', NULL, NULL, '/img/cars/ford-explorer-blue.jpg', NULL, '2017 Kia Sportage EX — front three-quarter (Ada George, Port Harcourt)', 0, 1200, 900),
+  (444, 64, 'image', 'Interior', NULL, NULL, '/img/details/interior.jpg', NULL, '2017 Kia Sportage EX — interior (Ada George, Port Harcourt)', 1, 1200, 900),
+  (445, 64, 'image', 'Dashboard', NULL, NULL, '/img/details/dashboard.jpg', NULL, '2017 Kia Sportage EX — dashboard (Ada George, Port Harcourt)', 2, 1200, 900),
+  (446, 64, 'image', 'Engine bay', NULL, NULL, '/img/details/engine-bay.jpg', NULL, '2017 Kia Sportage EX — engine bay (Ada George, Port Harcourt)', 3, 1200, 900),
+  (447, 64, 'image', 'Tyres & tread', NULL, NULL, '/img/details/tyres.jpg', NULL, '2017 Kia Sportage EX — tyres & tread (Ada George, Port Harcourt)', 4, 1200, 900),
+  (448, 64, 'image', 'Boot', NULL, NULL, '/img/details/boot.jpg', NULL, '2017 Kia Sportage EX — boot (Ada George, Port Harcourt)', 5, 1200, 900),
+  (449, 64, 'image', 'Odometer close-up', NULL, NULL, '/img/details/odometer.jpg', NULL, '2017 Kia Sportage EX — odometer close-up (Ada George, Port Harcourt)', 6, 1200, 900),
+  (450, 65, 'image', 'Front three-quarter', NULL, NULL, '/img/cars/nissan-xtrail-grey.jpg', NULL, '2015 Nissan X-Trail SV — front three-quarter (Woji, Port Harcourt)', 0, 1200, 900),
+  (451, 65, 'image', 'Interior', NULL, NULL, '/img/details/interior.jpg', NULL, '2015 Nissan X-Trail SV — interior (Woji, Port Harcourt)', 1, 1200, 900),
+  (452, 65, 'image', 'Dashboard', NULL, NULL, '/img/details/dashboard.jpg', NULL, '2015 Nissan X-Trail SV — dashboard (Woji, Port Harcourt)', 2, 1200, 900),
+  (453, 65, 'image', 'Engine bay', NULL, NULL, '/img/details/engine-bay.jpg', NULL, '2015 Nissan X-Trail SV — engine bay (Woji, Port Harcourt)', 3, 1200, 900),
+  (454, 65, 'image', 'Tyres & tread', NULL, NULL, '/img/details/tyres.jpg', NULL, '2015 Nissan X-Trail SV — tyres & tread (Woji, Port Harcourt)', 4, 1200, 900),
+  (455, 65, 'image', 'Boot', NULL, NULL, '/img/details/boot.jpg', NULL, '2015 Nissan X-Trail SV — boot (Woji, Port Harcourt)', 5, 1200, 900),
+  (456, 65, 'image', 'Odometer close-up', NULL, NULL, '/img/details/odometer.jpg', NULL, '2015 Nissan X-Trail SV — odometer close-up (Woji, Port Harcourt)', 6, 1200, 900),
+  (457, 66, 'image', 'Front three-quarter', NULL, NULL, '/img/cars/toyota-camry-silver.jpg', NULL, '2017 Toyota Camry SE — front three-quarter (Rumuola, Port Harcourt)', 0, 1200, 900),
+  (458, 66, 'image', 'Interior', NULL, NULL, '/img/details/interior.jpg', NULL, '2017 Toyota Camry SE — interior (Rumuola, Port Harcourt)', 1, 1200, 900),
+  (459, 66, 'image', 'Dashboard', NULL, NULL, '/img/details/dashboard.jpg', NULL, '2017 Toyota Camry SE — dashboard (Rumuola, Port Harcourt)', 2, 1200, 900),
+  (460, 66, 'image', 'Engine bay', NULL, NULL, '/img/details/engine-bay.jpg', NULL, '2017 Toyota Camry SE — engine bay (Rumuola, Port Harcourt)', 3, 1200, 900),
+  (461, 66, 'image', 'Tyres & tread', NULL, NULL, '/img/details/tyres.jpg', NULL, '2017 Toyota Camry SE — tyres & tread (Rumuola, Port Harcourt)', 4, 1200, 900),
+  (462, 66, 'image', 'Boot', NULL, NULL, '/img/details/boot.jpg', NULL, '2017 Toyota Camry SE — boot (Rumuola, Port Harcourt)', 5, 1200, 900),
+  (463, 66, 'image', 'Odometer close-up', NULL, NULL, '/img/details/odometer.jpg', NULL, '2017 Toyota Camry SE — odometer close-up (Rumuola, Port Harcourt)', 6, 1200, 900),
+  (464, 67, 'image', 'Front three-quarter', NULL, NULL, '/img/cars/toyota-corolla-white.jpg', NULL, '2014 Toyota Corolla LE — front three-quarter (Choba, Port Harcourt)', 0, 1200, 900),
+  (465, 67, 'image', 'Interior', NULL, NULL, '/img/details/interior.jpg', NULL, '2014 Toyota Corolla LE — interior (Choba, Port Harcourt)', 1, 1200, 900),
+  (466, 67, 'image', 'Dashboard', NULL, NULL, '/img/details/dashboard.jpg', NULL, '2014 Toyota Corolla LE — dashboard (Choba, Port Harcourt)', 2, 1200, 900),
+  (467, 67, 'image', 'Engine bay', NULL, NULL, '/img/details/engine-bay.jpg', NULL, '2014 Toyota Corolla LE — engine bay (Choba, Port Harcourt)', 3, 1200, 900),
+  (468, 67, 'image', 'Tyres & tread', NULL, NULL, '/img/details/tyres.jpg', NULL, '2014 Toyota Corolla LE — tyres & tread (Choba, Port Harcourt)', 4, 1200, 900),
+  (469, 67, 'image', 'Boot', NULL, NULL, '/img/details/boot.jpg', NULL, '2014 Toyota Corolla LE — boot (Choba, Port Harcourt)', 5, 1200, 900),
+  (470, 67, 'image', 'Odometer close-up', NULL, NULL, '/img/details/odometer.jpg', NULL, '2014 Toyota Corolla LE — odometer close-up (Choba, Port Harcourt)', 6, 1200, 900),
+  (471, 68, 'image', 'Front three-quarter', NULL, NULL, '/img/cars/honda-crv-silver.jpg', NULL, '2015 Honda CR-V EX — front three-quarter (Trans-Amadi, Port Harcourt)', 0, 1200, 900),
+  (472, 68, 'image', 'Interior', NULL, NULL, '/img/details/interior.jpg', NULL, '2015 Honda CR-V EX — interior (Trans-Amadi, Port Harcourt)', 1, 1200, 900),
+  (473, 68, 'image', 'Dashboard', NULL, NULL, '/img/details/dashboard.jpg', NULL, '2015 Honda CR-V EX — dashboard (Trans-Amadi, Port Harcourt)', 2, 1200, 900),
+  (474, 68, 'image', 'Engine bay', NULL, NULL, '/img/details/engine-bay.jpg', NULL, '2015 Honda CR-V EX — engine bay (Trans-Amadi, Port Harcourt)', 3, 1200, 900),
+  (475, 68, 'image', 'Tyres & tread', NULL, NULL, '/img/details/tyres.jpg', NULL, '2015 Honda CR-V EX — tyres & tread (Trans-Amadi, Port Harcourt)', 4, 1200, 900),
+  (476, 68, 'image', 'Boot', NULL, NULL, '/img/details/boot.jpg', NULL, '2015 Honda CR-V EX — boot (Trans-Amadi, Port Harcourt)', 5, 1200, 900),
+  (477, 68, 'image', 'Odometer close-up', NULL, NULL, '/img/details/odometer.jpg', NULL, '2015 Honda CR-V EX — odometer close-up (Trans-Amadi, Port Harcourt)', 6, 1200, 900),
+  (478, 68, 'video', 'Walkaround video', 10, 215501, '/video/flood-damage-check.mp4', '/video/flood-damage-check-poster.jpg', '2015 Honda CR-V walkaround — video, 10 seconds', 99, 960, 540),
+  (479, 69, 'image', 'Front three-quarter', NULL, NULL, '/img/cars/toyota-rav4-silver.jpg', NULL, '2012 Toyota RAV4 XLE — front three-quarter (Eliozu, Port Harcourt)', 0, 1200, 900),
+  (480, 69, 'image', 'Interior', NULL, NULL, '/img/details/interior.jpg', NULL, '2012 Toyota RAV4 XLE — interior (Eliozu, Port Harcourt)', 1, 1200, 900);
+INSERT INTO listing_media (`id`, `listing_id`, `type`, `shot_label`, `duration_seconds`, `size_bytes`, `url`, `poster_url`, `alt_text`, `position`, `width`, `height`) VALUES
+  (481, 69, 'image', 'Dashboard', NULL, NULL, '/img/details/dashboard.jpg', NULL, '2012 Toyota RAV4 XLE — dashboard (Eliozu, Port Harcourt)', 2, 1200, 900),
+  (482, 69, 'image', 'Engine bay', NULL, NULL, '/img/details/engine-bay.jpg', NULL, '2012 Toyota RAV4 XLE — engine bay (Eliozu, Port Harcourt)', 3, 1200, 900),
+  (483, 69, 'image', 'Tyres & tread', NULL, NULL, '/img/details/tyres.jpg', NULL, '2012 Toyota RAV4 XLE — tyres & tread (Eliozu, Port Harcourt)', 4, 1200, 900),
+  (484, 69, 'image', 'Boot', NULL, NULL, '/img/details/boot.jpg', NULL, '2012 Toyota RAV4 XLE — boot (Eliozu, Port Harcourt)', 5, 1200, 900),
+  (485, 69, 'image', 'Odometer close-up', NULL, NULL, '/img/details/odometer.jpg', NULL, '2012 Toyota RAV4 XLE — odometer close-up (Eliozu, Port Harcourt)', 6, 1200, 900),
+  (486, 70, 'image', 'Front three-quarter', NULL, NULL, '/img/cars/ford-explorer-blue.jpg', NULL, '2015 Kia Sportage EX — front three-quarter (Choba, Port Harcourt)', 0, 1200, 900),
+  (487, 70, 'image', 'Interior', NULL, NULL, '/img/details/interior.jpg', NULL, '2015 Kia Sportage EX — interior (Choba, Port Harcourt)', 1, 1200, 900),
+  (488, 70, 'image', 'Dashboard', NULL, NULL, '/img/details/dashboard.jpg', NULL, '2015 Kia Sportage EX — dashboard (Choba, Port Harcourt)', 2, 1200, 900),
+  (489, 70, 'image', 'Engine bay', NULL, NULL, '/img/details/engine-bay.jpg', NULL, '2015 Kia Sportage EX — engine bay (Choba, Port Harcourt)', 3, 1200, 900),
+  (490, 70, 'image', 'Tyres & tread', NULL, NULL, '/img/details/tyres.jpg', NULL, '2015 Kia Sportage EX — tyres & tread (Choba, Port Harcourt)', 4, 1200, 900),
+  (491, 70, 'image', 'Boot', NULL, NULL, '/img/details/boot.jpg', NULL, '2015 Kia Sportage EX — boot (Choba, Port Harcourt)', 5, 1200, 900),
+  (492, 70, 'image', 'Odometer close-up', NULL, NULL, '/img/details/odometer.jpg', NULL, '2015 Kia Sportage EX — odometer close-up (Choba, Port Harcourt)', 6, 1200, 900),
+  (493, 71, 'image', 'Front three-quarter', NULL, NULL, '/img/cars/nissan-xtrail-grey.jpg', NULL, '2016 Nissan X-Trail SV — front three-quarter (Eliozu, Port Harcourt)', 0, 1200, 900),
+  (494, 71, 'image', 'Interior', NULL, NULL, '/img/details/interior.jpg', NULL, '2016 Nissan X-Trail SV — interior (Eliozu, Port Harcourt)', 1, 1200, 900),
+  (495, 71, 'image', 'Dashboard', NULL, NULL, '/img/details/dashboard.jpg', NULL, '2016 Nissan X-Trail SV — dashboard (Eliozu, Port Harcourt)', 2, 1200, 900),
+  (496, 71, 'image', 'Engine bay', NULL, NULL, '/img/details/engine-bay.jpg', NULL, '2016 Nissan X-Trail SV — engine bay (Eliozu, Port Harcourt)', 3, 1200, 900),
+  (497, 71, 'image', 'Tyres & tread', NULL, NULL, '/img/details/tyres.jpg', NULL, '2016 Nissan X-Trail SV — tyres & tread (Eliozu, Port Harcourt)', 4, 1200, 900),
+  (498, 71, 'image', 'Boot', NULL, NULL, '/img/details/boot.jpg', NULL, '2016 Nissan X-Trail SV — boot (Eliozu, Port Harcourt)', 5, 1200, 900),
+  (499, 71, 'image', 'Odometer close-up', NULL, NULL, '/img/details/odometer.jpg', NULL, '2016 Nissan X-Trail SV — odometer close-up (Eliozu, Port Harcourt)', 6, 1200, 900),
+  (500, 72, 'image', 'Front three-quarter', NULL, NULL, '/img/cars/toyota-camry-silver.jpg', NULL, '2015 Toyota Camry XLE — front three-quarter (Eliozu, Port Harcourt)', 0, 1200, 900),
+  (501, 72, 'image', 'Interior', NULL, NULL, '/img/details/interior.jpg', NULL, '2015 Toyota Camry XLE — interior (Eliozu, Port Harcourt)', 1, 1200, 900),
+  (502, 72, 'image', 'Dashboard', NULL, NULL, '/img/details/dashboard.jpg', NULL, '2015 Toyota Camry XLE — dashboard (Eliozu, Port Harcourt)', 2, 1200, 900),
+  (503, 72, 'image', 'Engine bay', NULL, NULL, '/img/details/engine-bay.jpg', NULL, '2015 Toyota Camry XLE — engine bay (Eliozu, Port Harcourt)', 3, 1200, 900),
+  (504, 72, 'image', 'Tyres & tread', NULL, NULL, '/img/details/tyres.jpg', NULL, '2015 Toyota Camry XLE — tyres & tread (Eliozu, Port Harcourt)', 4, 1200, 900),
+  (505, 72, 'image', 'Boot', NULL, NULL, '/img/details/boot.jpg', NULL, '2015 Toyota Camry XLE — boot (Eliozu, Port Harcourt)', 5, 1200, 900),
+  (506, 72, 'image', 'Odometer close-up', NULL, NULL, '/img/details/odometer.jpg', NULL, '2015 Toyota Camry XLE — odometer close-up (Eliozu, Port Harcourt)', 6, 1200, 900),
+  (507, 73, 'image', 'Front three-quarter', NULL, NULL, '/img/cars/toyota-corolla-white.jpg', NULL, '2014 Toyota Corolla LE — front three-quarter (GRA Phase 2, Port Harcourt)', 0, 1200, 900),
+  (508, 73, 'image', 'Interior', NULL, NULL, '/img/details/interior.jpg', NULL, '2014 Toyota Corolla LE — interior (GRA Phase 2, Port Harcourt)', 1, 1200, 900),
+  (509, 73, 'image', 'Dashboard', NULL, NULL, '/img/details/dashboard.jpg', NULL, '2014 Toyota Corolla LE — dashboard (GRA Phase 2, Port Harcourt)', 2, 1200, 900),
+  (510, 73, 'image', 'Engine bay', NULL, NULL, '/img/details/engine-bay.jpg', NULL, '2014 Toyota Corolla LE — engine bay (GRA Phase 2, Port Harcourt)', 3, 1200, 900),
+  (511, 73, 'image', 'Tyres & tread', NULL, NULL, '/img/details/tyres.jpg', NULL, '2014 Toyota Corolla LE — tyres & tread (GRA Phase 2, Port Harcourt)', 4, 1200, 900),
+  (512, 73, 'image', 'Boot', NULL, NULL, '/img/details/boot.jpg', NULL, '2014 Toyota Corolla LE — boot (GRA Phase 2, Port Harcourt)', 5, 1200, 900),
+  (513, 73, 'image', 'Odometer close-up', NULL, NULL, '/img/details/odometer.jpg', NULL, '2014 Toyota Corolla LE — odometer close-up (GRA Phase 2, Port Harcourt)', 6, 1200, 900),
+  (514, 74, 'image', 'Front three-quarter', NULL, NULL, '/img/cars/honda-crv-silver.jpg', NULL, '2016 Honda CR-V EX — front three-quarter (Eliozu, Port Harcourt)', 0, 1200, 900),
+  (515, 74, 'image', 'Interior', NULL, NULL, '/img/details/interior.jpg', NULL, '2016 Honda CR-V EX — interior (Eliozu, Port Harcourt)', 1, 1200, 900),
+  (516, 74, 'image', 'Dashboard', NULL, NULL, '/img/details/dashboard.jpg', NULL, '2016 Honda CR-V EX — dashboard (Eliozu, Port Harcourt)', 2, 1200, 900),
+  (517, 74, 'image', 'Engine bay', NULL, NULL, '/img/details/engine-bay.jpg', NULL, '2016 Honda CR-V EX — engine bay (Eliozu, Port Harcourt)', 3, 1200, 900),
+  (518, 74, 'image', 'Tyres & tread', NULL, NULL, '/img/details/tyres.jpg', NULL, '2016 Honda CR-V EX — tyres & tread (Eliozu, Port Harcourt)', 4, 1200, 900),
+  (519, 74, 'image', 'Boot', NULL, NULL, '/img/details/boot.jpg', NULL, '2016 Honda CR-V EX — boot (Eliozu, Port Harcourt)', 5, 1200, 900),
+  (520, 74, 'image', 'Odometer close-up', NULL, NULL, '/img/details/odometer.jpg', NULL, '2016 Honda CR-V EX — odometer close-up (Eliozu, Port Harcourt)', 6, 1200, 900);
+INSERT INTO listing_media (`id`, `listing_id`, `type`, `shot_label`, `duration_seconds`, `size_bytes`, `url`, `poster_url`, `alt_text`, `position`, `width`, `height`) VALUES
+  (521, 75, 'image', 'Front three-quarter', NULL, NULL, '/img/cars/toyota-rav4-silver.jpg', NULL, '2014 Toyota RAV4 LE — front three-quarter (Peter Odili Road, Port Harcourt)', 0, 1200, 900),
+  (522, 75, 'image', 'Interior', NULL, NULL, '/img/details/interior.jpg', NULL, '2014 Toyota RAV4 LE — interior (Peter Odili Road, Port Harcourt)', 1, 1200, 900),
+  (523, 75, 'image', 'Dashboard', NULL, NULL, '/img/details/dashboard.jpg', NULL, '2014 Toyota RAV4 LE — dashboard (Peter Odili Road, Port Harcourt)', 2, 1200, 900),
+  (524, 75, 'image', 'Engine bay', NULL, NULL, '/img/details/engine-bay.jpg', NULL, '2014 Toyota RAV4 LE — engine bay (Peter Odili Road, Port Harcourt)', 3, 1200, 900),
+  (525, 75, 'image', 'Tyres & tread', NULL, NULL, '/img/details/tyres.jpg', NULL, '2014 Toyota RAV4 LE — tyres & tread (Peter Odili Road, Port Harcourt)', 4, 1200, 900),
+  (526, 75, 'image', 'Boot', NULL, NULL, '/img/details/boot.jpg', NULL, '2014 Toyota RAV4 LE — boot (Peter Odili Road, Port Harcourt)', 5, 1200, 900),
+  (527, 75, 'image', 'Odometer close-up', NULL, NULL, '/img/details/odometer.jpg', NULL, '2014 Toyota RAV4 LE — odometer close-up (Peter Odili Road, Port Harcourt)', 6, 1200, 900),
+  (528, 76, 'image', 'Front three-quarter', NULL, NULL, '/img/cars/ford-explorer-blue.jpg', NULL, '2015 Kia Sportage EX — front three-quarter (Eliozu, Port Harcourt)', 0, 1200, 900),
+  (529, 76, 'image', 'Interior', NULL, NULL, '/img/details/interior.jpg', NULL, '2015 Kia Sportage EX — interior (Eliozu, Port Harcourt)', 1, 1200, 900),
+  (530, 76, 'image', 'Dashboard', NULL, NULL, '/img/details/dashboard.jpg', NULL, '2015 Kia Sportage EX — dashboard (Eliozu, Port Harcourt)', 2, 1200, 900),
+  (531, 76, 'image', 'Engine bay', NULL, NULL, '/img/details/engine-bay.jpg', NULL, '2015 Kia Sportage EX — engine bay (Eliozu, Port Harcourt)', 3, 1200, 900),
+  (532, 76, 'image', 'Tyres & tread', NULL, NULL, '/img/details/tyres.jpg', NULL, '2015 Kia Sportage EX — tyres & tread (Eliozu, Port Harcourt)', 4, 1200, 900),
+  (533, 76, 'image', 'Boot', NULL, NULL, '/img/details/boot.jpg', NULL, '2015 Kia Sportage EX — boot (Eliozu, Port Harcourt)', 5, 1200, 900),
+  (534, 76, 'image', 'Odometer close-up', NULL, NULL, '/img/details/odometer.jpg', NULL, '2015 Kia Sportage EX — odometer close-up (Eliozu, Port Harcourt)', 6, 1200, 900),
+  (535, 77, 'image', 'Front three-quarter', NULL, NULL, '/img/cars/nissan-xtrail-grey.jpg', NULL, '2017 Nissan X-Trail SV — front three-quarter (Rukpokwu, Port Harcourt)', 0, 1200, 900),
+  (536, 77, 'image', 'Interior', NULL, NULL, '/img/details/interior.jpg', NULL, '2017 Nissan X-Trail SV — interior (Rukpokwu, Port Harcourt)', 1, 1200, 900),
+  (537, 77, 'image', 'Dashboard', NULL, NULL, '/img/details/dashboard.jpg', NULL, '2017 Nissan X-Trail SV — dashboard (Rukpokwu, Port Harcourt)', 2, 1200, 900),
+  (538, 77, 'image', 'Engine bay', NULL, NULL, '/img/details/engine-bay.jpg', NULL, '2017 Nissan X-Trail SV — engine bay (Rukpokwu, Port Harcourt)', 3, 1200, 900),
+  (539, 77, 'image', 'Tyres & tread', NULL, NULL, '/img/details/tyres.jpg', NULL, '2017 Nissan X-Trail SV — tyres & tread (Rukpokwu, Port Harcourt)', 4, 1200, 900),
+  (540, 77, 'image', 'Boot', NULL, NULL, '/img/details/boot.jpg', NULL, '2017 Nissan X-Trail SV — boot (Rukpokwu, Port Harcourt)', 5, 1200, 900),
+  (541, 77, 'image', 'Odometer close-up', NULL, NULL, '/img/details/odometer.jpg', NULL, '2017 Nissan X-Trail SV — odometer close-up (Rukpokwu, Port Harcourt)', 6, 1200, 900),
+  (542, 78, 'image', 'Front three-quarter', NULL, NULL, '/img/cars/toyota-camry-silver.jpg', NULL, '2015 Toyota Camry LE — front three-quarter (Ada George, Port Harcourt)', 0, 1200, 900),
+  (543, 78, 'image', 'Interior', NULL, NULL, '/img/details/interior.jpg', NULL, '2015 Toyota Camry LE — interior (Ada George, Port Harcourt)', 1, 1200, 900),
+  (544, 78, 'image', 'Dashboard', NULL, NULL, '/img/details/dashboard.jpg', NULL, '2015 Toyota Camry LE — dashboard (Ada George, Port Harcourt)', 2, 1200, 900),
+  (545, 78, 'image', 'Engine bay', NULL, NULL, '/img/details/engine-bay.jpg', NULL, '2015 Toyota Camry LE — engine bay (Ada George, Port Harcourt)', 3, 1200, 900),
+  (546, 78, 'image', 'Tyres & tread', NULL, NULL, '/img/details/tyres.jpg', NULL, '2015 Toyota Camry LE — tyres & tread (Ada George, Port Harcourt)', 4, 1200, 900),
+  (547, 78, 'image', 'Boot', NULL, NULL, '/img/details/boot.jpg', NULL, '2015 Toyota Camry LE — boot (Ada George, Port Harcourt)', 5, 1200, 900),
+  (548, 78, 'image', 'Odometer close-up', NULL, NULL, '/img/details/odometer.jpg', NULL, '2015 Toyota Camry LE — odometer close-up (Ada George, Port Harcourt)', 6, 1200, 900),
+  (549, 79, 'image', 'Front three-quarter', NULL, NULL, '/img/cars/toyota-corolla-white.jpg', NULL, '2015 Toyota Corolla S — front three-quarter (Mgbuoba, Port Harcourt)', 0, 1200, 900),
+  (550, 79, 'image', 'Interior', NULL, NULL, '/img/details/interior.jpg', NULL, '2015 Toyota Corolla S — interior (Mgbuoba, Port Harcourt)', 1, 1200, 900),
+  (551, 79, 'image', 'Dashboard', NULL, NULL, '/img/details/dashboard.jpg', NULL, '2015 Toyota Corolla S — dashboard (Mgbuoba, Port Harcourt)', 2, 1200, 900),
+  (552, 79, 'image', 'Engine bay', NULL, NULL, '/img/details/engine-bay.jpg', NULL, '2015 Toyota Corolla S — engine bay (Mgbuoba, Port Harcourt)', 3, 1200, 900),
+  (553, 79, 'image', 'Tyres & tread', NULL, NULL, '/img/details/tyres.jpg', NULL, '2015 Toyota Corolla S — tyres & tread (Mgbuoba, Port Harcourt)', 4, 1200, 900),
+  (554, 79, 'image', 'Boot', NULL, NULL, '/img/details/boot.jpg', NULL, '2015 Toyota Corolla S — boot (Mgbuoba, Port Harcourt)', 5, 1200, 900),
+  (555, 79, 'image', 'Odometer close-up', NULL, NULL, '/img/details/odometer.jpg', NULL, '2015 Toyota Corolla S — odometer close-up (Mgbuoba, Port Harcourt)', 6, 1200, 900);
 
 
 -- price_bands: 84 rows
 INSERT INTO price_bands (`make`, `model`, `year_from`, `year_to`, `condition`, `band_min_kobo`, `band_max_kobo`, `sample_size`, `refreshed_at`) VALUES
-  ('Toyota', 'Camry', 2010, 2012, 'any', 650000000, 870000000, 24, '2026-10-04 14:42:34'),
-  ('Toyota', 'Camry', 2013, 2015, 'any', 968750000, 1188750000, 37, '2026-09-13 14:42:34'),
-  ('Toyota', 'Camry', 2016, 2018, 'any', 1287500000, 1507500000, 6, '2026-09-30 14:42:34'),
-  ('Toyota', 'Corolla', 2011, 2013, 'any', 700000000, 953000000, 40, '2026-09-30 14:42:34'),
-  ('Toyota', 'Corolla', 2014, 2016, 'any', 1066562500, 1319562500, 20, '2026-09-05 14:42:34'),
-  ('Toyota', 'Corolla', 2017, 2019, 'any', 1433125000, 1686125000, 18, '2026-09-09 14:42:34'),
-  ('Toyota', 'RAV4', 2010, 2012, 'any', 950000000, 1357000000, 34, '2026-09-05 14:42:34'),
-  ('Toyota', 'RAV4', 2013, 2015, 'any', 1474166667, 1881166667, 22, '2026-10-05 14:42:34'),
-  ('Toyota', 'RAV4', 2016, 2018, 'any', 1998333333, 2405333333, 10, '2026-09-11 14:42:34'),
-  ('Toyota', 'RAV4', 2019, 2019, 'any', 2522500000, 2929500000, 28, '2026-10-05 14:42:34'),
-  ('Toyota', 'Highlander', 2011, 2013, 'any', 1400000000, 1928000000, 16, '2026-09-04 14:42:34'),
-  ('Toyota', 'Highlander', 2014, 2016, 'any', 2274285714, 2802285714, 13, '2026-10-02 14:42:34'),
-  ('Toyota', 'Highlander', 2017, 2018, 'any', 3148571429, 3676571429, 30, '2026-10-05 14:42:34'),
-  ('Toyota', 'Hilux', 2014, 2016, 'any', 2000000000, 2572000000, 12, '2026-10-03 14:42:34'),
-  ('Toyota', 'Hilux', 2017, 2019, 'any', 3105000000, 3677000000, 37, '2026-10-01 14:42:34'),
-  ('Toyota', 'Hilux', 2020, 2020, 'any', 4210000000, 4782000000, 29, '2026-10-04 14:42:34'),
-  ('Toyota', 'Sienna', 2011, 2013, 'any', 1100000000, 1408000000, 34, '2026-10-01 14:42:34'),
-  ('Toyota', 'Sienna', 2014, 2016, 'any', 1610000000, 1918000000, 33, '2026-10-03 14:42:34'),
-  ('Toyota', 'Sienna', 2017, 2018, 'any', 2120000000, 2428000000, 39, '2026-10-01 14:42:34'),
-  ('Toyota', 'Prado', 2012, 2014, 'any', 3200000000, 4212000000, 32, '2026-10-04 14:42:34'),
-  ('Toyota', 'Prado', 2015, 2017, 'any', 4875714286, 5887714286, 15, '2026-10-03 14:42:34'),
-  ('Toyota', 'Prado', 2018, 2019, 'any', 6551428571, 7563428571, 14, '2026-09-11 14:42:34'),
-  ('Toyota', 'Avalon', 2012, 2014, 'any', 950000000, 1115000000, 12, '2026-10-04 14:42:34'),
-  ('Toyota', 'Avalon', 2015, 2017, 'any', 1332500000, 1497500000, 25, '2026-10-03 14:42:34'),
-  ('Honda', 'Accord', 2012, 2014, 'any', 750000000, 981000000, 12, '2026-09-08 14:42:34'),
-  ('Honda', 'Accord', 2015, 2017, 'any', 1196250000, 1427250000, 19, '2026-09-21 14:42:34'),
-  ('Honda', 'Accord', 2018, 2018, 'any', 1642500000, 1873500000, 21, '2026-10-04 14:42:34'),
-  ('Honda', 'CR-V', 2012, 2014, 'any', 900000000, 1230000000, 32, '2026-09-30 14:42:34'),
-  ('Honda', 'CR-V', 2015, 2017, 'any', 1446428571, 1776428571, 12, '2026-10-03 14:42:34'),
-  ('Honda', 'CR-V', 2018, 2019, 'any', 1992857143, 2322857143, 26, '2026-09-21 14:42:34'),
-  ('Honda', 'Civic', 2013, 2015, 'any', 700000000, 887000000, 6, '2026-10-03 14:42:34'),
-  ('Honda', 'Civic', 2016, 2018, 'any', 1061250000, 1248250000, 37, '2026-09-14 14:42:34'),
-  ('Honda', 'Civic', 2019, 2019, 'any', 1422500000, 1609500000, 28, '2026-09-14 14:42:34'),
-  ('Honda', 'Pilot', 2013, 2015, 'any', 1500000000, 1830000000, 11, '2026-10-02 14:42:34'),
-  ('Honda', 'Pilot', 2016, 2018, 'any', 2265000000, 2595000000, 30, '2026-09-30 14:42:34'),
-  ('Lexus', 'RX 350', 2012, 2014, 'any', 1700000000, 2162000000, 40, '2026-09-20 14:42:34'),
-  ('Lexus', 'RX 350', 2015, 2017, 'any', 2592500000, 3054500000, 16, '2026-09-25 14:42:34'),
-  ('Lexus', 'RX 350', 2018, 2018, 'any', 3485000000, 3947000000, 10, '2026-09-16 14:42:34'),
-  ('Lexus', 'ES 350', 2013, 2015, 'any', 1250000000, 1503000000, 6, '2026-10-04 14:42:34'),
-  ('Lexus', 'ES 350', 2016, 2018, 'any', 1836500000, 2089500000, 37, '2026-10-04 14:42:34');
+  ('Toyota', 'Camry', 2010, 2012, 'any', 650000000, 870000000, 24, '2026-10-05 17:07:46'),
+  ('Toyota', 'Camry', 2013, 2015, 'any', 968750000, 1188750000, 37, '2026-09-14 17:07:46'),
+  ('Toyota', 'Camry', 2016, 2018, 'any', 1287500000, 1507500000, 6, '2026-10-01 17:07:46'),
+  ('Toyota', 'Corolla', 2011, 2013, 'any', 700000000, 953000000, 40, '2026-10-01 17:07:46'),
+  ('Toyota', 'Corolla', 2014, 2016, 'any', 1066562500, 1319562500, 20, '2026-09-06 17:07:46'),
+  ('Toyota', 'Corolla', 2017, 2019, 'any', 1433125000, 1686125000, 18, '2026-09-10 17:07:46'),
+  ('Toyota', 'RAV4', 2010, 2012, 'any', 950000000, 1357000000, 34, '2026-09-06 17:07:46'),
+  ('Toyota', 'RAV4', 2013, 2015, 'any', 1474166667, 1881166667, 22, '2026-10-06 17:07:46'),
+  ('Toyota', 'RAV4', 2016, 2018, 'any', 1998333333, 2405333333, 10, '2026-09-12 17:07:46'),
+  ('Toyota', 'RAV4', 2019, 2019, 'any', 2522500000, 2929500000, 28, '2026-10-06 17:07:46'),
+  ('Toyota', 'Highlander', 2011, 2013, 'any', 1400000000, 1928000000, 16, '2026-09-05 17:07:46'),
+  ('Toyota', 'Highlander', 2014, 2016, 'any', 2274285714, 2802285714, 13, '2026-10-03 17:07:46'),
+  ('Toyota', 'Highlander', 2017, 2018, 'any', 3148571429, 3676571429, 30, '2026-10-06 17:07:46'),
+  ('Toyota', 'Hilux', 2014, 2016, 'any', 2000000000, 2572000000, 12, '2026-10-04 17:07:46'),
+  ('Toyota', 'Hilux', 2017, 2019, 'any', 3105000000, 3677000000, 37, '2026-10-02 17:07:46'),
+  ('Toyota', 'Hilux', 2020, 2020, 'any', 4210000000, 4782000000, 29, '2026-10-05 17:07:46'),
+  ('Toyota', 'Sienna', 2011, 2013, 'any', 1100000000, 1408000000, 34, '2026-10-02 17:07:46'),
+  ('Toyota', 'Sienna', 2014, 2016, 'any', 1610000000, 1918000000, 33, '2026-10-04 17:07:46'),
+  ('Toyota', 'Sienna', 2017, 2018, 'any', 2120000000, 2428000000, 39, '2026-10-02 17:07:46'),
+  ('Toyota', 'Prado', 2012, 2014, 'any', 3200000000, 4212000000, 32, '2026-10-05 17:07:46'),
+  ('Toyota', 'Prado', 2015, 2017, 'any', 4875714286, 5887714286, 15, '2026-10-04 17:07:46'),
+  ('Toyota', 'Prado', 2018, 2019, 'any', 6551428571, 7563428571, 14, '2026-09-12 17:07:46'),
+  ('Toyota', 'Avalon', 2012, 2014, 'any', 950000000, 1115000000, 12, '2026-10-05 17:07:46'),
+  ('Toyota', 'Avalon', 2015, 2017, 'any', 1332500000, 1497500000, 25, '2026-10-04 17:07:46'),
+  ('Honda', 'Accord', 2012, 2014, 'any', 750000000, 981000000, 12, '2026-09-09 17:07:46'),
+  ('Honda', 'Accord', 2015, 2017, 'any', 1196250000, 1427250000, 19, '2026-09-22 17:07:46'),
+  ('Honda', 'Accord', 2018, 2018, 'any', 1642500000, 1873500000, 21, '2026-10-05 17:07:46'),
+  ('Honda', 'CR-V', 2012, 2014, 'any', 900000000, 1230000000, 32, '2026-10-01 17:07:46'),
+  ('Honda', 'CR-V', 2015, 2017, 'any', 1446428571, 1776428571, 12, '2026-10-04 17:07:46'),
+  ('Honda', 'CR-V', 2018, 2019, 'any', 1992857143, 2322857143, 26, '2026-09-22 17:07:46'),
+  ('Honda', 'Civic', 2013, 2015, 'any', 700000000, 887000000, 6, '2026-10-04 17:07:46'),
+  ('Honda', 'Civic', 2016, 2018, 'any', 1061250000, 1248250000, 37, '2026-09-15 17:07:46'),
+  ('Honda', 'Civic', 2019, 2019, 'any', 1422500000, 1609500000, 28, '2026-09-15 17:07:46'),
+  ('Honda', 'Pilot', 2013, 2015, 'any', 1500000000, 1830000000, 11, '2026-10-03 17:07:46'),
+  ('Honda', 'Pilot', 2016, 2018, 'any', 2265000000, 2595000000, 30, '2026-10-01 17:07:46'),
+  ('Lexus', 'RX 350', 2012, 2014, 'any', 1700000000, 2162000000, 40, '2026-09-21 17:07:46'),
+  ('Lexus', 'RX 350', 2015, 2017, 'any', 2592500000, 3054500000, 16, '2026-09-26 17:07:46'),
+  ('Lexus', 'RX 350', 2018, 2018, 'any', 3485000000, 3947000000, 10, '2026-09-17 17:07:46'),
+  ('Lexus', 'ES 350', 2013, 2015, 'any', 1250000000, 1503000000, 6, '2026-10-05 17:07:46'),
+  ('Lexus', 'ES 350', 2016, 2018, 'any', 1836500000, 2089500000, 37, '2026-10-05 17:07:46');
 INSERT INTO price_bands (`make`, `model`, `year_from`, `year_to`, `condition`, `band_min_kobo`, `band_max_kobo`, `sample_size`, `refreshed_at`) VALUES
-  ('Lexus', 'GX 460', 2014, 2016, 'any', 2800000000, 3394000000, 20, '2026-10-01 14:42:34'),
-  ('Lexus', 'GX 460', 2017, 2019, 'any', 4177000000, 4771000000, 39, '2026-10-04 14:42:34'),
-  ('Mercedes-Benz', 'C-Class', 2013, 2015, 'any', 1100000000, 1430000000, 32, '2026-10-01 14:42:34'),
-  ('Mercedes-Benz', 'C-Class', 2016, 2018, 'any', 1865000000, 2195000000, 26, '2026-09-30 14:42:34'),
-  ('Mercedes-Benz', 'GLE', 2016, 2018, 'any', 3200000000, 4080000000, 37, '2026-10-05 14:42:34'),
-  ('Mercedes-Benz', 'GLE', 2019, 2019, 'any', 6600000000, 7480000000, 33, '2026-10-02 14:42:34'),
-  ('Mercedes-Benz', 'E-Class', 2014, 2016, 'any', 1600000000, 1996000000, 33, '2026-09-30 14:42:34'),
-  ('Mercedes-Benz', 'E-Class', 2017, 2018, 'any', 2747500000, 3143500000, 30, '2026-10-04 14:42:34'),
-  ('Hyundai', 'Elantra', 2014, 2016, 'any', 600000000, 732000000, 27, '2026-09-12 14:42:34'),
-  ('Hyundai', 'Elantra', 2017, 2018, 'any', 982500000, 1114500000, 11, '2026-09-17 14:42:34'),
-  ('Hyundai', 'Santa Fe', 2014, 2016, 'any', 1100000000, 1342000000, 16, '2026-10-03 14:42:34'),
-  ('Hyundai', 'Santa Fe', 2017, 2019, 'any', 1661000000, 1903000000, 28, '2026-09-03 14:42:34'),
-  ('Hyundai', 'Tucson', 2015, 2017, 'any', 1000000000, 1220000000, 24, '2026-10-05 14:42:34'),
-  ('Hyundai', 'Tucson', 2018, 2019, 'any', 1637500000, 1857500000, 36, '2026-09-30 14:42:34'),
-  ('Kia', 'Sportage', 2015, 2017, 'any', 1100000000, 1342000000, 10, '2026-10-05 14:42:34'),
-  ('Kia', 'Sportage', 2018, 2019, 'any', 1801250000, 2043250000, 35, '2026-10-05 14:42:34'),
-  ('Kia', 'Rio', 2015, 2017, 'any', 550000000, 638000000, 6, '2026-09-30 14:42:34'),
-  ('Kia', 'Rio', 2018, 2018, 'any', 890000000, 978000000, 39, '2026-10-05 14:42:34'),
-  ('Kia', 'Sorento', 2015, 2017, 'any', 1300000000, 1542000000, 6, '2026-09-30 14:42:34'),
-  ('Kia', 'Sorento', 2018, 2019, 'any', 2001250000, 2243250000, 33, '2026-10-02 14:42:34'),
-  ('Nissan', 'X-Trail', 2015, 2017, 'any', 1300000000, 1564000000, 7, '2026-09-26 14:42:34'),
-  ('Nissan', 'X-Trail', 2018, 2019, 'any', 2065000000, 2329000000, 37, '2026-10-05 14:42:34'),
-  ('Nissan', 'Altima', 2013, 2015, 'any', 650000000, 793000000, 6, '2026-09-30 14:42:34'),
-  ('Nissan', 'Altima', 2016, 2017, 'any', 1064375000, 1207375000, 37, '2026-10-02 14:42:34'),
-  ('Nissan', 'Rogue', 2015, 2017, 'any', 1000000000, 1242000000, 6, '2026-10-04 14:42:34'),
-  ('Nissan', 'Rogue', 2018, 2019, 'any', 1701250000, 1943250000, 7, '2026-10-05 14:42:34'),
-  ('Ford', 'Explorer', 2013, 2015, 'any', 1300000000, 1608000000, 14, '2026-10-05 14:42:34'),
-  ('Ford', 'Explorer', 2016, 2018, 'any', 2014000000, 2322000000, 24, '2026-09-30 14:42:34'),
-  ('Ford', 'Ranger', 2016, 2018, 'any', 2000000000, 2484000000, 21, '2026-10-03 14:42:34'),
-  ('Ford', 'Ranger', 2019, 2020, 'any', 3402500000, 3886500000, 23, '2026-09-30 14:42:34'),
-  ('Mazda', 'CX-5', 2015, 2017, 'any', 1200000000, 1442000000, 12, '2026-10-04 14:42:34'),
-  ('Mazda', 'CX-5', 2018, 2019, 'any', 1901250000, 2143250000, 13, '2026-10-01 14:42:34'),
-  ('Mitsubishi', 'Pajero', 2013, 2015, 'any', 1400000000, 1708000000, 12, '2026-10-01 14:42:34'),
-  ('Mitsubishi', 'Pajero', 2016, 2017, 'any', 2292500000, 2600500000, 26, '2026-10-05 14:42:34'),
-  ('Acura', 'MDX', 2012, 2014, 'any', 1200000000, 1464000000, 31, '2026-10-01 14:42:34'),
-  ('Acura', 'MDX', 2015, 2017, 'any', 1812000000, 2076000000, 16, '2026-09-30 14:42:34'),
-  ('Infiniti', 'QX60', 2014, 2016, 'any', 1500000000, 1786000000, 37, '2026-10-04 14:42:34'),
-  ('Infiniti', 'QX60', 2017, 2018, 'any', 2328750000, 2614750000, 29, '2026-10-05 14:42:34'),
-  ('BMW', 'X5', 2013, 2015, 'any', 2000000000, 2528000000, 26, '2026-09-10 14:42:34'),
-  ('BMW', 'X5', 2016, 2017, 'any', 3530000000, 4058000000, 36, '2026-09-09 14:42:34');
+  ('Lexus', 'GX 460', 2014, 2016, 'any', 2800000000, 3394000000, 20, '2026-10-02 17:07:46'),
+  ('Lexus', 'GX 460', 2017, 2019, 'any', 4177000000, 4771000000, 39, '2026-10-05 17:07:46'),
+  ('Mercedes-Benz', 'C-Class', 2013, 2015, 'any', 1100000000, 1430000000, 32, '2026-10-02 17:07:46'),
+  ('Mercedes-Benz', 'C-Class', 2016, 2018, 'any', 1865000000, 2195000000, 26, '2026-10-01 17:07:46'),
+  ('Mercedes-Benz', 'GLE', 2016, 2018, 'any', 3200000000, 4080000000, 37, '2026-10-06 17:07:46'),
+  ('Mercedes-Benz', 'GLE', 2019, 2019, 'any', 6600000000, 7480000000, 33, '2026-10-03 17:07:46'),
+  ('Mercedes-Benz', 'E-Class', 2014, 2016, 'any', 1600000000, 1996000000, 33, '2026-10-01 17:07:46'),
+  ('Mercedes-Benz', 'E-Class', 2017, 2018, 'any', 2747500000, 3143500000, 30, '2026-10-05 17:07:46'),
+  ('Hyundai', 'Elantra', 2014, 2016, 'any', 600000000, 732000000, 27, '2026-09-13 17:07:46'),
+  ('Hyundai', 'Elantra', 2017, 2018, 'any', 982500000, 1114500000, 11, '2026-09-18 17:07:46'),
+  ('Hyundai', 'Santa Fe', 2014, 2016, 'any', 1100000000, 1342000000, 16, '2026-10-04 17:07:46'),
+  ('Hyundai', 'Santa Fe', 2017, 2019, 'any', 1661000000, 1903000000, 28, '2026-09-04 17:07:46'),
+  ('Hyundai', 'Tucson', 2015, 2017, 'any', 1000000000, 1220000000, 24, '2026-10-06 17:07:46'),
+  ('Hyundai', 'Tucson', 2018, 2019, 'any', 1637500000, 1857500000, 36, '2026-10-01 17:07:46'),
+  ('Kia', 'Sportage', 2015, 2017, 'any', 1100000000, 1342000000, 10, '2026-10-06 17:07:46'),
+  ('Kia', 'Sportage', 2018, 2019, 'any', 1801250000, 2043250000, 35, '2026-10-06 17:07:46'),
+  ('Kia', 'Rio', 2015, 2017, 'any', 550000000, 638000000, 6, '2026-10-01 17:07:46'),
+  ('Kia', 'Rio', 2018, 2018, 'any', 890000000, 978000000, 39, '2026-10-06 17:07:46'),
+  ('Kia', 'Sorento', 2015, 2017, 'any', 1300000000, 1542000000, 6, '2026-10-01 17:07:46'),
+  ('Kia', 'Sorento', 2018, 2019, 'any', 2001250000, 2243250000, 33, '2026-10-03 17:07:46'),
+  ('Nissan', 'X-Trail', 2015, 2017, 'any', 1300000000, 1564000000, 7, '2026-09-27 17:07:46'),
+  ('Nissan', 'X-Trail', 2018, 2019, 'any', 2065000000, 2329000000, 37, '2026-10-06 17:07:46'),
+  ('Nissan', 'Altima', 2013, 2015, 'any', 650000000, 793000000, 6, '2026-10-01 17:07:46'),
+  ('Nissan', 'Altima', 2016, 2017, 'any', 1064375000, 1207375000, 37, '2026-10-03 17:07:46'),
+  ('Nissan', 'Rogue', 2015, 2017, 'any', 1000000000, 1242000000, 6, '2026-10-05 17:07:46'),
+  ('Nissan', 'Rogue', 2018, 2019, 'any', 1701250000, 1943250000, 7, '2026-10-06 17:07:46'),
+  ('Ford', 'Explorer', 2013, 2015, 'any', 1300000000, 1608000000, 14, '2026-10-06 17:07:46'),
+  ('Ford', 'Explorer', 2016, 2018, 'any', 2014000000, 2322000000, 24, '2026-10-01 17:07:46'),
+  ('Ford', 'Ranger', 2016, 2018, 'any', 2000000000, 2484000000, 21, '2026-10-04 17:07:46'),
+  ('Ford', 'Ranger', 2019, 2020, 'any', 3402500000, 3886500000, 23, '2026-10-01 17:07:46'),
+  ('Mazda', 'CX-5', 2015, 2017, 'any', 1200000000, 1442000000, 12, '2026-10-05 17:07:46'),
+  ('Mazda', 'CX-5', 2018, 2019, 'any', 1901250000, 2143250000, 13, '2026-10-02 17:07:46'),
+  ('Mitsubishi', 'Pajero', 2013, 2015, 'any', 1400000000, 1708000000, 12, '2026-10-02 17:07:46'),
+  ('Mitsubishi', 'Pajero', 2016, 2017, 'any', 2292500000, 2600500000, 26, '2026-10-06 17:07:46'),
+  ('Acura', 'MDX', 2012, 2014, 'any', 1200000000, 1464000000, 31, '2026-10-02 17:07:46'),
+  ('Acura', 'MDX', 2015, 2017, 'any', 1812000000, 2076000000, 16, '2026-10-01 17:07:46'),
+  ('Infiniti', 'QX60', 2014, 2016, 'any', 1500000000, 1786000000, 37, '2026-10-05 17:07:46'),
+  ('Infiniti', 'QX60', 2017, 2018, 'any', 2328750000, 2614750000, 29, '2026-10-06 17:07:46'),
+  ('BMW', 'X5', 2013, 2015, 'any', 2000000000, 2528000000, 26, '2026-09-11 17:07:46'),
+  ('BMW', 'X5', 2016, 2017, 'any', 3530000000, 4058000000, 36, '2026-09-10 17:07:46');
 INSERT INTO price_bands (`make`, `model`, `year_from`, `year_to`, `condition`, `band_min_kobo`, `band_max_kobo`, `sample_size`, `refreshed_at`) VALUES
-  ('BMW', '3 Series', 2013, 2015, 'any', 1100000000, 1342000000, 7, '2026-09-02 14:42:34'),
-  ('BMW', '3 Series', 2016, 2017, 'any', 1801250000, 2043250000, 15, '2026-10-02 14:42:34'),
-  ('Volkswagen', 'Passat', 2013, 2015, 'any', 650000000, 793000000, 8, '2026-10-03 14:42:34'),
-  ('Volkswagen', 'Passat', 2016, 2017, 'any', 1064375000, 1207375000, 21, '2026-10-02 14:42:34');
+  ('BMW', '3 Series', 2013, 2015, 'any', 1100000000, 1342000000, 7, '2026-09-03 17:07:46'),
+  ('BMW', '3 Series', 2016, 2017, 'any', 1801250000, 2043250000, 15, '2026-10-03 17:07:46'),
+  ('Volkswagen', 'Passat', 2013, 2015, 'any', 650000000, 793000000, 8, '2026-10-04 17:07:46'),
+  ('Volkswagen', 'Passat', 2016, 2017, 'any', 1064375000, 1207375000, 21, '2026-10-03 17:07:46');
 
 
 -- facets: 10 rows
@@ -883,14 +893,65 @@ INSERT INTO testimonials (`customer_name`, `area`, `quote`, `service_tag`, `rati
   ('Fleet officer, oil & gas firm', 'Port Harcourt', 'We needed four hire vehicles for a two-week rotation with proper invoices. Quote, paperwork and tracking proposals all arrived in one day.', 'hire', 5, 6, 1);
 
 
--- blog_posts: 6 rows
-INSERT INTO blog_posts (`slug`, `title`, `category`, `excerpt`, `hero_image`, `hero_alt`, `author_name`, `author_role`, `read_minutes`, `status`, `published_at`, `is_featured`, `make_tags`, `body`, `service_cta`, `author_bio`, `meta_title`, `meta_description`) VALUES
-  ('2015-toyota-camry-honest-buyers-guide', 'The 2015 Toyota Camry: what ₦12m actually buys in Port Harcourt', 'honest_buyers_guide', 'We put a 2015 Camry through the full checklist and wrote down everything — the good, the tired and the priced-in.', '/img/cars/toyota-camry-silver.jpg', '2015 Toyota Camry inspection in Port Harcourt', 'Raph Nicks', 'Head of Inspections', 9, 'published', '2026-09-28 00:00:00', 1, '["Toyota"]', '[{"type":"paragraph","text":"A 2015 Camry is the [default sensible buy in Port Harcourt](/cars?make=Toyota), and that is exactly why you should be suspicious of it. Popular models attract the most repair-and-flip activity, because there is always a buyer."},{"type":"paragraph","text":"We put three 2015 Camrys through the full checklist in the same week. Here is what ₦12m bought in each case, with the numbers."},{"type":"heading","text":"What ₦12m buys in this market"},{"type":"table","head":["Car","Asking","Mileage","Grade","Notable finding"],"rows":[["Camry LE, 2015","₦11.8m","88,000 km","Certified","Clean; two panels resprayed, priced in"],["Camry SE, 2015","₦12.4m","62,000 km","Field-Checked","Odometer inconsistent with service book"],["Camry XLE, 2015","₦13.2m","104,000 km","Certified","AC compressor weak; rear bushings due"]]},{"type":"callout","tone":"amber","title":"The one that looked best was the worst","text":"The lowest-mileage car had the most inconsistent paperwork. A 62,000 km reading on a ten-year-old car is possible — it is just rare enough that the odometer history has to survive scrutiny."},{"type":"heading","text":"The five things that actually decide the price"},{"type":"checklist","items":["Odometer consistency: service book, OBD2 history and physical wear all have to agree.","Panel history: paint-depth readings on all four quarters, and the boot floor for accident repair.","AC performance: measured at the vent. “Blows cold” is not a measurement.","Suspension and bushings: Port Harcourt roads eat them, and the repair bill is real.","Document status: customs verified and duty sighted, or a discount that reflects the missing papers."]},{"type":"heading","text":"What we would pay"},{"type":"paragraph","text":"For a clean 2015 Camry with verified mileage, complete papers and everything working: ₦10.5m–₦12.5m depending on trim and km — compare that against [the Camrys we have actually inspected](/cars?make=Toyota&model=Camry). Below ₦10m, start asking what is wrong, because something usually is."},{"type":"quote","text":"The cheapest Camry on the road is rarely the cheapest Camry to own.","attribution":"Raph Nicks"},{"type":"heading","text":"Before you pay for one"},{"type":"paragraph","text":"Book the [inspection](/services/inspection), not the car. Any inspection we do lands in writing, names the faults and stays attached to the listing — including the faults that cost the seller money."}]', 'inspection', 'Raph Nicks leads HonestCars inspections in Port Harcourt. He has inspected more than 600 used cars and has talked more buyers out of bad ones than into them.', 'The 2015 Toyota Camry: what ₦12m buys in Port Harcourt', 'Three 2015 Camrys, the same week, the same checklist. What a clean one is worth, what the tired ones hide, and what to check before you pay.'),
-  ('tokunbo-vs-nigerian-used-ph', 'Tokunbo vs Nigerian-used: the honest maths for Port Harcourt buyers', 'market_intel', 'A cheaper import is not always cheaper. Here is the running-cost maths we run for buyers before they commit.', '/img/blog/tokunbo-vs-nigerian-used-ph.jpg', 'Comparing tokunbo and Nigerian-used cars in Port Harcourt', 'Ada George', 'Market Analyst', 7, 'published', '2026-09-24 00:00:00', 0, '["Toyota","Honda"]', '[{"type":"paragraph","text":"The reflex is “tokunbo is better”. The maths is not that simple, especially once you add registration, clearing and the first six months of repairs. Worth saying up front: you can inspect [either kind of car](/cars) the same way, on the same checklist."},{"type":"heading","text":"The cost lines people forget"},{"type":"table","head":["Cost","Tokunbo","Nigerian-used"],"rows":[["Duty and clearing","Landed in the asking price","Usually already paid and verified"],["First-year repairs","Higher — systems have sat unused","Lower if the owner drove it properly"],["Document risk","Mismatched papers are common","Papers usually already registered here"],["Depreciation","Already taken the big hit","Flatter curve from here"]]},{"type":"callout","tone":"navy","title":"The rule of thumb we use","text":"If the Nigerian-used car has a verifiable service history and the tokunbo does not, the Nigerian-used car usually wins on five-year cost — even when it is a year older."},{"type":"heading","text":"Where tokunbo wins"},{"type":"checklist","items":["You want specific trim or options that rarely get ordered here.","You want a platform with fewer miles on Nigerian roads, which matters for suspension.","You are buying a grade you can verify before shipping, not after — an [import inspection](/services/inspection) or a [research brief](/services/research) does that."]},{"type":"heading","text":"Where Nigerian-used wins"},{"type":"checklist","items":["Papers are already clean and registered in Nigeria.","You can inspect the actual car in person, today, with its service history.","The seller is the long-term owner rather than a trader who has had it three weeks. Cars with the full [Customs verified](/verification) status are the ones to compare."]}]', 'consultation', 'Ada George analyses the Port Harcourt market for HonestCars, building the price bands behind every listing.', 'Tokunbo vs Nigerian-used: the honest maths for PH', 'A cheaper import is not always cheaper. The five-year cost lines we actually add up for Port Harcourt buyers, and when each side wins.'),
-  ('odometer-fraud-check-yourself', 'How to check an odometer yourself before you pay a deposit', 'honest_buyers_guide', 'Seven checks anyone can do in ten minutes, plus the two tricks dealers use to reset a mileage that still fool buyers.', '/img/blog/odometer-fraud-check-yourself.jpg', 'Odometer close-up during a HonestCars inspection', 'Raph Nicks', 'Head of Inspections', 6, 'published', '2026-09-20 00:00:00', 0, '["Toyota"]', '[{"type":"paragraph","text":"Odometer fraud is the most common lie in the used-car market, and the easiest to catch if you know where the car keeps its own records. If you would rather not do it yourself, every [HonestCars inspection](/services/inspection) includes an OBD2 read and an odometer verdict."},{"type":"heading","text":"Seven checks you can do in ten minutes"},{"type":"checklist","items":["Service book: look for a chain of stamps whose km readings increase consistently with the dates.","OBD2 history: stored distance and fault snapshots often carry a higher figure than the dash.","Driver’s seat bolster and pedals: wear should match the claimed km.","Steering wheel and gear knob: shine and worn leather betray high mileage.","Suspension bushings: at 150,000 km they have usually been replaced, and the receipts prove it.","Windscreen: original glass with a manufacturer date before the car’s build year is a tell.","Tyre dates: four tyres stamped years apart suggest replacements driven by distance — the same quick read we do on every [field inspection](/services/inspection)."]},{"type":"callout","tone":"amber","title":"The two tricks that survive all of the above","text":"A worn interior can be swapped from a scrap car, and a service book can be forged entirely. If the numbers only come from the book and the interior, get an OBD2 read — the ECU keeps its own distance in most modern cars, and that is the number a seller cannot reach."},{"type":"heading","text":"What it costs you when you miss it"},{"type":"paragraph","text":"A 60,000 km car priced against a 140,000 km one typically carries a ₦1.5m–₦3m premium. That is the size of the bet you are making when you take the number on trust. Every [car in the listings](/cars) shows its grade openly, and the ones we have physically checked say so."}]', 'inspection', 'Raph Nicks leads HonestCars inspections in Port Harcourt and has written the checklist every inspector works to.', 'How to check an odometer before you pay a deposit', 'Seven checks anyone can do in ten minutes, the two tricks that survive them all, and the ₦1.5m–₦3m you are betting when you trust the dash.'),
-  ('customs-papers-explained', 'Customs papers, explained without the jargon', 'ownership_maintenance', 'What "duty sighted" really means, what happens if papers are missing, and how to verify them yourself.', '/img/blog/customs-papers-explained.jpg', 'Verifying customs documents for a car in Port Harcourt', 'Chinelo U.', 'Documentation Lead', 8, 'published', '2026-09-16 00:00:00', 0, '["Toyota"]', '[{"type":"paragraph","text":"“Duty paid” and “duty sighted” are not the same statement, and the difference is the difference between a car you can register and a car you cannot. Our [documentation service](/services/documents) exists because of how often that sentence comes back to bite people."},{"type":"heading","text":"The words, translated"},{"type":"table","head":["Term","What it actually means"],"rows":[["Duty paid","Someone says the import duty was paid. There is no document in front of you."],["Duty sighted","We have looked at the duty document and checked its reference against the VIN."],["Customs verified","The paperwork reconciles with the vehicle: VIN, engine number and entry reference all agree."],["Registration complete","The vehicle is on the Nigerian register in an owner’s name and transfer can be lodged."]]},{"type":"callout","tone":"green","title":"The check that matters most","text":"Match the VIN on the customs document to the VIN on the chassis. If they disagree, nothing else about the papers matters — you are looking at a car you may never be able to register."},{"type":"heading","text":"What to do when papers are missing"},{"type":"checklist","items":["Get the missing-papers discount in writing before you commit to anything.","Confirm the vehicle is not flagged before you spend on repairs.","Budget [the document service](/services/documents) and the timeline — 7 to 14 working days in a straightforward case.","Do not pay a seller in full while documents are unresolved; [concierge purchases](/services/concierge) hold funds against milestones for exactly this."]},{"type":"heading","text":"Red flags"},{"type":"checklist","items":["Photocopies offered “because the original is with a brother”.","A duty document whose reference does not appear in any register.","Urgency: a genuine paper does not become more urgent because you asked to see it."]}]', 'documents', 'Chinelo U. leads documentation at HonestCars, handling customs verification, registration and permits across Rivers State.', 'Customs papers, explained without the jargon', 'Duty paid, duty sighted, customs verified, registration complete — what each term really means, and the VIN check that decides whether you can register the car.'),
-  ('ph-fuel-cost-by-model', 'What 100km really costs in PH traffic, by model', 'market_intel', 'We tracked real consumption on Camry, Corolla, CR-V, RX 350 and Hilux over the same Aba Road run.', '/img/blog/ph-fuel-cost-by-model.jpg', 'Fuel economy comparison chart for Port Harcourt cars', 'Ada George', 'Market Analyst', 5, 'published', '2026-09-12 00:00:00', 0, '["Toyota","Honda"]', '[{"type":"paragraph","text":"We tracked real consumption on the same Port Harcourt run for a week: GRA to Trans-Amadi and back, with the Aba Road stretch at peak. Here are the numbers owners reported, plus what they mean per year. The models below are the ones that move through [our listings](/cars) fastest, so the maths sticks."},{"type":"table","head":["Model","Observed","Per 100 km","Yearly (15,000 km)"],"rows":[["Corolla 1.8","11.5 km/l","8.7 L","≈ ₦405,000"],["Camry 2.5","9.8 km/l","10.2 L","≈ ₦475,000"],["CR-V 2.4","8.4 km/l","11.9 L","≈ ₦555,000"],["RX 350 3.5","6.6 km/l","15.2 L","≈ ₦705,000"],["Hilux 2.8 TD","10.4 km/l","9.6 L","≈ ₦445,000 (diesel)"]]},{"type":"callout","tone":"navy","title":"Read the yearly column, not the monthly one","text":"A ₦150,000 yearly fuel difference is easy to ignore in a test drive and impossible to ignore by month five. It is also the reason the V6 you love is usually cheaper to buy than to own."},{"type":"heading","text":"What moves the number most"},{"type":"checklist","items":["Tyre pressure: under-inflated tyres cost more than any driving style change.","Cold-start trips: short school runs in traffic are the worst case for consumption.","AC: it is not free, but in Port Harcourt it is not optional either.","Fuel quality: the cheaper pump is not always the cheaper tank."]},{"type":"paragraph","text":"If you are choosing between two cars and the ₦150,000 a year matters, ask for a [running-cost research brief](/services/research) — we model fuel, tyres, servicing and the model-specific repair bills before you commit, and it is credited against the car if you buy through us."},{"type":"paragraph","text":"Every car we list carries its [full service price list](/services) so you can price the care as well as the car."}]', 'research', 'Ada George runs market intelligence at HonestCars, including the fuel and running-cost data behind our TCO reports.', 'What 100km really costs in PH traffic, by model', 'Observed consumption for Corolla, Camry, CR-V, RX 350 and Hilux on the same Port Harcourt run, converted into what a year of driving actually costs.'),
-  ('tyres-you-should-walk-away-from', 'Three tyre conditions that should end your inspection', 'honest_buyers_guide', 'Uneven wear tells you more about a car than the dealer ever will. What to look for and what it costs to fix.', '/img/blog/tyres-you-should-walk-away-from.jpg', 'Tyres and tread depth check on a used car', 'Raph Nicks', 'Head of Inspections', 4, 'published', '2026-09-08 00:00:00', 0, '["Toyota"]', '[{"type":"paragraph","text":"Tyres tell you what the service history will not: how the car was driven, whether the owner noticed problems, and how much they were willing to spend on maintenance. It is one of the first things checked in a [HonestCars inspection](/services/inspection), along with the wheel bearings and alignment."},{"type":"heading","text":"Three conditions that should end the inspection"},{"type":"checklist","items":["Uneven wear across one tyre — alignment or suspension geometry is wrong, and the cause costs more than the tyre.","Different brands on the same axle — the owner was solving problems one wheel at a time.","Cracking on sidewalls with plenty of tread left — a six-year-old tyre is finished regardless of the tread depth. Cars whose tyres and suspension have already been checked carry the HonestCars-Certified badge in [the listings](/cars)."]},{"type":"callout","tone":"amber","title":"The cheap tell","text":"Four new matched tyres on a car that is otherwise average usually means the seller was preparing it to be driven away, which is a good sign. Cheap part-worn tyres on a car with premium trim usually means the opposite."},{"type":"heading","text":"What replacement actually costs in PH"},{"type":"table","head":["Size class","Set of four","Notes"],"rows":[["15–16\\" economy (Corolla, Elantra)","₦180,000–₦280,000","Widely available; price varies by brand"],["17–18\\" mid (Camry, CR-V)","₦320,000–₦520,000","Check dates; old stock is common"],["19\\" + (RX, Prado)","₦650,000+","Budget for it before you buy the car"]]},{"type":"heading","text":"Do this before you agree a price"},{"type":"paragraph","text":"Walk the four corners yourself, or let a [field inspection](/services/inspection) do it before you travel. If the tyres fail any of the three checks above, put the replacement cost on the negotiating table that day — it is the one repair every seller understands and cannot argue with."}]', 'inspection', 'Raph Nicks leads HonestCars inspections, where tyre condition is the fastest read on how a car has been maintained.', 'Three tyre conditions that should end your inspection', 'Uneven wear, mismatched brands and cracked sidewalls: what each one tells you about the owner, and what replacement really costs in Port Harcourt.');
+-- blog_authors: 3 rows
+INSERT INTO blog_authors (`id`, `slug`, `name`, `role`, `bio`) VALUES
+  (1, 'raph-nicks', 'Raph Nicks', 'Head of Inspections', 'Raph leads HonestCars inspections in Port Harcourt. He has inspected more than 600 used cars and has talked more buyers out of bad ones than into them.'),
+  (2, 'ada-george', 'Ada George', 'Market Analyst', 'Ada runs market intelligence at HonestCars, building the price bands behind every listing.'),
+  (3, 'chinelo-u', 'Chinelo U.', 'Documentation Lead', 'Chinelo leads documentation at HonestCars, handling customs verification, registration and permits across Rivers State.');
+
+
+-- blog_tags: 13 rows
+INSERT INTO blog_tags (`id`, `slug`, `label`, `kind`, `description`) VALUES
+  (1, 'buying', 'Buying', 'topic', 'Choosing a car, reading a seller, and the questions to ask before money moves.'),
+  (2, 'inspection', 'Inspection', 'topic', 'What our inspectors look at, in the order they look at it — and what a report can miss.'),
+  (3, 'paperwork', 'Paperwork & customs', 'topic', 'Customs duty, registration, change of ownership and the order of operations.'),
+  (4, 'running-costs', 'Running costs', 'topic', 'Fuel, servicing, insurance and what a car really costs per year in Port Harcourt.'),
+  (5, 'mileage', 'Mileage & odometer', 'topic', 'Reading wear instead of believing a number on a dashboard.'),
+  (6, 'tyres', 'Tyres', 'topic', 'The fastest read on how a car has been driven and maintained.'),
+  (7, 'first-car', 'First car', 'topic', 'Buying your first car in Nigeria without a story to tell afterwards.'),
+  (8, 'maintenance', 'Maintenance', 'topic', 'Keeping a Nigerian used car on the road.'),
+  (9, 'toyota', 'Toyota', 'make', 'Toyotas we have inspected, priced and written about — the safest default in this market.'),
+  (10, 'honda', 'Honda', 'make', 'Hondas in Port Harcourt: what holds value and what to check.'),
+  (11, 'lexus', 'Lexus', 'make', 'Lexus SUVs and sedans: the running costs nobody mentions at the point of sale.'),
+  (12, 'video-guide', 'Video guides', 'format', 'Short clips from real inspections — the checks, run on a real car.'),
+  (13, 'market-report', 'Market reports', 'format', 'What the Port Harcourt market is actually doing this quarter, priced from live deals.');
+
+
+-- blog_posts: 8 rows
+INSERT INTO blog_posts (`id`, `slug`, `title`, `category`, `excerpt`, `hero_image`, `hero_alt`, `author_name`, `author_role`, `read_minutes`, `status`, `published_at`, `is_featured`, `make_tags`, `body`, `service_cta`, `author_bio`, `author_id`, `meta_title`, `meta_description`) VALUES
+  (1, '2015-toyota-camry-honest-buyers-guide', 'The 2015 Toyota Camry: what ₦12m actually buys in Port Harcourt', 'honest_buyers_guide', 'We put a 2015 Camry through the full checklist and wrote down everything — the good, the tired and the priced-in.', '/img/cars/toyota-camry-silver.jpg', '2015 Toyota Camry inspection in Port Harcourt', 'Raph Nicks', 'Head of Inspections', 9, 'published', '2026-09-28 00:00:00', 1, '["Toyota"]', '[{"type":"paragraph","text":"A 2015 Camry is the [default sensible buy in Port Harcourt](/cars?make=Toyota), and that is exactly why you should be suspicious of it. Popular models attract the most repair-and-flip activity, because there is always a buyer."},{"type":"paragraph","text":"We put three 2015 Camrys through the full checklist in the same week. Here is what ₦12m bought in each case, with the numbers."},{"type":"heading","text":"What ₦12m buys in this market"},{"type":"table","head":["Car","Asking","Mileage","Grade","Notable finding"],"rows":[["Camry LE, 2015","₦11.8m","88,000 km","Certified","Clean; two panels resprayed, priced in"],["Camry SE, 2015","₦12.4m","62,000 km","Field-Checked","Odometer inconsistent with service book"],["Camry XLE, 2015","₦13.2m","104,000 km","Certified","AC compressor weak; rear bushings due"]]},{"type":"callout","tone":"amber","title":"The one that looked best was the worst","text":"The lowest-mileage car had the most inconsistent paperwork. A 62,000 km reading on a ten-year-old car is possible — it is just rare enough that the odometer history has to survive scrutiny."},{"type":"heading","text":"The five things that actually decide the price"},{"type":"checklist","items":["Odometer consistency: service book, OBD2 history and physical wear all have to agree.","Panel history: paint-depth readings on all four quarters, and the boot floor for accident repair.","AC performance: measured at the vent. “Blows cold” is not a measurement.","Suspension and bushings: Port Harcourt roads eat them, and the repair bill is real.","Document status: customs verified and duty sighted, or a discount that reflects the missing papers."]},{"type":"heading","text":"What we would pay"},{"type":"paragraph","text":"For a clean 2015 Camry with verified mileage, complete papers and everything working: ₦10.5m–₦12.5m depending on trim and km — compare that against [the Camrys we have actually inspected](/cars?make=Toyota&model=Camry). Below ₦10m, start asking what is wrong, because something usually is."},{"type":"quote","text":"The cheapest Camry on the road is rarely the cheapest Camry to own.","attribution":"Raph Nicks"},{"type":"heading","text":"Before you pay for one"},{"type":"paragraph","text":"Book the [inspection](/services/inspection), not the car. Any inspection we do lands in writing, names the faults and stays attached to the listing — including the faults that cost the seller money."}]', 'inspection', 'Raph Nicks leads HonestCars inspections in Port Harcourt. He has inspected more than 600 used cars and has talked more buyers out of bad ones than into them.', 1, 'The 2015 Toyota Camry: what ₦12m buys in Port Harcourt', 'Three 2015 Camrys, the same week, the same checklist. What a clean one is worth, what the tired ones hide, and what to check before you pay.'),
+  (2, 'tokunbo-vs-nigerian-used-ph', 'Tokunbo vs Nigerian-used: the honest maths for Port Harcourt buyers', 'market_intel', 'A cheaper import is not always cheaper. Here is the running-cost maths we run for buyers before they commit.', '/img/blog/tokunbo-vs-nigerian-used-ph.jpg', 'Comparing tokunbo and Nigerian-used cars in Port Harcourt', 'Ada George', 'Market Analyst', 7, 'published', '2026-09-24 00:00:00', 0, '["Toyota","Honda"]', '[{"type":"paragraph","text":"The reflex is “tokunbo is better”. The maths is not that simple, especially once you add registration, clearing and the first six months of repairs. Worth saying up front: you can inspect [either kind of car](/cars) the same way, on the same checklist."},{"type":"heading","text":"The cost lines people forget"},{"type":"table","head":["Cost","Tokunbo","Nigerian-used"],"rows":[["Duty and clearing","Landed in the asking price","Usually already paid and verified"],["First-year repairs","Higher — systems have sat unused","Lower if the owner drove it properly"],["Document risk","Mismatched papers are common","Papers usually already registered here"],["Depreciation","Already taken the big hit","Flatter curve from here"]]},{"type":"callout","tone":"navy","title":"The rule of thumb we use","text":"If the Nigerian-used car has a verifiable service history and the tokunbo does not, the Nigerian-used car usually wins on five-year cost — even when it is a year older."},{"type":"heading","text":"Where tokunbo wins"},{"type":"checklist","items":["You want specific trim or options that rarely get ordered here.","You want a platform with fewer miles on Nigerian roads, which matters for suspension.","You are buying a grade you can verify before shipping, not after — an [import inspection](/services/inspection) or a [research brief](/services/research) does that."]},{"type":"video","src":"/video/flood-damage-check.mp4","title":"Spotting flood damage before you pay","caption":"Where water leaves a mark on an imported car — and why sellers clean two of the three. 10 seconds, no sound."},{"type":"heading","text":"Where Nigerian-used wins"},{"type":"checklist","items":["Papers are already clean and registered in Nigeria.","You can inspect the actual car in person, today, with its service history.","The seller is the long-term owner rather than a trader who has had it three weeks. Cars with the full [Customs verified](/verification) status are the ones to compare."]}]', 'consultation', 'Ada George analyses the Port Harcourt market for HonestCars, building the price bands behind every listing.', 2, 'Tokunbo vs Nigerian-used: the honest maths for PH', 'A cheaper import is not always cheaper. The five-year cost lines we actually add up for Port Harcourt buyers, and when each side wins.'),
+  (3, 'odometer-fraud-check-yourself', 'How to check an odometer yourself before you pay a deposit', 'honest_buyers_guide', 'Seven checks anyone can do in ten minutes, plus the two tricks dealers use to reset a mileage that still fool buyers.', '/img/blog/odometer-fraud-check-yourself.jpg', 'Odometer close-up during a HonestCars inspection', 'Raph Nicks', 'Head of Inspections', 6, 'published', '2026-09-20 00:00:00', 0, '["Toyota"]', '[{"type":"paragraph","text":"Odometer fraud is the most common lie in the used-car market, and the easiest to catch if you know where the car keeps its own records. If you would rather not do it yourself, every [HonestCars inspection](/services/inspection) includes an OBD2 read and an odometer verdict."},{"type":"heading","text":"Seven checks you can do in ten minutes"},{"type":"checklist","items":["Service book: look for a chain of stamps whose km readings increase consistently with the dates.","OBD2 history: stored distance and fault snapshots often carry a higher figure than the dash.","Driver’s seat bolster and pedals: wear should match the claimed km.","Steering wheel and gear knob: shine and worn leather betray high mileage.","Suspension bushings: at 150,000 km they have usually been replaced, and the receipts prove it.","Windscreen: original glass with a manufacturer date before the car’s build year is a tell.","Tyre dates: four tyres stamped years apart suggest replacements driven by distance — the same quick read we do on every [field inspection](/services/inspection)."]},{"type":"video","src":"/video/odometer-check.mp4","title":"Two odometer checks anyone can do","caption":"The wear test and the service-record cross-check, shown on a real Port Harcourt car. 10 seconds, no sound."},{"type":"callout","tone":"amber","title":"The two tricks that survive all of the above","text":"A worn interior can be swapped from a scrap car, and a service book can be forged entirely. If the numbers only come from the book and the interior, get an OBD2 read — the ECU keeps its own distance in most modern cars, and that is the number a seller cannot reach."},{"type":"heading","text":"What it costs you when you miss it"},{"type":"paragraph","text":"A 60,000 km car priced against a 140,000 km one typically carries a ₦1.5m–₦3m premium. That is the size of the bet you are making when you take the number on trust. Every [car in the listings](/cars) shows its grade openly, and the ones we have physically checked say so."}]', 'inspection', 'Raph Nicks leads HonestCars inspections in Port Harcourt and has written the checklist every inspector works to.', 1, 'How to check an odometer before you pay a deposit', 'Seven checks anyone can do in ten minutes, the two tricks that survive them all, and the ₦1.5m–₦3m you are betting when you trust the dash.'),
+  (4, 'customs-papers-explained', 'Customs papers, explained without the jargon', 'ownership_maintenance', 'What "duty sighted" really means, what happens if papers are missing, and how to verify them yourself.', '/img/blog/customs-papers-explained.jpg', 'Verifying customs documents for a car in Port Harcourt', 'Chinelo U.', 'Documentation Lead', 8, 'published', '2026-09-16 00:00:00', 0, '["Toyota"]', '[{"type":"paragraph","text":"“Duty paid” and “duty sighted” are not the same statement, and the difference is the difference between a car you can register and a car you cannot. Our [documentation service](/services/documents) exists because of how often that sentence comes back to bite people."},{"type":"heading","text":"The words, translated"},{"type":"table","head":["Term","What it actually means"],"rows":[["Duty paid","Someone says the import duty was paid. There is no document in front of you."],["Duty sighted","We have looked at the duty document and checked its reference against the VIN."],["Customs verified","The paperwork reconciles with the vehicle: VIN, engine number and entry reference all agree."],["Registration complete","The vehicle is on the Nigerian register in an owner’s name and transfer can be lodged."]]},{"type":"callout","tone":"green","title":"The check that matters most","text":"Match the VIN on the customs document to the VIN on the chassis. If they disagree, nothing else about the papers matters — you are looking at a car you may never be able to register."},{"type":"heading","text":"What to do when papers are missing"},{"type":"checklist","items":["Get the missing-papers discount in writing before you commit to anything.","Confirm the vehicle is not flagged before you spend on repairs.","Budget [the document service](/services/documents) and the timeline — 7 to 14 working days in a straightforward case.","Do not pay a seller in full while documents are unresolved; [concierge purchases](/services/concierge) hold funds against milestones for exactly this."]},{"type":"heading","text":"Red flags"},{"type":"checklist","items":["Photocopies offered “because the original is with a brother”.","A duty document whose reference does not appear in any register.","Urgency: a genuine paper does not become more urgent because you asked to see it."]}]', 'documents', 'Chinelo U. leads documentation at HonestCars, handling customs verification, registration and permits across Rivers State.', 3, 'Customs papers, explained without the jargon', 'Duty paid, duty sighted, customs verified, registration complete — what each term really means, and the VIN check that decides whether you can register the car.'),
+  (5, 'ph-fuel-cost-by-model', 'What 100km really costs in PH traffic, by model', 'market_intel', 'We tracked real consumption on Camry, Corolla, CR-V, RX 350 and Hilux over the same Aba Road run.', '/img/blog/ph-fuel-cost-by-model.jpg', 'Fuel economy comparison chart for Port Harcourt cars', 'Ada George', 'Market Analyst', 5, 'published', '2026-09-12 00:00:00', 0, '["Toyota","Honda"]', '[{"type":"paragraph","text":"We tracked real consumption on the same Port Harcourt run for a week: GRA to Trans-Amadi and back, with the Aba Road stretch at peak. Here are the numbers owners reported, plus what they mean per year. The models below are the ones that move through [our listings](/cars) fastest, so the maths sticks."},{"type":"table","head":["Model","Observed","Per 100 km","Yearly (15,000 km)"],"rows":[["Corolla 1.8","11.5 km/l","8.7 L","≈ ₦405,000"],["Camry 2.5","9.8 km/l","10.2 L","≈ ₦475,000"],["CR-V 2.4","8.4 km/l","11.9 L","≈ ₦555,000"],["RX 350 3.5","6.6 km/l","15.2 L","≈ ₦705,000"],["Hilux 2.8 TD","10.4 km/l","9.6 L","≈ ₦445,000 (diesel)"]]},{"type":"callout","tone":"navy","title":"Read the yearly column, not the monthly one","text":"A ₦150,000 yearly fuel difference is easy to ignore in a test drive and impossible to ignore by month five. It is also the reason the V6 you love is usually cheaper to buy than to own."},{"type":"heading","text":"What moves the number most"},{"type":"checklist","items":["Tyre pressure: under-inflated tyres cost more than any driving style change.","Cold-start trips: short school runs in traffic are the worst case for consumption.","AC: it is not free, but in Port Harcourt it is not optional either.","Fuel quality: the cheaper pump is not always the cheaper tank."]},{"type":"paragraph","text":"If you are choosing between two cars and the ₦150,000 a year matters, ask for a [running-cost research brief](/services/research) — we model fuel, tyres, servicing and the model-specific repair bills before you commit, and it is credited against the car if you buy through us."},{"type":"paragraph","text":"Every car we list carries its [full service price list](/services) so you can price the care as well as the car."}]', 'research', 'Ada George runs market intelligence at HonestCars, including the fuel and running-cost data behind our TCO reports.', 2, 'What 100km really costs in PH traffic, by model', 'Observed consumption for Corolla, Camry, CR-V, RX 350 and Hilux on the same Port Harcourt run, converted into what a year of driving actually costs.'),
+  (6, 'tyres-you-should-walk-away-from', 'Three tyre conditions that should end your inspection', 'honest_buyers_guide', 'Uneven wear tells you more about a car than the dealer ever will. What to look for and what it costs to fix.', '/img/blog/tyres-you-should-walk-away-from.jpg', 'Tyres and tread depth check on a used car', 'Raph Nicks', 'Head of Inspections', 4, 'published', '2026-09-08 00:00:00', 0, '["Toyota"]', '[{"type":"paragraph","text":"Tyres tell you what the service history will not: how the car was driven, whether the owner noticed problems, and how much they were willing to spend on maintenance. It is one of the first things checked in a [HonestCars inspection](/services/inspection), along with the wheel bearings and alignment."},{"type":"heading","text":"Three conditions that should end the inspection"},{"type":"checklist","items":["Uneven wear across one tyre — alignment or suspension geometry is wrong, and the cause costs more than the tyre.","Different brands on the same axle — the owner was solving problems one wheel at a time.","Cracking on sidewalls with plenty of tread left — a six-year-old tyre is finished regardless of the tread depth. Cars whose tyres and suspension have already been checked carry the HonestCars-Certified badge in [the listings](/cars)."]},{"type":"video","src":"/video/tyre-tread.mp4","title":"What uneven tyre wear tells you","caption":"Three wear patterns, filmed on a car we walked away from. 9 seconds, no sound."},{"type":"callout","tone":"amber","title":"The cheap tell","text":"Four new matched tyres on a car that is otherwise average usually means the seller was preparing it to be driven away, which is a good sign. Cheap part-worn tyres on a car with premium trim usually means the opposite."},{"type":"heading","text":"What replacement actually costs in PH"},{"type":"table","head":["Size class","Set of four","Notes"],"rows":[["15–16\\" economy (Corolla, Elantra)","₦180,000–₦280,000","Widely available; price varies by brand"],["17–18\\" mid (Camry, CR-V)","₦320,000–₦520,000","Check dates; old stock is common"],["19\\" + (RX, Prado)","₦650,000+","Budget for it before you buy the car"]]},{"type":"heading","text":"Do this before you agree a price"},{"type":"paragraph","text":"Walk the four corners yourself, or let a [field inspection](/services/inspection) do it before you travel. If the tyres fail any of the three checks above, put the replacement cost on the negotiating table that day — it is the one repair every seller understands and cannot argue with."}]', 'inspection', 'Raph Nicks leads HonestCars inspections, where tyre condition is the fastest read on how a car has been maintained.', 1, 'Three tyre conditions that should end your inspection', 'Uneven wear, mismatched brands and cracked sidewalls: what each one tells you about the owner, and what replacement really costs in Port Harcourt.'),
+  (7, 'first-car-under-10m-port-harcourt', 'Your first car under ₦10m in Port Harcourt', 'honest_buyers_guide', 'What ₦6m–₦10m buys right now, the four cars we would shortlist, and the three costs nobody puts on the windscreen.', '/img/blog/first-car-under-10m.jpg', 'A first car parked on a Port Harcourt street', 'Ada George', 'Market Analyst', 6, 'published', '2026-09-04 00:00:00', 0, '["Toyota"]', '[{"type":"paragraph","text":"A first car in Port Harcourt is bought against three prices, not one: the car, the fuel, and the repairs the last owner deferred. Under ₦10m the third one decides whether you bought well. Here is what we see moving in that band — and you can [browse the sedans under ₦10m live](/cars/sedan-under-10m)."},{"type":"heading","text":"What ₦6m–₦10m buys this month"},{"type":"table","head":["Band","What it buys","What to expect"],"rows":[["₦6m–₦7.5m","2010–2013 Corolla, Civic, Elantra","Usually 150,000 km-plus. Budget ₦400k for suspension and tyres in year one."],["₦7.5m–₦9m","2013–2016 Camry, Corolla, Sonata","The sweet spot: still serviceable, parts everywhere on Aba Road."],["₦9m–₦10m","2014–2017 small SUVs, clean sedans","Check tyres and battery first — they are the usual reason the price is here."]]},{"type":"callout","tone":"green","title":"The four we would shortlist","text":"Corolla 1.8, Camry 2.5, Elantra 1.8, and the CR-V 2.4 if you need the space. All four have parts on every street in PH and a mechanic who has seen a hundred of them."},{"type":"heading","text":"The three costs nobody puts on the windscreen"},{"type":"checklist","items":["Transfer and papers: ₦150k–₦300k if the customs documents are clean, and a refusal if they are not.","Insurance and tracker: ₦120k a year for comprehensive, plus installation if you want the tracker on day one.","The first service: whoever sold it did not do this for you. Assume filters, oil, plugs and a battery test."]},{"type":"heading","text":"How to buy it without guessing"},{"type":"paragraph","text":"Book an [inspection](/services/inspection) before money moves. We read the ECU, check the papers against the chassis, and put a written verdict in your hands — the same one that decides whether the car appears in [our listings](/cars) at all."}]', 'inspection', 'Ada George is HonestCars’ market analyst. She prices every car we list against live Port Harcourt transactions.', 2, 'Your first car under ₦10m in Port Harcourt', 'What ₦6m–₦10m actually buys in PH right now, the four cars we would shortlist, and the three costs nobody puts on the windscreen.'),
+  (8, 'inspection-walkaround-video', 'Watch a HonestCars inspection, start to finish', 'video', 'Twelve seconds of the 45-minute checklist every car goes through before it reaches you.', '/img/blog/inspection-walkaround-video.jpg', 'An inspector filming the walkaround on a silver sedan', 'Raph Nicks', 'Head of Inspections', 3, 'published', '2026-08-31 00:00:00', 0, '["Toyota"]', '[{"type":"paragraph","text":"Every car on this site has been through the same 45-minute checklist. This is the short version — no narration, no music, just the steps, in order, on a real Port Harcourt car."},{"type":"video","src":"/video/inspection-walkaround.mp4","title":"The 45-minute inspection, in 12 seconds","caption":"Silent clip, 12 seconds. Nothing loads until you press play."},{"type":"heading","text":"What the inspector is doing at each step"},{"type":"checklist","items":["Walkaround: panel gaps and paint depth, because filler shows up as a shadow before it shows up on a meter.","Cold start: what the engine does before it is warm is the honest version of it.","OBD2 read: stored fault codes and the ECU’s own distance figure.","Papers against metal: VIN on the chassis, VIN on the customs document, engine number.","Road test: brakes, gearbox under load, and the suspension on a real PH road rather than a smooth one."]},{"type":"callout","tone":"blue","title":"What you get for it","text":"A written report with photos of every finding, a verdict, and a [price comparison](/cars) against the market band for that exact model and year. If the car is wrong, you find out before you have paid for it."},{"type":"paragraph","text":"Book one on any car in Port Harcourt, from any seller — it does not have to be one of ours. [Request an inspection](/services/inspection) and we will route the nearest inspector."}]', 'inspection', 'Raph Nicks leads HonestCars inspections in Port Harcourt and has written the checklist every inspector works to.', 1, 'Watch a HonestCars inspection, start to finish', 'Twelve seconds of the 45-minute checklist every car goes through before it reaches you, plus what each step is looking for.');
+
+
+-- blog_post_tags: 21 rows
+INSERT INTO blog_post_tags (`post_id`, `tag_id`) VALUES
+  (1, 9),
+  (1, 1),
+  (1, 8),
+  (2, 1),
+  (2, 3),
+  (2, 13),
+  (3, 5),
+  (3, 2),
+  (4, 3),
+  (4, 1),
+  (5, 4),
+  (5, 9),
+  (5, 10),
+  (5, 13),
+  (6, 6),
+  (6, 2),
+  (7, 7),
+  (7, 1),
+  (7, 13),
+  (8, 2),
+  (8, 12);
 
 INSERT INTO homepage_modules (`key`, title, payload, is_active, position) VALUES
   ('hero', 'Homepage hero', JSON_OBJECT('headline', NULL, 'subhead', NULL), 0, 10),
@@ -1074,7 +1135,7 @@ INSERT INTO leads (type, listing_id, name, phone, message, preferred_day, source
 INSERT INTO service_requests (tracking_id, type, status, name, phone, brief, sla_due_at, source_path,
                               notes, assigned_to, assigned_at, last_contacted_at) VALUES
   ('HC-2482', 'hire', 'new', 'Fleet officer, oil & gas firm', '+2348031110004',
-    '{"class":"suv","vehicles":4,"days":14,"with_driver":true,"airport_pickup":true,"corporate":true}',
+    '{"vehicle_class":"suv","vehicles":4,"days":14,"with_driver":"yes","airport_pickup":"yes","corporate":"yes","location":"Woji yard, with driver change-over at the base"}',
     DATE_SUB(UTC_TIMESTAMP(), INTERVAL 5 HOUR), '/hire', 'Corporate rotation — needs an invoice.',
     NULL, NULL, NULL),
   ('HC-2483', 'sell', 'new', 'Uche Nnamdi', '+2348031110009',
@@ -1350,7 +1411,23 @@ INSERT INTO leads (type, listing_id, name, phone, message, preferred_day, source
     (SELECT id FROM `users` WHERE phone = '+2348000000006' LIMIT 1),
     DATE_SUB(UTC_TIMESTAMP(), INTERVAL 6 DAY), DATE_SUB(UTC_TIMESTAMP(), INTERVAL 5 DAY),
     'AC not working — buyer walked away, told ops to fix before relisting.',
-    DATE_SUB(UTC_TIMESTAMP(), INTERVAL 6 DAY));
+    DATE_SUB(UTC_TIMESTAMP(), INTERVAL 6 DAY)),
+  -- The two customers who actually paid (§15.2): every payer has an enquiry
+  -- behind them, and the dashboard credits the channel that produced it. A
+  -- payment with no lead at all reads as "(unattributed)" — honest, but it is
+  -- not how this business works, so the demo shows the real shape.
+  ('concierge', NULL, 'Demo buyer (seeded record)', '+2348030000000',
+    'Wants a family SUV, budget ₦25m, prefers something with service history.',
+    NULL, '/find-my-car', 'closed',
+    (SELECT id FROM `users` WHERE phone = '+2348000000002' LIMIT 1),
+    DATE_SUB(UTC_TIMESTAMP(), INTERVAL 21 DAY), DATE_SUB(UTC_TIMESTAMP(), INTERVAL 19 DAY),
+    NULL, DATE_SUB(UTC_TIMESTAMP(), INTERVAL 21 DAY)),
+  ('viewing', (SELECT id FROM vehicle_listings WHERE stock_no = 'HC-PH-0029' LIMIT 1),
+    'Ada Okafor', '+2348031234567', 'Do you have a tracker for this one? I want it installed before delivery.',
+    NULL, '/cars/2015-toyota-corolla-hc-ph-0029', 'closed',
+    (SELECT id FROM `users` WHERE phone = '+2348000000006' LIMIT 1),
+    DATE_SUB(UTC_TIMESTAMP(), INTERVAL 14 DAY), DATE_SUB(UTC_TIMESTAMP(), INTERVAL 12 DAY),
+    NULL, DATE_SUB(UTC_TIMESTAMP(), INTERVAL 14 DAY));
 
 INSERT INTO saved_cars (user_id, listing_id, note, last_price_kobo) VALUES
   ((SELECT id FROM `users` WHERE phone = '+2348031234567' LIMIT 1),
@@ -1369,8 +1446,12 @@ INSERT INTO saved_searches (user_id, label, query, alerts_enabled, alert_price_d
 
 INSERT INTO service_requests (tracking_id, type, status, name, phone, brief, sla_due_at, source_path, notes) VALUES
   ('HC-2490', 'hire', 'options_ready', 'Ada Okafor', '+2348031234567',
-   '{"class":"suv","pickup":"2026-10-10","dropoff":"2026-10-13","days":3,"with_driver":false,"pickup_point":"airport","addons":["tracking"]}',
-   DATE_ADD(UTC_TIMESTAMP(), INTERVAL 20 HOUR), '/hire', 'Three days with an SUV, airport pickup Friday.');
+   JSON_OBJECT('vehicle_class', 'suv',
+               'date_from', DATE_FORMAT(DATE_ADD(UTC_DATE(), INTERVAL 4 DAY), '%Y-%m-%d'),
+               'date_to',   DATE_FORMAT(DATE_ADD(UTC_DATE(), INTERVAL 7 DAY), '%Y-%m-%d'),
+               'days', 4, 'location', 'Omagwa arrivals',
+               'airport_pickup', 'yes', 'addons', JSON_ARRAY('tracking')),
+   DATE_ADD(UTC_TIMESTAMP(), INTERVAL 20 HOUR), '/hire', 'Four days with an SUV, airport pickup — the brief matches what /hire posts.');
 
 INSERT INTO orders (order_no, name, phone, delivery_area, delivery_fee_kobo, subtotal_kobo, total_kobo, status, payment_ref, notes) VALUES
   ('HC-ORD-0001', 'Ada Okafor', '+2348031234567', 'GRA Phase 2', 0, 4500000, 4500000, 'paid', 'SEED-DEMO-0001',
@@ -1381,12 +1462,82 @@ INSERT INTO order_items (order_id, product_id, name, qty, unit_price_kobo, insta
    (SELECT id FROM products WHERE slug = 'tracker-standard' LIMIT 1),
    'Tracker — Standard', 1, 4500000, 1);
 
-INSERT INTO subscriptions (order_id, product_id, customer_name, customer_phone, device_state, installed_at, activated_at, renewal_at) VALUES
-  ((SELECT id FROM orders WHERE order_no = 'HC-ORD-0001' LIMIT 1),
+-- FR-20. Five tracker subscriptions across the whole lifecycle, so every state
+-- the console and the account screen can render is visible on a fresh seed:
+--
+--   #1  active, most of a year to run         nothing to do, shows the happy path
+--   #2  9 days out                            inside the 30-day window, reminder pending
+--   #3  2 days past the renewal date          inside the 7-day grace, still renewable
+--   #4  40 days past, never renewed            lapsed — the queue's reason to exist
+--   #5  paid, not yet fitted                   the activation checklist, mid-flight
+--
+-- amount_kobo is the renewal price and unit_label is the car the unit is in:
+-- together they make a renewal quotable and a unit identifiable on a phone call. The renewal dates are anchored to the seed run, not to fixed calendar
+-- dates, so the demo is never stale.
+INSERT INTO subscriptions
+  (kind, order_id, product_id, customer_name, customer_phone, unit_label, plan_name, amount_kobo,
+   device_state, installed_at, activated_at, renewal_at, period_months)
+VALUES
+  ('tracker', (SELECT id FROM orders WHERE order_no = 'HC-ORD-0001' LIMIT 1),
    (SELECT id FROM products WHERE slug = 'tracker-standard' LIMIT 1),
-   'Ada Okafor', '+2348031234567', 'activated',
+   'Ada Okafor', '+2348031234567',
+   '2016 Honda CR-V · ABC-123-PH', 'Tracker — Standard, 12 months', 4500000,
+   'activated',
    DATE_SUB(UTC_TIMESTAMP(), INTERVAL 10 DAY), DATE_SUB(UTC_TIMESTAMP(), INTERVAL 10 DAY),
-   DATE_ADD(UTC_TIMESTAMP(), INTERVAL 355 DAY));
+   DATE_ADD(UTC_TIMESTAMP(), INTERVAL 355 DAY), 12),
+  ('tracker', NULL,
+   (SELECT id FROM products WHERE slug = 'tracker-standard' LIMIT 1),
+   'Ada Okafor', '+2348031234567',
+   '2019 Toyota Corolla · KJA-884-XA', 'Tracker — Standard, 12 months', 4500000,
+   'activated',
+   DATE_SUB(UTC_TIMESTAMP(), INTERVAL 361 DAY), DATE_SUB(UTC_TIMESTAMP(), INTERVAL 361 DAY),
+   DATE_ADD(UTC_TIMESTAMP(), INTERVAL 9 DAY), 12),
+  ('tracker', NULL,
+   (SELECT id FROM products WHERE slug = 'tracker-pro' LIMIT 1),
+   'Ada Okafor', '+2348031234567',
+   '2014 Lexus RX 350 · LSR-201-PH', 'Tracker Pro — 12 months', 6500000,
+   'activated',
+   DATE_SUB(UTC_TIMESTAMP(), INTERVAL 367 DAY), DATE_SUB(UTC_TIMESTAMP(), INTERVAL 367 DAY),
+   DATE_SUB(UTC_TIMESTAMP(), INTERVAL 2 DAY), 12),
+  ('tracker', NULL,
+   (SELECT id FROM products WHERE slug = 'tracker-standard' LIMIT 1),
+   'Ada Okafor', '+2348031234567',
+   '2008 Toyota Corolla · GGE-410-XA', 'Tracker — Standard, 12 months', 4500000,
+   'lapsed',
+   DATE_SUB(UTC_TIMESTAMP(), INTERVAL 410 DAY), DATE_SUB(UTC_TIMESTAMP(), INTERVAL 410 DAY),
+   DATE_SUB(UTC_TIMESTAMP(), INTERVAL 40 DAY), 12);
+
+-- ...and one paid for but not yet fitted, which is the only row the activation
+-- checklist (installed → platform activated → renewal date) has anything to do on.
+INSERT INTO subscriptions
+  (kind, order_id, product_id, customer_name, customer_phone, unit_label, plan_name, amount_kobo,
+   device_state, installed_at, activated_at, renewal_at, period_months)
+VALUES
+  ('tracker', (SELECT id FROM orders WHERE order_no = 'HC-ORD-0001' LIMIT 1),
+   (SELECT id FROM products WHERE slug = 'tracker-standard' LIMIT 1),
+   'Ada Okafor', '+2348031234567',
+   '2012 Honda Accord · PH-552-KJA', 'Tracker — Standard, 12 months', 4500000,
+   'ordered', NULL, NULL, NULL, 12);
+
+-- FR-20 / §7.3 “dealer retainer/subs management”: two lots on monthly plans —
+-- one paid up, one overdue — created with the checklist already complete because
+-- a retainer is a paperwork arrangement, not a device waiting to be fitted.
+INSERT INTO subscriptions
+  (kind, dealer_id, customer_name, customer_phone, unit_label, plan_name, amount_kobo,
+   device_state, installed_at, activated_at, renewal_at, period_months)
+VALUES
+  ('dealer_retainer', (SELECT id FROM dealers WHERE name = 'Woji Car Mart' LIMIT 1),
+   'Woji Car Mart', '+2348000000006', 'Woji Car Mart',
+   'Dealer retainer — monthly', 2500000,
+   'activated',
+   DATE_SUB(UTC_TIMESTAMP(), INTERVAL 90 DAY), DATE_SUB(UTC_TIMESTAMP(), INTERVAL 90 DAY),
+   DATE_ADD(UTC_TIMESTAMP(), INTERVAL 21 DAY), 1),
+  ('dealer_retainer', (SELECT id FROM dealers WHERE name = 'Aba Road Autos' LIMIT 1),
+   'Aba Road Autos', '+2348000000007', 'Aba Road Autos',
+   'Dealer retainer — monthly', 2500000,
+   'renewal_due',
+   DATE_SUB(UTC_TIMESTAMP(), INTERVAL 120 DAY), DATE_SUB(UTC_TIMESTAMP(), INTERVAL 120 DAY),
+   DATE_SUB(UTC_TIMESTAMP(), INTERVAL 6 DAY), 1);
 
 -- ---------------------------------------------------------------------------
 -- Post-seed sanity: the 90-day sold hand-off row on vehicle_listings so ops
@@ -1396,13 +1547,352 @@ UPDATE vehicle_listings SET archive_redirect_path = CONCAT('/cars/', LOWER(REPLA
  WHERE status = 'sold' AND sold_at <= DATE_SUB(UTC_TIMESTAMP(), INTERVAL 90 DAY);
 
 -- ---------------------------------------------------------------------------
--- §7.3 UTM report: the links the demo traffic actually arrived on. Keyed off
--- the lead id, so the same lead always reports the same campaign — a report
--- that reshuffles itself on every load is worse than no report. One bucket in
--- five stays NULL on purpose: "direct / none" is a real answer, and hiding it
--- would make the channel mix look tidier than it is.
+-- §7.3 UTM report / §15.2 channel report: the links the demo traffic arrived on.
+--
+-- Bucketed by each lead's *rank* (1st, 2nd, 3rd…), not by its id: ids drift as
+-- the table is reseeded, and an attribution that changes between two loads of
+-- the same database is worse than no attribution. One bucket in five stays NULL
+-- on purpose — "direct / none" is a real answer, and hiding it would make the
+-- channel mix look tidier than it is.
 -- ---------------------------------------------------------------------------
-UPDATE leads SET utm = JSON_OBJECT('source', 'instagram', 'medium', 'social', 'campaign', 'ph-suv-september') WHERE id % 5 = 0;
-UPDATE leads SET utm = JSON_OBJECT('source', 'google',    'medium', 'cpc',    'campaign', 'ph-inspection-search') WHERE id % 5 = 1;
-UPDATE leads SET utm = JSON_OBJECT('source', 'facebook',  'medium', 'social', 'campaign', 'ph-diesel-trucks') WHERE id % 5 = 2;
-UPDATE leads SET utm = JSON_OBJECT('source', 'whatsapp',  'medium', 'referral', 'campaign', 'dealer-referral') WHERE id % 5 = 3;
+UPDATE leads
+   SET utm = CASE (
+         SELECT COUNT(*) FROM (SELECT id FROM leads) AS ranked WHERE ranked.id <= leads.id
+       ) % 5
+         WHEN 0 THEN JSON_OBJECT('source', 'instagram', 'medium', 'social',   'campaign', 'ph-suv-september')
+         WHEN 1 THEN JSON_OBJECT('source', 'google',    'medium', 'cpc',      'campaign', 'ph-inspection-search')
+         WHEN 2 THEN JSON_OBJECT('source', 'facebook',  'medium', 'social',   'campaign', 'ph-diesel-trucks')
+         WHEN 3 THEN JSON_OBJECT('source', 'whatsapp',  'medium', 'referral', 'campaign', 'dealer-referral')
+         ELSE NULL
+       END;
+
+-- ...and the two paying customers explicitly, so the demo shows a full chain
+-- rather than the pattern landing them in the NULL bucket by accident.
+UPDATE leads SET utm = JSON_OBJECT('source', 'instagram', 'medium', 'social', 'campaign', 'ph-suv-september')
+ WHERE phone = '+2348030000000';
+UPDATE leads SET utm = JSON_OBJECT('source', 'google', 'medium', 'cpc', 'campaign', 'ph-inspection-search')
+ WHERE phone = '+2348031234567';
+
+-- ---------------------------------------------------------------------------
+-- §15.2 Marketing dashboard: thirty days of arrival traffic.
+--
+-- Events are only ever written by a real browser, so a fresh database has an
+-- empty analytics_events table and every channel reads zero — a dashboard that
+-- demoes as a wall of dashes. This seeds the month a business this size would
+-- actually have: six channels, hours spread through the day, and the funnel
+-- events each channel converts on.
+--
+-- Direct traffic carries no utm key at all, because that is what direct means;
+-- the dashboard must show it as "(direct / none)" rather than folding it into a
+-- channel it may not have come from.
+--
+-- Built by cross join (channel × day × session) rather than a thousand literal
+-- rows: the file stays small, and changing a channel's volume is one number.
+-- ---------------------------------------------------------------------------
+CREATE TEMPORARY TABLE seed_channel (
+  slot     VARCHAR(20) NOT NULL,
+  source   VARCHAR(40) NULL,
+  medium   VARCHAR(30) NULL,
+  campaign VARCHAR(60) NULL,
+  per_day  INT NOT NULL,   -- sessions a day
+  views    INT NOT NULL,   -- of those, how many open a listing
+  clicks   INT NOT NULL,   -- WhatsApp hand-offs
+  starts   INT NOT NULL,   -- concierge/booking/checkout started
+  retainer INT NOT NULL,   -- concierge retainers paid
+  buys     INT NOT NULL,   -- shop purchases
+  books    INT NOT NULL    -- hire/booking completed
+);
+
+INSERT INTO seed_channel (slot, source, medium, campaign, per_day, views, clicks, starts, retainer, buys, books) VALUES
+  ('google',    'google',    'cpc',      'ph-inspection-search', 9, 6, 2, 3, 1, 1, 0),
+  ('instagram', 'instagram', 'social',   'ph-suv-september',     7, 5, 2, 2, 1, 0, 1),
+  ('facebook',  'facebook',  'social',   'ph-diesel-trucks',     5, 3, 1, 1, 0, 0, 1),
+  ('whatsapp',  'whatsapp',  'referral', 'dealer-referral',      3, 2, 2, 1, 1, 1, 0),
+  ('direct',    NULL,        NULL,       NULL,                   6, 4, 1, 1, 0, 0, 0),
+  ('tiktok',    'tiktok',    'social',   'ph-first-car-october', 3, 2, 0, 1, 0, 0, 0);
+
+CREATE TEMPORARY TABLE seed_day (d INT NOT NULL);
+INSERT INTO seed_day (d) VALUES
+  (0),(1),(2),(3),(4),(5),(6),(7),(8),(9),(10),(11),(12),(13),(14),
+  (15),(16),(17),(18),(19),(20),(21),(22),(23),(24),(25),(26),(27),(28),(29);
+
+CREATE TEMPORARY TABLE seed_slot (n INT NOT NULL);
+INSERT INTO seed_slot (n) VALUES
+  (0),(1),(2),(3),(4),(5),(6),(7),(8),(9),(10),(11),(12),(13),(14),(15);
+
+-- One statement per event name, and the per-channel columns above decide which
+-- sessions emit it, so the volumes stay in one readable table and nothing is
+-- random (a seed that reshuffles on every load cannot be compared with itself).
+-- The session id is shared by every event of one visit, which is what makes
+-- "sessions" a count of people rather than of page views.
+INSERT INTO analytics_events (event_name, payload, source_path, session_id, created_at)
+SELECT 'listing_impression',
+       IF(ch.source IS NULL, NULL,
+          JSON_OBJECT('utm', JSON_OBJECT('source', ch.source, 'medium', ch.medium, 'campaign', ch.campaign),
+                      'result_count', 40 + (d.d % 20))),
+       '/cars',
+       CONCAT('seed-', ch.slot, '-', d.d, '-', s.n),
+       -- Midnight-anchored, and today's sessions stop at the current hour: a
+       -- seeded visit dated tomorrow would fall outside the very window the
+       -- dashboard opens on, and the traffic would read as less than it is.
+       DATE_ADD(DATE_ADD(DATE_SUB(UTC_DATE(), INTERVAL d.d DAY),
+                INTERVAL ((s.n * 5 + d.d * 7) % IF(d.d = 0, GREATEST(1, HOUR(UTC_TIMESTAMP())), 24)) HOUR),
+                INTERVAL ((s.n * 13 + d.d * 11) % 60) MINUTE)
+  FROM seed_channel ch, seed_day d, seed_slot s
+ WHERE s.n < ch.per_day;
+
+INSERT INTO analytics_events (event_name, payload, source_path, session_id, created_at)
+SELECT 'listing_view',
+       IF(ch.source IS NULL, NULL,
+          JSON_OBJECT('utm', JSON_OBJECT('source', ch.source, 'medium', ch.medium, 'campaign', ch.campaign),
+                      'listing_id', 1 + ((s.n * 7 + d.d) % 60), 'grade', ELT(1 + ((s.n + d.d) % 4), 'verified', 'inspected', 'listed', 'pending'),
+                      'price_position', ELT(1 + ((s.n + d.d) % 3), 'below', 'within', 'premium'))),
+       '/cars',
+       CONCAT('seed-', ch.slot, '-', d.d, '-', s.n),
+       -- Midnight-anchored, and today's sessions stop at the current hour: a
+       -- seeded visit dated tomorrow would fall outside the very window the
+       -- dashboard opens on, and the traffic would read as less than it is.
+       DATE_ADD(DATE_ADD(DATE_SUB(UTC_DATE(), INTERVAL d.d DAY),
+                INTERVAL ((s.n * 5 + d.d * 7) % IF(d.d = 0, GREATEST(1, HOUR(UTC_TIMESTAMP())), 24)) HOUR),
+                INTERVAL ((s.n * 13 + d.d * 11) % 60) MINUTE)
+  FROM seed_channel ch, seed_day d, seed_slot s
+ WHERE s.n < ch.views;
+
+INSERT INTO analytics_events (event_name, payload, source_path, session_id, created_at)
+SELECT 'whatsapp_click',
+       IF(ch.source IS NULL, NULL,
+          JSON_OBJECT('utm', JSON_OBJECT('source', ch.source, 'medium', ch.medium, 'campaign', ch.campaign),
+                      'source', 'vdp')),
+       '/cars',
+       CONCAT('seed-', ch.slot, '-', d.d, '-', s.n),
+       -- Midnight-anchored, and today's sessions stop at the current hour: a
+       -- seeded visit dated tomorrow would fall outside the very window the
+       -- dashboard opens on, and the traffic would read as less than it is.
+       DATE_ADD(DATE_ADD(DATE_SUB(UTC_DATE(), INTERVAL d.d DAY),
+                INTERVAL ((s.n * 5 + d.d * 7) % IF(d.d = 0, GREATEST(1, HOUR(UTC_TIMESTAMP())), 24)) HOUR),
+                INTERVAL ((s.n * 13 + d.d * 11) % 60) MINUTE)
+  FROM seed_channel ch, seed_day d, seed_slot s
+ WHERE s.n < ch.clicks;
+
+INSERT INTO analytics_events (event_name, payload, source_path, session_id, created_at)
+SELECT 'concierge_started',
+       IF(ch.source IS NULL, NULL,
+          JSON_OBJECT('utm', JSON_OBJECT('source', ch.source, 'medium', ch.medium, 'campaign', ch.campaign),
+                      'type', 'concierge')),
+       '/find-my-car',
+       CONCAT('seed-', ch.slot, '-', d.d, '-', s.n),
+       -- Midnight-anchored, and today's sessions stop at the current hour: a
+       -- seeded visit dated tomorrow would fall outside the very window the
+       -- dashboard opens on, and the traffic would read as less than it is.
+       DATE_ADD(DATE_ADD(DATE_SUB(UTC_DATE(), INTERVAL d.d DAY),
+                INTERVAL ((s.n * 5 + d.d * 7) % IF(d.d = 0, GREATEST(1, HOUR(UTC_TIMESTAMP())), 24)) HOUR),
+                INTERVAL ((s.n * 13 + d.d * 11) % 60) MINUTE)
+  FROM seed_channel ch, seed_day d, seed_slot s
+ WHERE s.n < ch.starts;
+
+INSERT INTO analytics_events (event_name, payload, source_path, session_id, created_at)
+SELECT 'concierge_retainer_paid',
+       IF(ch.source IS NULL, NULL,
+          JSON_OBJECT('utm', JSON_OBJECT('source', ch.source, 'medium', ch.medium, 'campaign', ch.campaign),
+                      'type', 'concierge', 'value', 50000, 'currency', 'NGN')),
+       '/find-my-car',
+       CONCAT('seed-', ch.slot, '-', d.d, '-', s.n),
+       -- Midnight-anchored, and today's sessions stop at the current hour: a
+       -- seeded visit dated tomorrow would fall outside the very window the
+       -- dashboard opens on, and the traffic would read as less than it is.
+       DATE_ADD(DATE_ADD(DATE_SUB(UTC_DATE(), INTERVAL d.d DAY),
+                INTERVAL ((s.n * 5 + d.d * 7) % IF(d.d = 0, GREATEST(1, HOUR(UTC_TIMESTAMP())), 24)) HOUR),
+                INTERVAL ((s.n * 13 + d.d * 11) % 60) MINUTE)
+  FROM seed_channel ch, seed_day d, seed_slot s
+ WHERE s.n < ch.retainer;
+
+INSERT INTO analytics_events (event_name, payload, source_path, session_id, created_at)
+SELECT 'purchase',
+       IF(ch.source IS NULL, NULL,
+          JSON_OBJECT('utm', JSON_OBJECT('source', ch.source, 'medium', ch.medium, 'campaign', ch.campaign),
+                      'type', 'order', 'value', 45000, 'currency', 'NGN')),
+       '/checkout',
+       CONCAT('seed-', ch.slot, '-', d.d, '-', s.n),
+       -- Midnight-anchored, and today's sessions stop at the current hour: a
+       -- seeded visit dated tomorrow would fall outside the very window the
+       -- dashboard opens on, and the traffic would read as less than it is.
+       DATE_ADD(DATE_ADD(DATE_SUB(UTC_DATE(), INTERVAL d.d DAY),
+                INTERVAL ((s.n * 5 + d.d * 7) % IF(d.d = 0, GREATEST(1, HOUR(UTC_TIMESTAMP())), 24)) HOUR),
+                INTERVAL ((s.n * 13 + d.d * 11) % 60) MINUTE)
+  FROM seed_channel ch, seed_day d, seed_slot s
+ WHERE s.n < ch.buys;
+
+INSERT INTO analytics_events (event_name, payload, source_path, session_id, created_at)
+SELECT 'booking_completed',
+       IF(ch.source IS NULL, NULL,
+          JSON_OBJECT('utm', JSON_OBJECT('source', ch.source, 'medium', ch.medium, 'campaign', ch.campaign),
+                      'type', 'hire', 'value', 45000, 'currency', 'NGN')),
+       '/hire',
+       CONCAT('seed-', ch.slot, '-', d.d, '-', s.n),
+       -- Midnight-anchored, and today's sessions stop at the current hour: a
+       -- seeded visit dated tomorrow would fall outside the very window the
+       -- dashboard opens on, and the traffic would read as less than it is.
+       DATE_ADD(DATE_ADD(DATE_SUB(UTC_DATE(), INTERVAL d.d DAY),
+                INTERVAL ((s.n * 5 + d.d * 7) % IF(d.d = 0, GREATEST(1, HOUR(UTC_TIMESTAMP())), 24)) HOUR),
+                INTERVAL ((s.n * 13 + d.d * 11) % 60) MINUTE)
+  FROM seed_channel ch, seed_day d, seed_slot s
+ WHERE s.n < ch.books;
+
+DROP TEMPORARY TABLE seed_channel;
+DROP TEMPORARY TABLE seed_day;
+DROP TEMPORARY TABLE seed_slot;
+
+-- ---------------------------------------------------------------------------
+-- FR-22 — hire management.
+--
+-- The pool is ten real units, not ten of the same car: two partner-owned,
+-- one whose papers are missing (so the allocation guard has something to
+-- refuse), one with papers expiring inside the month, one with a tracker still
+-- on order, one in the workshop. A demo where every unit is identical hides
+-- exactly the decisions this screen exists to support.
+--
+-- The hire book covers every state the lifecycle can be in: quoted (waiting on
+-- the client), accepted (payment raised), confirmed (paid, car allocated),
+-- on hire (out now), completed (came back, invoice issued) and cancelled. The
+-- corporate RFQ from HC-2482 is four references under one request — a hire is
+-- one car, so four cars is four hires.
+-- ---------------------------------------------------------------------------
+INSERT INTO hire_vehicles (plate, class_slug, make, model, year, colour, seats, owner, partner_name,
+                           driver_available, documents_state, documents_due, tracker_state, status,
+                           location, notes) VALUES
+  ('KJA-482-PH', 'suv',    'Toyota', 'Highlander', 2019, 'Silver',  7, 'honestcars', NULL, 1, 'current',  DATE_ADD(UTC_DATE(), INTERVAL 400 DAY), 'fitted',   'on_hire',   'Woji yard',      'Corporate favourite — out on the Saipem rotation.'),
+  ('RUM-119-PH', 'suv',    'Ford',   'Explorer',   2018, 'Black',   7, 'partner',    'Delta Fleet Services', 1, 'missing', NULL, 'none', 'available', 'GRA Phase 2', 'Partner unit. Insurance lapsed — nothing goes out on it until papers are back.'),
+  ('WOJ-630-PH', 'sedan',  'Toyota', 'Corolla',    2018, 'White',   5, 'honestcars', NULL, 1, 'current',  DATE_ADD(UTC_DATE(), INTERVAL 250 DAY), 'fitted',   'available', 'Woji yard',      NULL),
+  ('GRA-274-PH', 'sedan',  'Toyota', 'Camry',      2019, 'Grey',    5, 'partner',    'Rivers Fleet Ltd', 1, 'current',  DATE_ADD(UTC_DATE(), INTERVAL 120 DAY), 'fitted',   'available', 'GRA Phase 2', 'Partner unit, driver supplied by us.'),
+  ('PHC-905-PH', 'suv',    'Lexus',  'RX 350',     2017, 'Blue',    5, 'honestcars', NULL, 1, 'expiring', DATE_ADD(UTC_DATE(), INTERVAL 18 DAY),  'fitted',   'available', 'Woji yard',      'Papers due this month — renewal with the underwriter.'),
+  ('RUM-518-PH', 'suv',    'Toyota', 'RAV4',       2019, 'Green',   5, 'honestcars', NULL, 1, 'current',  DATE_ADD(UTC_DATE(), INTERVAL 275 DAY), 'fitted',   'available', 'Woji yard',      'Spare SUV — the one the desk puts on a late corporate ask.'),
+  ('TRA-188-PH', 'pickup', 'Toyota', 'Hilux',      2020, 'White',   5, 'honestcars', NULL, 1, 'current',  DATE_ADD(UTC_DATE(), INTERVAL 310 DAY), 'fitted',   'available', 'Trans-Amadi',    'Site and project work.'),
+  ('OBI-357-PH', 'bus',    'Toyota', 'Hiace',      2016, 'White',  14, 'honestcars', NULL, 1, 'current',  DATE_ADD(UTC_DATE(), INTERVAL 200 DAY), 'on_order', 'available', 'Rumuokoro',      'Tracker still on order — booked to be fitted next week.'),
+  ('ELE-712-PH', 'luxury', 'Lexus',  'GX 460',     2018, 'Black',   5, 'honestcars', NULL, 1, 'current',  DATE_ADD(UTC_DATE(), INTERVAL 140 DAY), 'fitted',   'available', 'Woji yard',      'Weddings, delegations, the chairman.'),
+  ('RIV-204-PH', 'sedan',  'Hyundai','Elantra',    2017, 'Ash',     5, 'honestcars', NULL, 1, 'current',  DATE_ADD(UTC_DATE(), INTERVAL 60 DAY),  'fitted',   'service',   'Woji workshop',  'In the workshop — see the open incident against it.');
+
+-- The hire book. Amounts are computed off the rate card the client saw, with the
+-- 10% refundable deposit the /hire page describes.
+INSERT INTO hire_bookings (reference, request_id, vehicle_id, class_slug, client_name, client_phone, company,
+                           pickup_at, dropoff_at, pickup_point, days, with_driver, driver_name, airport_pickup,
+                           day_rate_kobo, driver_kobo, extras_kobo, deposit_kobo, total_kobo, status,
+                           quote_sent_at, accepted_at, completed_at, cancelled_at, cancel_reason,
+                           notes, fuel_out, fuel_in, odometer_out, odometer_in) VALUES
+  -- ① The concierge hire request: quoted, waiting on Ada to accept.
+  ('HC-HIRE-0001',
+   (SELECT id FROM service_requests WHERE tracking_id = 'HC-2490' LIMIT 1), NULL, 'suv',
+   'Ada Okafor', '+2348031234567', NULL,
+   DATE_ADD(UTC_DATE(), INTERVAL 4 DAY), DATE_ADD(UTC_DATE(), INTERVAL 7 DAY), 'Omagwa arrivals', 3, 0, NULL, 1,
+   5500000, 0, 0, 1650000, 18150000, 'quoted',
+   DATE_SUB(UTC_TIMESTAMP(), INTERVAL 20 HOUR), NULL, NULL, NULL, NULL,
+   'Airport pick-up Friday morning; add the tracking add-on after handover.', NULL, NULL, NULL, NULL),
+
+  -- ②–⑤ The corporate RFQ (HC-2482): fourteen days, four SUVs, with drivers.
+  ('HC-HIRE-0002',
+   (SELECT id FROM service_requests WHERE tracking_id = 'HC-2482' LIMIT 1),
+   (SELECT id FROM hire_vehicles WHERE plate = 'KJA-482-PH' LIMIT 1), 'suv',
+   'Fleet officer, oil & gas firm', '+2348031110004', 'Saipem Nigeria field rotation',
+   DATE_SUB(UTC_DATE(), INTERVAL 2 DAY), DATE_ADD(UTC_DATE(), INTERVAL 12 DAY), 'Woji yard', 14, 1, 'Monday Chukwu', 1,
+   33000000, 25200000, 0, 9120000, 100320000, 'on_hire',
+   DATE_SUB(UTC_TIMESTAMP(), INTERVAL 6 DAY), DATE_SUB(UTC_TIMESTAMP(), INTERVAL 5 DAY), NULL, NULL, NULL,
+   'Rotation 1 — unit out, driver assigned.', 92, NULL, 61240, NULL),
+  ('HC-HIRE-0003',
+   (SELECT id FROM service_requests WHERE tracking_id = 'HC-2482' LIMIT 1),
+   (SELECT id FROM hire_vehicles WHERE plate = 'PHC-905-PH' LIMIT 1), 'suv',
+   'Fleet officer, oil & gas firm', '+2348031110004', 'Saipem Nigeria field rotation',
+   DATE_ADD(UTC_DATE(), INTERVAL 1 DAY), DATE_ADD(UTC_DATE(), INTERVAL 15 DAY), 'Woji yard', 14, 1, 'Ibrahim Sule', 1,
+   33000000, 25200000, 0, 9120000, 100320000, 'confirmed',
+   DATE_SUB(UTC_TIMESTAMP(), INTERVAL 6 DAY), DATE_SUB(UTC_TIMESTAMP(), INTERVAL 5 DAY), NULL, NULL, NULL,
+   'Rotation 1 — paid, unit allocated, goes out tomorrow.', NULL, NULL, NULL, NULL),
+  ('HC-HIRE-0004',
+   (SELECT id FROM service_requests WHERE tracking_id = 'HC-2482' LIMIT 1), NULL, 'suv',
+   'Fleet officer, oil & gas firm', '+2348031110004', 'Saipem Nigeria field rotation',
+   DATE_ADD(UTC_DATE(), INTERVAL 1 DAY), DATE_ADD(UTC_DATE(), INTERVAL 15 DAY), 'Woji yard', 14, 1, NULL, 1,
+   33000000, 25200000, 0, 9120000, 100320000, 'accepted',
+   DATE_SUB(UTC_TIMESTAMP(), INTERVAL 6 DAY), DATE_SUB(UTC_TIMESTAMP(), INTERVAL 3 DAY), NULL, NULL, NULL,
+   'Rotation 1 — client accepted, transfer not yet landed. Fourth unit owes us a car: the Explorer cannot go out.', NULL, NULL, NULL, NULL),
+  ('HC-HIRE-0005',
+   (SELECT id FROM service_requests WHERE tracking_id = 'HC-2482' LIMIT 1), NULL, 'suv',
+   'Fleet officer, oil & gas firm', '+2348031110004', 'Saipem Nigeria field rotation',
+   DATE_ADD(UTC_DATE(), INTERVAL 16 DAY), DATE_ADD(UTC_DATE(), INTERVAL 30 DAY), 'Woji yard', 14, 1, NULL, 1,
+   33000000, 25200000, 0, 9120000, 100320000, 'quoted',
+   DATE_SUB(UTC_TIMESTAMP(), INTERVAL 2 DAY), NULL, NULL, NULL, NULL,
+   'Rotation 2 — quoted, waiting on their procurement.', NULL, NULL, NULL, NULL),
+
+  -- ⑥ A hire that ran and closed, with the readings taken both ways.
+  ('HC-HIRE-0006',
+   NULL, (SELECT id FROM hire_vehicles WHERE plate = 'WOJ-630-PH' LIMIT 1), 'sedan',
+   'Chinedu Okafor', '+2348031110013', 'Zenith Bank, Aba Road branch',
+   DATE_SUB(UTC_DATE(), INTERVAL 9 DAY), DATE_SUB(UTC_DATE(), INTERVAL 5 DAY), 'Our Woji office', 5, 0, NULL, 0,
+   3500000, 0, 0, 1750000, 19250000, 'completed',
+   DATE_SUB(UTC_TIMESTAMP(), INTERVAL 12 DAY), DATE_SUB(UTC_TIMESTAMP(), INTERVAL 11 DAY),
+   DATE_SUB(UTC_TIMESTAMP(), INTERVAL 5 DAY), NULL, NULL,
+   'Left with a full tank and came back with three-quarters — no charge, within tolerance.',
+   100, 74, 45120, 45533),
+
+  -- ⑦ A hire that stopped before it started.
+  ('HC-HIRE-0007',
+   NULL, (SELECT id FROM hire_vehicles WHERE plate = 'OBI-357-PH' LIMIT 1), 'bus',
+   'Bright Iheanacho', '+2348031110014', 'Iheanacho Events',
+   DATE_ADD(UTC_DATE(), INTERVAL 9 DAY), DATE_ADD(UTC_DATE(), INTERVAL 11 DAY), 'Hotel Presidential', 3, 1, NULL, 1,
+   9500000, 7500000, 0, 3600000, 39600000, 'cancelled',
+   DATE_SUB(UTC_TIMESTAMP(), INTERVAL 8 DAY), NULL, NULL, DATE_SUB(UTC_TIMESTAMP(), INTERVAL 4 DAY),
+   'Event moved to next month — the client will rebook.',
+   'Cancelled before any money moved; the unit was never allocated for the new dates.', NULL, NULL, NULL, NULL);
+
+-- The hire payments: two paid (the unit is out, and the one that closed) and one
+-- raised and still pending (the fourth rotation car, waiting on procurement).
+INSERT INTO payments (reference, provider, provider_ref, purpose, order_id, booking_id, request_id,
+                      subscription_id, hire_booking_id, customer_name, customer_phone, amount_kobo, status,
+                      checkout_url, created_by, paid_at) VALUES
+  ('HC-PAY-000006', 'bank_transfer', 'SEED-BT-0006', 'hire', NULL, NULL, NULL, NULL,
+   (SELECT id FROM hire_bookings WHERE reference = 'HC-HIRE-0002' LIMIT 1),
+   'Fleet officer, oil & gas firm', '+2348031110004', 100320000, 'paid', NULL, NULL,
+   DATE_SUB(UTC_TIMESTAMP(), INTERVAL 5 DAY)),
+  ('HC-PAY-000007', 'bank_transfer', 'SEED-BT-0007', 'hire', NULL, NULL, NULL, NULL,
+   (SELECT id FROM hire_bookings WHERE reference = 'HC-HIRE-0003' LIMIT 1),
+   'Fleet officer, oil & gas firm', '+2348031110004', 100320000, 'paid', NULL, NULL,
+   DATE_SUB(UTC_TIMESTAMP(), INTERVAL 4 DAY)),
+  ('HC-PAY-000008', 'manual', NULL, 'hire', NULL, NULL, NULL, NULL,
+   (SELECT id FROM hire_bookings WHERE reference = 'HC-HIRE-0004' LIMIT 1),
+   'Fleet officer, oil & gas firm', '+2348031110004', 100320000, 'pending', NULL, NULL, NULL),
+  ('HC-PAY-000009', 'bank_transfer', 'SEED-BT-0009', 'hire', NULL, NULL, NULL, NULL,
+   (SELECT id FROM hire_bookings WHERE reference = 'HC-HIRE-0006' LIMIT 1),
+   'Chinedu Okafor', '+2348031110013', 19250000, 'paid', NULL, NULL,
+   DATE_SUB(UTC_TIMESTAMP(), INTERVAL 11 DAY));
+
+-- The incident log. One open against the workshop car (which is why it is off
+-- the road), and one closed from the hire that just finished — the resolved
+-- record is the point of keeping a log at all.
+INSERT INTO hire_incidents (booking_id, vehicle_id, kind, severity, detail, cost_kobo, charged_kobo,
+                            status, occurred_at, resolved_at, resolution, reported_by) VALUES
+  (NULL, (SELECT id FROM hire_vehicles WHERE plate = 'RIV-204-PH' LIMIT 1), 'breakdown', 'major',
+   'Overheated on Aba Road during a hire — head gasket suspected. Recovered to the Woji workshop.',
+   0, 0, 'open', DATE_SUB(UTC_TIMESTAMP(), INTERVAL 3 DAY), NULL, NULL, NULL),
+  ((SELECT id FROM hire_bookings WHERE reference = 'HC-HIRE-0006' LIMIT 1),
+   (SELECT id FROM hire_vehicles WHERE plate = 'WOJ-630-PH' LIMIT 1), 'fuel', 'minor',
+   'Returned with the tank at 74% against 100% at handover.',
+   0, 0, 'resolved', DATE_SUB(UTC_TIMESTAMP(), INTERVAL 5 DAY),
+   DATE_SUB(UTC_TIMESTAMP(), INTERVAL 5 DAY),
+   'Within the tolerance we allow on a five-day hire — no charge to the client.', NULL);
+
+-- ---------------------------------------------------------------------------
+-- §15.2 CAC guardrail: what the advertising cost.
+--
+-- An invoice arrives from Meta or Google after the month closes, so spend is
+-- entered by hand (admin → Marketing) rather than derived. Seeded here for the
+-- two 30-day blocks the dashboard's default window sits inside, so a reader can
+-- widen or shift the dates and see the window actually do something.
+--
+-- No row for direct (organic) or WhatsApp (referral): untracked cost is not
+-- zero cost, it is unknown, and the screen shows a dash rather than a
+-- flattering ₦0.
+-- ---------------------------------------------------------------------------
+INSERT INTO marketing_spend (channel, period_start, period_end, amount_kobo, note) VALUES
+  ('google',    DATE_SUB(UTC_DATE(), INTERVAL 29 DAY), UTC_DATE(), 7400000, 'Search — inspection and concierge terms (demo figure)'),
+  ('instagram', DATE_SUB(UTC_DATE(), INTERVAL 29 DAY), UTC_DATE(), 3950000, 'Reels + carousel, SUV pillar (demo figure)'),
+  ('facebook',  DATE_SUB(UTC_DATE(), INTERVAL 29 DAY), UTC_DATE(), 1500000, 'Marketplace audience retargeting (demo figure)'),
+  ('tiktok',    DATE_SUB(UTC_DATE(), INTERVAL 29 DAY), UTC_DATE(),  700000, 'First-car series, test spend (demo figure)'),
+  ('google',    DATE_SUB(UTC_DATE(), INTERVAL 60 DAY), DATE_SUB(UTC_DATE(), INTERVAL 31 DAY), 6800000, 'Search — previous month (demo figure)'),
+  ('instagram', DATE_SUB(UTC_DATE(), INTERVAL 60 DAY), DATE_SUB(UTC_DATE(), INTERVAL 31 DAY), 3600000, 'Reels — previous month (demo figure)'),
+  ('facebook',  DATE_SUB(UTC_DATE(), INTERVAL 60 DAY), DATE_SUB(UTC_DATE(), INTERVAL 31 DAY), 1200000, 'Retargeting — previous month (demo figure)');
