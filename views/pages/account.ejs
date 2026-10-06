@@ -220,7 +220,7 @@
         <% } %>
 
         <% if (subscriptions.length) { %>
-          <h3 class="mt-3 mb-1">My tracked vehicles</h3>
+          <h3 class="mt-3 mb-1" id="subscriptions">My tracked vehicles</h3>
           <ul class="account-list account-list--tight">
             <% subscriptions.forEach(function (subscription) { %>
               <li class="account-item">
@@ -241,10 +241,17 @@
                 </div>
                 <div class="account-item__side">
                   <span class="status-pill status-pill--<%= subscription.state %>"><%= subscription.stateLabel %></span>
-                  <%# FR-20 in progress: the renewal price is shown, the online
-                      renew action lands with the /account subscription routes. %>
-                  <% if (subscription.amountKobo && subscription.state !== 'cancelled') { %>
-                    <span class="account-item__meta tabular">Renew · <%= helpers.formatNaira(subscription.amountKobo) %></span>
+                  <%# FR-20: renewal is a real POST (§7.3 “online renewals”). An
+                      unpaid renewal already raised shows the way back to it rather
+                      than a second button that would raise a second reference. %>
+                  <% if (subscription.paymentId && subscription.paymentStatus === 'pending' && subscription.paymentReference) { %>
+                    <a class="btn btn--secondary btn--sm" href="/account/renewals/<%= subscription.paymentReference %>">Finish paying</a>
+                  <% } else if (subscription.amountKobo && subscription.state !== 'cancelled') { %>
+                    <form method="post" action="/account/subscriptions/<%= subscription.id %>/renew">
+                      <button class="btn btn--secondary btn--sm" type="submit">
+                        Renew · <%= helpers.formatNaira(subscription.amountKobo) %>
+                      </button>
+                    </form>
                   <% } %>
                 </div>
               </li>

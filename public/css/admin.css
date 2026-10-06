@@ -1022,3 +1022,20 @@ body.admin {
 }
 
 .lead-row__actions .input { flex: 1 1 220px; }
+
+/* FR-20 subscriptions — a per-row form inside the queue table. The row itself
+   stays scannable; the checklist and terms open on demand. */
+.mini-list__side { display: inline-flex; align-items: center; gap: var(--space-1); }
+.badge-row { margin-left: auto; }
+.row-details > summary {
+  cursor: pointer;
+  font-size: var(--text-14);
+  font-weight: var(--weight-semibold, 600);
+  color: var(--colour-navy, #10233D);
+  padding: 4px 0;
+}
+.row-details > summary:hover { text-decoration: underline; }
+.row-details[open] { min-width: 260px; }
+.row-details form { margin-top: var(--space-1); }
+.row-details .field { margin-bottom: var(--space-1); }
+.topbar-check { display: inline-flex; align-items: center; gap: 6px; min-height: 32px; }

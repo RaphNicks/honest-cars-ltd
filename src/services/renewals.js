@@ -35,19 +35,38 @@ const MAX_PER_RUN = Number(process.env.RENEWALS_MAX_PER_RUN || 50);
 
 const subscriptions = db.subscriptions;
 
-/** The sentences a customer reads. Each states the date, because that is the question. */
-function reminderBody({ windowDays, subscription, renewalLabel, amount }) {
+/**
+ * The sentences a customer reads.
+ *
+ * Two things decide the wording, and neither is the window: how many days are
+ * actually left (an overdue renewal must not read “expires tomorrow”, and a
+ * heads-up must not promise another reminder it will not send), and whether
+ * there is a price to state — a renewal the desk has not priced cannot ask for
+ * money, so it says so and offers the call instead.
+ */
+function reminderBody({ windowDays, subscription, renewalLabel, amount, daysRemaining = null }) {
   const what = subscription.kind === 'dealer_retainer'
     ? `${subscription.planName || 'Your HonestCars plan'} for ${subscription.unitLabel || subscription.dealerName || 'your lot'}`
     : `${subscription.planName || 'your tracker subscription'}${subscription.unitLabel ? ` on ${subscription.unitLabel}` : ''}`;
-  const price = amount ? ` Renewal is ${money.formatNaira(amount)}.` : '';
+  const price = amount
+    ? ` Renewal is ${money.formatNaira(amount)}.`
+    : ' We will confirm the renewal price when we speak — it has not been set on this plan.';
+  const renewCta = ' You can renew in your account at honestcarsltd.com/account.';
+
+  // Late: the date has passed and the money has not arrived. Say exactly that.
+  if (daysRemaining !== null && daysRemaining < 0) {
+    const late = Math.abs(daysRemaining);
+    return `Your HonestCars subscription${subscription.unitLabel ? ` on ${subscription.unitLabel}` : ''} went past its renewal date on ${renewalLabel} — ${late} day${late === 1 ? '' : 's'} ago.${price}${renewCta} If the car has been sold or the unit is off the road, reply here and we will close it properly instead of billing you for it.`;
+  }
+
+  const today = daysRemaining === 0 ? 'today' : 'tomorrow';
   if (windowDays <= 1) {
-    return `Your HonestCars subscription expires tomorrow — ${what} renews on ${renewalLabel}.${price} You can renew in your account: honestcarsltd.com/account. If anything has changed, reply here and we will sort it out.`;
+    return `Your HonestCars subscription expires ${today} — ${what} renews on ${renewalLabel}.${price}${renewCta} If anything has changed, reply here and we will sort it out.`;
   }
   if (windowDays <= 7) {
-    return `A week to go: ${what} renews on ${renewalLabel}.${price} Renew any time in your account at honestcarsltd.com/account — renewing early does not lose you days.`;
+    return `A week to go: ${what} renews on ${renewalLabel}.${price} Renew any time at honestcarsltd.com/account — renewing early does not lose you days.`;
   }
-  return `Heads-up: ${what} renews on ${renewalLabel}.${price} Nothing to do now — we will remind you again closer to the date, and you can renew any time at honestcarsltd.com/account.`;
+  return `Heads-up: ${what} renews on ${renewalLabel}.${price} Nothing to do now, and nothing has been charged — you can renew any time at honestcarsltd.com/account.`;
 }
 
 function formatDate(value) {
@@ -121,15 +140,23 @@ async function runReminders({ dryRun = false, limit = MAX_PER_RUN } = {}) {
       subscription,
       renewalLabel: formatDate(subscription.renewalAt),
       amount,
+      daysRemaining: subscription.daysRemaining,
       name: subscription.customerName,
     };
-    const body = reminderBody(values);
+    // The template carries the composed sentence verbatim: which window this is
+    // and how many days are actually left are decisions made here, not in a
+    // string template. `body` therefore has to travel in `values` — without it
+    // the notification renders as "undefined", which is how this bug looked the
+    // first time the sweep ran.
+    values.body = reminderBody(values);
+    const body = values.body;
     const entry = {
       id: subscription.id,
       kind: subscription.kind,
       windowDays,
       phone: subscription.maskedPhone,
       renewalAt: subscription.renewalAt,
+      daysRemaining: subscription.daysRemaining,
       body,
     };
 

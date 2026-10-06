@@ -27,7 +27,8 @@
     "smoke:cms": "node scripts/cms-smoke.mjs",
     "alerts": "node scripts/run-alerts.mjs",
     "videos": "node scripts/generate-videos.js",
-    "videos:check": "node scripts/generate-videos.js --check"
+    "videos:check": "node scripts/generate-videos.js --check",
+    "renewals": "node scripts/renewals.js"
   },
   "engines": {
     "node": ">=20"

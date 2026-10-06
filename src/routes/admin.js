@@ -31,6 +31,7 @@ const roles = require('../services/roles');
 const validate = require('../services/validate');
 const paymentService = require('../services/payments');
 const alertsService = require('../services/alerts');
+const renewalsService = require('../services/renewals');
 const notify = require('../services/notify');
 const money = require('../lib/money');
 const report = require('../services/report');
@@ -52,6 +53,7 @@ const PATHS = {
   payments: `${HOME}/payments`,
   milestones: `${HOME}/milestones`,
   alerts: `${HOME}/alerts`,
+  subscriptions: `${HOME}/subscriptions`,
   intel: `${HOME}/intel`,
   reports: `${HOME}/reports`,
   marketing: `${HOME}/marketing`,
@@ -71,6 +73,7 @@ const NAV = [
   { href: PATHS.payments, label: 'Money', icon: 'chart', capability: 'payments.view' },
   { href: PATHS.milestones, label: 'Escrow', icon: 'shield', capability: 'payments.view' },
   { href: PATHS.alerts, label: 'Alerts', icon: 'bell', capability: 'intel.manage' },
+  { href: PATHS.subscriptions, label: 'Subscriptions', icon: 'repeat', capability: 'payments.view' },
   { href: PATHS.intel, label: 'Price intel', icon: 'gauge', capability: 'pricing.view' },
   { href: PATHS.reports, label: 'Reports', icon: 'fileCheck', capability: 'reports.view' },
   { href: PATHS.marketing, label: 'Marketing', icon: 'chart', capability: 'marketing.view' },
@@ -1156,6 +1159,168 @@ router.post('/alerts/run', auth.requireStaff('intel.manage'), async (req, res, n
       dryRun ? 'dry run — nothing sent or written' : null,
     ].filter(Boolean).join(' · ');
     return done(res, PATHS.alerts, `Watch run: ${summary}.`);
+  } catch (error) {
+    return next(error);
+  }
+});
+
+// ---------------------------------------------------------------------------
+// Subscriptions & renewals — FR-20, §7.3
+//
+// “Tracking subscriptions (unit, client, plan, renewal date, status); renewal
+// queue + auto reminders (30/7/1 day); dealer retainer/subs management.”
+//
+// One screen for both kinds, because the desk chases one queue. The queue is
+// derived (a renewal date past its grace window is lapsed whether or not a sweep
+// has run), and the reminder strip shows what the 30/7/1-day sweep has actually
+// sent rather than what it intended to.
+//
+// §7.4: the renewal queue sits with money — admin and finance see it. Flipping
+// an activation checklist box and creating a retainer is money approval, so it
+// needs payments.approve (finance/admin).
+// ---------------------------------------------------------------------------
+router.get('/subscriptions', auth.requireStaff('payments.view'), async (req, res, next) => {
+  try {
+    const kind = ['tracker', 'dealer_retainer'].includes(String(req.query.kind || '')) ? String(req.query.kind) : null;
+    const state = ['ordered', 'installed', 'activated', 'renewal_due', 'lapsed', 'cancelled'].includes(String(req.query.state || ''))
+      ? String(req.query.state)
+      : null;
+    const search = validate.text(req.query.q, 60) || null;
+    const withinDays = req.query.all === '1' ? null : 30;
+
+    const [queue, register, dealers] = await Promise.all([
+      renewalsService.queue({ withinDays, kind, state, search, limit: 200 }),
+      renewalsService.register({ kind, state, search, limit: 200 }),
+      // Retainer form's dealer picker. Read straight off the table: the console
+      // only needs name and city, and every lot is a candidate for a plan.
+      db.query('SELECT id, name, city, tier FROM dealers ORDER BY name ASC LIMIT 200').catch(() => []),
+    ]);
+
+    // Reminders actually recorded, newest first — the audit of the sweep.
+    const reminders = await db.query(
+      `SELECT r.*, s.unit_label, s.plan_name, s.kind
+         FROM subscription_reminders r
+         JOIN subscriptions s ON s.id = r.subscription_id
+        ORDER BY r.sent_at DESC, r.id DESC LIMIT 40`,
+    );
+    const remindersSent = await db.query(
+      `SELECT COUNT(*) AS total, SUM(status = 'sent') AS delivered,
+              SUM(status = 'skipped') AS skipped,
+              SUM(sent_at >= DATE_SUB(UTC_TIMESTAMP(), INTERVAL 30 DAY)) AS last30
+         FROM subscription_reminders`,
+    );
+
+    return await page(req, res, {
+      view: 'admin/subscriptions',
+      active: PATHS.subscriptions,
+      title: 'Subscriptions & renewals',
+      description: 'The renewal queue, the activation checklist and dealer retainers.',
+      data: {
+        queue: queue.rows,
+        summary: queue.summary,
+        register,
+        withinDays,
+        filters: { kind, state, search },
+        dealers,
+        reminders: reminders.map((row) => ({
+          id: row.id,
+          subscriptionId: row.subscription_id,
+          windowDays: row.window_days,
+          sentAt: row.sent_at,
+          status: row.status,
+          channel: row.channel,
+          detail: row.detail,
+          unitLabel: row.unit_label,
+          planName: row.plan_name,
+          kind: row.kind,
+        })),
+        reminderTotals: remindersSent[0] || { total: 0, delivered: 0, skipped: 0, last30: 0 },
+        windows: db.subscriptions.REMINDER_WINDOWS,
+        states: Object.entries(db.subscriptions.STATE_LABELS).map(([value, label]) => ({ value, label })),
+        maxPerRun: renewalsService.MAX_PER_RUN,
+      },
+    });
+  } catch (error) {
+    return next(error);
+  }
+});
+
+/** The activation checklist: installed → platform activated → renewal date. */
+router.post('/subscriptions/:id/checklist', auth.requireStaff('payments.approve'), auth.sameOriginOnly, async (req, res, next) => {
+  try {
+    const body = req.body || {};
+    const result = await db.subscriptions.setChecklist(req.params.id, {
+      installed: Boolean(body.installed),
+      activated: Boolean(body.activated),
+      renewalAt: validate.text(body.renewal_at, 20) || null,
+      unitLabel: body.unit_label !== undefined ? validate.text(body.unit_label, 80) : null,
+      planName: body.plan_name !== undefined ? validate.text(body.plan_name, 80) : null,
+      amountKobo: body.amount ? money.nairaToKobo(body.amount) : null,
+      periodMonths: validate.integer(body.period_months, { min: 1, max: 60 }) || null,
+      actorId: req.user.id,
+      note: validate.text(body.note, 120) || null,
+    });
+    if (!result.ok) return done(res, PATHS.subscriptions, result.error, { error: true });
+    const subscription = result.subscription;
+    if (result.unchanged) return done(res, PATHS.subscriptions, 'Nothing to change — the checklist and terms are already as they were.');
+    return done(res, PATHS.subscriptions, `${subscription.unitLabel || subscription.planName || 'Subscription'} updated — state ${subscription.stateLabel}.`);
+  } catch (error) {
+    return next(error);
+  }
+});
+
+/** Stop the clock on a unit that is off the road or a lot that has left. */
+router.post('/subscriptions/:id/cancel', auth.requireStaff('payments.approve'), auth.sameOriginOnly, async (req, res, next) => {
+  try {
+    const result = await db.subscriptions.cancel(req.params.id, {
+      actorId: req.user.id,
+      reason: validate.text((req.body || {}).reason, 160) || null,
+    });
+    if (!result.ok) return done(res, PATHS.subscriptions, result.error, { error: true });
+    return done(res, PATHS.subscriptions, 'Subscription cancelled. The record stays — the renewal queue drops it.');
+  } catch (error) {
+    return next(error);
+  }
+});
+
+/** Put a lot on a retainer plan (§7.3 “dealer retainer/subs management”). */
+router.post('/subscriptions/retainers', auth.requireStaff('payments.approve'), auth.sameOriginOnly, async (req, res, next) => {
+  try {
+    const body = req.body || {};
+    const result = await db.subscriptions.createRetainer({
+      dealerId: validate.integer(body.dealer_id, { min: 1, fallback: 0 }),
+      planName: validate.text(body.plan_name, 80) || 'Dealer retainer — monthly',
+      amountKobo: money.nairaToKobo(body.amount),
+      periodMonths: validate.integer(body.period_months, { min: 1, max: 60 }) || 1,
+      renewalAt: validate.text(body.renewal_at, 20) || null,
+      actorId: req.user.id,
+    });
+    if (!result.ok) return done(res, PATHS.subscriptions, result.error, { error: true });
+    return done(res, PATHS.subscriptions, `${result.subscription.dealerName} is on ${result.subscription.planName} — renews ${renewalsService.formatDate(result.subscription.renewalAt)}.`);
+  } catch (error) {
+    return next(error);
+  }
+});
+
+/**
+ * Run the reminder sweep. Same code as `npm run renewals`, and safe to press
+ * twice: each 30/7/1-day window sends once per subscription, enforced by a
+ * unique key rather than by memory.
+ */
+router.post('/subscriptions/reminders', auth.requireStaff('payments.approve'), auth.sameOriginOnly, async (req, res, next) => {
+  try {
+    const dryRun = String((req.body || {}).dry_run || '') === '1';
+    const report = await renewalsService.runReminders({ dryRun });
+    const summary = [
+      `${report.checked} subscription${report.checked === 1 ? '' : 's'} inside the window`,
+      dryRun
+        ? `${report.wouldSend.length} would send`
+        : `${report.sent} sent`,
+      report.skipped.length ? `${report.skipped.length} recorded but not delivered (no provider for the channel)` : null,
+      report.lapsed ? `${report.lapsed} lapsed` : null,
+      dryRun ? 'dry run — nothing sent or written' : null,
+    ].filter(Boolean).join(' · ');
+    return done(res, PATHS.subscriptions, `Renewal sweep: ${summary}.`);
   } catch (error) {
     return next(error);
   }

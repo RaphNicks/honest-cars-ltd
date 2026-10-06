@@ -27,6 +27,8 @@ const roles = require('../services/roles');
 const validate = require('../services/validate');
 const listingQuery = require('../services/listing-query');
 const reportService = require('../services/report');
+const paymentService = require('../services/payments');
+const phone = require('../lib/phone');
 const { helpers } = require('../lib/locals');
 const { sendPage, sendJson, CACHE } = require('../lib/respond');
 
@@ -193,6 +195,136 @@ router.get('/account/receipts/:reference', auth.requireUser, async (req, res, ne
         jsonLd: [],
       },
       data: { receipt, trail: [{ label: 'Account', href: '/account' }, { label: reference }] },
+    });
+  } catch (error) {
+    return next(error);
+  }
+});
+
+/** The bank account a renewal is paid into until a PSP is live (§11, §18). */
+function bankDetails(reference) {
+  return {
+    name: config.business.bankAccountName,
+    bank: config.business.bankName,
+    account: config.business.bankAccount,
+    note: reference
+      ? `Use ${reference} as the transfer narration so we match it in seconds.`
+      : 'Use the renewal reference as the transfer narration so we match it in seconds.',
+  };
+}
+
+/**
+ * Ownership check for anything keyed on a subscription id.
+ *
+ * A subscription is the customer's own record, so this is the whole
+ * authorisation story: the id is in the URL, and the phone number on the row
+ * has to be the signed-in account's. Anyone can type an id; only its owner gets
+ * past here.
+ */
+async function ownedSubscription(user, id) {
+  const subscription = await db.subscriptions.byId(id);
+  if (!subscription || !subscription.phone) return null;
+  const shapes = phone.variants(user.phone);
+  const stored = phone.canonical(subscription.phone);
+  return shapes.includes(stored) ? subscription : null;
+}
+
+/**
+ * POST /account/subscriptions/:id/renew — §7.3 “online renewals”, FR-20.
+ *
+ * Raises the renewal payment and sends the customer to the page that says how
+ * to pay it. Nothing is charged here and the renewal date does not move until
+ * the money is confirmed: `db.payments.markPaid` extends the subscription
+ * inside the same transaction that marks the payment paid, so there is no path
+ * that grants the year without the payment (and none that takes the payment
+ * without granting it).
+ */
+router.post('/account/subscriptions/:id/renew', auth.sameOriginOnly, auth.requireUser, async (req, res, next) => {
+  try {
+    const back = '/account#subscriptions';
+    const subscription = await ownedSubscription(req.user, req.params.id);
+    if (!subscription) return res.redirect(303, `${back}?err=${encodeURIComponent('That subscription is not on this account.')}`);
+    if (subscription.deviceState === 'cancelled') {
+      return res.redirect(303, `${back}?err=${encodeURIComponent('That subscription has been cancelled — message us and we will restart it.')}`);
+    }
+
+    const quote = await db.subscriptions.renewalQuote(subscription.id);
+    if (!quote.ok) return res.redirect(303, `${back}?err=${encodeURIComponent(quote.error)}`);
+
+    // A renewal already raised and still unpaid is reused rather than
+    // duplicated: two pending references for one year is two chances to pay
+    // twice, and the customer has only ever seen one.
+    if (subscription.paymentId && subscription.paymentStatus === 'pending' && subscription.paymentReference) {
+      return res.redirect(303, `/account/renewals/${subscription.paymentReference}`);
+    }
+
+    const raised = await paymentService.initiate({
+      purpose: 'subscription',
+      amountKobo: quote.amountKobo,
+      subscriptionId: subscription.id,
+      customerName: subscription.customerName,
+      customerPhone: subscription.phone,
+    });
+    if (!raised.ok) return res.redirect(303, `${back}?err=${encodeURIComponent(raised.error || 'That renewal could not be raised.')}`);
+
+    if (raised.hosted && raised.checkoutUrl) return res.redirect(303, raised.checkoutUrl);
+    return res.redirect(303, `/account/renewals/${raised.reference}`);
+  } catch (error) {
+    return next(error);
+  }
+});
+
+/**
+ * GET /account/renewals/:reference — what the customer keeps while the transfer
+ * is in flight. Private to the phone number that owns it, noindex, no-store.
+ */
+router.get('/account/renewals/:reference', auth.requireUser, async (req, res, next) => {
+  try {
+    const reference = String(req.params.reference || '').toUpperCase().slice(0, 32);
+    if (!/^HC-PAY-\d{6}$/.test(reference)) return next();
+
+    const receipt = await db.payments.receiptForPhone(reference, req.user.phone);
+    if (!receipt) {
+      return await sendPage(req, res, {
+        view: 'error',
+        status: 404,
+        cache: CACHE.private,
+        page: {
+          title: 'Renewal not found',
+          metaTitle: 'Renewal not found',
+          canonical: `/account/renewals/${reference}`,
+          robots: 'noindex,nofollow',
+          bodyClass: 'page-error',
+          jsonLd: [],
+        },
+        data: { reason: 'not-found', detail: 'That reference is not on this account.' },
+      });
+    }
+
+    const payment = receipt.payment;
+    const subscription = payment.subscriptionId ? await db.subscriptions.byId(payment.subscriptionId) : null;
+
+    return await sendPage(req, res, {
+      routePath: `/account/renewals/${reference}`,
+      view: 'renewal',
+      cache: CACHE.private,
+      page: {
+        title: `Renewal ${reference}`,
+        metaTitle: `Renewal ${reference}`,
+        titleSuffix: false,
+        description: 'A subscription renewal and how to pay it.',
+        canonical: `/account/renewals/${reference}`,
+        robots: 'noindex,nofollow',
+        breadcrumbs: [{ label: 'Account', href: '/account' }, { label: reference }],
+        bodyClass: 'page-order',
+        jsonLd: [],
+      },
+      data: {
+        payment,
+        subscription,
+        bank: bankDetails(reference),
+        trail: [{ label: 'Account', href: '/account' }, { label: reference }],
+      },
     });
   } catch (error) {
     return next(error);

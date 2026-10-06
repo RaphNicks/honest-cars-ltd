@@ -73,13 +73,22 @@ function daysUntil(date) {
 /**
  * Which reminder window a subscription is inside, if any.
  *
- * Returns the *tightest* window that still applies (1 beats 7 beats 30), so a
- * subscription that was created 29 days before renewal does not get a stale
- * “30 days” message — it gets the one that is true today.
+ * The windows are bands, not instants: “30 days” means *inside 30 days and not
+ * yet inside 7*, “7” means inside 7 and not yet inside 1, and “1” is the last
+ * band — everything at or past one day out. So the scan is ascending and takes
+ * the first window the subscription has reached, which is also what makes the
+ * per-window dedupe a one-liner: a daily sweep sends 30, then 7, then 1, and a
+ * subscriber who was added late starts at whichever band they are actually in.
+ *
+ * Overdue days sit in the 1-day band on purpose — the last reminder has already
+ * gone out by then, and the wording (not the window) is what says “this is now
+ * late”.
  */
 function windowFor(days) {
-  if (days === null || days > REMINDER_WINDOWS[0]) return null;
-  return [...REMINDER_WINDOWS].reverse().find((w) => days >= w) || REMINDER_WINDOWS[REMINDER_WINDOWS.length - 1];
+  if (days === null || days === undefined) return null;
+  // REMINDER_WINDOWS is written widest-first because that is the order a person
+  // says them; the scan needs them tightest-first.
+  return [...REMINDER_WINDOWS].sort((a, b) => a - b).find((w) => days <= w) || null;
 }
 
 /**
@@ -222,15 +231,30 @@ async function queue({ withinDays = 30, kind = null, state = null, search = null
 
 /** Counts per state across everything live — the console's summary strip. */
 async function summary() {
-  const rows = await query(`${SELECT} WHERE s.device_state <> 'cancelled' AND s.renewal_at IS NOT NULL`);
+  // Every live row, including the ones with no renewal date yet: a subscription
+  // that has been paid for and not fitted is still a subscription, and leaving it
+  // out of the state counts made the console's own summary disagree with its
+  // register. Only the money figures below need a date.
+  const rows = await query(`${SELECT} WHERE s.device_state <> 'cancelled' AND s.kind IS NOT NULL`);
   const counts = { activated: 0, renewal_due: 0, lapsed: 0, ordered: 0, installed: 0, cancelled: 0 };
   let dueSoon = 0;
+  let lapsed = 0;
   let revenueKobo = 0;
   for (const row of rows) {
     const state = effectiveState(row);
     counts[state] = (counts[state] || 0) + 1;
     const days = daysUntil(row.renewal_at);
-    if (days !== null && days <= 30) {
+    // “Due in 30 days” means money we can expect: a lapsed subscription is not
+    // due, it is lost, and counting it here would flatter the queue. A row that
+    // has not been fitted yet is not due either — there is nothing protecting a
+    // car to renew.
+    if (state === 'lapsed') {
+      lapsed += 1;
+      continue;
+    }
+    if (days === null) continue;
+    if (state === 'ordered') continue;
+    if (days <= 30) {
       dueSoon += 1;
       revenueKobo += Number(row.amount_kobo ?? row.product_price_kobo ?? 0);
     }
@@ -241,6 +265,7 @@ async function summary() {
   return {
     counts,
     dueSoon,
+    lapsed,
     revenueKobo,
     trackerCount: Number((byKind.find((r) => r.kind === 'tracker') || {}).n || 0),
     retainerCount: Number((byKind.find((r) => r.kind === 'dealer_retainer') || {}).n || 0),
@@ -353,7 +378,10 @@ async function setChecklist(id, { installed = null, activated = null, renewalAt 
     params.push(Math.min(60, Math.max(1, Number(periodMonths) || 12)));
     detail.periodMonths = Number(periodMonths) || 12;
   }
-  if (!sets.length) return { ok: false, error: 'Nothing to record.' };
+  // Nothing to change is not a failure. The console disables an already-stamped
+  // step, but a stale page or a double press still posts it, and answering that
+  // with an error flash teaches the desk to distrust a control that worked.
+  if (!sets.length) return { ok: true, unchanged: true, subscription: await byId(id) };
 
   // State follows the checklist: installed once both dates exist, activated
   // when both stamps and a renewal date are present.

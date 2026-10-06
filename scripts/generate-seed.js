@@ -578,6 +578,7 @@ DELETE FROM saved_cars;
 DELETE FROM saved_searches;
 DELETE FROM leads;
 DELETE FROM listing_media;
+DELETE FROM subscription_reminders;
 DELETE FROM subscriptions;
 DELETE FROM delivery_areas;
 DELETE FROM order_items;
@@ -1271,12 +1272,82 @@ INSERT INTO order_items (order_id, product_id, name, qty, unit_price_kobo, insta
    (SELECT id FROM products WHERE slug = 'tracker-standard' LIMIT 1),
    'Tracker — Standard', 1, 4500000, 1);
 
-INSERT INTO subscriptions (order_id, product_id, customer_name, customer_phone, device_state, installed_at, activated_at, renewal_at) VALUES
-  ((SELECT id FROM orders WHERE order_no = 'HC-ORD-0001' LIMIT 1),
+-- FR-20. Five tracker subscriptions across the whole lifecycle, so every state
+-- the console and the account screen can render is visible on a fresh seed:
+--
+--   #1  active, most of a year to run         nothing to do, shows the happy path
+--   #2  9 days out                            inside the 30-day window, reminder pending
+--   #3  2 days past the renewal date          inside the 7-day grace, still renewable
+--   #4  40 days past, never renewed            lapsed — the queue's reason to exist
+--   #5  paid, not yet fitted                   the activation checklist, mid-flight
+--
+-- amount_kobo is the renewal price and unit_label is the car the unit is in:
+-- together they make a renewal quotable and a unit identifiable on a phone call. The renewal dates are anchored to the seed run, not to fixed calendar
+-- dates, so the demo is never stale.
+INSERT INTO subscriptions
+  (kind, order_id, product_id, customer_name, customer_phone, unit_label, plan_name, amount_kobo,
+   device_state, installed_at, activated_at, renewal_at, period_months)
+VALUES
+  ('tracker', (SELECT id FROM orders WHERE order_no = 'HC-ORD-0001' LIMIT 1),
    (SELECT id FROM products WHERE slug = 'tracker-standard' LIMIT 1),
-   'Ada Okafor', '+2348031234567', 'activated',
+   'Ada Okafor', '+2348031234567',
+   '2016 Honda CR-V · ABC-123-PH', 'Tracker — Standard, 12 months', 4500000,
+   'activated',
    DATE_SUB(UTC_TIMESTAMP(), INTERVAL 10 DAY), DATE_SUB(UTC_TIMESTAMP(), INTERVAL 10 DAY),
-   DATE_ADD(UTC_TIMESTAMP(), INTERVAL 355 DAY));
+   DATE_ADD(UTC_TIMESTAMP(), INTERVAL 355 DAY), 12),
+  ('tracker', NULL,
+   (SELECT id FROM products WHERE slug = 'tracker-standard' LIMIT 1),
+   'Ada Okafor', '+2348031234567',
+   '2019 Toyota Corolla · KJA-884-XA', 'Tracker — Standard, 12 months', 4500000,
+   'activated',
+   DATE_SUB(UTC_TIMESTAMP(), INTERVAL 361 DAY), DATE_SUB(UTC_TIMESTAMP(), INTERVAL 361 DAY),
+   DATE_ADD(UTC_TIMESTAMP(), INTERVAL 9 DAY), 12),
+  ('tracker', NULL,
+   (SELECT id FROM products WHERE slug = 'tracker-pro' LIMIT 1),
+   'Ada Okafor', '+2348031234567',
+   '2014 Lexus RX 350 · LSR-201-PH', 'Tracker Pro — 12 months', 6500000,
+   'activated',
+   DATE_SUB(UTC_TIMESTAMP(), INTERVAL 367 DAY), DATE_SUB(UTC_TIMESTAMP(), INTERVAL 367 DAY),
+   DATE_SUB(UTC_TIMESTAMP(), INTERVAL 2 DAY), 12),
+  ('tracker', NULL,
+   (SELECT id FROM products WHERE slug = 'tracker-standard' LIMIT 1),
+   'Ada Okafor', '+2348031234567',
+   '2008 Toyota Corolla · GGE-410-XA', 'Tracker — Standard, 12 months', 4500000,
+   'lapsed',
+   DATE_SUB(UTC_TIMESTAMP(), INTERVAL 410 DAY), DATE_SUB(UTC_TIMESTAMP(), INTERVAL 410 DAY),
+   DATE_SUB(UTC_TIMESTAMP(), INTERVAL 40 DAY), 12);
+
+-- ...and one paid for but not yet fitted, which is the only row the activation
+-- checklist (installed → platform activated → renewal date) has anything to do on.
+INSERT INTO subscriptions
+  (kind, order_id, product_id, customer_name, customer_phone, unit_label, plan_name, amount_kobo,
+   device_state, installed_at, activated_at, renewal_at, period_months)
+VALUES
+  ('tracker', (SELECT id FROM orders WHERE order_no = 'HC-ORD-0001' LIMIT 1),
+   (SELECT id FROM products WHERE slug = 'tracker-standard' LIMIT 1),
+   'Ada Okafor', '+2348031234567',
+   '2012 Honda Accord · PH-552-KJA', 'Tracker — Standard, 12 months', 4500000,
+   'ordered', NULL, NULL, NULL, 12);
+
+-- FR-20 / §7.3 “dealer retainer/subs management”: two lots on monthly plans —
+-- one paid up, one overdue — created with the checklist already complete because
+-- a retainer is a paperwork arrangement, not a device waiting to be fitted.
+INSERT INTO subscriptions
+  (kind, dealer_id, customer_name, customer_phone, unit_label, plan_name, amount_kobo,
+   device_state, installed_at, activated_at, renewal_at, period_months)
+VALUES
+  ('dealer_retainer', (SELECT id FROM dealers WHERE name = 'Woji Car Mart' LIMIT 1),
+   'Woji Car Mart', '+2348000000006', 'Woji Car Mart',
+   'Dealer retainer — monthly', 2500000,
+   'activated',
+   DATE_SUB(UTC_TIMESTAMP(), INTERVAL 90 DAY), DATE_SUB(UTC_TIMESTAMP(), INTERVAL 90 DAY),
+   DATE_ADD(UTC_TIMESTAMP(), INTERVAL 21 DAY), 1),
+  ('dealer_retainer', (SELECT id FROM dealers WHERE name = 'Aba Road Autos' LIMIT 1),
+   'Aba Road Autos', '+2348000000007', 'Aba Road Autos',
+   'Dealer retainer — monthly', 2500000,
+   'renewal_due',
+   DATE_SUB(UTC_TIMESTAMP(), INTERVAL 120 DAY), DATE_SUB(UTC_TIMESTAMP(), INTERVAL 120 DAY),
+   DATE_SUB(UTC_TIMESTAMP(), INTERVAL 6 DAY), 1);
 
 -- ---------------------------------------------------------------------------
 -- Post-seed sanity: the 90-day sold hand-off row on vehicle_listings so ops
