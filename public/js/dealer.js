@@ -124,5 +124,39 @@ function wireDraftAutosave() {
   });
 }
 
+/**
+ * FR-33 — read the chosen CSV in the browser and put it in the paste box.
+ *
+ * The file is never uploaded by this script: it fills the textarea, so the
+ * dealer sees exactly what is about to be sent, and the import is the same
+ * request either way (paste or pick). With JavaScript off, the paste box and
+ * the file input still work — the input simply sends its name and nothing else,
+ * which is why the page tells the dealer to paste in that case.
+ */
+function wireCsvPicker() {
+  document.querySelectorAll('[data-csv-target]').forEach((input) => {
+    input.addEventListener('change', () => {
+      const file = input.files && input.files[0];
+      const target = document.getElementById(input.getAttribute('data-csv-target'));
+      if (!file || !target) return;
+      if (file.size > 512 * 1024) {
+        target.value = '';
+        input.setCustomValidity('That file is over 512 KB — split it and import the rest after.');
+        input.reportValidity();
+        return;
+      }
+      input.setCustomValidity('');
+      const reader = new FileReader();
+      reader.addEventListener('load', () => {
+        target.value = String(reader.result || '');
+        target.focus();
+        target.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      });
+      reader.readAsText(file);
+    });
+  });
+}
+
 wireWizard();
 wireDraftAutosave();
+wireCsvPicker();

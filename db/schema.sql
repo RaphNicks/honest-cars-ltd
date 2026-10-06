@@ -1068,6 +1068,32 @@ CREATE TABLE IF NOT EXISTS dealer_ledger (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ---------------------------------------------------------------------------
+-- dealer_api_keys — FR-33: the credential a lot's own tooling imports with
+--
+-- Only the SHA-256 hash is stored; `prefix` is the twelve clear characters the
+-- console shows so a key can be identified without being usable.
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS `dealer_api_keys` (
+  id            INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  dealer_id     INT UNSIGNED NOT NULL,
+  label         VARCHAR(80)  NOT NULL,
+  `prefix`      VARCHAR(16)  NOT NULL,
+  hash          CHAR(64)     NOT NULL,
+  last_used_at  DATETIME     NULL,
+  request_count INT UNSIGNED NOT NULL DEFAULT 0,
+  revoked_at    DATETIME     NULL,
+  revoked_by    INT UNSIGNED NULL,
+  created_by    INT UNSIGNED NULL,
+  created_at    TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  UNIQUE KEY uq_api_key_hash (hash),
+  KEY idx_api_key_dealer (dealer_id, revoked_at),
+  CONSTRAINT fk_api_key_dealer  FOREIGN KEY (dealer_id)  REFERENCES dealers (id) ON DELETE CASCADE,
+  CONSTRAINT fk_api_key_actor   FOREIGN KEY (created_by) REFERENCES `users` (id) ON DELETE SET NULL,
+  CONSTRAINT fk_api_key_revoker FOREIGN KEY (revoked_by) REFERENCES `users` (id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ---------------------------------------------------------------------------
 -- CMS workflow (013): content_revisions + homepage_modules
 -- (the blog_posts columns from 013 are merged into its CREATE above)
 -- ---------------------------------------------------------------------------

@@ -1,0 +1,265 @@
+<%
+/**
+ * Bulk import — FR-33 (§7.2 “bulk listing management”).
+ *
+ * The page is built around the dry run: the dealer pastes or picks a file, sees
+ * the report line by line, and only then imports. Nothing here writes on the
+ * first press, and nothing here can make a car live — imports are drafts, and
+ * ops publishes them through the §7.3 queue.
+ *
+ * Locals: fields, maxRows, maxPhotos, keys, keyPrefix, csv, report, newKey
+ */
+var naira = helpers.formatNaira;
+%>
+
+<section class="panel">
+  <div class="panel__head">
+    <h2 class="panel__title">Import a spreadsheet</h2>
+    <a class="section-head__link" href="/dealer/imports/template.csv">Download the CSV template →</a>
+  </div>
+
+  <p>
+    One row per car, up to <%= maxRows %> rows per file and <%= maxPhotos %> photo links per car.
+    Imported cars are <strong>drafts</strong> — check each one, add anything missing, then send it for
+    review. Nothing goes live without ops seeing it, same as a car you type in by hand.
+  </p>
+
+  <form method="post" action="/dealer/imports" id="import-form">
+    <div class="field">
+      <label class="field__label" for="csv-file">Choose your file</label>
+      <input class="input" type="file" id="csv-file" accept=".csv,text/csv" data-csv-target="csv">
+      <p class="field__hint">
+        Your file never leaves this page until you press a button below — the browser reads it and
+        fills the box, so you can see exactly what is being sent.
+      </p>
+    </div>
+
+    <div class="field">
+      <label class="field__label" for="csv">Or paste the rows</label>
+      <textarea class="input input--mono" id="csv" name="csv" rows="10" spellcheck="false"
+                placeholder="make,model,year,price,…"><%= csv %></textarea>
+      <p class="field__hint">Commas inside a value need quotes around it: <span class="tabular">"Air conditioning, Reverse camera"</span>.</p>
+    </div>
+
+    <div class="btn-row">
+      <button class="btn btn--secondary" type="submit" name="mode" value="dry">Check the file — write nothing</button>
+      <button class="btn btn--primary" type="submit" name="mode" value="apply">Import the rows that pass</button>
+    </div>
+  </form>
+</section>
+
+<% if (report) { %>
+  <section class="panel mt-3">
+    <div class="panel__head">
+      <h2 class="panel__title">
+        <% if (report.dryRun) { %>Dry run — nothing was written<% } else { %>Import report<% } %>
+      </h2>
+      <span class="cms-hint">
+        <%= report.counts.total %> row<%= report.counts.total === 1 ? '' : 's' %> ·
+        <%= report.counts.refused %> refused<% if (report.counts.warned) { %> ·
+        <%= report.counts.warned %> with a warning<% } %>
+      </span>
+    </div>
+
+    <% report.fileErrors.forEach(function (message) { %>
+      <p class="note-inline note-inline--error"><%= message %></p>
+    <% }); %>
+
+    <% if (!report.dryRun) { %>
+      <p class="note-inline">
+        <strong><%= report.created.length %></strong> draft<%= report.created.length === 1 ? '' : 's' %> created<% if (report.created.length) { %>:
+          <%= report.created.map(function (row) { return row.stockNo; }).join(', ') %><% } %>.
+        <% if (report.counts.refused) { %>The refused rows were not imported — fix them and import again.<% } %>
+        <a href="/dealer/listings">Open my listings</a>.
+      </p>
+    <% } else if (report.ok) { %>
+      <p class="note-inline">
+        <%= report.counts.ready %> row<%= report.counts.ready === 1 ? '' : 's' %> ready to import. Press
+        <strong>Import the rows that pass</strong> when you are happy — the check above did not write anything.
+      </p>
+    <% } %>
+
+    <% if (report.rows.length) { %>
+      <div class="table-scroll">
+        <table class="table table--stack">
+          <caption class="visually-hidden">Every row in the file, with what the importer made of it</caption>
+          <thead>
+            <tr>
+              <th scope="col">Line</th>
+              <th scope="col">Car</th>
+              <th scope="col">Price</th>
+              <th scope="col">Verdict</th>
+            </tr>
+          </thead>
+          <tbody>
+            <% report.rows.forEach(function (row) { %>
+              <tr>
+                <td class="tabular muted"><%= row.line %></td>
+                <th scope="row">
+                  <% if (row.errors.length) { %>
+                    <span class="muted">—</span>
+                  <% } else { %>
+                    <%= [row.input.year, row.input.make, row.input.model, row.input.trim].filter(Boolean).join(' ') %>
+                  <% } %>
+                  <span class="listing-row__meta">
+                    <%= row.input.bodyType || '' %>
+                    <% if (row.input.condition) { %> · <%= row.input.condition.replace(/_/g, ' ') %><% } %>
+                    <% if (row.input.mileageKm) { %> · <%= Number(row.input.mileageKm).toLocaleString('en-NG') %> km<% } %>
+                    <% if (!row.errors.length) { %> · <%= row.photos.length %> photo(s)<% } %>
+                  </span>
+                </th>
+                <td class="tabular">
+                  <%= !row.errors.length && row.input.priceKobo ? naira(row.input.priceKobo) : '—' %>
+                </td>
+                <td>
+                  <% if (row.errors.length) { %>
+                    <span class="badge badge--closed">Refused</span>
+                    <% row.errors.forEach(function (error) { %>
+                      <span class="listing-row__meta"><strong><%= error.column %></strong>: <%= error.message %></span>
+                    <% }); %>
+                  <% } else { %>
+                    <span class="badge badge--<%= report.dryRun ? 'ok' : 'live' %>"><%= report.dryRun ? 'Ready' : 'Imported' %></span>
+                  <% } %>
+                  <% row.warnings.forEach(function (warning) { %>
+                    <span class="listing-row__meta">⚠︎ <%= warning.message %></span>
+                  <% }); %>
+                </td>
+              </tr>
+            <% }); %>
+          </tbody>
+        </table>
+      </div>
+    <% } %>
+  </section>
+<% } %>
+
+<section class="panel mt-3">
+  <div class="panel__head">
+    <h2 class="panel__title">What each column means</h2>
+    <span class="cms-hint">The template’s header is this list, in this order</span>
+  </div>
+  <div class="table-scroll">
+    <table class="table table--stack">
+      <caption class="visually-hidden">The import columns, and what the importer expects in each</caption>
+      <thead>
+        <tr>
+          <th scope="col">Column</th>
+          <th scope="col">Required</th>
+          <th scope="col">Example</th>
+          <th scope="col">Notes</th>
+        </tr>
+      </thead>
+      <tbody>
+        <% fields.forEach(function (field) { %>
+          <tr>
+            <th scope="row"><span class="tabular"><%= field.name %></span><span class="listing-row__meta"><%= field.label %></span></th>
+            <td><%= field.required ? 'Yes' : '—' %></td>
+            <td class="muted"><%= field.example %></td>
+            <td class="muted"><%= field.note || '' %></td>
+          </tr>
+        <% }); %>
+      </tbody>
+    </table>
+  </div>
+  <p class="cms-hint">
+    Prices can be written as <span class="tabular">12500000</span>,
+    <span class="tabular">₦12,500,000</span> or <span class="tabular">12.5m</span>.
+    Yes/no columns take <span class="tabular">yes</span>, <span class="tabular">no</span>, <span class="tabular">1</span> or
+    <span class="tabular">0</span>. Blank optional cells are fine — the importer fills the same defaults the wizard does.
+  </p>
+</section>
+
+<section class="panel mt-3">
+  <div class="panel__head">
+    <h2 class="panel__title">API keys</h2>
+    <span class="cms-hint">For your own stock tooling — <%= keyPrefix %>… keys</span>
+  </div>
+
+  <% if (newKey) { %>
+    <div class="panel panel--pay">
+      <h3 class="mb-1">Your new key — copy it now</h3>
+      <p class="mb-2">
+        This is the only time it is shown. It is stored as a one-way hash, so nobody — including us — can read it
+        back. If you lose it, revoke it and make another.
+      </p>
+      <p class="tabular key-reveal"><%= newKey %></p>
+      <p class="field__hint mb-0">Treat it like a password: send it as a header, never in a URL, and never in a photo of a screen.</p>
+    </div>
+  <% } %>
+
+  <% if (!keys.length) { %>
+    <p class="empty-line">No key yet. Make one when you have a tool that should add cars without a browser.</p>
+  <% } else { %>
+    <div class="table-scroll">
+      <table class="table">
+        <caption class="visually-hidden">This lot’s API keys</caption>
+        <thead>
+          <tr>
+            <th scope="col">Label</th>
+            <th scope="col">Key</th>
+            <th scope="col">Last used</th>
+            <th scope="col">Requests</th>
+            <th scope="col">State</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% keys.forEach(function (key) { %>
+            <tr>
+              <th scope="row"><%= key.label %></th>
+              <td class="tabular muted"><%= key.prefix %>…</td>
+              <td class="muted">
+                <% if (key.lastUsedAt) { %><%= helpers.relativeDays(key.lastUsedAt) %><% } else { %>never<% } %>
+              </td>
+              <td class="tabular"><%= key.requestCount %></td>
+              <td>
+                <% if (key.active) { %>
+                  <form method="post" action="/dealer/imports/keys/<%= key.id %>/revoke" class="inline-form">
+                    <button class="btn btn--ghost btn--sm" type="submit">Revoke</button>
+                  </form>
+                <% } else { %>
+                  <span class="badge badge--closed">Revoked</span>
+                <% } %>
+              </td>
+            </tr>
+          <% }); %>
+        </tbody>
+      </table>
+    </div>
+  <% } %>
+
+  <form method="post" action="/dealer/imports/keys" class="admin-inline-form">
+    <div class="field">
+      <label class="field__label" for="key-label">Name the key</label>
+      <input class="input" type="text" id="key-label" name="label" maxlength="80" placeholder="Stock tool — Aba Road" required>
+      <p class="field__hint">A name you will recognise in a year, when you are deciding which one to revoke.</p>
+    </div>
+    <button class="btn btn--secondary" type="submit">Make a key</button>
+  </form>
+</section>
+
+<section class="panel mt-3">
+  <div class="panel__head">
+    <h2 class="panel__title">Using the API</h2>
+    <span class="cms-hint">Same validation as the form, same drafts</span>
+  </div>
+  <p>
+    Send the CSV (or JSON) to <span class="tabular">POST /api/dealer/listings</span> with your key in an
+    <span class="tabular">x-api-key</span> header. <strong>The default is a dry run</strong> — it answers exactly what
+    would happen and writes nothing. Add <span class="tabular">?dry_run=false</span> when you mean it.
+  </p>
+  <pre class="code-block tabular">curl -X POST <%= site.url %>/api/dealer/listings \
+  -H "x-api-key: <%= keyPrefix %>…" \
+  -H "Content-Type: text/csv" \
+  --data-binary @my-stock.csv
+
+# and when the report looks right:
+curl -X POST "<%= site.url %>/api/dealer/listings?dry_run=false" \
+  -H "x-api-key: <%= keyPrefix %>…" \
+  -H "Content-Type: text/csv" \
+  --data-binary @my-stock.csv</pre>
+  <p class="cms-hint">
+    The response is JSON: <span class="tabular">counts</span> for the summary and
+    <span class="tabular">rows[]</span> with a line number, a verdict, and the refusals in words.
+    Keys only ever see this lot's stock; a key cannot be used to read anything else.
+  </p>
+</section>

@@ -139,8 +139,8 @@ Where the code is: `db/migrations/021-blog-authors-tags.sql`, `src/db/content.js
 migration 020 adds the same objects after the targets exist — which is exactly
 why nobody had seen it.
 
-**Next in order:** FR-28/29/30/31/32/33/34 (P3) → the remaining admin screen
-(settings). `docs/GAPS.md` is canonical: 26 rows, each with what “done” means.
+**Next in order:** FR-28/29/30/31/32/34 (P3) → the remaining admin screen
+(settings). `docs/GAPS.md` is canonical: 25 rows, each with what “done” means.
 
 ## 4. Conventions that are not negotiable
 

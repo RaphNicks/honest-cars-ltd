@@ -1109,3 +1109,13 @@ a.hire-cal__ref:hover { text-decoration: underline; }
 .addon .admin-inline-form { margin-top: 8px; }
 .panel--pay { border-left: 4px solid var(--colour-amber, #E8A13D); }
 .panel--paid { border-left: 4px solid var(--honest-green, #12A150); }
+
+/* ==========================================================================
+   Bulk import (FR-33, §7.2)
+   The paste box, the key reveal and the API example. Inter only, per §3.3 —
+   a code block gets its shape from spacing and a surface, not a second family.
+   ========================================================================== */
+.input--mono { min-height: 180px; line-height: 1.5; resize: vertical; white-space: pre; overflow-wrap: normal; overflow-x: auto; }
+.key-reveal { margin: 0; padding: var(--space-2); background: var(--surface, #F5F7FA); border: 1px solid var(--color-border, #D8E0E8); border-radius: var(--radius, 12px); overflow-x: auto; letter-spacing: 0.02em; }
+.code-block { margin: 0 0 var(--space-2); padding: var(--space-2); background: var(--surface, #F5F7FA); border: 1px solid var(--color-border, #D8E0E8); border-radius: var(--radius, 12px); font-size: var(--text-14); line-height: 1.6; white-space: pre; overflow-x: auto; }
+.note-inline--error { color: var(--danger, #B3261E); }

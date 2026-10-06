@@ -12,6 +12,7 @@
  *   GET  /api/listings           filtered results for the AJAX filter update (§6.2)
  *   GET  /api/listings/compare   the ≤3 cars on /cars/compare (§6.4)
  *   GET  /api/posts              next 9 blog cards for “load more” (§6.9)
+ *   POST /api/dealer/listings    bulk listing import for a lot, by API key (FR-33)
  *   GET  /api/og/listing/:slug.png   composited 1200×630 OG card (§12.4)
  *   GET  /api/health             liveness + database check
  */
@@ -27,6 +28,8 @@ const validate = require('../services/validate');
 const seo = require('../services/seo');
 const og = require('../services/og');
 const listingQuery = require('../services/listing-query');
+const imports = require('../services/imports');
+const dealerApi = require('../services/dealer-api');
 const render = require('../lib/render');
 const { sendJson, sendFragment, personalise, wantsLessData } = require('../lib/respond');
 const { helpers } = require('../lib/locals');
@@ -573,6 +576,83 @@ router.get('/payments/methods', async (req, res) => {
     providers: paymentService.availability(),
     active: paymentService.activeProvider(),
   });
+});
+
+// ---------------------------------------------------------------------------
+// FR-33 — bulk listing import over the API, one key per lot.
+//
+//   POST /api/dealer/listings                     dry run (default)
+//   POST /api/dealer/listings?dry_run=false       write the rows that pass
+//   POST /api/dealer/listings?dry_run=false&status=draft
+//
+// Body: CSV (text/csv) or JSON — either { "csv": "..." } or
+// { "listings": [ { make, model, year, price, ... } ] }.
+//
+// The default is a dry run on purpose: a script that gets the URL wrong writes
+// nothing, and the response says exactly what a real run would do. Nothing can
+// go live from here — imports create drafts, and ops publishes them.
+// ---------------------------------------------------------------------------
+const IMPORT_BODY = [
+  express.text({ type: ['text/csv', 'text/plain'], limit: '512kb' }),
+  express.json({ limit: '512kb' }),
+];
+
+/** A JSON array of objects becomes the same CSV the file form takes. */
+function csvFromJson(listings) {
+  if (!Array.isArray(listings) || !listings.length) return null;
+  const columns = imports.COLUMNS.map((column) => column.name).filter((name) => name !== 'photos');
+  const rows = listings.slice(0, imports.MAX_ROWS).map((row) => columns.map((column) => {
+    const value = row[column];
+    if (Array.isArray(value)) return value.join(' | ');
+    return value == null ? '' : String(value);
+  }).concat([Array.isArray(row.photos) ? row.photos.join(' | ') : String(row.photos || '')]));
+  return require('../lib/csv').stringify(rows, [...columns, 'photos']);
+}
+
+router.post('/dealer/listings', rateLimit({ windowMs: 60_000, max: 20 }), IMPORT_BODY, async (req, res, next) => {
+  try {
+    const auth = await dealerApi.fromRequest(req);
+    if (!auth.ok) return sendJson(res, { ok: false, error: auth.error }, { status: auth.status, cache: 'no-store' });
+
+    let text = typeof req.body === 'string' ? req.body : '';
+    if (!text && req.body && typeof req.body === 'object') {
+      if (typeof req.body.csv === 'string') text = req.body.csv;
+      else if (Array.isArray(req.body.listings)) text = csvFromJson(req.body.listings) || '';
+    }
+    if (!text.trim()) {
+      return sendJson(res, {
+        ok: false,
+        error: 'Send CSV as the body (content-type text/csv), or JSON like { "listings": [ … ] }.',
+        template: '/dealer/imports/template.csv',
+      }, { status: 400, cache: 'no-store' });
+    }
+
+    const dryRun = String(req.query.dry_run || 'true') !== 'false';
+    const report = await imports.run(text, { dealerId: auth.lot.id, actorId: null, dryRun });
+
+    return sendJson(res, {
+      ok: report.ok,
+      lot: { id: auth.lot.id, name: auth.lot.name },
+      dryRun: report.dryRun,
+      counts: report.counts,
+      fileErrors: report.fileErrors,
+      rows: report.rows.map((row) => ({
+        line: row.line,
+        action: row.errors.length ? 'refuse' : 'create',
+        errors: row.errors,
+        warnings: row.warnings,
+        preview: row.errors.length ? undefined : {
+          title: [row.input.year, row.input.make, row.input.model].filter(Boolean).join(' '),
+          priceKobo: row.input.priceKobo,
+          condition: row.input.condition,
+          photos: row.photos.length,
+        },
+      })),
+      created: report.created,
+    }, { cache: 'no-store' });
+  } catch (error) {
+    return next(error);
+  }
 });
 
 // ---------------------------------------------------------------------------

@@ -87,6 +87,7 @@ const PAGES = [
 const DEALER_PAGES = [
   '/dealer/dashboard', '/dealer/listings', '/dealer/listings/new',
   '/dealer/leads', '/dealer/performance', '/dealer/billing', '/dealer/profile',
+  '/dealer/addons', '/dealer/imports',
 ];
 const DEALER_PHONE = '+2348000000006';
 const CUSTOMER_PHONE = '+2348031234567';

@@ -40,6 +40,9 @@ const MATRIX = {
   // read-only — a lot's terms are set at onboarding, and an add-on is delivered
   // by the payment landing, never by a button here.
   'dealers.view': ['admin', 'ops', 'finance'],
+  // Revoking a lot's API key cuts an integration off mid-flight, so it is the
+  // desk that runs partner onboarding (admin/ops), not finance reading the books.
+  'dealers.manage': ['admin', 'ops'],
   'users.manage': ['admin'],                       // staff accounts, roles, audit log
   'reports.view': ['admin', 'ops', 'finance', 'marketing'],
   // §15.2 marketing dashboard. Read is the CMS-and-marketing column of §7.4

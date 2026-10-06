@@ -6,7 +6,20 @@ integrations §11, NFRs §12, sitemap §5.1, acceptance §18.3).
 Line references below point at the code that exists. Where an item is missing, the
 note says what "done" would mean, so the work can be scoped without re-reading the PRD.
 
-**Status at this commit:** FR-18 is built — §7.2's Orders & Billing is real on
+**Status at this commit:** FR-33 is built — the dealer portal imports a
+spreadsheet. `/dealer/imports` takes CSV (picked or pasted, read in the browser)
+and always shows the dry run first: line by line, what would be created, what
+was refused and which column was wrong, with warnings rather than silence for a
+car the lot already has or two identical rows in one file. Applying creates
+**drafts** — live is still ops' decision (§7.3) — and a partly-good file imports
+the rows that passed. The template is generated from the same column table the
+validator uses, so a downloaded template always imports. Each lot can issue
+itself API keys (hashed at rest, shown once, revocable) and drive the same
+validation from its own tooling at `POST /api/dealer/listings`, where the
+default is a dry run; the desk can revoke a key from `/admin/dealers/:id`
+(§7.4 gains `dealers.manage`, admin/ops). The row count below drops to 25.
+
+**Status at `9d1b4d8`:** FR-18 is built — §7.2's Orders & Billing is real on
 both sides of the desk. A lot buys a media shoot, a featured placement or the
 monthly intelligence report from `/dealer/addons`; each purchase raises its own
 payment (purpose `addon`) and, while no PSP keys exist, says how to pay it by
@@ -59,7 +72,6 @@ No external account needed. These are real gaps against the PRD.
 | FR-29 | Instant valuation widget from price-intel data (§6.6) | `/sell-swap` promises a human valuation within 24h; `price_bands` (FR-23) holds exactly the data a widget needs. | Make/model/year/condition/mileage in, an indicative band out, with the same "sample size" honesty the VDP indicator uses. |
 | FR-30 | PWA — installable, offline shell, web push | Mobile-first responsive site; no manifest, no service worker. | Manifest + service worker + install prompt; push is a bigger call (needs VAPID keys). |
 | FR-32 | Multi-city inventory (Owerri/Aba/Benin) with area switcher | Single-city: `city` is a column, but there is no area filter or switcher anywhere. | City dimension through inventory, facets, sitemap and the area switcher in the header. |
-| FR-33 | Dealer bulk CSV/API listing import | One-listing-at-a-time via the dealer wizard and `/admin/listings/new`. | A CSV template, a validating importer with a dry-run report, and an API key per lot. |
 | FR-34 | Financing-lead partner handoff | Nothing. | A financing enquiry that captures intent and hands off, with the partner recorded on the lead. |
 | §5.1 | Admin screen named in the sitemap but absent: **settings** (the **dealers**, **subscriptions** and **hire** screens now exist) | `/admin/dealers` lists every lot with its stock, commission and paid add-ons, and opens each lot's ledger, statements and purchases. Settings has no screen. | A settings screen (business facts, thresholds, channels) — the last of the §5.1 sitemap. |
 | §18.3 | "Privacy requests actionable in admin" (NDPA) | Self-service works: `/account/export` and account deletion, with the record anonymised (`DELETED-…`). | An admin view of data-subject requests and their handling, so the duty is discharged, not just offered. |

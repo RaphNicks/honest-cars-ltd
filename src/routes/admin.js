@@ -41,6 +41,7 @@ const reportExport = require('../services/report-export');
 const hireService = require('../services/hire');
 const invoiceService = require('../services/invoice');
 const statementService = require('../services/statement');
+const dealerApi = require('../services/dealer-api');
 const { sendPage, CACHE } = require('../lib/respond');
 
 const router = express.Router();
@@ -1375,6 +1376,22 @@ router.get('/dealers', auth.requireStaff('dealers.view'), async (req, res, next)
   }
 });
 
+// A leaked key is an emergency, so the desk can cut one off without waiting for
+// the dealer to sign in.
+router.post('/dealers/:id/keys/:keyId/revoke', auth.requireStaff('dealers.manage'), auth.sameOriginOnly, async (req, res, next) => {
+  try {
+    const id = Number.parseInt(req.params.id, 10);
+    const keyId = Number.parseInt(req.params.keyId, 10);
+    if (!Number.isFinite(id) || !Number.isFinite(keyId)) return next();
+    // Through the service, so the revocation lands in the audit log with who did it.
+    const result = await dealerApi.revoke(id, keyId, { actorId: req.user.id });
+    if (!result.ok) return done(res, `/admin/dealers/${id}`, result.error, { error: true });
+    return done(res, `/admin/dealers/${id}`, result.already ? 'That key was already revoked.' : `“${result.key.label}” is revoked — anything still using it stops working now.`);
+  } catch (error) {
+    return next(error);
+  }
+});
+
 router.get('/dealers/:id', auth.requireStaff('dealers.view'), async (req, res, next) => {
   try {
     const id = Number.parseInt(req.params.id, 10);
@@ -1382,19 +1399,20 @@ router.get('/dealers/:id', auth.requireStaff('dealers.view'), async (req, res, n
     const lot = await db.dealers.byId(id);
     if (!lot) return next();
 
-    const [ledger, months, purchases, dashboard, listings] = await Promise.all([
+    const [ledger, months, purchases, dashboard, listings, keys] = await Promise.all([
       db.dealers.statements(id, { limit: 200 }),
       statementService.months(id),
       db.addons.purchasesFor(id, { limit: 100 }),
       db.dealers.dashboard(id),
       db.dealers.listings(id, { limit: 100 }),
+      db.dealerKeys.listFor(id),
     ]);
     return await page(req, res, {
       view: 'admin/dealer',
       active: PATHS.dealers,
       title: lot.name,
       description: `Commission ledger, monthly statements and add-on purchases for ${lot.name}.`,
-      data: { lot, ledger, months, purchases, counts: dashboard.counts, commission: dashboard.commission, listings },
+      data: { lot, ledger, months, purchases, counts: dashboard.counts, commission: dashboard.commission, listings, keys, canManage: roles.can(req.user.role, 'dealers.manage') },
     });
   } catch (error) {
     return next(error);

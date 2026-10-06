@@ -6,8 +6,11 @@
   by the same service, so a partner querying a figure gets the identical
   arithmetic here and there.
 
-  Locals: lot, ledger, months, purchases, counts, commission, listings,
-          statementService
+  FR-33 hangs a lot's API keys here too: the desk that onboards a partner is the
+  desk that should be able to cut an integration off.
+
+  Locals: lot, ledger, months, purchases, counts, commission, listings, keys,
+          canManage, statementService
 %>
 <% var naira = helpers.formatNaira; %>
 <% var money = function (kobo) {
@@ -42,6 +45,18 @@
     <strong class="kpi__value tabular"><%= purchases.filter(function (p) { return p.status === 'active'; }).length %></strong>
     <span class="kpi__foot">
       <%= purchases.filter(function (p) { return p.status === 'pending'; }).length %> raised and unpaid
+    </span>
+  </div>
+  <div class="kpi kpi--sm">
+    <span class="kpi__label">API keys</span>
+    <strong class="kpi__value tabular"><%= keys.filter(function (k) { return k.active; }).length %></strong>
+    <span class="kpi__foot">
+      <% if (keys.length) { %>
+        <%= keys.length - keys.filter(function (k) { return k.active; }).length %> revoked ·
+        <%= keys.reduce(function (total, k) { return total + k.requestCount; }, 0) %> request(s) ever
+      <% } else { %>
+        none issued — the lot can make one itself
+      <% } %>
     </span>
   </div>
   <div class="kpi kpi--sm">
@@ -204,6 +219,56 @@
         </tbody>
       </table>
     </div>
+  <% } %>
+</section>
+
+<section class="panel">
+  <div class="panel__head">
+    <h2 class="panel__title">API keys</h2>
+    <span class="cms-hint">FR-33 — for the lot's own bulk-import tooling</span>
+  </div>
+  <% if (!keys.length) { %>
+    <p class="empty-line">No key issued. The lot makes one at <span class="tabular">/dealer/imports</span> when it has a tool to connect.</p>
+  <% } else { %>
+    <div class="table-scroll">
+      <table class="table">
+        <caption class="visually-hidden">API keys issued to <%= lot.name %></caption>
+        <thead>
+          <tr>
+            <th scope="col">Label</th>
+            <th scope="col">Key</th>
+            <th scope="col">Last used</th>
+            <th scope="col">Requests</th>
+            <th scope="col">State</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% keys.forEach(function (key) { %>
+            <tr>
+              <th scope="row"><%= key.label %></th>
+              <td class="tabular muted"><%= key.prefix %>…</td>
+              <td class="muted"><% if (key.lastUsedAt) { %><%= dayLabel(key.lastUsedAt) %><% } else { %>never<% } %></td>
+              <td class="tabular"><%= key.requestCount %></td>
+              <td>
+                <% if (!key.active) { %>
+                  <span class="badge badge--closed">Revoked</span>
+                <% } else if (canManage) { %>
+                  <form method="post" action="/admin/dealers/<%= lot.id %>/keys/<%= key.id %>/revoke" class="inline-form">
+                    <button class="btn btn--ghost btn--sm" type="submit">Revoke</button>
+                  </form>
+                <% } else { %>
+                  <span class="badge badge--ok">Active</span>
+                <% } %>
+              </td>
+            </tr>
+          <% }); %>
+        </tbody>
+      </table>
+    </div>
+    <p class="cms-hint">
+      Only a hash is stored, so nobody — including this console — can read a key back.
+      <% if (!canManage) { %>Revoking needs the partner desk (admin or ops).<% } %>
+    </p>
   <% } %>
 </section>
 

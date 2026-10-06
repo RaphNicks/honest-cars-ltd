@@ -23,6 +23,11 @@
  *   POST /dealer/addons/:slug        buy an add-on — raises the purchase + payment
  *   GET  /dealer/addons/purchase/:reference     where to pay it, and what it does
  *   GET  /dealer/profile             lot details, tier and the signed agreement
+ *   GET  /dealer/imports             bulk CSV import: template, dry run, keys (FR-33)
+ *   POST /dealer/imports             check a pasted/uploaded file — apply only if asked
+ *   GET  /dealer/imports/template.csv the header, and one row showing every column
+ *   POST /dealer/imports/keys        issue an API key for this lot (shown once)
+ *   POST /dealer/imports/keys/:id/revoke   cut a key off
  *
  * Authorisation is one idea: the lot comes from the signed-in account's own row
  * (`db.dealers.forUser`), and every query is scoped by that id. A dealer can
@@ -39,6 +44,8 @@ const { sendPrebuiltOrRender, sendPage, CACHE } = require('../lib/respond');
 const { helpers } = require('../lib/locals');
 const addonService = require('../services/addons');
 const statementService = require('../services/statement');
+const imports = require('../services/imports');
+const dealerApi = require('../services/dealer-api');
 
 const router = express.Router();
 const dealers = db.dealers;
@@ -55,6 +62,7 @@ const PATHS = {
   statements: `${HOME}/billing/statements`,
   addons: `${HOME}/addons`,
   profile: `${HOME}/profile`,
+  imports: `${HOME}/imports`,
 };
 
 const NAV = [
@@ -65,6 +73,7 @@ const NAV = [
   { href: PATHS.performance, label: 'Performance', icon: 'gauge' },
   { href: PATHS.billing, label: 'Commission', icon: 'scale' },
   { href: PATHS.addons, label: 'Add-ons', icon: 'plus' },
+  { href: PATHS.imports, label: 'Import', icon: 'package' },
   { href: PATHS.profile, label: 'Profile', icon: 'store' },
 ];
 
@@ -655,6 +664,106 @@ router.get('/addons/purchase/:reference', requireDealer, async (req, res, next) 
       description: 'What this add-on does, what it costs, and how to pay it.',
       data: { purchase, payment, bank: addonService.bank(purchase.paymentReference || reference) },
     });
+  } catch (error) {
+    return next(error);
+  }
+});
+
+// ---------------------------------------------------------------------------
+// Bulk import — FR-33. The whole point is the dry run: nothing is written until
+// the dealer has seen what would be written, row by row.
+// ---------------------------------------------------------------------------
+const IMPORT_BODY = express.urlencoded({ extended: false, limit: '512kb' });
+
+router.get('/imports', requireDealer, async (req, res, next) => {
+  try {
+    const keys = await dealerApi.keysFor(req.lot.id);
+    return await page(req, res, {
+      view: 'dealer/imports',
+      active: PATHS.imports,
+      title: 'Bulk import',
+      description: 'Import a spreadsheet of cars as drafts, with a dry run first, or wire your own tooling up with an API key.',
+      data: {
+        fields: imports.fieldGuide(),
+        maxRows: imports.MAX_ROWS,
+        maxPhotos: imports.MAX_PHOTOS,
+        keys,
+        keyPrefix: dealerApi.KEY_PREFIX,
+        csv: '',
+        report: null,
+        newKey: null,
+      },
+    });
+  } catch (error) {
+    return next(error);
+  }
+});
+
+router.get('/imports/template.csv', requireDealer, (req, res) => {
+  res.set('Content-Type', 'text/csv; charset=utf-8');
+  res.set('Content-Disposition', 'attachment; filename="honestcars-listing-import-template.csv"');
+  res.set('Cache-Control', CACHE.private);
+  return res.send(imports.template());
+});
+
+router.post('/imports', requireDealer, auth.sameOriginOnly, IMPORT_BODY, async (req, res, next) => {
+  try {
+    const text = typeof req.body.csv === 'string' ? req.body.csv : '';
+    const apply = String(req.body.mode || 'dry') === 'apply';
+    const keys = await dealerApi.keysFor(req.lot.id);
+
+    const report = await imports.run(text, { dealerId: req.lot.id, actorId: req.user.id, dryRun: !apply });
+    return await page(req, res, {
+      view: 'dealer/imports',
+      active: PATHS.imports,
+      title: 'Bulk import',
+      description: 'The dry run’s findings, line by line.',
+      data: {
+        fields: imports.fieldGuide(),
+        maxRows: imports.MAX_ROWS,
+        maxPhotos: imports.MAX_PHOTOS,
+        keys,
+        keyPrefix: dealerApi.KEY_PREFIX,
+        csv: text.slice(0, 200_000),
+        report,
+        newKey: null,
+      },
+    });
+  } catch (error) {
+    return next(error);
+  }
+});
+
+router.post('/imports/keys', requireDealer, auth.sameOriginOnly, async (req, res, next) => {
+  try {
+    const issued = await dealerApi.issue(req.lot.id, { label: validate.text(req.body.label, 80), actorId: req.user.id });
+    const keys = await dealerApi.keysFor(req.lot.id);
+    return await page(req, res, {
+      view: 'dealer/imports',
+      active: PATHS.imports,
+      title: 'Bulk import',
+      description: 'Your new API key — it is shown once.',
+      data: {
+        fields: imports.fieldGuide(),
+        maxRows: imports.MAX_ROWS,
+        maxPhotos: imports.MAX_PHOTOS,
+        keys,
+        keyPrefix: dealerApi.KEY_PREFIX,
+        csv: '',
+        report: null,
+        newKey: issued.key,
+      },
+    });
+  } catch (error) {
+    return next(error);
+  }
+});
+
+router.post('/imports/keys/:id/revoke', requireDealer, auth.sameOriginOnly, async (req, res, next) => {
+  try {
+    const result = await dealerApi.revoke(req.lot.id, validate.integer(req.params.id, { min: 1, fallback: 0 }), { actorId: req.user.id });
+    if (!result.ok) return done(res, PATHS.imports, result.error, { error: true });
+    return done(res, PATHS.imports, result.already ? 'That key was already revoked.' : `“${result.key.label}” is revoked. Anything still using it stops working now.`);
   } catch (error) {
     return next(error);
   }
