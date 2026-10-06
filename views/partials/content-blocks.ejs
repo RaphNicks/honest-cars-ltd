@@ -3,8 +3,9 @@
   pages (§6.10). Keeps one definition of what a “callout” or a “checklist” is.
 
   Block types: paragraph · heading · callout · checklist · table · quote ·
-  youtube · listings · stats
-  Locals: blocks, mentioned (listings, optional), helpers
+  youtube · video · listings · listing · stats
+  Locals: blocks, mentioned (listings, optional), embeds (slug → listing, optional),
+  helpers
 %>
 <div class="post-body">
   <% blocks.forEach(function (block, index) { %>
@@ -76,6 +77,15 @@
           <span><%= block.title || 'Play video' %><%= block.duration ? ` · ${block.duration}` : '' %></span>
         </button>
       </div>
+
+    <% } else if (block.type === 'listing') { %>
+      <%# FR-35 — one specific car. A sold or pulled car renders nothing. %>
+      <% var embed = embeds ? embeds.get(block.slug) : null; %>
+      <% if (embed) { %>
+        <div class="grid grid--3" style="margin: var(--space-3) 0">
+          <%- include('car-card', { listing: embed, helpers: helpers }) %>
+        </div>
+      <% } %>
 
     <% } else if (block.type === 'listings') { %>
       <% if (mentioned && mentioned.length) { %>

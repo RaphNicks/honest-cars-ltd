@@ -13,7 +13,7 @@
       <h1 class="mt-1"><%= post.title %></h1>
       <p class="lead"><%= post.excerpt %></p>
       <p class="page-hero__meta">
-        <span>By <%= post.author.name %>, <%= post.author.role %></span> ·
+        <span>By <% if (post.authorUrl) { %><a href="<%= post.authorUrl %>"><%= post.author.name %></a><% } else { %><%= post.author.name %><% } %>, <%= post.author.role %></span> ·
         <time datetime="<%= new Date(post.publishedAt).toISOString() %>">
           <%= new Date(post.publishedAt).toLocaleDateString('en-NG', { day: 'numeric', month: 'long', year: 'numeric' }) %>
         </time> ·
@@ -22,6 +22,13 @@
           · <span>updated <%= new Date(post.updatedAt).toLocaleDateString('en-NG', { day: 'numeric', month: 'short' }) %></span>
         <% } %>
       </p>
+      <% if (post.tags && post.tags.length) { %>
+        <nav class="chip-bar mt-1" aria-label="Tags">
+          <% post.tags.forEach(function (tag) { %>
+            <a class="chip" href="<%= tag.url %>">#<%= tag.label %></a>
+          <% }); %>
+        </nav>
+      <% } %>
     </div>
   </header>
 
@@ -37,7 +44,7 @@
       <div>
         <% var headings = post.body.filter(function (b) { return b.type === 'heading'; }); %>
         <div data-post-body>
-          <%- include('../partials/content-blocks', { blocks: post.body, mentioned: mentioned, helpers: helpers }) %>
+          <%- include('../partials/content-blocks', { blocks: post.body, mentioned: mentioned, embeds: embeds, helpers: helpers }) %>
         </div>
 
         <%# “Cars mentioned in this article” — auto-pulled live listings (§6.9). %>
@@ -132,9 +139,12 @@
         <div class="author-card">
           <span class="author-card__avatar" aria-hidden="true"><%= post.author.name.slice(0, 1) %></span>
           <div>
-            <strong><%= post.author.name %></strong>
+            <strong><% if (post.authorUrl) { %><a href="<%= post.authorUrl %>"><%= post.author.name %></a><% } else { %><%= post.author.name %><% } %></strong>
             <p class="author-card__role mb-0"><%= post.author.role %></p>
             <% if (post.author.bio) { %><p class="mb-0 mt-1"><%= post.author.bio %></p><% } %>
+            <% if (author && post.authorUrl) { %>
+              <p class="mb-0 mt-1"><a href="<%= post.authorUrl %>">Every post by <%= author.name.split(' ')[0] %> →</a></p>
+            <% } %>
           </div>
         </div>
 

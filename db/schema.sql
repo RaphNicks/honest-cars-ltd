@@ -371,6 +371,51 @@ CREATE TABLE IF NOT EXISTS testimonials (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ---------------------------------------------------------------------------
+-- blog_authors · blog_tags · blog_post_tags — FR-35
+--
+-- §6.9 asks for an author card (“name, role, short bio — E-E-A-T”) and for
+-- “tags governed”, a fixed taxonomy. The author is an entity so it can have a
+-- page (/blog/author/{slug}) and one bio; the post keeps its byline columns as
+-- the CMS writes them, with author_id as the link.
+--
+-- Tags are a governed list, separate from `blog_posts.make_tags`: make_tags
+-- pulls live listings (“Cars mentioned in this article”), tags are what a post
+-- is *about* (/blog/tag/{slug}).
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS blog_authors (
+  id         INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  slug       VARCHAR(80)  NOT NULL,
+  name       VARCHAR(120) NOT NULL,
+  role       VARCHAR(120) NOT NULL,
+  bio        VARCHAR(300) NULL,
+  created_at TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  UNIQUE KEY uq_author_slug (slug)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS blog_tags (
+  id          INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  slug        VARCHAR(80)  NOT NULL,
+  label       VARCHAR(80)  NOT NULL,
+  kind        ENUM('topic','make','format') NOT NULL DEFAULT 'topic',
+  description VARCHAR(200) NULL,
+  created_at  TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  UNIQUE KEY uq_tag_slug (slug),
+  KEY idx_tag_kind (kind, label)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS blog_post_tags (
+  post_id INT UNSIGNED NOT NULL,
+  tag_id  INT UNSIGNED NOT NULL,
+  PRIMARY KEY (post_id, tag_id),
+  KEY idx_post_tag_tag (tag_id),
+  CONSTRAINT fk_post_tag_post FOREIGN KEY (post_id) REFERENCES blog_posts (id) ON DELETE CASCADE,
+  CONSTRAINT fk_post_tag_tag  FOREIGN KEY (tag_id)  REFERENCES blog_tags  (id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ---------------------------------------------------------------------------
 -- blog_posts — "Home of the Honest Buyer's Guide" (§6.9)
 -- ---------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS blog_posts (
@@ -392,6 +437,7 @@ CREATE TABLE IF NOT EXISTS blog_posts (
   body           JSON          NULL,                          -- block list: paragraph|heading|callout|checklist|table|quote|youtube|listing
   service_cta    VARCHAR(80)   NULL,                          -- contextual service footer (§6.9)
   author_bio     VARCHAR(300)  NULL,                          -- E-E-A-T author card
+  author_id      INT UNSIGNED  NULL,                          -- FR-35 author page (/blog/author/{slug})
   meta_title     VARCHAR(200)  NULL,                          -- §14.3 search-result title
   meta_description VARCHAR(320) NULL,                          -- §14.3 search-result description
   review_note    VARCHAR(300)  NULL,                          -- why it was sent back to draft
@@ -401,6 +447,8 @@ CREATE TABLE IF NOT EXISTS blog_posts (
   PRIMARY KEY (id),
   UNIQUE KEY uq_blog_slug (slug),
   KEY idx_blog_publish (status, published_at),
+  KEY idx_blog_author (author_id, status, published_at),
+  CONSTRAINT fk_blog_author        FOREIGN KEY (author_id)     REFERENCES blog_authors (id) ON DELETE SET NULL,
   CONSTRAINT fk_blog_published_by FOREIGN KEY (published_by) REFERENCES `users` (id) ON DELETE SET NULL,
   CONSTRAINT fk_blog_updated_by   FOREIGN KEY (updated_by)   REFERENCES `users` (id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
@@ -629,6 +677,39 @@ CREATE TABLE IF NOT EXISTS subscription_reminders (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ---------------------------------------------------------------------------
+-- service_requests — §10.1: “User has many ServiceRequest (types: concierge,
+-- sell, swap, documents, research, parts, consultation)”. One table, a JSON
+-- brief, and a tracking id that the customer can watch at /concierge/{id}.
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS service_requests (
+  id            INT UNSIGNED  NOT NULL AUTO_INCREMENT,
+  tracking_id   VARCHAR(16)   NOT NULL,                 -- HC-2481
+  type          ENUM('concierge','sell','swap','documents','research','parts','consultation','tracking','hire')
+                              NOT NULL,
+  status        ENUM('new','searching','options_ready','viewings','closed','lost')
+                              NOT NULL DEFAULT 'new',
+  name          VARCHAR(120)  NOT NULL,
+  phone         VARCHAR(40)   NOT NULL,
+  brief         JSON          NULL,                     -- step answers, must-haves, timeline…
+  listing_id    INT UNSIGNED  NULL,                     -- parts/documents requests may point at a car
+  sla_due_at    DATETIME      NULL,                     -- 48–72h for concierge (§6.5)
+  source_path   VARCHAR(200)  NOT NULL,
+  notes         VARCHAR(500)  NULL,
+  assigned_to   INT UNSIGNED  NULL,                     -- CRM owner (§7.3)
+  assigned_at   DATETIME      NULL,
+  last_contacted_at DATETIME  NULL,
+  lost_reason   VARCHAR(160)  NULL,
+  created_at    TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at    TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  UNIQUE KEY uq_request_tracking (tracking_id),
+  KEY idx_request_pipeline (type, status, created_at),
+  KEY idx_request_assignee (assigned_to, status),
+  CONSTRAINT fk_request_listing FOREIGN KEY (listing_id) REFERENCES vehicle_listings (id) ON DELETE SET NULL,
+  CONSTRAINT fk_request_assignee FOREIGN KEY (assigned_to) REFERENCES `users` (id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ---------------------------------------------------------------------------
 -- hire_vehicles / hire_bookings / hire_incidents — FR-22, §7.3 “Hire Management
 -- (vehicle pool registry, availability calendar, booking records, incident log)”.
 -- Migration 020. Kept out of `bookings` on purpose: an inspection booking is a
@@ -712,63 +793,7 @@ CREATE TABLE IF NOT EXISTS hire_bookings (
   CONSTRAINT fk_hire_booking_actor FOREIGN KEY (created_by) REFERENCES `users` (id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-CREATE TABLE IF NOT EXISTS hire_incidents (
-  id             INT UNSIGNED NOT NULL AUTO_INCREMENT,
-  booking_id     INT UNSIGNED NULL,
-  vehicle_id     INT UNSIGNED NULL,
-  kind           ENUM('damage','late_return','fine','breakdown','fuel','theft','other') NOT NULL DEFAULT 'other',
-  severity       ENUM('minor','major','write_off') NOT NULL DEFAULT 'minor',
-  detail         VARCHAR(500) NOT NULL,
-  cost_kobo      BIGINT       NOT NULL DEFAULT 0,
-  charged_kobo   BIGINT       NOT NULL DEFAULT 0,
-  status         ENUM('open','resolved','written_off') NOT NULL DEFAULT 'open',
-  occurred_at    DATETIME     NULL,
-  resolved_at    DATETIME     NULL,
-  resolution     VARCHAR(400) NULL,
-  payment_id     INT UNSIGNED NULL,
-  reported_by    INT UNSIGNED NULL,
-  created_at     TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  PRIMARY KEY (id),
-  KEY idx_incident_booking (booking_id),
-  KEY idx_incident_status (status, created_at),
-  CONSTRAINT fk_incident_booking FOREIGN KEY (booking_id) REFERENCES hire_bookings (id) ON DELETE SET NULL,
-  CONSTRAINT fk_incident_vehicle FOREIGN KEY (vehicle_id) REFERENCES hire_vehicles (id) ON DELETE SET NULL,
-  CONSTRAINT fk_incident_payment FOREIGN KEY (payment_id) REFERENCES payments (id) ON DELETE SET NULL,
-  CONSTRAINT fk_incident_actor FOREIGN KEY (reported_by) REFERENCES `users` (id) ON DELETE SET NULL
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- ---------------------------------------------------------------------------
--- service_requests — §10.1: “User has many ServiceRequest (types: concierge,
--- sell, swap, documents, research, parts, consultation)”. One table, a JSON
--- brief, and a tracking id that the customer can watch at /concierge/{id}.
--- ---------------------------------------------------------------------------
-CREATE TABLE IF NOT EXISTS service_requests (
-  id            INT UNSIGNED  NOT NULL AUTO_INCREMENT,
-  tracking_id   VARCHAR(16)   NOT NULL,                 -- HC-2481
-  type          ENUM('concierge','sell','swap','documents','research','parts','consultation','tracking','hire')
-                              NOT NULL,
-  status        ENUM('new','searching','options_ready','viewings','closed','lost')
-                              NOT NULL DEFAULT 'new',
-  name          VARCHAR(120)  NOT NULL,
-  phone         VARCHAR(40)   NOT NULL,
-  brief         JSON          NULL,                     -- step answers, must-haves, timeline…
-  listing_id    INT UNSIGNED  NULL,                     -- parts/documents requests may point at a car
-  sla_due_at    DATETIME      NULL,                     -- 48–72h for concierge (§6.5)
-  source_path   VARCHAR(200)  NOT NULL,
-  notes         VARCHAR(500)  NULL,
-  assigned_to   INT UNSIGNED  NULL,                     -- CRM owner (§7.3)
-  assigned_at   DATETIME      NULL,
-  last_contacted_at DATETIME  NULL,
-  lost_reason   VARCHAR(160)  NULL,
-  created_at    TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  updated_at    TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  PRIMARY KEY (id),
-  UNIQUE KEY uq_request_tracking (tracking_id),
-  KEY idx_request_pipeline (type, status, created_at),
-  KEY idx_request_assignee (assigned_to, status),
-  CONSTRAINT fk_request_listing FOREIGN KEY (listing_id) REFERENCES vehicle_listings (id) ON DELETE SET NULL,
-  CONSTRAINT fk_request_assignee FOREIGN KEY (assigned_to) REFERENCES `users` (id) ON DELETE SET NULL
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ---------------------------------------------------------------------------
 -- bookings — inspections, installs and consultations (§6.7, §7.3 dispatch).
@@ -853,6 +878,37 @@ CREATE TABLE IF NOT EXISTS `payments` (
   CONSTRAINT fk_payment_hire FOREIGN KEY (hire_booking_id) REFERENCES hire_bookings (id) ON DELETE SET NULL,
   CONSTRAINT fk_payment_actor   FOREIGN KEY (created_by) REFERENCES `users` (id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ---------------------------------------------------------------------------
+-- hire_incidents — FR-22, §7.3 “incident log”. Below `payments` because an
+-- incident can charge a payment (`payment_id`), and below `hire_bookings`
+-- because it belongs to one.
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS hire_incidents (
+  id             INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  booking_id     INT UNSIGNED NULL,
+  vehicle_id     INT UNSIGNED NULL,
+  kind           ENUM('damage','late_return','fine','breakdown','fuel','theft','other') NOT NULL DEFAULT 'other',
+  severity       ENUM('minor','major','write_off') NOT NULL DEFAULT 'minor',
+  detail         VARCHAR(500) NOT NULL,
+  cost_kobo      BIGINT       NOT NULL DEFAULT 0,
+  charged_kobo   BIGINT       NOT NULL DEFAULT 0,
+  status         ENUM('open','resolved','written_off') NOT NULL DEFAULT 'open',
+  occurred_at    DATETIME     NULL,
+  resolved_at    DATETIME     NULL,
+  resolution     VARCHAR(400) NULL,
+  payment_id     INT UNSIGNED NULL,
+  reported_by    INT UNSIGNED NULL,
+  created_at     TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  KEY idx_incident_booking (booking_id),
+  KEY idx_incident_status (status, created_at),
+  CONSTRAINT fk_incident_booking FOREIGN KEY (booking_id) REFERENCES hire_bookings (id) ON DELETE SET NULL,
+  CONSTRAINT fk_incident_vehicle FOREIGN KEY (vehicle_id) REFERENCES hire_vehicles (id) ON DELETE SET NULL,
+  CONSTRAINT fk_incident_payment FOREIGN KEY (payment_id) REFERENCES payments (id) ON DELETE SET NULL,
+  CONSTRAINT fk_incident_actor FOREIGN KEY (reported_by) REFERENCES `users` (id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 
 -- Every webhook and every manual state change, with the signature verdict.
 -- (provider, event_id) is unique: that is the idempotency key.

@@ -19,6 +19,7 @@
  *     ^ Caption for the table below     → table caption
  *     = 1,200 | inspections completed   → stats band (consecutive = lines)
  *     [cars]                            → live listings that match the tags
+ *     [listing:2014-toyota-camry-ph]    → one specific car, card and all
  *     [video:VIDEOID | title | 4:12]    → tap-to-load YouTube facade
  *
  * Blank lines separate blocks. `parse()` never throws: a line it cannot place
@@ -33,7 +34,7 @@
 
 const BLOCK_TYPES = [
   'paragraph', 'heading', 'callout', 'checklist', 'table',
-  'quote', 'youtube', 'video', 'listings', 'stats',
+  'quote', 'youtube', 'video', 'listings', 'listing', 'stats',
 ];
 
 const DIRECTIVES = new Set(['cars', 'listings']);
@@ -108,6 +109,13 @@ function canonical(blocks) {
       case 'listings':
         out.push({ type: 'listings' });
         break;
+      case 'listing': {
+        // A specific car by its SEO slug (§14.1). The renderer drops a block
+        // whose car is sold or gone rather than printing a dead card.
+        const slug = clean(block.slug);
+        if (slug) out.push({ type: 'listing', slug });
+        break;
+      }
       case 'stats': {
         const items = (block.items || [])
           .map((item) => ({ value: clean(item && item.value), label: clean(item && item.label) }))
@@ -273,6 +281,16 @@ function parse(text) {
       const [name, ...args] = head.split(':');
       const lower = name.toLowerCase();
 
+      if (lower === 'listing') {
+        const slug = clean(args.join(':'));
+        if (!slug) {
+          errors.push({ line: i + 1, message: '[listing:…] needs the car’s web address ending — e.g. [listing:2014-toyota-camry-ph]' });
+        } else {
+          blocks.push({ type: 'listing', slug });
+        }
+        i += 1;
+        continue;
+      }
       if (DIRECTIVES.has(lower)) {
         blocks.push({ type: 'listings' });
         i += 1;
@@ -307,7 +325,7 @@ function parse(text) {
         i += 1;
         continue;
       }
-      errors.push({ line: i + 1, message: `Unknown directive “[${name}]” — try [cars] or [video:id | title].` });
+      errors.push({ line: i + 1, message: `Unknown directive “[${name}]” — try [cars], [listing:slug] or [video:id | title].` });
       blocks.push({ type: 'paragraph', text: line });
       i += 1;
       continue;
@@ -367,6 +385,9 @@ function toMarkup(blocks) {
       case 'listings':
         push('[cars]');
         break;
+      case 'listing':
+        push(`[listing:${block.slug}]`);
+        break;
       case 'stats': {
         if (lines.length && lines[lines.length - 1] !== '') lines.push('');
         block.items.forEach((item) => lines.push(`= ${item.value} | ${item.label}`));
@@ -390,6 +411,7 @@ function wordCount(blocks) {
       if (block.type === 'table') return [block.caption, ...block.head, ...block.rows.flat()].filter(Boolean).join(' ');
       if (block.type === 'checklist') return block.items.join(' ');
       if (block.type === 'stats') return block.items.map((item) => `${item.value} ${item.label}`).join(' ');
+      if (block.type === 'listing') return block.slug;
       return [block.title, block.text, block.attribution].filter(Boolean).join(' ');
     })
     .join(' ');

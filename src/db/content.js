@@ -107,6 +107,15 @@ async function publishedTestimonials(limit = 4) {
 // ---------------------------------------------------------------------------
 // Blog (§6.9)
 // ---------------------------------------------------------------------------
+/**
+ * Every post query joins its author entity (FR-35) so a card can link to
+ * /blog/author/{slug}; `author_name/role/bio` stay on the post as the byline.
+ * Tags are attached in a second query — one round trip for a whole grid.
+ */
+const POST_SELECT = `SELECT p.*, a.slug AS author_slug
+   FROM blog_posts p
+   LEFT JOIN blog_authors a ON a.id = p.author_id`;
+
 function shapePost(row, { full = false } = {}) {
   if (!row) return null;
   const base = {
@@ -119,11 +128,14 @@ function shapePost(row, { full = false } = {}) {
     heroImage: row.hero_image,
     heroAlt: row.hero_alt,
     author: { name: row.author_name, role: row.author_role, bio: row.author_bio || null },
+    authorSlug: row.author_slug || null,
+    authorUrl: row.author_slug ? `/blog/author/${row.author_slug}` : null,
     readMinutes: row.read_minutes,
     publishedAt: row.published_at,
     updatedAt: row.updated_at,
     isFeatured: Boolean(row.is_featured),
     makeTags: parseJson(row.make_tags, []) || [],
+    tags: [],
     url: `/blog/${row.slug}`,
   };
   if (!full) return base;
@@ -134,32 +146,63 @@ function shapePost(row, { full = false } = {}) {
   };
 }
 
+/** One query for every tag of every post on the page (FR-35). */
+async function attachPostTags(posts = []) {
+  const clean = [...new Set(posts.map((post) => post && post.id).filter(Boolean))];
+  if (!clean.length) return posts;
+  const rows = await query(
+    `SELECT pt.post_id, t.slug, t.label, t.kind
+       FROM blog_post_tags pt
+       JOIN blog_tags t ON t.id = pt.tag_id
+      WHERE pt.post_id IN (${clean.map(() => '?').join(',')})
+      ORDER BY t.kind, t.label`,
+    clean,
+  );
+  const byPost = new Map();
+  for (const row of rows) {
+    if (!byPost.has(row.post_id)) byPost.set(row.post_id, []);
+    byPost.get(row.post_id).push({
+      slug: row.slug,
+      label: row.label,
+      kind: row.kind,
+      url: `/blog/tag/${row.slug}`,
+    });
+  }
+  for (const post of posts) post.tags = byPost.get(post.id) || [];
+  return posts;
+}
+
 /**
  * Blog home feed — featured pin first, then published posts, 9 per “load more”.
  * Category chips come from a count query so an empty category never renders.
+ * FR-35 adds a `tag` filter and a governed tag list with live counts.
  */
-async function blogIndex({ page = 1, perPage = POSTS_PER_PAGE, category = null, q = null } = {}) {
-  const where = ["status = 'published'", 'published_at <= UTC_TIMESTAMP()'];
+async function blogIndex({ page = 1, perPage = POSTS_PER_PAGE, category = null, q = null, tag = null } = {}) {
+  const where = ["p.status = 'published'", 'p.published_at <= UTC_TIMESTAMP()'];
   const params = [];
 
   if (category && CATEGORY_LABELS[category]) {
-    where.push('category = ?');
+    where.push('p.category = ?');
     params.push(category);
   }
+  if (tag) {
+    where.push('EXISTS (SELECT 1 FROM blog_post_tags pt JOIN blog_tags t ON t.id = pt.tag_id WHERE pt.post_id = p.id AND t.slug = ?)');
+    params.push(tag);
+  }
   if (q) {
-    where.push('(title LIKE ? OR excerpt LIKE ?)');
+    where.push('(p.title LIKE ? OR p.excerpt LIKE ?)');
     const term = `%${String(q).slice(0, 60)}%`;
     params.push(term, term);
   }
 
   const whereSql = `WHERE ${where.join(' AND ')}`;
-  const counted = await queryOne(`SELECT COUNT(*) AS total FROM blog_posts ${whereSql}`, params);
+  const counted = await queryOne(`SELECT COUNT(*) AS total FROM blog_posts p ${whereSql}`, params);
   const total = counted ? Number(counted.total) : 0;
   const offset = (Math.max(1, page) - 1) * perPage;
 
   const rows = await query(
-    `SELECT * FROM blog_posts ${whereSql}
-      ORDER BY is_featured DESC, published_at DESC
+    `${POST_SELECT} ${whereSql}
+      ORDER BY p.is_featured DESC, p.published_at DESC
       LIMIT ${Number(perPage)} OFFSET ${Number(offset)}`,
     params,
   );
@@ -171,7 +214,7 @@ async function blogIndex({ page = 1, perPage = POSTS_PER_PAGE, category = null, 
   );
 
   return {
-    posts: rows.map((row) => shapePost(row)),
+    posts: await attachPostTags(rows.map((row) => shapePost(row))),
     total,
     page: Math.max(1, page),
     pages: Math.max(1, Math.ceil(total / perPage)),
@@ -180,41 +223,75 @@ async function blogIndex({ page = 1, perPage = POSTS_PER_PAGE, category = null, 
       label: CATEGORY_LABELS[key],
       count: Number((counts.find((c) => c.category === key) || {}).count || 0),
     })),
+    tags: await blogTags({ limit: 12 }),
   };
 }
 
 async function featuredPost() {
   const row = await queryOne(
-    `SELECT * FROM blog_posts WHERE status = 'published' AND published_at <= UTC_TIMESTAMP()
-      ORDER BY is_featured DESC, published_at DESC LIMIT 1`,
+    `${POST_SELECT} WHERE p.status = 'published' AND p.published_at <= UTC_TIMESTAMP()
+      ORDER BY p.is_featured DESC, p.published_at DESC LIMIT 1`,
   );
-  return shapePost(row, { full: true });
+  if (!row) return null;
+  const post = shapePost(row, { full: true });
+  await attachPostTags([post]);
+  return post;
 }
 
 async function latestPosts(limit = 3) {
   const rows = await query(
-    `SELECT * FROM blog_posts WHERE status = 'published' AND published_at <= UTC_TIMESTAMP()
-      ORDER BY is_featured DESC, published_at DESC LIMIT ?`,
+    `${POST_SELECT} WHERE p.status = 'published' AND p.published_at <= UTC_TIMESTAMP()
+      ORDER BY p.is_featured DESC, p.published_at DESC LIMIT ?`,
     [String(limit)],
   );
-  return rows.map((row) => shapePost(row));
+  return attachPostTags(rows.map((row) => shapePost(row)));
 }
 
 async function postBySlug(slug) {
-  const row = await queryOne('SELECT * FROM blog_posts WHERE slug = ? AND status = \'published\' LIMIT 1', [slug]);
-  return shapePost(row, { full: true });
+  const row = await queryOne(
+    `${POST_SELECT} WHERE p.slug = ? AND p.status = 'published' LIMIT 1`,
+    [slug],
+  );
+  if (!row) return null;
+  const post = shapePost(row, { full: true });
+  await attachPostTags([post]);
+  return post;
 }
 
-/** Related posts: same category first, then anything recent. */
+/**
+ * Related posts — FR-35's engine: shared tags first, then the same category,
+ * then the same make tags (both ends share a car), and recency breaks ties.
+ */
 async function relatedPosts(post, limit = 3) {
+  const tagSlugs = (post.tags || []).map((tag) => tag.slug);
+  const makeTags = (post.makeTags || []).map((make) => String(make).toLowerCase());
   const rows = await query(
-    `SELECT * FROM blog_posts
-      WHERE status = 'published' AND published_at <= UTC_TIMESTAMP() AND id <> ?
-      ORDER BY (category = ?) DESC, published_at DESC
+    `SELECT p.*, a.slug AS author_slug,
+            (SELECT COUNT(*) FROM blog_post_tags pt
+               JOIN blog_tags t ON t.id = pt.tag_id
+              WHERE pt.post_id = p.id
+                AND t.slug IN (${tagSlugs.length ? tagSlugs.map(() => '?').join(',') : "''"})) AS tag_hits
+       FROM blog_posts p
+       LEFT JOIN blog_authors a ON a.id = p.author_id
+      WHERE p.status = 'published' AND p.published_at <= UTC_TIMESTAMP() AND p.id <> ?
+      ORDER BY tag_hits DESC, (p.category = ?) DESC, p.published_at DESC
       LIMIT ?`,
-    [post.id, post.category, String(limit)],
+    [...tagSlugs, post.id, post.category, String(Math.max(limit, 3))],
   );
-  return rows.map((row) => shapePost(row));
+  const picks = rows
+    .map((row) => ({
+      post: shapePost(row),
+      tagHits: Number(row.tag_hits || 0),
+      makeHits: (parseJson(row.make_tags, []) || []).filter((make) => makeTags.includes(String(make).toLowerCase())).length,
+    }))
+    .sort((a, b) => {
+      if (b.tagHits !== a.tagHits) return b.tagHits - a.tagHits;
+      if (b.makeHits !== a.makeHits) return b.makeHits - a.makeHits;
+      return new Date(b.post.publishedAt) - new Date(a.post.publishedAt);
+    })
+    .slice(0, limit)
+    .map((entry) => entry.post);
+  return attachPostTags(picks);
 }
 
 /** Prev / next navigation in publication order. */
@@ -240,7 +317,203 @@ async function guideShelf(limit = 12) {
       ORDER BY published_at DESC LIMIT ?`,
     [String(limit)],
   );
-  return rows.map((row) => shapePost(row));
+  return attachPostTags(rows.map((row) => shapePost(row)));
+}
+
+// ---------------------------------------------------------------------------
+// Authors, tags and the editorial calendar (FR-35)
+// ---------------------------------------------------------------------------
+
+/** The governed tag list, with a published-post count each. */
+async function blogTags({ limit = 40, kind = null } = {}) {
+  const params = [];
+  let extra = '';
+  if (kind) {
+    extra = 'AND t.kind = ?';
+    params.push(kind);
+  }
+  const rows = await query(
+    `SELECT t.id, t.slug, t.label, t.kind, t.description,
+            (SELECT COUNT(*) FROM blog_post_tags pt
+               JOIN blog_posts p ON p.id = pt.post_id
+              WHERE pt.tag_id = t.id AND p.status = 'published' AND p.published_at <= UTC_TIMESTAMP()) AS posts
+       FROM blog_tags t
+      WHERE 1 = 1 ${extra}
+      ORDER BY posts DESC, t.label ASC
+      LIMIT ${Number(limit)}`,
+    params,
+  );
+  return rows.map((row) => ({
+    id: row.id,
+    slug: row.slug,
+    label: row.label,
+    kind: row.kind,
+    description: row.description || null,
+    count: Number(row.posts || 0),
+    url: `/blog/tag/${row.slug}`,
+  }));
+}
+
+async function tagBySlug(slug) {
+  const row = await queryOne('SELECT * FROM blog_tags WHERE slug = ? LIMIT 1', [slug]);
+  if (!row) return null;
+  const counted = await queryOne(
+    `SELECT COUNT(*) AS total FROM blog_post_tags pt
+       JOIN blog_posts p ON p.id = pt.post_id
+      WHERE pt.tag_id = ? AND p.status = 'published' AND p.published_at <= UTC_TIMESTAMP()`,
+    [row.id],
+  );
+  return {
+    id: row.id,
+    slug: row.slug,
+    label: row.label,
+    kind: row.kind,
+    description: row.description || null,
+    count: counted ? Number(counted.total) : 0,
+    url: `/blog/tag/${row.slug}`,
+  };
+}
+
+/** Posts carrying a tag — the tag page's grid. */
+async function postsByTag(slug, { page = 1, perPage = POSTS_PER_PAGE } = {}) {
+  const tag = await tagBySlug(slug);
+  if (!tag) return null;
+  const offset = (Math.max(1, page) - 1) * perPage;
+  const rows = await query(
+    `${POST_SELECT}
+      WHERE p.status = 'published' AND p.published_at <= UTC_TIMESTAMP()
+        AND EXISTS (SELECT 1 FROM blog_post_tags pt JOIN blog_tags t ON t.id = pt.tag_id
+                     WHERE pt.post_id = p.id AND t.slug = ?)
+      ORDER BY p.published_at DESC
+      LIMIT ${Number(perPage)} OFFSET ${Number(offset)}`,
+    [slug],
+  );
+  return {
+    tag,
+    posts: await attachPostTags(rows.map((row) => shapePost(row))),
+    total: tag.count,
+    page: Math.max(1, page),
+    pages: Math.max(1, Math.ceil(tag.count / perPage)),
+  };
+}
+
+async function authorBySlug(slug) {
+  const row = await queryOne('SELECT * FROM blog_authors WHERE slug = ? LIMIT 1', [slug]);
+  if (!row) return null;
+  const counted = await queryOne(
+    `SELECT COUNT(*) AS total FROM blog_posts
+      WHERE author_id = ? AND status = 'published' AND published_at <= UTC_TIMESTAMP()`,
+    [row.id],
+  );
+  return {
+    id: row.id,
+    slug: row.slug,
+    name: row.name,
+    role: row.role,
+    bio: row.bio || null,
+    count: counted ? Number(counted.total) : 0,
+    url: `/blog/author/${row.slug}`,
+  };
+}
+
+/** Everything an author has published, newest first. */
+async function postsByAuthor(slug, { page = 1, perPage = POSTS_PER_PAGE } = {}) {
+  const author = await authorBySlug(slug);
+  if (!author) return null;
+  const offset = (Math.max(1, page) - 1) * perPage;
+  const rows = await query(
+    `${POST_SELECT}
+      WHERE p.author_id = ? AND p.status = 'published' AND p.published_at <= UTC_TIMESTAMP()
+      ORDER BY p.published_at DESC
+      LIMIT ${Number(perPage)} OFFSET ${Number(offset)}`,
+    [author.id],
+  );
+  return {
+    author,
+    posts: await attachPostTags(rows.map((row) => shapePost(row))),
+    total: author.count,
+    page: Math.max(1, page),
+    pages: Math.max(1, Math.ceil(author.count / perPage)),
+  };
+}
+
+/** Authors who have published something, for the blog footer and the CMS. */
+async function authorsWithCounts({ limit = 12 } = {}) {
+  const rows = await query(
+    `SELECT a.*, (SELECT COUNT(*) FROM blog_posts p
+                   WHERE p.author_id = a.id AND p.status = 'published' AND p.published_at <= UTC_TIMESTAMP()) AS posts
+       FROM blog_authors a
+      ORDER BY posts DESC, a.name ASC
+      LIMIT ${Number(limit)}`,
+  );
+  return rows.map((row) => ({
+    id: row.id,
+    slug: row.slug,
+    name: row.name,
+    role: row.role,
+    bio: row.bio || null,
+    count: Number(row.posts || 0),
+    url: `/blog/author/${row.slug}`,
+  }));
+}
+
+/**
+ * Editorial calendar (FR-35) — every post that touches the month, grouped by
+ * the day it is (or was) due. A month at a glance is what stops two posts
+ * landing on the same morning.
+ */
+async function editorialCalendar(monthKey = null) {
+  const month = /^\d{4}-\d{2}$/.test(String(monthKey || ''))
+    ? String(monthKey)
+    : new Date().toISOString().slice(0, 7);
+  const rows = await query(
+    `SELECT p.id, p.slug, p.title, p.category, p.status, p.published_at, p.updated_at,
+            a.slug AS author_slug, a.name AS author_entity_name
+       FROM blog_posts p
+       LEFT JOIN blog_authors a ON a.id = p.author_id
+      WHERE COALESCE(p.published_at, p.updated_at) >= ? AND COALESCE(p.published_at, p.updated_at) < DATE_ADD(?, INTERVAL 1 MONTH)
+      ORDER BY COALESCE(p.published_at, p.updated_at) ASC`,
+    [`${month}-01`, `${month}-01`],
+  );
+
+  const [year, monthNumber] = month.split('-').map(Number);
+  const first = new Date(Date.UTC(year, monthNumber - 1, 1));
+  const daysInMonth = new Date(Date.UTC(year, monthNumber, 0)).getUTCDate();
+  const lead = (first.getUTCDay() + 6) % 7;      // Monday-first grid
+  const days = [];
+  for (let day = 1; day <= daysInMonth; day += 1) {
+    const key = `${month}-${String(day).padStart(2, '0')}`;
+    days.push({
+      day,
+      key,
+      posts: rows
+        .filter((row) => String(row.published_at || row.updated_at).slice(0, 10) === key)
+        .map((row) => ({
+          id: row.id,
+          slug: row.slug,
+          title: row.title,
+          category: row.category,
+          categoryLabel: CATEGORY_LABELS[row.category] || row.category,
+          status: row.status,
+          date: row.published_at || row.updated_at,
+          authorName: row.author_entity_name || null,
+          authorUrl: row.author_slug ? `/blog/author/${row.author_slug}` : null,
+          url: `/blog/${row.slug}`,
+        })),
+    });
+  }
+
+  const statusRows = await query('SELECT status, COUNT(*) AS count FROM blog_posts GROUP BY status');
+  return {
+    month,
+    monthLabel: first.toLocaleDateString('en-GB', { month: 'long', year: 'numeric', timeZone: 'UTC' }),
+    days,
+    lead,
+    previous: new Date(Date.UTC(year, monthNumber - 2, 1)).toISOString().slice(0, 7),
+    next: new Date(Date.UTC(year, monthNumber, 1)).toISOString().slice(0, 7),
+    counts: Object.fromEntries(statusRows.map((row) => [row.status, Number(row.count)])),
+    total: rows.length,
+  };
 }
 
 /** RSS 2.0 feed for the blog (§6.9 “RSS link”). */
@@ -438,6 +711,14 @@ module.exports = {
   relatedPosts,
   postNeighbours,
   guideShelf,
+  blogTags,
+  tagBySlug,
+  postsByTag,
+  authorBySlug,
+  postsByAuthor,
+  authorsWithCounts,
+  editorialCalendar,
+  attachPostTags,
   rssFeed,
   pageBySlug,
   allPages,

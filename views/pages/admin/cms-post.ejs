@@ -177,7 +177,7 @@
         <h2 class="panel__title">Preview</h2>
         <p class="cms-hint">Rendered from the block list that was saved — the same renderer the live page uses.</p>
         <div class="cms-preview">
-          <%- include('../../partials/content-blocks', { blocks: previewBlocks, mentioned: [], helpers: helpers }) %>
+          <%- include('../../partials/content-blocks', { blocks: previewBlocks, mentioned: [], embeds: embedPreview, helpers: helpers }) %>
         </div>
       </section>
     <% } %>
