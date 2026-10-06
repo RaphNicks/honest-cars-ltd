@@ -49,6 +49,7 @@ Every **§9 MUST is built.** The commit trail, most recent first:
 | Commit | What it delivered |
 |---|---|
 | `a6ba608` | `docs/GAPS.md` retired FR-20 (27 left) |
+| `0f424bc` | **FR-22** hire management: pool, availability, bookings, incidents, invoice PDF |
 | `3f01527` | **FR-20** tracker subscriptions: renewals, reminders, dealer retainers |
 | `a834c71` | `docs/HANDOFF.md` (this file) |
 | `8c53572` | FR-20 groundwork — migration 019, `src/db/subscriptions.js`, `src/services/renewals.js` |
@@ -90,46 +91,61 @@ embedded videos. All four clips total 726 KB.
 
 ---
 
-## 3. Just finished: FR-20 tracking subscriptions
+## 3. Just finished: FR-22 hire management
 
-**Built and pushed in `3f01527`.** §7.3 asks for three things — the subscription
-records, a renewal queue with 30/7/1-day reminders, and dealer retainer
-management — and all three exist.
+**Built in this commit.** §7.3 asks for three things — a vehicle pool registry
+with documents and tracker state, an availability calendar, and booking records
+with an incident log — and acceptance scenario J6 asks for the corporate path
+end to end: RFQ → quote → client accepts and pays → the car is on the calendar →
+completion and an invoice PDF.
 
 What it does:
 
-- **State is derived, not stored.** `effectiveState()` in `src/db/subscriptions.js`
-  reads the renewal date: past a 7-day grace window it is `lapsed`, inside 30 days
-  `renewal_due`, otherwise whatever the activation checklist recorded. A customer
-  who stopped paying cannot sit in the console looking active, and `cancelled`
-  stays cancelled because that is a decision, not a date.
-- **Online renewals** — `POST /account/subscriptions/:id/renew` raises a payment
-  and `/account/renewals/:reference` shows how to pay it (bank transfer until a
-  PSP exists, and it says so). The year is granted by `applyRenewal(conn, payment)`
-  **inside the transaction that marks the payment paid**, so no path can take a
-  renewal without extending the subscription and none can extend it twice.
-  Renewing early adds the period to the existing date, so nobody loses days.
-- **The sweep** — `npm run renewals [--dry-run]`, or the button on
-  `/admin/subscriptions`. One reminder per 30/7/1-day window, deduped by a unique
-  key in `subscription_reminders`, so a daily cron is safe. The wording follows
-  the days actually left (a six-day-late renewal says so; it does not say
-  “expires tomorrow”). An undeliverable reminder is still recorded with its text
-  for the desk to send by hand.
-- **Dealer retainers** share the table and the queue; the summary keeps them
-  separate.
-- **§7.4** — the queue is `payments.view` (admin, finance); the checklist,
-  retainer form and sweep are `payments.approve`. Ops and marketing are refused
-  and `npm run smoke` asserts it.
+- **The pool is real cars, not classes.** `hire_vehicles` is a row per plate with
+  `owner` (ours or a partner's), `documents_state` + `documents_due`, and
+  `tracker_state`. Two Corollas are two rows; `hire_classes` still supplies the
+  price.
+- **Availability is computed, per unit per day.** `db.hire.availability()`
+  returns `free` / `out` / `held` / `service` / `invalid` / `retired` for every
+  day in a window. A unit is not available if it is in the workshop, already
+  booked on overlapping dates, or if its papers are missing or lapsed — *and the
+  label follows the date, not the column*, so a row that says “current” with an
+  expiry three months gone reads `Lapsed` and cannot be allocated.
+- **The lifecycle runs one way**, and every out-of-order step is refused in a
+  sentence: a car cannot go out on an unpaid hire, a hire that is out cannot be
+  cancelled, a hire that never left cannot be completed, a closed hire cannot be
+  reopened.
+- **Allocation has three guards**: the unit must be free on those dates
+  (overlap is `pickup_at <= dropoff AND dropoff_at >= pickup`, inclusive both
+  ends), must have valid papers, and must be *of the class that was quoted* —
+  putting a sedan on an SUV quote would bill the client for a car they are not
+  getting.
+- **Paying a hire confirms it** — `hire.confirmFromPayment(conn, payment)` runs
+  inside the transaction that marks the money paid, the same shape as FR-20's
+  renewals. `payments.purpose` gained `'hire'` in migration 020 so the receipt
+  says what it is.
+- **The incident log separates cost from charge** (`cost_kobo` vs
+  `charged_kobo`; the difference is what the desk argues about). Anything above
+  minor parks the unit until the incident is closed; a hire's incident takes its
+  vehicle from the booking, never from the form.
+- **The invoice bills what was quoted**, never the current rate card, adds any
+  incident charges, and releases the deposit at handover. `services/invoice.js`
+  builds one object and both renders it twice — the page and a real A4 PDF.
+- **§7.4** — two new rows: `hire.view` (admin, ops, finance — finance needs the
+  hire revenue and the invoices) and `hire.manage` (admin, ops — the same desk
+  that runs bookings and dispatch). Marketing holds neither, and `npm run smoke`
+  asserts all of it.
 
-Where the code is: `db/migrations/019-subscriptions-renewals.sql`,
-`src/db/subscriptions.js`, `src/services/renewals.js`, `scripts/renewals.js`,
-`views/pages/renewal.ejs`, `views/pages/admin/subscriptions.ejs`,
-`test/subscriptions.test.js` (19 tests).
+Where the code is: `db/migrations/020-hire-management.sql`, `src/db/hire.js`,
+`src/services/hire.js`, `src/services/invoice.js`, `views/pages/admin/hire.ejs`,
+`views/pages/admin/hire-invoice.ejs`, `views/pages/hire-booking.ejs`,
+`test/hire.test.js` (33 tests). The demo pool is ten units (two partner-owned,
+one with no papers, one expiring, one tracker on order, one in the workshop) and
+the hire book holds every state the lifecycle can be in.
 
-**Next in order:** FR-22 (hire management — pool registry, availability calendar,
-booking records, incident log; the public `/hire` page and its enquiry already
-exist) → FR-35 (blog extras) → FR-18 (add-on purchases) → FR-28/29/30/31/32/33/34
-(P3). `docs/GAPS.md` is canonical: 27 rows, each with what “done” means.
+**Next in order:** FR-35 (blog extras) → FR-18 (add-on purchases) →
+FR-28/29/30/31/32/33/34 (P3) → the remaining admin screens (dealers, settings).
+`docs/GAPS.md` is canonical: 28 rows, each with what “done” means.
 
 ## 4. Conventions that are not negotiable
 
@@ -155,7 +171,7 @@ exist) → FR-35 (blog extras) → FR-18 (add-on purchases) → FR-28/29/30/31/3
 ## 5. Gates before any commit
 
 ```bash
-npm test          # 273/273 at 3f01527
+npm test          # 306/306 (33 of them hire, in test/hire.test.js)
 npm run lint      # type ladder + 14 ES modules / 75 event references
 npm run build:static && npm run crawl && npm run audit:pages
 npm run smoke && npm run smoke:cms      # role matrix + CMS round trip
