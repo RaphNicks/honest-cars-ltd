@@ -300,6 +300,13 @@
             channels for you — the dealer never sees your money.
           </p>
 
+          <%# FR-34 — the honest version of "financing available": the link shows what
+              this car's price means as a monthly figure, and says who decides terms. %>
+          <p class="note-inline mt-2 mb-0">
+            Paying part of it? <a href="/financing?car=<%= listing.slug %>">See what this car costs as a monthly
+            figure</a> — the arithmetic is ours, the terms are a lender’s.
+          </p>
+
           <div class="row mt-2">
             <a class="icon-btn" target="_blank" rel="noopener"
                href="https://wa.me/?text=<%= encodeURIComponent(listing.title + ' · ' + helpers.formatNaira(listing.priceKobo) + ' · ' + helpers.absolute(listing.url)) %>"

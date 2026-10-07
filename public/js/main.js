@@ -25,6 +25,7 @@ import { initServiceForms } from './service-forms.js';
 import { initFlows } from './flow.js';
 import { initValuation } from './valuation.js';
 import { initPWA } from './pwa.js';
+import { initFinancing } from './financing.js';
 import { initAddToCart, initCartPage, initCheckoutPage, initComparePage } from './cart.js';
 import { initLoadMore, initVideoFacades, initTableOfContents, initHelpful } from './blog.js';
 import { initLogin, initSaveButtons, initAccount, initSaveSearch } from './account.js';
@@ -53,6 +54,9 @@ function boot() {
   initServiceForms();
   initFlows();
   initValuation();
+  // FR-34 — the financing calculator posts the numbers and prints the server's
+  // own sentences; the arithmetic has exactly one implementation.
+  initFinancing();
   // FR-30 — register the service worker, and offer install only if the
   // browser says the app is installable (§13.3: no nagging).
   initPWA();

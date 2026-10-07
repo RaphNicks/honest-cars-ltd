@@ -65,6 +65,9 @@ async function buildSitemap(db, { siteUrl = config.siteUrl } = {}) {
   entries.push(urlEntry({ loc: `${siteUrl}/find-my-car`, changefreq: 'monthly', priority: '0.9' }));
   entries.push(urlEntry({ loc: `${siteUrl}/sell-swap`, changefreq: 'monthly', priority: '0.8' }));
   entries.push(urlEntry({ loc: `${siteUrl}/hire`, changefreq: 'monthly', priority: '0.7' }));
+  // FR-34 — the financing page is real content (what we do, what we refuse to
+  // claim, the questions people ask), not a form bolted to a nav item.
+  entries.push(urlEntry({ loc: `${siteUrl}/financing`, changefreq: 'monthly', priority: '0.7' }));
   entries.push(urlEntry({ loc: `${siteUrl}/verification`, changefreq: 'monthly', priority: '0.8' }));
   entries.push(urlEntry({ loc: `${siteUrl}/how-it-works`, changefreq: 'monthly', priority: '0.7' }));
   entries.push(urlEntry({ loc: `${siteUrl}/about`, changefreq: 'monthly', priority: '0.6' }));

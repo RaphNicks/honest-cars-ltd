@@ -134,6 +134,12 @@ const config = {
       referral_qualified: process.env.NOTIFY_CHANNEL || 'console',
       referral_reward_approved: process.env.NOTIFY_CHANNEL || 'console',
       referral_reward_paid: process.env.NOTIFY_CHANNEL_PAYMENT || process.env.NOTIFY_CHANNEL || 'console',
+      // FR-34 — a financing referral leaves for a lender, so it gets its own
+      // knob: the customer receipts and the partner message may not want to
+      // travel the same route, and neither must be silently substituted.
+      financing_received: process.env.NOTIFY_CHANNEL_FINANCING || process.env.NOTIFY_CHANNEL || 'console',
+      financing_handoff: process.env.NOTIFY_CHANNEL_FINANCING || process.env.NOTIFY_CHANNEL || 'console',
+      financing_update: process.env.NOTIFY_CHANNEL_FINANCING || process.env.NOTIFY_CHANNEL || 'console',
     },
   },
 

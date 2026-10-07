@@ -318,3 +318,20 @@
 }
 .offline__actions { display: flex; flex-wrap: wrap; gap: var(--space-1); }
 .offline__small { margin-top: var(--space-2); font-size: var(--text-12); color: var(--color-text-muted); }
+
+/* --------------------------------------------------------------------------
+   /financing — FR-34. The page is mostly existing components; what it adds is
+   the arithmetic panel that sits beside the form.
+   -------------------------------------------------------------------------- */
+.financing-summary__headline {
+  font-size: var(--text-16);
+  font-weight: var(--weight-semibold);
+  color: var(--honest-navy);
+  margin-bottom: var(--space-1);
+}
+.financing-summary__caveat {
+  padding-top: var(--space-1);
+  border-top: var(--border);
+  margin-top: var(--space-1);
+}
+.financing-summary .checklist { margin-top: var(--space-1); }

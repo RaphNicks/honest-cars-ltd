@@ -72,6 +72,21 @@ const TEMPLATES = {
     `Your referral reward has been approved: ${amount}${detail ? ` (${detail})` : ''}. We will confirm here the moment it is paid. Nothing else is needed from you.`,
   referral_reward_paid: ({ amount }) =>
     `Your referral reward of ${amount} has been paid — thank you for bringing someone to Honest Cars. The record stays on your account at honestcarsltd.com/account.`,
+  // FR-34 — financing. Three messages, and the wording of each is the point:
+  // the enquiry says what we will do next rather than thanking them, the
+  // handoff carries the customer's actual requirements to the lender (so a
+  // lender rep can decide whether they want it without a phone call), and the
+  // outcome says who decided — because it was never us.
+  financing_received: ({ name, reference, amount, car }) =>
+    `${name ? `${name}, we` : 'We'} have your financing enquiry ${reference}${car ? ` for the ${car}` : ''}${
+      amount ? ` (${amount})` : ''
+    }. A human reads it today, and we will come back to you with which lender we are routing it to — or tell you plainly if we cannot help. We are not a lender and we do not charge you for this.`,
+  financing_handoff: ({ partner, reference, customer, phone, car, amount, down, monthly, tenor, employment, timeline, notes }) =>
+    `Financing referral ${reference} for ${partner}: ${customer} on ${phone}. Car: ${car}. Price ${amount}, down ${down}, wants to pay ${monthly} a month over ${tenor}. Employment: ${employment}. Timeline: ${timeline}.${
+      notes ? ` Our note: ${notes}` : ''
+    } Contact is the customer's own — please tell us the outcome either way and we will pass it on.`,
+  financing_update: ({ reference, status, partner, note }) =>
+    `Your financing enquiry ${reference}: ${status}${note ? ` (${note})` : ''} If anything there is unclear, reply here and a human will answer.`,
   hire_completed: ({ reference, amount, deposit }) =>
     `Hire ${reference} is closed. Your invoice is in your account at honestcarsltd.com/account${amount ? ` — ${amount} was paid on it` : ''}.${deposit ? ` The deposit of ${deposit} is released back to you; it can take up to 5 working days.` : ''}`,
 };
@@ -128,8 +143,13 @@ const providers = {
  * @param {string} [options.recipient] phone or email; omit to record only
  * @param {string} [options.entity] @param {number} [options.entityId]
  * @param {number} [options.createdBy] staff id when a human triggered it
+ * @param {boolean} [options.mustDeliver] the message only counts if the other
+ *   side actually receives it (a financing referral to a lender, or a decision
+ *   back to the customer). With no provider configured the console sink prints
+ *   the text and records it `skipped`, because "we printed it on our own server"
+ *   is not "they know", and the ops screen must not say it is.
  */
-async function send({ template, values = {}, recipient = null, entity = null, entityId = null, createdBy = null, subject = null }) {
+async function send({ template, values = {}, recipient = null, entity = null, entityId = null, createdBy = null, subject = null, mustDeliver = false }) {
   const channel = channelFor(template, recipient);
   const body = render(template, values);
   const to = recipient || 'ops:unaddressed';
@@ -138,6 +158,17 @@ async function send({ template, values = {}, recipient = null, entity = null, en
     channel, template, recipient: to, subject, body, entity, entityId, createdBy,
   });
   if (!created.ok) return created;
+
+  // The console channel is a development sink: it prints and records, and the
+  // record it leaves is useful in the log. It is not a delivery, so where the
+  // message is the handoff itself, it is recorded as skipped with the reason —
+  // which is the desk's cue to send it by hand.
+  if (mustDeliver && channel === 'console') {
+    const error = 'No delivery channel is configured — the message is recorded, not delivered.';
+    await db.payments.markNotification(created.id, { status: 'skipped', error });
+    console.log(`[notify] (not delivered) ${body}`);
+    return { ok: false, id: created.id, channel, status: 'skipped', body, error };
+  }
 
   const provider = providers[channel] || providers.console;
   const result = await provider({ body, subject, recipient: to, values });

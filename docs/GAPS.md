@@ -6,7 +6,61 @@ integrations §11, NFRs §12, sitemap §5.1, acceptance §18.3).
 Line references below point at the code that exists. Where an item is missing, the
 note says what "done" would mean, so the work can be scoped without re-reading the PRD.
 
-**Status at this commit:** FR-30 is built — the installable, offline-tolerant
+**Status at this commit:** FR-34 is built — the financing handoff, end to end,
+and the whole module is written so that it cannot read like a lender.
+
+- **The arithmetic is ours; the terms are not.** `POST /api/financing/plan` takes
+  the price (or the budget), the down payment, the monthly and the tenor, and
+  answers with three things it can stand behind: the gap that has to be financed,
+  what the principal alone costs per month, and what that payment becomes —
+  "their figure, not ours". There is **no rate, no APR, no approval and no "you
+  qualify" anywhere in the service, the page, the messages or the console**,
+  because a monthly figure we invented is a person planning around a number we
+  cannot honour. A payment that does not cover the principal says the plan does
+  not add up and names the three levers instead of inventing a repayment; paying
+  the whole price is answered with "you do not need financing".
+- **Capture.** `POST /api/financing` writes the enquiry (`HC-FIN-######`) with the
+  arithmetic the customer actually saw, and an ops **inbox lead** of type
+  `financing` alongside it (§7.3) — so an enquiry that fails downstream still
+  exists where a human will see it. A named car is priced **from the database**;
+  the amount in the request body is ignored (§11).
+- **§6.5 step 3 is a real answer now.** The concierge brief's "do you need
+  financing?" was previously a dead end: the answer only sat in the brief. A
+  brief that says `financing: 'yes'` now creates the financing lead itself,
+  linked to the `service_request`, using the brief's own budget as the amount,
+  and the success screen shows the reference. The customer does not fill in a
+  second form.
+- **The handoff is a handoff.** `/admin/financing` (capabilities `financing.view`
+  / `financing.manage`) keeps the partner book (add, activate, switch off) and
+  the queue, with the two states that need acting on stated separately: *waiting
+  on us* (no partner yet) and *routed, no answer yet*. Routing records the
+  partner and the date; an outcome (`contacted`/`approved`/`declined`/
+  `withdrawn`) records what the lender said **and never our own verdict** — every
+  change is audited with the staff id, so "who told this customer they were
+  approved?" has an answer.
+- **Nothing is reported as delivered when it was not.** The handoff message and
+  both customer messages go through `notify` with `mustDeliver`, so with no
+  provider configured they are recorded `skipped` **with the text intact** and
+  handed to ops as a WhatsApp deep link — the console says *"recorded as routed
+  to X, but nothing was delivered"* rather than *"they have the details"*. A
+  switched-off partner cannot be routed to at all. This is a small honesty fix in
+  `notify.send` that the module now relies on.
+- **The account page shows the customer their own enquiry** — reference, the car,
+  the figures, who it went to, and a sentence for the current state that never
+  says a lender has answered when they have not.
+- Seed: two lenders (one switched off) and four enquiries — one per state, one
+  linked to the concierge flow, one owned by the demo customer — so every
+  renderer opens onto real data. The seed also resolves listing stock numbers
+  through the generator's own list (`stockAt()`), which closes a latent trap:
+  city prefixes move with the market cycle (FR-32), and a literal stock number
+  silently attaches a lead to nothing the moment they do.
+- `POST /api/financing` is rate-limited, and `financing_*` messages follow their
+  own `NOTIFY_CHANNEL_FINANCING` knob.
+
+One row leaves the list here (FR-34). **The list is now 20 rows: 4 buildable in
+this sandbox, 9 blocked on an account, 7 with no home here.**
+
+**Status at `485bf04`:** FR-30 is built — the installable, offline-tolerant
 half of the PWA.
 
 What shipped: a generated icon set, a real web app manifest, a service worker
@@ -23,9 +77,8 @@ missing.
 **Push moves to the blocked table below.** FR-30 also names "push via web
 notifications"; that half needs VAPID keys, a push service and a consented
 reason to send. It cannot be honestly built here, so the row stays in the list,
-in the bucket where every other account-dependent seam lives. The list is still
-**21 rows**: 5 buildable here, 9 blocked on an account, 7 with no home in this
-sandbox.
+in the bucket where every other account-dependent seam lives. The list stood at
+**21 rows** when FR-30 shipped; FR-34 has since taken it to 20.
 
 **Status at `c680d51`:** FR-29 is built — the instant estimate on /sell-swap.
 §6.6 asks for "a rough band from pricing DB with 'confirm with free human
@@ -161,7 +214,6 @@ No external account needed. These are real gaps against the PRD.
 
 | ID | Requirement | What is actually there | What "done" means |
 |---|---|---|---|
-| FR-34 | Financing-lead partner handoff | Nothing. | A financing enquiry that captures intent and hands off, with the partner recorded on the lead. |
 | §5.1 | **settings** screen: the market/area manager exists, the rest of the group does not | `/admin/settings` (FR-32) manages markets and their area lists with audit rows, and shows cars filed under areas the list does not know. Business facts, thresholds, fee tables, channels and SLAs are still config-only. | Bring the remaining §5.1 settings groups onto `/admin/settings` so the screen is the console's answer to "where do I change that?" |
 | §18.3 | "Privacy requests actionable in admin" (NDPA) | Self-service works: `/account/export` and account deletion, with the record anonymised (`DELETED-…`). | An admin view of data-subject requests and their handling, so the duty is discharged, not just offered. |
 | §12.2 | MFA for admin roles | Sign-in is phone OTP — one factor, however strong. | TOTP (or WebAuthn) as a second factor for `admin`/`finance`, with recovery codes. |

@@ -23,6 +23,7 @@ const { router: flowRoutes } = require('./routes/flow');
 const { router: blogRoutes } = require('./routes/blog');
 const { router: shopRoutes } = require('./routes/shop');
 const { router: pageRoutes } = require('./routes/pages');
+const { router: financingRoutes } = require('./routes/financing');
 const { router: authRoutes } = require('./routes/auth');
 const { router: accountRoutes } = require('./routes/account');
 const { router: adminRoutes } = require('./routes/admin');
@@ -153,6 +154,7 @@ function createApp() {
   app.use('/', flowRoutes);
   app.use('/blog', blogRoutes);
   app.use('/', shopRoutes);
+  app.use('/', financingRoutes); // FR-34 — /financing, before the generic page routes
   app.use('/', pageRoutes);
   app.use('/', publicRoutes);
 

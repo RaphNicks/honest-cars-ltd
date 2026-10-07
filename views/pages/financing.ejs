@@ -1,0 +1,234 @@
+<%#
+  /financing — FR-34. The page a customer lands on from a car, the concierge, or
+  a search. It says what we do (route the requirement), what we do not do (lend,
+  price credit, promise anything) and shows the arithmetic before interest, using
+  the same sentences the server sends — the client only saves a round trip.
+%>
+<section class="service-hero">
+  <div class="container">
+    <%- include('../partials/breadcrumbs', { crumbs: trail }) %>
+    <p class="eyebrow">Financing</p>
+    <h1>Financing, without a rate we cannot honour</h1>
+    <p class="lead">
+      Honest Cars is not a lender. We do not sell loans, we do not decide who qualifies, and we will not
+      invent an interest rate to make a page look finished. What we do is put your requirement in front of
+      a bank or microfinance lender we work with, and tell you plainly where it got to.
+    </p>
+    <div class="row mt-3">
+      <a class="btn btn--primary" href="#enquire">Start an enquiry</a>
+      <a class="btn btn--ghost" href="#how-it-works">How the handoff works</a>
+    </div>
+    <p class="note-inline mt-2 mb-0">
+      <% if (partners.length) { %>
+        <strong><%= partners.length %></strong> lender<%= partners.length === 1 ? '' : 's' %> on the desk today —
+        <%= partners.map(function (p) { return p.name; }).join(', ') %>.
+      <% } else { %>
+        We have <strong>no lender on the desk today</strong>. Send the enquiry anyway: a human reads it, and we
+        will either find a partner for your case or tell you we cannot help rather than leaving you waiting.
+      <% } %>
+    </p>
+  </div>
+</section>
+
+<%# ----------------------------------------------------------- calculator + form %>
+<section class="section" id="enquire">
+  <div class="container">
+    <div class="article-grid">
+      <div>
+        <h2>What the numbers look like before interest</h2>
+        <p class="lead">
+          Give us the price, what you can put down and what you can pay monthly. We will do the arithmetic we
+          can stand behind — the gap, and the principal-only monthly — and say out loud where our knowledge
+          stops.
+        </p>
+
+        <form class="form-grid card card__body" data-financing-form
+              data-endpoint="/api/financing" data-plan-endpoint="/api/financing/plan"
+              method="post" action="/api/financing" novalidate>
+          <div class="field full-width" data-car-field <%= car ? '' : 'hidden' %>>
+            <span class="field__label">The car you asked about</span>
+            <p class="mb-0">
+              <strong><%= car ? car.title : '' %></strong>
+              <span class="note-inline" data-car-meta><%= car ? `${car.stockNo} · ${car.price} · ${car.area}` : '' %></span>
+            </p>
+            <input type="hidden" name="listingSlug" value="<%= car ? car.slug : '' %>">
+          </div>
+
+          <div class="field">
+            <label class="field__label" for="fin-amount">Price or budget</label>
+            <input class="input" id="fin-amount" name="amount" type="text" inputmode="numeric"
+                   placeholder="12,000,000" value="<%= car ? car.priceKobo / 100 : '' %>"
+                   <%= car ? 'readonly' : '' %> required>
+          </div>
+
+          <div class="field">
+            <label class="field__label" for="fin-down">What you can put down</label>
+            <input class="input" id="fin-down" name="down" type="text" inputmode="numeric" placeholder="4,000,000">
+          </div>
+
+          <div class="field">
+            <label class="field__label" for="fin-monthly">Monthly you are comfortable with</label>
+            <input class="input" id="fin-monthly" name="monthly" type="text" inputmode="numeric" placeholder="250,000">
+          </div>
+
+          <div class="field">
+            <label class="field__label" for="fin-tenor">Over how long</label>
+            <select class="select" id="fin-tenor" name="tenor">
+              <% tenors.forEach(function (months) { %>
+                <option value="<%= months %>" <%= months === 36 ? 'selected' : '' %>><%= months %> months</option>
+              <% }); %>
+            </select>
+          </div>
+
+          <div class="field">
+            <label class="field__label" for="fin-name">Your name</label>
+            <input class="input" id="fin-name" name="name" type="text" autocomplete="name" required>
+          </div>
+
+          <div class="field">
+            <label class="field__label" for="fin-phone">WhatsApp number</label>
+            <input class="input" id="fin-phone" name="phone" type="tel" inputmode="numeric" autocomplete="tel"
+                   placeholder="0803 123 4567" required>
+          </div>
+
+          <div class="field">
+            <label class="field__label" for="fin-email">Email <span class="field__hint">(optional)</span></label>
+            <input class="input" id="fin-email" name="email" type="email" autocomplete="email">
+          </div>
+
+          <div class="field">
+            <label class="field__label" for="fin-employment">How you earn</label>
+            <select class="select" id="fin-employment" name="employment">
+              <option value="">Prefer not to say</option>
+              <% employments.forEach(function (key) { %>
+                <option value="<%= key %>"><%= key.replace(/_/g, ' ').replace(/^\w/, function (c) { return c.toUpperCase(); }) %></option>
+              <% }); %>
+            </select>
+          </div>
+
+          <div class="field">
+            <label class="field__label" for="fin-timeline">When you need the car</label>
+            <select class="select" id="fin-timeline" name="timeline">
+              <option value="">Not sure yet</option>
+              <% timelines.forEach(function (key) { %>
+                <option value="<%= key %>"><%= key.replace(/_/g, ' ').replace(/^\w/, function (c) { return c.toUpperCase(); }) %></option>
+              <% }); %>
+            </select>
+          </div>
+
+          <div class="field full-width">
+            <label class="checkbox">
+              <input type="checkbox" name="consent" value="yes" required>
+              <span>I am happy for Honest Cars to share these details with a lender so they can contact me
+                about this enquiry. Nothing is shared until you send it.</span>
+            </label>
+          </div>
+
+          <p class="field full-width note-inline mb-0" data-financing-status role="status" aria-live="polite"></p>
+
+          <div class="field full-width">
+            <button class="btn btn--primary btn--lg" type="submit">Send the enquiry</button>
+            <span class="note-inline">A human reads it today — not a scoring model.</span>
+          </div>
+        </form>
+      </div>
+
+      <aside class="card card__body financing-summary" data-financing-result aria-live="polite">
+        <h3>Your arithmetic</h3>
+        <p class="note-inline" data-financing-placeholder>
+          Fill in the price, what you can put down and what you can pay monthly, and the sums appear here —
+          with the parts we cannot know named as such.
+        </p>
+        <div data-financing-summary hidden>
+          <p class="financing-summary__headline" data-financing-headline></p>
+          <p class="note-inline" data-financing-detail></p>
+          <p class="note-inline financing-summary__caveat" data-financing-caveat></p>
+        </div>
+        <div data-financing-receipt hidden>
+          <p class="financing-summary__headline" data-financing-reference></p>
+          <p class="note-inline" data-financing-next></p>
+          <h4 class="mt-2">What the lender will ask you for</h4>
+          <ul class="checklist">
+            <% readiness.forEach(function (item) { %>
+              <li><%- helpers.icon('check', { size: 18 }) %> <span><%= item %></span></li>
+            <% }); %>
+          </ul>
+          <p class="note-inline mb-0" data-financing-whatsapp hidden></p>
+        </div>
+      </aside>
+    </div>
+  </div>
+</section>
+
+<%# ----------------------------------------------------------------- the handoff %>
+<section class="section section--surface" id="how-it-works">
+  <div class="container">
+    <h2>How the handoff works</h2>
+    <ol class="steps steps--compact">
+      <% steps.forEach(function (step, index) { %>
+        <li class="step">
+          <span class="step__num"><%= index + 1 %></span>
+          <div>
+            <strong><%= step.title %></strong>
+            <p class="mb-0"><%= step.copy %></p>
+          </div>
+        </li>
+      <% }); %>
+    </ol>
+
+    <div class="grid grid--2 mt-3">
+      <div class="card card__body">
+        <h3>What a lender will ask you for</h3>
+        <ul>
+          <% readiness.forEach(function (item) { %>
+            <li><%= item %></li>
+          <% }); %>
+        </ul>
+        <p class="note-inline mb-0">
+          Requirements differ per lender, and their own offer letter is the only thing that binds them.
+        </p>
+      </div>
+      <div class="card card__body">
+        <h3>What we will not do</h3>
+        <ul>
+          <li>Quote an interest rate, an APR, or a monthly repayment that includes interest</li>
+          <li>Tell you that you qualify, or that you are likely to be approved</li>
+          <li>Charge you for the enquiry or for the introduction</li>
+          <li>Pass your number to a lender we have not named on this page</li>
+        </ul>
+        <p class="note-inline mb-0">
+          Your enquiry stays on your account, with the partner it went to and the date it went.
+        </p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<%# --------------------------------------------------------------------- the FAQ %>
+<section class="section">
+  <div class="container container--narrow">
+    <h2>The questions people actually ask</h2>
+    <%- include('../partials/accordion', { faqs: questions, idPrefix: 'financing-faq' }) %>
+  </div>
+</section>
+
+<% if (examples.length) { %>
+<section class="section section--surface">
+  <div class="container">
+    <h2>Cars people are financing right now</h2>
+    <p class="lead">
+      Start from a car and the form carries its real price — the one in our system, not one from a link.
+    </p>
+    <div class="grid grid--3">
+      <% examples.forEach(function (listing) { %>
+        <a class="card card__body" href="/financing?car=<%= listing.slug %>">
+          <strong><%= listing.title %></strong>
+          <span class="note-inline"><%= listing.price %> · <%= listing.area %></span>
+          <span class="note-inline text-green">Finance this car →</span>
+        </a>
+      <% }); %>
+    </div>
+    <p class="note-inline mt-2 mb-0"><%= carsLive %> cars in the network today.</p>
+  </div>
+</section>
+<% } %>

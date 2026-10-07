@@ -16,6 +16,7 @@ const seo = require('../services/seo');
 const { buildHomeLocals, buildFacetLocals } = require('./public');
 const { buildServicesHubLocals, buildServiceLocals } = require('./services');
 const { buildFindMyCarLocals, buildSellSwapLocals, buildHireLocals } = require('./flow');
+const { buildFinancingLocals } = require('./financing');
 const { buildBlogLocals, buildPostLocals, buildTagLocals, buildAuthorLocals } = require('./blog');
 const { buildShopLocals, buildProductLocals } = require('./shop');
 const {
@@ -155,6 +156,8 @@ function trustRoutes() {
     { path: '/find-my-car', view: 'find-my-car', build: () => buildFindMyCarLocals() },
     { path: '/sell-swap', view: 'sell-swap', build: () => buildSellSwapLocals() },
     { path: '/hire', view: 'hire', build: () => buildHireLocals() },
+    // FR-34 — a funnel entry page, statically built like the rest of §6.10's set.
+    { path: '/financing', view: 'financing', build: () => buildFinancingLocals() },
     // FR-30 — precached by the service worker, and noindex: nobody should reach
     // "you are offline" from a search result.
     { path: '/offline', view: 'offline', build: () => buildOfflineLocals() },

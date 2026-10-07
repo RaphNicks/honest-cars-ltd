@@ -2,14 +2,17 @@
 
 /**
  * Lead capture — every public form lands here (§6.3 Request Viewing,
- * §6.5 concierge, §6.6 sell/swap, §6.7 service requests, deal alerts).
+ * §6.5 concierge, §6.6 sell/swap, §6.7 service requests, deal alerts, and
+ * FR-34 financing enquiries). A financing enquiry keeps its own richer row in
+ * `financing_leads`; this is the inbox copy, so it cannot be missed by whoever
+ * is working the inbox rather than the financing screen.
  */
 
 const { query, queryOne } = require('./pool');
 const phones = require('../lib/phone');
 const { sanitizeUtm } = require('../lib/campaign');
 
-const LEAD_TYPES = ['viewing', 'concierge', 'sell_swap', 'hire', 'service', 'parts', 'b2b', 'deal_alert'];
+const LEAD_TYPES = ['viewing', 'concierge', 'sell_swap', 'hire', 'service', 'parts', 'b2b', 'deal_alert', 'financing'];
 
 async function createLead(lead) {
   const type = LEAD_TYPES.includes(lead.type) ? lead.type : 'viewing';

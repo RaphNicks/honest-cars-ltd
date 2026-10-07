@@ -55,6 +55,14 @@ const MATRIX = {
   // `hire.view` include finance for exactly this reason), and the decision to
   // pay a customer is ops' work, entered by hand like §15.2 spend.
   'referrals.view': ['admin', 'ops', 'finance'],
+  // FR-34 financing. The enquiry is a lead, and §7.4 gives leads to admin/ops;
+  // but it is a lead that turns into a lender's money, so finance reads it too
+  // (`dealers.view`, `hire.view` and `payments.view` all include finance for the
+  // same reason). Routing it and recording what a lender said is the desk's
+  // work: it happens outside this system and the screen records it, so it stays
+  // with admin/ops rather than with whoever reads the ledger.
+  'financing.view': ['admin', 'ops', 'finance'],
+  'financing.manage': ['admin', 'ops'],
   'referrals.reward': ['admin', 'ops'],
   'reports.view': ['admin', 'ops', 'finance', 'marketing'],
   // §15.2 marketing dashboard. Read is the CMS-and-marketing column of §7.4

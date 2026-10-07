@@ -303,7 +303,7 @@ CREATE TABLE IF NOT EXISTS facets (
 -- ---------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS leads (
   id            INT UNSIGNED  NOT NULL AUTO_INCREMENT,
-  type          ENUM('viewing','concierge','sell_swap','hire','service','parts','b2b','deal_alert')
+  type          ENUM('viewing','concierge','sell_swap','hire','service','parts','b2b','deal_alert','financing')
                                 NOT NULL,
   listing_id    INT UNSIGNED  NULL,
   name          VARCHAR(120)  NOT NULL,
@@ -1283,4 +1283,63 @@ CREATE TABLE IF NOT EXISTS admin_audit (
   KEY idx_audit_entity (entity, entity_id, created_at),
   KEY idx_audit_actor (actor_id, created_at),
   CONSTRAINT fk_audit_actor FOREIGN KEY (actor_id) REFERENCES `users` (id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ---------------------------------------------------------------------------
+-- finance_partners + financing_leads — FR-34 (migration 026)
+-- The lenders the desk works with, and the enquiries routed to them. Empty on a
+-- fresh install is the honest state: no partner account exists behind this site
+-- yet, and the console says so. See db/migrations/026-financing-handoff.sql.
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS `finance_partners` (
+  id         INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  name       VARCHAR(120) NOT NULL,
+  kind       ENUM('bank','mfb','fintech','cooperative','other') NOT NULL DEFAULT 'other',
+  channel    ENUM('whatsapp','email','phone','manual') NOT NULL DEFAULT 'manual',
+  contact    VARCHAR(160) NULL,
+  note       VARCHAR(240) NULL,
+  active     TINYINT(1)   NOT NULL DEFAULT 1,
+  created_by INT UNSIGNED NULL,
+  created_at TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  UNIQUE KEY uq_finance_partner (name),
+  CONSTRAINT fk_finance_partner_creator FOREIGN KEY (created_by) REFERENCES `users` (id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `financing_leads` (
+  id           INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  reference    VARCHAR(20)  NOT NULL,
+  name         VARCHAR(120) NOT NULL,
+  phone        VARCHAR(40)  NOT NULL,
+  email        VARCHAR(160) NULL,
+  lead_id      INT UNSIGNED NULL,
+  listing_id   INT UNSIGNED NULL,
+  request_id   INT UNSIGNED NULL,
+  amount_kobo  BIGINT       NOT NULL DEFAULT 0,
+  down_kobo    BIGINT       NOT NULL DEFAULT 0,
+  monthly_kobo BIGINT       NOT NULL DEFAULT 0,
+  tenor_months SMALLINT UNSIGNED NOT NULL DEFAULT 0,
+  employment   ENUM('salaried','self_employed','business_owner','civil_servant','retired','other') NULL,
+  timeline     ENUM('asap','two_weeks','month','researching') NULL,
+  plan         JSON         NULL,
+  partner_id   INT UNSIGNED NULL,
+  status       ENUM('new','shared','contacted','approved','declined','withdrawn') NOT NULL DEFAULT 'new',
+  shared_at    DATETIME     NULL,
+  outcome_note VARCHAR(240) NULL,
+  acted_by     INT UNSIGNED NULL,
+  source_path  VARCHAR(200) NOT NULL,
+  utm          JSON         NULL,
+  created_at   TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at   TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  UNIQUE KEY uq_financing_reference (reference),
+  KEY idx_financing_status (status, created_at),
+  KEY idx_financing_phone (phone, created_at),
+  KEY idx_financing_partner (partner_id, status),
+  CONSTRAINT fk_financing_lead    FOREIGN KEY (lead_id)    REFERENCES `leads` (id) ON DELETE SET NULL,
+  CONSTRAINT fk_financing_listing FOREIGN KEY (listing_id) REFERENCES vehicle_listings (id) ON DELETE SET NULL,
+  CONSTRAINT fk_financing_request FOREIGN KEY (request_id) REFERENCES service_requests (id) ON DELETE SET NULL,
+  CONSTRAINT fk_financing_partner FOREIGN KEY (partner_id) REFERENCES finance_partners (id) ON DELETE SET NULL,
+  CONSTRAINT fk_financing_actor   FOREIGN KEY (acted_by)   REFERENCES `users` (id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

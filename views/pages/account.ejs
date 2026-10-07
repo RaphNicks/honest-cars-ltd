@@ -5,7 +5,7 @@
     new-match switches) · Your details · Referrals
   Every card reads a record the public site already wrote, matched by phone.
   Locals: user, requests, hireRequests, hires, bookings, orders, subscriptions,
-          documents, savedCars, savedSearches, referral, counts, trail
+          documents, savedCars, savedSearches, referral, financing, counts, trail
 %>
 <section class="page-hero page-hero--account">
   <div class="container">
@@ -475,6 +475,49 @@
             <span class="auth-message" data-profile-message role="status" aria-live="polite"></span>
           </div>
         </form>
+      </div>
+
+      <%# ------------------------------------------------- Financing (FR-34) %>
+      <div class="dash-card" id="financing">
+        <div class="dash-card__head">
+          <h2 class="mb-0">Financing enquiries</h2>
+          <span class="note-inline">§6.5 · FR-34</span>
+        </div>
+        <% if (!financing || !financing.length) { %>
+          <p class="mb-0">
+            No financing enquiry on this number. If you want to know what a car costs before interest,
+            <a href="/financing">the calculator is here</a> — we do not lend, and we do not quote rates.
+          </p>
+        <% } else { %>
+          <div class="account-list">
+            <% financing.forEach(function (item) { %>
+              <div class="account-item">
+                <div class="account-item__main">
+                  <strong class="tabular"><%= item.reference %></strong>
+                  <span class="account-item__meta">
+                    <%= item.car || 'Budget' %> · <%= item.amount %> · down <%= item.down %> · <%= item.monthly %>/mo over <%= item.tenor %>
+                  </span>
+                  <span class="note-inline">
+                    <%= item.statusSentence %>
+                    <% if (item.partner) { %>Lender: <strong><%= item.partner %></strong>.<% } %>
+                  </span>
+                </div>
+                <div class="account-item__side">
+                  <span class="status-pill status-pill--<%= item.status === 'approved' ? 'confirmed' : item.status === 'declined' || item.status === 'withdrawn' ? 'cancelled' : 'new' %>">
+                    <%= item.status === 'approved' ? 'Approved by the lender' : item.status.replace(/^\w/, function (c) { return c.toUpperCase(); }) %>
+                  </span>
+                  <span class="account-item__meta">
+                    updated <%= new Date(item.lastUpdate).toLocaleDateString('en-NG', { day: 'numeric', month: 'short', year: 'numeric' }) %>
+                  </span>
+                </div>
+              </div>
+            <% }); %>
+          </div>
+          <p class="note-inline mb-0">
+            We are not a lender. The partner decides, their written offer is what counts, and we never quote
+            their rates on their behalf. <a href="/financing">How the handoff works</a>.
+          </p>
+        <% } %>
       </div>
 
       <%# ------------------------------------------------ Referrals %>

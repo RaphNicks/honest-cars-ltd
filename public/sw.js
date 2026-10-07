@@ -54,15 +54,17 @@ const SHELL_URLS = [
   // time a page that uses them is opened, and are then available offline too.
   '/fonts/inter-latin-400-normal.woff2',
   '/fonts/inter-latin-700-normal.woff2',
+  // `/js/admin.js` and `/js/dealer.js` are deliberately absent: /admin and
+  // /dealer are bypassed by this worker, so precaching them would only cost
+  // every other visitor bytes — their pages fill the runtime cache when used.
   '/js/main.js',
   '/js/account.js',
-  '/js/admin.js',
   '/js/area.js',
   '/js/blog.js',
   '/js/cart.js',
-  '/js/dealer.js',
   '/js/drafts.js',
   '/js/events.js',
+  '/js/financing.js',
   '/js/filters.js',
   '/js/flow.js',
   '/js/header.js',

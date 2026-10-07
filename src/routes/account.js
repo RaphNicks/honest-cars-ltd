@@ -31,6 +31,7 @@ const hireService = require('../services/hire');
 const invoiceService = require('../services/invoice');
 const paymentService = require('../services/payments');
 const referralService = require('../services/referrals');
+const financingService = require('../services/financing');
 const phone = require('../lib/phone');
 const { helpers } = require('../lib/locals');
 const { sendPage, sendJson, CACHE } = require('../lib/respond');
@@ -114,6 +115,12 @@ async function buildAccountLocals(user) {
   // reward labels come from the service, so the card and the console can never
   // describe the same person differently.
   dashboard.referral = referralService.accountView(user, dashboard.referral);
+  // FR-34: a financing enquiry is the customer's own record of what we told a
+  // lender and when. It is matched on the number they gave us, like everything
+  // else on this page, and it carries no figure we did not already tell them.
+  dashboard.financing = financingService.accountView(
+    await db.financing.listForPhone(user.phone, { limit: 5 }).catch(() => []),
+  );
   // §7.1 lists hire separately, so it does not also sit in the Requests card.
   dashboard.requests = dashboard.requests.filter((request) => request.type !== 'hire');
   const trail = [{ label: 'Account' }];

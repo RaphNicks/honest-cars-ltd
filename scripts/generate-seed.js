@@ -623,6 +623,15 @@ function render({ listings, media }) {
     if (!car) throw new Error(`seed: no ${status} stock for ${lotName}`);
     return car.stockNo;
   };
+  // Stock numbers carry the city prefix of the listing's position (FR-32), so a
+  // literal like 'HC-PH-0018' silently stops matching the moment the city cycle
+  // moves that car to Benin — the subquery returns NULL and the seed quietly
+  // ships a lead with no car attached. Resolve them from what was generated.
+  const stockAt = (n) => {
+    const car = listings.find((l) => l.id === n);
+    if (!car) throw new Error(`seed: no listing at index ${n}`);
+    return car.stockNo;
+  };
   const featuredCar = lotStock('Aba Road Autos', 'live');
   const shootCar = lotStock('Woji Car Mart', 'live');
   const expiredCar = lotStock('Trans-Amadi Motors', 'live');
@@ -686,6 +695,9 @@ DELETE FROM dealer_addons;
 -- FR-28: the referral queue is seed-owned (the accounts themselves are upserted,
 -- never deleted, because a real login may be using one).
 DELETE FROM referral_rewards;
+-- FR-34: financing rows point at leads, listings and partners, so they go first.
+DELETE FROM financing_leads;
+DELETE FROM finance_partners;
 DELETE FROM dealers;
 -- FR-32: the markets and their area lists are seed-owned too.
 DELETE FROM service_areas;
@@ -1108,11 +1120,11 @@ ON DUPLICATE KEY UPDATE role = VALUES(role), name = VALUES(name), status = 'acti
 -- The CRM-lite inbox (§7.3): every one of these came in through a real form.
 INSERT INTO leads (type, listing_id, name, phone, message, preferred_day, source_path, status,
                    assigned_to, assigned_at, last_contacted_at, lost_reason, created_at) VALUES
-  ('viewing', (SELECT id FROM vehicle_listings WHERE stock_no = 'HC-PH-0018' LIMIT 1),
+  ('viewing', (SELECT id FROM vehicle_listings WHERE stock_no = '${stockAt(18)}' LIMIT 1),
     'Chidi Okafor', '+2348031110001', 'Please can I see the Prado this Saturday? I am in Woji.',
     DATE_ADD(UTC_DATE(), INTERVAL 3 DAY), '/cars/2016-toyota-prado-tx-hc-ph-0018', 'new',
     NULL, NULL, NULL, NULL, DATE_SUB(UTC_TIMESTAMP(), INTERVAL 4 HOUR)),
-  ('viewing', (SELECT id FROM vehicle_listings WHERE stock_no = 'HC-PH-0032' LIMIT 1),
+  ('viewing', (SELECT id FROM vehicle_listings WHERE stock_no = '${stockAt(32)}' LIMIT 1),
     'Blessing Etim', '+2348031110002', 'Is the Camry still available? What is the lowest price you will take?',
     DATE_ADD(UTC_DATE(), INTERVAL 1 DAY), '/cars/2010-toyota-camry-le-hc-ph-0032', 'contacted',
     (SELECT id FROM \`users\` WHERE phone = '+2348000000002' LIMIT 1), DATE_SUB(UTC_TIMESTAMP(), INTERVAL 20 HOUR),
@@ -1133,7 +1145,7 @@ INSERT INTO leads (type, listing_id, name, phone, message, preferred_day, source
     NULL, '/services/inspection', 'closed',
     (SELECT id FROM \`users\` WHERE phone = '+2348000000002' LIMIT 1), DATE_SUB(UTC_TIMESTAMP(), INTERVAL 6 DAY),
     DATE_SUB(UTC_TIMESTAMP(), INTERVAL 5 DAY), NULL, DATE_SUB(UTC_TIMESTAMP(), INTERVAL 6 DAY)),
-  ('viewing', (SELECT id FROM vehicle_listings WHERE stock_no = 'HC-PH-0018' LIMIT 1),
+  ('viewing', (SELECT id FROM vehicle_listings WHERE stock_no = '${stockAt(18)}' LIMIT 1),
     'Tunde Adeyemi', '+2348031110006', 'I want to swap my Corolla for something bigger.',
     NULL, '/sell-swap', 'lost',
     (SELECT id FROM \`users\` WHERE phone = '+2348000000002' LIMIT 1), DATE_SUB(UTC_TIMESTAMP(), INTERVAL 8 DAY),
@@ -1182,15 +1194,15 @@ INSERT INTO service_requests (tracking_id, type, status, name, phone, brief, sla
 -- The cars attached to the demo request: exactly what the buyer's comparison reads.
 INSERT INTO request_candidates (request_id, listing_id, note, rank_no, added_by) VALUES
   ((SELECT id FROM service_requests WHERE tracking_id = 'HC-2481' LIMIT 1),
-   (SELECT id FROM vehicle_listings WHERE stock_no = 'HC-PH-0032' LIMIT 1),
+   (SELECT id FROM vehicle_listings WHERE stock_no = '${stockAt(32)}' LIMIT 1),
    'Cleanest papers of the three; two panels resprayed and priced in.', 1,
    (SELECT id FROM \`users\` WHERE phone = '+2348000000002' LIMIT 1)),
   ((SELECT id FROM service_requests WHERE tracking_id = 'HC-2481' LIMIT 1),
-   (SELECT id FROM vehicle_listings WHERE stock_no = 'HC-PH-0068' LIMIT 1),
+   (SELECT id FROM vehicle_listings WHERE stock_no = '${stockAt(68)}' LIMIT 1),
    'The SUV alternative: same budget, more room, and the papers are clean.', 2,
    (SELECT id FROM \`users\` WHERE phone = '+2348000000002' LIMIT 1)),
   ((SELECT id FROM service_requests WHERE tracking_id = 'HC-2481' LIMIT 1),
-   (SELECT id FROM vehicle_listings WHERE stock_no = 'HC-PH-0066' LIMIT 1),
+   (SELECT id FROM vehicle_listings WHERE stock_no = '${stockAt(66)}' LIMIT 1),
    'Newest of the three and still under the budget ceiling — worth the drive to see.', 3,
    (SELECT id FROM \`users\` WHERE phone = '+2348000000002' LIMIT 1));
 
@@ -1295,14 +1307,14 @@ INSERT INTO payment_milestones (reference, kind, subject, listing_id, booking_id
                                 customer_phone, amount_kobo, stage, stage_note, released_by, released_at,
                                 created_by, created_at) VALUES
   ('HC-ML-000001', 'protected_purchase', '2010 Toyota Camry LE — protected purchase deposit',
-   (SELECT id FROM vehicle_listings WHERE stock_no = 'HC-PH-0032' LIMIT 1),
+   (SELECT id FROM vehicle_listings WHERE stock_no = '${stockAt(32)}' LIMIT 1),
    (SELECT id FROM bookings WHERE reference = 'HC-BK-0004' LIMIT 1),
    'Blessing Etim', '+2348031110002', 50000000, 'inspection_passed',
    'Inspection passed 8 days ago with rear bushings noted — dealer re-quoted inside the band.',
    NULL, NULL, (SELECT id FROM \`users\` WHERE phone = '+2348000000002' LIMIT 1),
    DATE_SUB(UTC_TIMESTAMP(), INTERVAL 12 DAY)),
   ('HC-ML-000002', 'protected_purchase', '2018 Infiniti QX60 — protected purchase deposit',
-   (SELECT id FROM vehicle_listings WHERE stock_no = 'HC-PH-0045' LIMIT 1), NULL,
+   (SELECT id FROM vehicle_listings WHERE stock_no = '${stockAt(45)}' LIMIT 1), NULL,
    'Uche Nnamdi', '+2348031110009', 75000000, 'documents_verified',
    'Customs and registration papers sighted and copied to the file — waiting on the buyer to confirm the pickup date.',
    NULL, NULL, (SELECT id FROM \`users\` WHERE phone = '+2348000000002' LIMIT 1),
@@ -1334,7 +1346,7 @@ INSERT INTO notifications (channel, template, recipient, subject, body, status, 
 -- away — a correction is another row.
 INSERT INTO dealer_ledger (dealer_id, listing_id, payment_id, entry_type, amount_kobo, reference, detail, created_by, created_at) VALUES
   ((SELECT id FROM dealers WHERE name = 'Trans-Amadi Motors' LIMIT 1),
-   (SELECT id FROM vehicle_listings WHERE stock_no = 'HC-PH-0045' LIMIT 1),
+   (SELECT id FROM vehicle_listings WHERE stock_no = '${stockAt(45)}' LIMIT 1),
    (SELECT id FROM payments WHERE reference = 'HC-PAY-000002' LIMIT 1),
    'sale_commission', 25000000, 'STMT-2026-09',
    'Commission on the QX60 sale — agreed rate on the signed terms, statement STMT-2026-09.',
@@ -1344,7 +1356,7 @@ INSERT INTO dealer_ledger (dealer_id, listing_id, payment_id, entry_type, amount
    'Payout sent by transfer — balance carried to October.',
    (SELECT id FROM \`users\` WHERE phone = '+2348000000001' LIMIT 1), DATE_SUB(UTC_TIMESTAMP(), INTERVAL 5 DAY)),
   ((SELECT id FROM dealers WHERE name = 'Woji Car Mart' LIMIT 1),
-   (SELECT id FROM vehicle_listings WHERE stock_no = 'HC-PH-0038' LIMIT 1),
+   (SELECT id FROM vehicle_listings WHERE stock_no = '${stockAt(38)}' LIMIT 1),
    (SELECT id FROM payments WHERE reference = 'HC-PAY-000003' LIMIT 1),
    'sale_commission', 18000000, 'STMT-2026-09',
    'Commission on the GLE sale plus the tracking install — statement STMT-2026-09.',
@@ -1354,7 +1366,7 @@ INSERT INTO dealer_ledger (dealer_id, listing_id, payment_id, entry_type, amount
    'Part settlement of the September statement, sent by transfer.',
    (SELECT id FROM \`users\` WHERE phone = '+2348000000001' LIMIT 1), DATE_SUB(UTC_TIMESTAMP(), INTERVAL 4 DAY)),
   ((SELECT id FROM dealers WHERE name = 'GRA Premium Motors' LIMIT 1),
-   (SELECT id FROM vehicle_listings WHERE stock_no = 'HC-PH-0018' LIMIT 1), NULL,
+   (SELECT id FROM vehicle_listings WHERE stock_no = '${stockAt(18)}' LIMIT 1), NULL,
    'sale_commission', 12000000, 'STMT-2026-09',
    'Commission on the Santa Fe sale, plus the two add-on installs.',
    (SELECT id FROM \`users\` WHERE phone = '+2348000000001' LIMIT 1), DATE_SUB(UTC_TIMESTAMP(), INTERVAL 3 DAY));
@@ -1363,15 +1375,15 @@ INSERT INTO dealer_ledger (dealer_id, listing_id, payment_id, entry_type, amount
 -- first open. Everything the console does from here appends its own row.
 INSERT INTO admin_audit (actor_id, action, entity, entity_id, detail, created_at) VALUES
   ((SELECT id FROM \`users\` WHERE phone = '+2348000000001' LIMIT 1), 'listing.grade', 'listing',
-   (SELECT id FROM vehicle_listings WHERE stock_no = 'HC-PH-0032' LIMIT 1),
+   (SELECT id FROM vehicle_listings WHERE stock_no = '${stockAt(32)}' LIMIT 1),
    '{"grade":"certified","note":"VIN, documents, OBD2 and road test all completed in person."}',
    DATE_SUB(UTC_TIMESTAMP(), INTERVAL 2 DAY)),
   ((SELECT id FROM \`users\` WHERE phone = '+2348000000001' LIMIT 1), 'listing.price', 'listing',
-   (SELECT id FROM vehicle_listings WHERE stock_no = 'HC-PH-0045' LIMIT 1),
+   (SELECT id FROM vehicle_listings WHERE stock_no = '${stockAt(45)}' LIMIT 1),
    '{"note":"Dealer dropped ₦250k after the inspection found rear bushings due."}',
    DATE_SUB(UTC_TIMESTAMP(), INTERVAL 1 DAY)),
   ((SELECT id FROM \`users\` WHERE phone = '+2348000000001' LIMIT 1), 'listing.publish', 'listing',
-   (SELECT id FROM vehicle_listings WHERE stock_no = 'HC-PH-0018' LIMIT 1),
+   (SELECT id FROM vehicle_listings WHERE stock_no = '${stockAt(18)}' LIMIT 1),
    '{"grade":"certified"}', DATE_SUB(UTC_TIMESTAMP(), INTERVAL 4 HOUR));
 
 -- ---------------------------------------------------------------------------
@@ -1428,6 +1440,78 @@ INSERT INTO referral_rewards (referrer_id, referred_user_id, status, basis, amou
    DATE_SUB(UTC_TIMESTAMP(), INTERVAL 4 DAY), DATE_SUB(UTC_TIMESTAMP(), INTERVAL 3 DAY),
    (SELECT id FROM \`users\` WHERE phone = '+2348000000002' LIMIT 1));
 
+-- FR-34 — the financing desk. Two lenders, one switched off, and enquiries in
+-- every state the console has to render. The amounts are the seeded cars' real
+-- prices (looked up by stock number, so a price change cannot make the seed
+-- lie), and the arithmetic shown is the same principal-only sentence the
+-- service produces: no rate appears anywhere in this data.
+INSERT INTO finance_partners (id, name, kind, channel, contact, note, active) VALUES
+  (1, 'Example MFB', 'mfb', 'manual', '+2348000000009',
+   'Salaried and business owners — 6 months statements, up to ₦20m', 1),
+  (2, 'Rivers Trust Bank', 'bank', 'email', 'referrals@example-bank.test',
+   'Salaried only for now — payslip and employer confirmation', 0);
+
+-- Inbox copies first: every financing enquiry is also a lead (§7.3), and the
+-- desk screen links back to it. Ids are looked up by phone and type.
+INSERT INTO leads (type, listing_id, name, phone, message, source_path, status, created_at) VALUES
+  ('financing', (SELECT id FROM vehicle_listings WHERE stock_no = '${stockAt(18)}' LIMIT 1),
+    'Ngozi Eze', '+2348034440001',
+    'Financing enquiry — price 15,900,000 NGN, down 5,000,000 NGN, monthly 350,000 NGN, 48 months.',
+    '/financing?car=2016-toyota-prado-tx-hc-ph-0018', 'new',
+    DATE_SUB(UTC_TIMESTAMP(), INTERVAL 6 HOUR)),
+  ('financing', NULL, 'Ada Okafor', '+2348031234567',
+    'Financing enquiry — budget 12,000,000 NGN, down 4,000,000 NGN, monthly 250,000 NGN, 48 months.',
+    '/financing', 'contacted',
+    DATE_SUB(UTC_TIMESTAMP(), INTERVAL 4 DAY)),
+  ('financing', (SELECT id FROM vehicle_listings WHERE stock_no = '${stockAt(25)}' LIMIT 1),
+    'Halima Bello', '+2348034440003',
+    'Financing enquiry — price 9,800,000 NGN, down 2,000,000 NGN, monthly 180,000 NGN, 48 months.',
+    '/find-my-car', 'new',
+    DATE_SUB(UTC_TIMESTAMP(), INTERVAL 2 DAY)),
+  ('financing', NULL, 'Peter Nwachukwu', '+2348034440004',
+    'Financing enquiry — budget 20,000,000 NGN, down 3,000,000 NGN, monthly 200,000 NGN, 60 months.',
+    '/financing', 'lost',
+    DATE_SUB(UTC_TIMESTAMP(), INTERVAL 11 DAY));
+
+INSERT INTO financing_leads (reference, name, phone, email, lead_id, listing_id, amount_kobo,
+                             down_kobo, monthly_kobo, tenor_months, employment, timeline, plan,
+                             partner_id, status, shared_at, outcome_note, acted_by, source_path, created_at) VALUES
+  -- Waiting on the desk: nobody has routed it, and the screen says so.
+  ('HC-FIN-000001', 'Ngozi Eze', '+2348034440001', NULL,
+   (SELECT id FROM leads WHERE phone = '+2348034440001' AND type = 'financing' LIMIT 1),
+   (SELECT id FROM vehicle_listings WHERE stock_no = '${stockAt(18)}' LIMIT 1),
+   1590000000, 500000000, 35000000, 48, 'self_employed', 'two_weeks',
+   '{"headline":"₦227,084 a month over 48 months covers the whole ₦10,900,000 gap — before interest and fees.","detail":"What that payment becomes once the lender adds interest is their figure, not ours.","caveat":"This is arithmetic, not an offer. No credit decision has been made, and no rate is implied."}',
+   NULL, 'new', NULL, NULL, NULL, '/financing?car=2016-toyota-prado-tx-hc-ph-0018',
+   DATE_SUB(UTC_TIMESTAMP(), INTERVAL 6 HOUR)),
+  -- Routed, and the lender has asked for something.
+  ('HC-FIN-000002', 'Ada Okafor', '+2348031234567', 'ada@example.test',
+   (SELECT id FROM leads WHERE phone = '+2348031234567' AND type = 'financing' LIMIT 1),
+   NULL, 1200000000, 400000000, 25000000, 48, 'salaried', 'asap',
+   '{"headline":"₦166,667 a month over 48 months covers the whole ₦8,000,000 gap — before interest and fees.","detail":"Your ₦4,000,000 down payment is 33% of the price.","caveat":"This is arithmetic, not an offer. No credit decision has been made, and no rate is implied."}',
+   1, 'contacted', DATE_SUB(UTC_TIMESTAMP(), INTERVAL 3 DAY),
+   'Asked for six months of statements; customer sending them this week.',
+   (SELECT id FROM \`users\` WHERE phone = '+2348000000002' LIMIT 1),
+   '/financing', DATE_SUB(UTC_TIMESTAMP(), INTERVAL 4 DAY)),
+  -- Routed and waiting: the state that must never be described as "approved".
+  ('HC-FIN-000003', 'Halima Bello', '+2348034440003', NULL,
+   (SELECT id FROM leads WHERE phone = '+2348034440003' AND type = 'financing' LIMIT 1),
+   (SELECT id FROM vehicle_listings WHERE stock_no = '${stockAt(25)}' LIMIT 1),
+   980000000, 200000000, 18000000, 48, 'civil_servant', 'month',
+   '{"headline":"₦162,500 a month over 48 months covers the whole ₦7,800,000 gap — before interest and fees.","detail":"Your ₦2,000,000 down payment is 20% of the price.","caveat":"This is arithmetic, not an offer. No credit decision has been made, and no rate is implied."}',
+   1, 'shared', DATE_SUB(UTC_TIMESTAMP(), INTERVAL 1 DAY), NULL,
+   (SELECT id FROM \`users\` WHERE phone = '+2348000000002' LIMIT 1),
+   '/find-my-car', DATE_SUB(UTC_TIMESTAMP(), INTERVAL 2 DAY)),
+  -- Declined, with the lender's reason kept on the row.
+  ('HC-FIN-000004', 'Peter Nwachukwu', '+2348034440004', NULL,
+   (SELECT id FROM leads WHERE phone = '+2348034440004' AND type = 'financing' LIMIT 1),
+   NULL, 2000000000, 300000000, 20000000, 60, 'business_owner', 'researching',
+   '{"headline":"At ₦200,000 a month over 60 months you would pay ₦12,000,000, and the gap is ₦17,000,000 — so this plan does not add up yet.","detail":"The principal alone needs ₦283,334 a month over 60 months, before any interest or fees.","caveat":"This is arithmetic, not an offer. No credit decision has been made, and no rate is implied."}',
+   1, 'declined', DATE_SUB(UTC_TIMESTAMP(), INTERVAL 9 DAY),
+   'No payslip and no formal employment record — told him the terms a lender will want.',
+   (SELECT id FROM \`users\` WHERE phone = '+2348000000002' LIMIT 1),
+   '/financing', DATE_SUB(UTC_TIMESTAMP(), INTERVAL 11 DAY));
+
 -- FR-25. Two saved cars: one watched at the price Ada saw (no pending alert),
 -- and one whose price has already moved down since she saved it — which is
 -- exactly what the sweep is for. Nothing here invents a price: the baseline on
@@ -1446,23 +1530,23 @@ UPDATE dealers SET user_id = (SELECT id FROM \`users\` WHERE phone = '+234800000
 -- pipeline, so the dealer portal opens onto a working day rather than zeroes.
 INSERT INTO leads (type, listing_id, name, phone, message, preferred_day, source_path, status,
                    assigned_to, assigned_at, last_contacted_at, lost_reason, created_at) VALUES
-  ('viewing', (SELECT id FROM vehicle_listings WHERE stock_no = 'HC-PH-0008' LIMIT 1),
+  ('viewing', (SELECT id FROM vehicle_listings WHERE stock_no = '${stockAt(8)}' LIMIT 1),
     'Emeka Ogbonna', '+2348032220001', 'Is the Pajero still available? I can come to Woji tomorrow morning.',
     DATE_ADD(UTC_DATE(), INTERVAL 1 DAY), '/cars/2014-mitsubishi-pajero-hc-ph-0008', 'new',
     NULL, NULL, NULL, NULL, DATE_SUB(UTC_TIMESTAMP(), INTERVAL 5 HOUR)),
-  ('viewing', (SELECT id FROM vehicle_listings WHERE stock_no = 'HC-PH-0025' LIMIT 1),
+  ('viewing', (SELECT id FROM vehicle_listings WHERE stock_no = '${stockAt(25)}' LIMIT 1),
     'Blessing Nwosu', '+2348032220002', 'What is the lowest you will take on the Elantra? I am paying cash.',
     DATE_ADD(UTC_DATE(), INTERVAL 2 DAY), '/cars/2017-hyundai-elantra-hc-ph-0025', 'contacted',
     (SELECT id FROM \`users\` WHERE phone = '+2348000000006' LIMIT 1),
     DATE_SUB(UTC_TIMESTAMP(), INTERVAL 2 DAY), DATE_SUB(UTC_TIMESTAMP(), INTERVAL 3 HOUR), NULL,
     DATE_SUB(UTC_TIMESTAMP(), INTERVAL 2 DAY)),
-  ('viewing', (SELECT id FROM vehicle_listings WHERE stock_no = 'HC-PH-0057' LIMIT 1),
+  ('viewing', (SELECT id FROM vehicle_listings WHERE stock_no = '${stockAt(57)}' LIMIT 1),
     'Tunde Alabi', '+2348032220003', 'Does the RAV4 have full service history? Any accident on it?',
     NULL, '/cars/2014-toyota-rav4-hc-ph-0057', 'viewing',
     (SELECT id FROM \`users\` WHERE phone = '+2348000000006' LIMIT 1),
     DATE_SUB(UTC_TIMESTAMP(), INTERVAL 4 DAY), DATE_SUB(UTC_TIMESTAMP(), INTERVAL 1 DAY), NULL,
     DATE_SUB(UTC_TIMESTAMP(), INTERVAL 4 DAY)),
-  ('viewing', (SELECT id FROM vehicle_listings WHERE stock_no = 'HC-PH-0064' LIMIT 1),
+  ('viewing', (SELECT id FROM vehicle_listings WHERE stock_no = '${stockAt(64)}' LIMIT 1),
     'Ify Chukwu', '+2348032220004', 'I came to see the Sportage but the AC was not blowing cold.',
     NULL, '/cars/2017-kia-sportage-hc-ph-0064', 'lost',
     (SELECT id FROM \`users\` WHERE phone = '+2348000000006' LIMIT 1),
@@ -1479,7 +1563,7 @@ INSERT INTO leads (type, listing_id, name, phone, message, preferred_day, source
     (SELECT id FROM \`users\` WHERE phone = '+2348000000002' LIMIT 1),
     DATE_SUB(UTC_TIMESTAMP(), INTERVAL 21 DAY), DATE_SUB(UTC_TIMESTAMP(), INTERVAL 19 DAY),
     NULL, DATE_SUB(UTC_TIMESTAMP(), INTERVAL 21 DAY)),
-  ('viewing', (SELECT id FROM vehicle_listings WHERE stock_no = 'HC-PH-0029' LIMIT 1),
+  ('viewing', (SELECT id FROM vehicle_listings WHERE stock_no = '${stockAt(29)}' LIMIT 1),
     'Ada Okafor', '+2348031234567', 'Do you have a tracker for this one? I want it installed before delivery.',
     NULL, '/cars/2015-toyota-corolla-hc-ph-0029', 'closed',
     (SELECT id FROM \`users\` WHERE phone = '+2348000000006' LIMIT 1),
@@ -1488,13 +1572,13 @@ INSERT INTO leads (type, listing_id, name, phone, message, preferred_day, source
 
 INSERT INTO saved_cars (user_id, listing_id, note, last_price_kobo) VALUES
   ((SELECT id FROM \`users\` WHERE phone = '+2348031234567' LIMIT 1),
-   (SELECT id FROM vehicle_listings WHERE stock_no = 'HC-PH-0020' LIMIT 1),
+   (SELECT id FROM vehicle_listings WHERE stock_no = '${stockAt(20)}' LIMIT 1),
    'Watching this one — asking about the service history',
-   (SELECT asking_price_kobo FROM vehicle_listings WHERE stock_no = 'HC-PH-0020' LIMIT 1)),
+   (SELECT asking_price_kobo FROM vehicle_listings WHERE stock_no = '${stockAt(20)}' LIMIT 1)),
   ((SELECT id FROM \`users\` WHERE phone = '+2348031234567' LIMIT 1),
-   (SELECT id FROM vehicle_listings WHERE stock_no = 'HC-PH-0069' LIMIT 1),
+   (SELECT id FROM vehicle_listings WHERE stock_no = '${stockAt(69)}' LIMIT 1),
    'Missed this one at the old price — watching it now',
-   (SELECT asking_price_kobo FROM vehicle_listings WHERE stock_no = 'HC-PH-0069' LIMIT 1) + 20000000);
+   (SELECT asking_price_kobo FROM vehicle_listings WHERE stock_no = '${stockAt(69)}' LIMIT 1) + 20000000);
 
 INSERT INTO saved_searches (user_id, label, query, alerts_enabled, alert_price_drop, alert_new_match, last_alerted_at) VALUES
   ((SELECT id FROM \`users\` WHERE phone = '+2348031234567' LIMIT 1),

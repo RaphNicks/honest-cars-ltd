@@ -189,6 +189,12 @@ function buildPayload({ kind, serviceSlug, values }) {
   } else {
     body.type = 'concierge';
     brief.notes = values.notes || null;
+    // §6.5 step 3 asks "do you need financing?" and the server turns a `yes` into
+    // a financing lead (FR-34). The answer arrives as the checked radio's value,
+    // so it has to be copied across explicitly — an unchecked radio contributes
+    // nothing to FormData, and a missing key would silently mean "no".
+    if (values.financing === 'yes') brief.financing = 'yes';
+    else if (values.financing === 'no') brief.financing = 'no';
   }
 
   if (Object.keys(brief).length) body.brief = brief;
@@ -235,6 +241,23 @@ export function renderSuccess(container, { kind, serviceSlug, result }) {
       </div>`
     : '';
 
+  // FR-34 — the concierge asked "do you need financing?" and the answer created
+  // a real enquiry with its own reference. Say so, with the reference, rather
+  // than leaving them to wonder whether the Yes did anything.
+  const financingBlock = result.financing
+    ? `
+      <div class="card card__body mt-2">
+        <h4 class="mb-1">Your financing enquiry</h4>
+        <p class="mb-1">
+          Reference <strong class="tabular">${result.financing.reference}</strong> — a human will route it to a
+          lender and tell you which one, or say plainly that we cannot help.
+        </p>
+        <p class="field__hint mb-0">
+          We are not a lender and we do not quote rates. <a href="/financing">How the handoff works</a>.
+        </p>
+      </div>`
+    : '';
+
   if (kind === 'contact') {
     container.innerHTML = `
       <h3 class="mb-0">Message received</h3>
@@ -266,6 +289,7 @@ export function renderSuccess(container, { kind, serviceSlug, result }) {
         : `<li class="tick-list__yes">No payment is taken here${isRequest ? ' — the retainer is settled after the brief is confirmed' : ''}</li>`}
     </ul>
     ${retainerBlock}
+    ${financingBlock}
     <div class="btn-row">
       ${wa ? `<a class="btn btn--primary" href="${wa}" target="_blank" rel="noopener" data-event="whatsapp_click" data-source="form_success">Continue on WhatsApp</a>` : ''}
       ${isRequest && reference ? `<a class="btn btn--secondary" href="/concierge/${reference}">Track this request</a>` : ''}

@@ -43,6 +43,7 @@ const invoiceService = require('../services/invoice');
 const statementService = require('../services/statement');
 const dealerApi = require('../services/dealer-api');
 const referralService = require('../services/referrals');
+const financingService = require('../services/financing');
 const { sendPage, CACHE } = require('../lib/respond');
 
 const router = express.Router();
@@ -70,6 +71,7 @@ const PATHS = {
   audit: `${HOME}/audit`,
   settings: `${HOME}/settings`,
   referrals: `${HOME}/referrals`,
+  financing: `${HOME}/financing`,
 };
 
 /** Navigation, filtered by what this role may actually open (§7.4). */
@@ -94,6 +96,7 @@ const NAV = [
   { href: PATHS.staff, label: 'Staff & roles', icon: 'account', capability: 'users.manage' },
   { href: PATHS.audit, label: 'Audit log', icon: 'shield', capability: 'users.manage' },
   { href: PATHS.referrals, label: 'Referrals', icon: 'account', capability: 'referrals.view' },
+  { href: PATHS.financing, label: 'Financing', icon: 'scale', capability: 'financing.view' },
   { href: PATHS.settings, label: 'Settings', icon: 'cog', capability: 'settings.manage' },
 ];
 
@@ -2308,6 +2311,155 @@ router.post('/referrals/:id/restore', auth.requireStaff('referrals.reward'), aut
     const result = await referralService.restoreReward(id, req.user);
     if (!result.ok) return done(res, back, result.error, { error: true });
     return done(res, back, 'Back in the queue as pending.');
+  } catch (error) {
+    return next(error);
+  }
+});
+
+// ---------------------------------------------------------------------------
+// FR-34 — the financing desk
+//
+// The screen exists to make one sentence true: *this enquiry went to that
+// lender on that date, and this is what came back*. Everything it shows is
+// either the customer's own figures or a fact a human entered here — there is
+// no rate, no score and no automatic routing anywhere on it.
+// ---------------------------------------------------------------------------
+router.get('/financing', auth.requireStaff('financing.view'), async (req, res, next) => {
+  try {
+    const status = validate.oneOf(req.query.status, db.financing.STATUSES, null);
+    const desk = await financingService.desk();
+    const queue = status ? desk.queue.filter((lead) => lead.status === status) : desk.queue;
+    return await page(req, res, {
+      view: 'admin/financing',
+      active: PATHS.financing,
+      title: 'Financing',
+      description: 'Enquiries, the lender each one went to, and what came back.',
+      data: {
+        ...desk,
+        queue,
+        status,
+        canManage: roles.can(req.user.role, 'financing.manage'),
+        employments: db.financing.EMPLOYMENTS,
+        timelines: db.financing.TIMELINES,
+        statuses: db.financing.STATUSES,
+      },
+    });
+  } catch (error) {
+    return next(error);
+  }
+});
+
+/** Add a lender to the desk's list. Not a setting: it is the desk's own book. */
+router.post('/financing/partners', auth.requireStaff('financing.manage'), auth.sameOriginOnly, async (req, res, next) => {
+  const back = PATHS.financing;
+  try {
+    const name = validate.name(req.body.name);
+    if (!name) return done(res, back, 'A partner needs a name.', { error: true });
+    const result = await db.financing.createPartner({
+      name,
+      kind: validate.oneOf(req.body.kind, db.financing.PARTNER_KINDS, 'other'),
+      channel: validate.oneOf(req.body.channel, db.financing.CHANNELS, 'manual'),
+      contact: validate.text(req.body.contact, 160) || null,
+      note: validate.text(req.body.note, 240) || null,
+      createdBy: req.user.id,
+    });
+    if (!result.ok) return done(res, back, result.error, { error: true });
+    await admin
+      .recordAudit({
+        actorId: req.user.id,
+        action: 'financing.partner_added',
+        entity: 'finance_partner',
+        entityId: result.partner.id,
+        detail: { name: result.partner.name, channel: result.partner.channel },
+      })
+      .catch(() => {});
+    return done(res, back, `${result.partner.name} is on the list. Enquiries can be routed to them.`);
+  } catch (error) {
+    return next(error);
+  }
+});
+
+router.post('/financing/partners/:id/active', auth.requireStaff('financing.manage'), auth.sameOriginOnly, async (req, res, next) => {
+  const back = PATHS.financing;
+  try {
+    const id = Number.parseInt(req.params.id, 10);
+    if (!Number.isFinite(id)) return done(res, back, 'Unknown partner.', { error: true });
+    const active = req.body.active === '1' || req.body.active === 'on';
+    const partner = await db.financing.setPartnerActive(id, active);
+    if (!partner) return done(res, back, 'Unknown partner.', { error: true });
+    return done(res, back, active ? `${partner.name} is active again.` : `${partner.name} is switched off — nothing else will be routed to them.`);
+  } catch (error) {
+    return next(error);
+  }
+});
+
+/** The handoff itself. Records the partner, the date, and sends the message. */
+router.post('/financing/:id/route', auth.requireStaff('financing.manage'), auth.sameOriginOnly, async (req, res, next) => {
+  const back = PATHS.financing;
+  try {
+    const id = Number.parseInt(req.params.id, 10);
+    const partnerId = Number.parseInt(req.body.partner_id, 10);
+    if (!Number.isFinite(id) || !Number.isFinite(partnerId)) {
+      return done(res, back, 'Pick a partner to route this to.', { error: true });
+    }
+    const result = await financingService.route(id, { partnerId, actorId: req.user.id });
+    if (!result.ok) return done(res, back, result.error, { error: true });
+
+    await admin
+      .recordAudit({
+        actorId: req.user.id,
+        action: 'financing.routed',
+        entity: 'financing_lead',
+        entityId: id,
+        detail: {
+          reference: result.lead.reference,
+          partner: result.partner.name,
+          channel: result.notification ? result.notification.channel : null,
+          delivered: result.notification ? result.notification.status : null,
+        },
+      })
+      .catch(() => {});
+
+    if (result.notification && result.notification.status === 'sent') {
+      return done(res, back, `${result.lead.reference} went to ${result.partner.name}, and they have the details.`);
+    }
+    return done(
+      res,
+      back,
+      `${result.lead.reference} is recorded as routed to ${result.partner.name}, but nothing was delivered — ${result.notification ? result.notification.error : 'no channel'} Send it by hand from the row, then the record matches reality.`,
+    );
+  } catch (error) {
+    return next(error);
+  }
+});
+
+/** What the lender said. Not our decision, and never entered as if it were. */
+router.post('/financing/:id/outcome', auth.requireStaff('financing.manage'), auth.sameOriginOnly, async (req, res, next) => {
+  const back = PATHS.financing;
+  try {
+    const id = Number.parseInt(req.params.id, 10);
+    if (!Number.isFinite(id)) return done(res, back, 'Unknown enquiry.', { error: true });
+    const status = validate.oneOf(req.body.status, ['contacted', 'approved', 'declined', 'withdrawn'], null);
+    if (!status) return done(res, back, 'Record contacted, approved, declined or withdrawn.', { error: true });
+    const note = validate.text(req.body.note, 240) || null;
+    const result = await financingService.outcome(id, { status, note, actorId: req.user.id });
+    if (!result.ok) return done(res, back, result.error, { error: true });
+
+    await admin
+      .recordAudit({
+        actorId: req.user.id,
+        action: `financing.${status}`,
+        entity: 'financing_lead',
+        entityId: id,
+        detail: { reference: result.lead.reference, note, partner: result.lead.partnerName },
+      })
+      .catch(() => {});
+
+    const delivered =
+      result.notification && result.notification.status === 'sent'
+        ? 'The customer has been told.'
+        : 'The customer could NOT be messaged automatically — send it by hand, the text is recorded.';
+    return done(res, back, `Recorded: ${result.lead.reference} is ${status}. ${delivered}`);
   } catch (error) {
     return next(error);
   }

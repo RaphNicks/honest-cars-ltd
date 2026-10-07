@@ -31,6 +31,7 @@ const og = require('../services/og');
 const listingQuery = require('../services/listing-query');
 const imports = require('../services/imports');
 const valuation = require('../services/valuation');
+const financing = require('../services/financing');
 const dealerApi = require('../services/dealer-api');
 const render = require('../lib/render');
 const { sendJson, sendFragment, personalise, wantsLessData } = require('../lib/respond');
@@ -193,6 +194,36 @@ router.post('/service-requests', rateLimit({ windowMs: 60_000, max: 10 }), async
       }
     }
 
+    // §6.5 step 3 asks whether financing is needed, and until FR-34 the answer
+    // only sat in the brief. The customer has already chosen the option that
+    // says we will route it to a lender, so the lead is created here — linked to
+    // the request, with the brief's own budget as the amount — and the desk
+    // routes it from /admin/financing. They do not fill in a second form.
+    let financingLead = null;
+    if (rule.type === 'concierge' && brief.financing === 'yes') {
+      const budget = validate.kobo(brief.budget_max) || validate.kobo(brief.budget_min) || null;
+      const captured = budget
+        ? await financing
+            .capture(
+              {
+                name,
+                phone,
+                amount: String(budget / 100),
+                consent: 'yes',
+              },
+              {
+                sourcePath: validate.text(body.sourcePath || '/find-my-car', 200),
+                utm: body.utm || null,
+                requestId: request.id,
+              },
+            )
+            .catch(() => null)
+        : null;
+      if (captured && captured.ok) {
+        financingLead = { reference: captured.lead.reference, status: captured.lead.status };
+      }
+    }
+
     await db.leads.createLead({
       type: rule.leadType,
       name,
@@ -222,7 +253,76 @@ router.post('/service-requests', rateLimit({ windowMs: 60_000, max: 10 }), async
       url: request.url,
       slaDueAt: request.slaDueAt,
       retainer,
+      financing: financingLead,
       whatsappUrl: `https://wa.me/${config.business.whatsapp}?text=${opsText}`,
+    });
+  } catch (error) {
+    return next(error);
+  }
+});
+
+// ---------------------------------------------------------------------------
+// Financing (FR-34) — the calculator and the enquiry.
+//
+// Two endpoints, deliberately: the plan is arithmetic on numbers the visitor
+// typed (nothing is stored), and the enquiry is a record with a reference. A
+// visitor who only wants to see whether the numbers add up should not have to
+// create a lead to find out — and should not have one created for them either.
+// ---------------------------------------------------------------------------
+router.post('/financing/plan', rateLimit({ windowMs: 60_000, max: 60 }), async (req, res, next) => {
+  try {
+    const body = req.body || {};
+    // The car, when named, is priced from the database — never from the body.
+    let amountKobo = null;
+    if (body.listingSlug) {
+      const listing = await db.listings.findBySlug(validate.text(body.listingSlug, 200)).catch(() => null);
+      if (listing) amountKobo = listing.priceKobo;
+    }
+    if (!amountKobo) {
+      amountKobo = validate.kobo(body.amount);
+      if (amountKobo === null || amountKobo <= 0) {
+        return sendJson(res, { ok: false, error: 'Enter the price or a budget to see the arithmetic.' }, { status: 422 });
+      }
+    }
+    if (amountKobo > financing.MAX_AMOUNT_KOBO) {
+      return sendJson(res, { ok: false, error: 'That figure is larger than we can help with — please check it.' }, { status: 422 });
+    }
+
+    const plan = financing.plan({
+      amountKobo,
+      downKobo: validate.kobo(body.down) ?? 0,
+      monthlyKobo: validate.kobo(body.monthly) ?? 0,
+      tenorMonths: validate.oneOf(String(body.tenor || ''), financing.TENORS.map(String), '36'),
+    });
+    if (!plan.ok) return sendJson(res, { ok: false, error: plan.error }, { status: 422 });
+    return sendJson(res, { ok: true, plan });
+  } catch (error) {
+    return next(error);
+  }
+});
+
+router.post('/financing', rateLimit({ windowMs: 60_000, max: 8 }), async (req, res, next) => {
+  try {
+    const body = req.body || {};
+    if (body.consent !== 'yes' && body.consent !== true && body.consent !== 'on') {
+      return sendJson(
+        res,
+        { ok: false, error: 'Please tick the box that lets us share these details with a lender.' },
+        { status: 422 },
+      );
+    }
+    const result = await financing.capture(body, {
+      sourcePath: validate.text(body.sourcePath || req.get('referer') || '/financing', 200),
+      utm: body.utm || null,
+    });
+    if (!result.ok) return sendJson(res, { ok: false, error: result.error }, { status: result.status || 422 });
+    return sendJson(res, {
+      ok: true,
+      reference: result.lead.reference,
+      plan: result.plan,
+      readiness: result.readiness,
+      notification: result.notification,
+      whatsappUrl: result.whatsappUrl,
     });
   } catch (error) {
     return next(error);
