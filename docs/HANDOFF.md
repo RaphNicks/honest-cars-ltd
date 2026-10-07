@@ -197,18 +197,35 @@ lazily) instead of at module scope, so the shortlist PDF threw
 catch it; the full-suite options-PDF test did. Assert your anchors, then read
 the whole-suite result — not just the file you touched.
 
-## 3y. Outstanding: the logo
+## 3y. The brand mark
 
-The uploaded `image-1.png` (black shield, gold double border, gold laurel and
-three stars over a hand cradling a sedan) never reached this session — the
-sandbox was reset before the turn ran and `/home/user/uploads/` was empty. It
-must be re-attached before the work can start. When it lands: one source PNG in
-`public/`, `sharp` down-scales to 192/512/apple-touch/maskable plus favicon; swap
-the inline shield at `views/partials/header.ejs:6`; repoint the JSON-LD `logo`
-in `src/services/seo.js` (currently `/icons/icon-512.png`); update the manifest
-and the OG default card's mark; then grep for any remaining logo use. Decide
-against the file whether the black background needs transparency or a light
-chip in the header.
+The artwork was uploaded twice and destroyed twice — a sandbox restore at the
+start of the turn empties `/home/user/uploads/` before the turn runs, and the
+bytes are not recoverable from the message. So the *pipeline* is built and the
+master is the only thing missing.
+
+`assets/brand/logo.png` is the master. `npm run icons` cuts every size from it:
+`public/img/logo.png` (header, drawer, console), `public/favicon.png` (tabs —
+`favicon.svg` is retired), `icons/icon-192|512`, `icons/maskable-192|512`,
+`icons/apple-touch-icon.png`, and rewrites `public/manifest.webmanifest`.
+Derived files are committed; `npm run icons:check` byte-compares them.
+
+Two design facts, both measured rather than assumed:
+
+- The mark was drawn gold on black, so the black is kept — the art is trimmed of
+  the upload's margin and centred on its own field. The maskable pair keeps
+  every lit pixel inside Android's 80% safe circle; `test/brand.test.js` walks
+  the pixels, so a master that would be cropped fails the suite instead of the
+  home screen.
+- Nothing points at a logo that is not there. `helpers.brandMark`
+  (`src/lib/locals.js`) is null exactly when `public/img/logo.png` is absent, and
+  each brand block draws the mark when it exists and its inline shield when it
+  does not. `views/layouts/admin.ejs` had no favicon at all; it has one now.
+
+Changing the master is one file plus `npm run icons && npm run build:static` —
+no template, test or CSS edit. The OG card carries the mark above the eyebrow
+line when one exists, and the mark is part of the card's cache key, so a logo
+supplied later cannot leave stale cards behind.
 
 ## 3. Just finished: the OG cards that were clipping every title
 
@@ -831,7 +848,14 @@ who would count and writes nothing).
 - **`INSERT … SET ?` is invalid under `pool.execute`** — explicit column list plus
   `COLUMNS.map(() => '?')`. And MySQL 5.7 has no `RETURNING`; `::SIGNED` is
   Postgres.
-- `honestcarsltd.com` does not resolve; no headless browser is available.
+- `honestcarsltd.com` does not resolve; no headless browser is available. Also
+  no PDF rasteriser (`pdftoppm`/`gs`/`mutool` are absent and ImageMagick's PDF
+  coder is disabled by policy), so a PDF's *appearance* cannot be verified here
+  — only its text and structure. The OG cards are PNGs and can be looked at.
+- **Uploads do not survive a sandbox restore.** `/home/user/uploads/` is emptied
+  before the next turn runs, and the file cannot be reconstructed from the
+  message it arrived in. If an attachment is missing, ask for it again; for the
+  logo, ask for it as `logo.png` so it needs no renaming before `npm run icons`.
 - Two consecutive pushes to this branch can non-fast-forward:
   `git fetch origin arena/01a0f7df-honest-cars-ltd` + `git reset --mixed FETCH_HEAD`,
   keep the tree, re-commit.
