@@ -1361,3 +1361,61 @@ CREATE TABLE IF NOT EXISTS `settings` (
   KEY idx_settings_updated (updated_at),
   CONSTRAINT fk_settings_actor FOREIGN KEY (updated_by) REFERENCES `users` (id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ---------------------------------------------------------------------------
+-- consent_records + data_requests — §18.3's privacy desk (migration 028)
+--
+-- Consent is recorded as *events* (with the wording shown), not as a flag, so
+-- the console can answer what a person actually agreed to. data_requests is
+-- the NDPA request log: self-service exports and deletions file themselves,
+-- and requests that arrive by phone or WhatsApp are logged by hand. See
+-- db/migrations/028-privacy-desk.sql for why `user_id` is ON DELETE SET NULL.
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS `consent_records` (
+  id           INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  user_id      INT UNSIGNED NULL,                  -- NULL when there is no account yet
+  phone        VARCHAR(40)  NULL,                  -- canonical, when we have one
+  name         VARCHAR(120) NULL,
+  purpose      ENUM('marketing','deal_alerts','lender_share','service_contact') NOT NULL,
+  granted      TINYINT(1)   NOT NULL,              -- 1 = permission given, 0 = withdrawn
+  source       VARCHAR(40)  NOT NULL,              -- account | saved_car | saved_search | financing | service_form | contact
+  path         VARCHAR(200) NULL,                  -- the page they were on
+  notice       VARCHAR(400) NOT NULL,              -- the exact wording shown next to the box
+  actor        ENUM('self','staff') NOT NULL DEFAULT 'self',
+  recorded_by  INT UNSIGNED NULL,                  -- staff member, when actor = 'staff'
+  created_at   TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  KEY idx_consent_phone (phone, created_at),
+  KEY idx_consent_purpose (purpose, created_at),
+  KEY idx_consent_user (user_id, purpose, created_at),
+  CONSTRAINT fk_consent_user FOREIGN KEY (user_id)     REFERENCES `users` (id) ON DELETE SET NULL,
+  CONSTRAINT fk_consent_actor FOREIGN KEY (recorded_by) REFERENCES `users` (id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `data_requests` (
+  id           INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  reference    VARCHAR(20)  NOT NULL,              -- HC-DSR-000001, quoted back to the person
+  request_type ENUM('access','erasure','correction','withdraw_marketing','other') NOT NULL DEFAULT 'other',
+  status       ENUM('received','in_progress','completed','refused') NOT NULL DEFAULT 'received',
+  channel      ENUM('self_service','contact_form','whatsapp','phone','email','walk_in','other') NOT NULL DEFAULT 'other',
+  user_id      INT UNSIGNED NULL,                  -- the account, when there was one
+  name         VARCHAR(120) NULL,
+  phone        VARCHAR(40)  NULL,
+  email        VARCHAR(160) NULL,
+  subject      VARCHAR(240) NULL,                  -- what they asked for, in the words used
+  resolution   VARCHAR(240) NULL,                  -- what was actually done about it
+  requested_at DATETIME     NOT NULL,              -- when the person asked (not when the row appeared)
+  due_at       DATETIME     NOT NULL,              -- NDPA: 30 days from requested_at
+  completed_at DATETIME     NULL,
+  handled_by   INT UNSIGNED NULL,
+  source_path  VARCHAR(200) NULL,                  -- where it was filed from
+  created_at   TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at   TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  UNIQUE KEY uq_data_request_reference (reference),
+  KEY idx_data_requests_status (status, due_at),
+  KEY idx_data_requests_phone (phone, requested_at),
+  KEY idx_data_requests_user (user_id, request_type, requested_at),
+  CONSTRAINT fk_data_request_user    FOREIGN KEY (user_id)    REFERENCES `users` (id) ON DELETE SET NULL,
+  CONSTRAINT fk_data_request_handler FOREIGN KEY (handled_by) REFERENCES `users` (id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

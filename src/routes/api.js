@@ -32,6 +32,7 @@ const listingQuery = require('../services/listing-query');
 const imports = require('../services/imports');
 const valuation = require('../services/valuation');
 const financing = require('../services/financing');
+const privacy = require('../services/privacy');
 const dealerApi = require('../services/dealer-api');
 const render = require('../lib/render');
 const { sendJson, sendFragment, personalise, wantsLessData } = require('../lib/respond');
@@ -129,6 +130,12 @@ router.post('/leads', rateLimit({ windowMs: 60_000, max: 12 }), async (req, res,
 // Creates the operational record the admin pipeline reads (§7.3) and returns
 // the human tracking id the customer keeps.
 // ---------------------------------------------------------------------------
+/** The truth about a checkbox: 'on', 'yes', true, 1 — anything else is a no. */
+function consentGiven(body) {
+  const value = (body || {}).consent;
+  return value === true || value === 'yes' || value === 'on' || value === '1' || value === 1;
+}
+
 const REQUEST_KINDS = {
   concierge: { type: 'concierge', slaHours: 72, leadType: 'concierge', event: 'concierge_started' },
   documents: { type: 'documents', slaHours: 48, leadType: 'service', event: 'services_enquiry_submitted' },
@@ -161,14 +168,31 @@ router.post('/service-requests', rateLimit({ windowMs: 60_000, max: 10 }), async
     const sla = rule.type === 'concierge' ? concierge.slaOption(body.sla) : null;
     if (sla) brief.sla = sla.key;
 
+    const sourcePath = validate.text(body.sourcePath || req.get('referer') || '/', 200);
     const request = await db.requests.createRequest({
       type: rule.type,
       name,
       phone,
       brief,
-      sourcePath: validate.text(body.sourcePath || req.get('referer') || '/', 200),
+      sourcePath,
       slaHours: sla ? sla.hours : validate.slaHours(body.slaHours, rule.slaHours),
     });
+
+    // §18.3: the enquiry box says "HonestCars can contact me about this
+    // request. No marketing spam — that is a separate, optional list." The
+    // record keeps that sentence, and it is written only when the box really
+    // came through — a submission without it is not recorded as consent. (The
+    // page marks the box required; this is the server telling the truth about
+    // what it received.)
+    if (consentGiven(body)) {
+      await privacy.recordConsent(privacy.noticeKeyForIntake(body.kind, sourcePath), {
+        userId: req.user ? req.user.id : null,
+        phone,
+        name,
+        granted: true,
+        path: sourcePath,
+      });
+    }
 
     // The retainer is raised with the brief, not after it: the customer leaves
     // with a reference to pay against. Without PSP keys `initiate` returns
@@ -221,6 +245,16 @@ router.post('/service-requests', rateLimit({ windowMs: 60_000, max: 10 }), async
         : null;
       if (captured && captured.ok) {
         financingLead = { reference: captured.lead.reference, status: captured.lead.status };
+        // §18.3: the radio card the customer chose carries the sentence that
+        // says the requirement goes in front of a lender, so that is the
+        // permission being recorded — with the wording, from the page.
+        await privacy.recordConsent('concierge_financing', {
+          userId: req.user ? req.user.id : null,
+          phone,
+          name,
+          granted: true,
+          path: sourcePath,
+        });
       }
     }
 
@@ -311,11 +345,20 @@ router.post('/financing', rateLimit({ windowMs: 60_000, max: 8 }), async (req, r
         { status: 422 },
       );
     }
-    const result = await financing.capture(body, {
-      sourcePath: validate.text(body.sourcePath || req.get('referer') || '/financing', 200),
-      utm: body.utm || null,
-    });
+    const financingPath = validate.text(body.sourcePath || req.get('referer') || '/financing', 200);
+    const result = await financing.capture(body, { sourcePath: financingPath, utm: body.utm || null });
     if (!result.ok) return sendJson(res, { ok: false, error: result.error }, { status: result.status || 422 });
+
+    // §18.3: the lender-sharing permission is the strongest consent on the
+    // site — it is the one that moves a person's details to a third party — so
+    // the event is recorded with the wording they agreed to.
+    await privacy.recordConsent('financing', {
+      userId: req.user ? req.user.id : null,
+      phone: result.lead.phone,
+      name: result.lead.name,
+      granted: true,
+      path: financingPath,
+    });
     return sendJson(res, {
       ok: true,
       reference: result.lead.reference,
@@ -415,6 +458,19 @@ router.post('/orders', rateLimit({ windowMs: 60_000, max: 8 }), async (req, res,
       deliveryArea: validate.text(body.deliveryArea, 80) || 'Pickup at a PH meet-point',
       notes: validate.text(body.notes, 400) || null,
     });
+
+    // §18.3: "HonestCars can contact me on WhatsApp to confirm this order and
+    // payment." A guest has no account, so the event is keyed to the phone.
+    if (consentGiven(body)) {
+      const account = await db.users.findByPhone(phone).catch(() => null);
+      await privacy.recordConsent('checkout', {
+        userId: account ? account.id : null,
+        phone,
+        name,
+        granted: true,
+        path: validate.text(body.sourcePath || '/checkout', 200),
+      });
+    }
 
     await db.leads.createLead({
       type: 'service',

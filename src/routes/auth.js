@@ -67,6 +67,10 @@ router.post('/verify', verifyLimiter, async (req, res, next) => {
       code: validate.text(body.code, 12),
       // §7.1 referrals: the invitation code rides along from /login?ref=…
       referralCode: validate.text(body.ref, 16),
+      // §18.3: the sign-in box is consent to be contacted about this person's
+      // own requests and orders — service contact, never marketing — recorded
+      // only when it really came through, which is what the login page posts.
+      consent: body.consent === '1' || body.consent === 'on' || body.consent === true,
       ip: req.ip,
       userAgent: req.get('user-agent'),
     });

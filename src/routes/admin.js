@@ -45,6 +45,8 @@ const dealerApi = require('../services/dealer-api');
 const referralService = require('../services/referrals');
 const financingService = require('../services/financing');
 const settingsService = require('../services/settings');
+const privacyService = require('../services/privacy');
+const csv = require('../lib/csv');
 const { sendPage, CACHE } = require('../lib/respond');
 
 const router = express.Router();
@@ -73,6 +75,7 @@ const PATHS = {
   settings: `${HOME}/settings`,
   referrals: `${HOME}/referrals`,
   financing: `${HOME}/financing`,
+  privacy: `${HOME}/privacy`,
 };
 
 /** Navigation, filtered by what this role may actually open (§7.4). */
@@ -99,6 +102,7 @@ const NAV = [
   { href: PATHS.referrals, label: 'Referrals', icon: 'account', capability: 'referrals.view' },
   { href: PATHS.financing, label: 'Financing', icon: 'scale', capability: 'financing.view' },
   { href: PATHS.settings, label: 'Settings', icon: 'cog', capability: 'settings.manage' },
+  { href: PATHS.privacy, label: 'Privacy', icon: 'shield', capability: 'privacy.view' },
 ];
 
 function navFor(user) {
@@ -2537,6 +2541,128 @@ router.post('/financing/:id/outcome', auth.requireStaff('financing.manage'), aut
         ? 'The customer has been told.'
         : 'The customer could NOT be messaged automatically — send it by hand, the text is recorded.';
     return done(res, back, `Recorded: ${result.lead.reference} is ${status}. ${delivered}`);
+  } catch (error) {
+    return next(error);
+  }
+});
+
+// ---------------------------------------------------------------------------
+// §18.3 — the privacy desk (NDPA data-subject requests + consent records)
+//
+// §12.2's self-service rights work without this screen: a customer can download
+// everything we hold and close their account. What this screen adds is the
+// *record* — the two self-service paths file themselves the moment they happen,
+// a request that arrived by WhatsApp can be logged by hand, and the 30-day
+// clock NDPA sets is visible while there is still time to act on it rather than
+// after it has run out.
+// ---------------------------------------------------------------------------
+router.get('/privacy', auth.requireStaff('privacy.view'), async (req, res, next) => {
+  try {
+    const status = validate.oneOf(req.query.status, [...db.privacy.STATUSES, 'open', 'all'], 'open');
+    const type = validate.oneOf(req.query.type, db.privacy.TYPES, null);
+    const desk = await privacyService.desk({ status: status === 'all' ? null : status, type });
+    return await page(req, res, {
+      view: 'admin/privacy',
+      active: PATHS.privacy,
+      title: 'Privacy',
+      description: 'Data-subject requests, the 30-day clock, and the consent record behind every opt-in.',
+      data: {
+        ...desk,
+        status,
+        type,
+        canManage: roles.can(req.user.role, 'privacy.manage'),
+        types: db.privacy.TYPES,
+        channels: db.privacy.CHANNELS.filter((channel) => channel !== 'self_service'),
+        typeLabels: db.privacy.TYPE_LABELS,
+        typeSentences: db.privacy.TYPE_SENTENCE,
+        channelLabels: db.privacy.CHANNEL_LABELS,
+        purposeLabels: db.privacy.PURPOSE_LABELS,
+        dueDays: db.privacy.DUE_DAYS,
+      },
+    });
+  } catch (error) {
+    return next(error);
+  }
+});
+
+/** The compliance file: the same rows as the screen, in a spreadsheet. */
+router.get('/privacy/requests.csv', auth.requireStaff('privacy.view'), async (req, res, next) => {
+  try {
+    const rows = await privacyService.csv();
+    res.set('Content-Type', 'text/csv; charset=utf-8');
+    res.set('Content-Disposition', 'attachment; filename="honestcars-data-requests.csv"');
+    res.set('Cache-Control', CACHE.private);
+    return res.send(csv.stringify(rows, privacyService.CSV_HEADER));
+  } catch (error) {
+    return next(error);
+  }
+});
+
+/** Log a request that arrived by WhatsApp, on the phone, or over the counter. */
+router.post('/privacy/requests', auth.requireStaff('privacy.manage'), auth.sameOriginOnly, async (req, res, next) => {
+  const back = PATHS.privacy;
+  try {
+    const result = await privacyService.logRequest(req.body || {}, { path: PATHS.privacy });
+    if (!result.ok) return done(res, back, result.error, { error: true });
+    const due = new Date(result.request.dueAt).toLocaleDateString('en-NG', { day: 'numeric', month: 'long' });
+    await admin
+      .recordAudit({
+        actorId: req.user.id,
+        action: 'privacy.request_logged',
+        entity: 'data_request',
+        entityId: result.request.id,
+        detail: {
+          reference: result.request.reference,
+          type: result.request.type,
+          channel: result.request.channel,
+          requested_at: result.request.requestedAt,
+          due_at: result.request.dueAt,
+        },
+      })
+      .catch(() => {});
+    return done(
+      res,
+      back,
+      `${result.request.reference} logged. It is due by ${due} — ${db.privacy.DUE_DAYS} days from the day they asked, not from today.`,
+    );
+  } catch (error) {
+    return next(error);
+  }
+});
+
+/** Move a request along. Closing one needs the sentence that says what was done. */
+router.post('/privacy/requests/:id', auth.requireStaff('privacy.manage'), auth.sameOriginOnly, async (req, res, next) => {
+  const back = PATHS.privacy;
+  try {
+    const id = Number.parseInt(req.params.id, 10);
+    if (!Number.isFinite(id)) return done(res, back, 'Unknown request.', { error: true });
+    const status = validate.oneOf(req.body.status, db.privacy.STATUSES, null);
+    if (!status) return done(res, back, 'Pick received, in progress, completed or refused.', { error: true });
+
+    const before = await db.privacy.findRequest(id);
+    if (!before) return done(res, back, 'Unknown request.', { error: true });
+
+    const result = await privacyService.moveRequest(id, { status, resolution: req.body.resolution }, req.user);
+    if (!result.ok) return done(res, back, result.error, { error: true });
+
+    await admin
+      .recordAudit({
+        actorId: req.user.id,
+        action: 'privacy.request_updated',
+        entity: 'data_request',
+        entityId: id,
+        detail: {
+          reference: before.reference,
+          from: before.status,
+          to: status,
+          resolution: result.request.resolution || null,
+        },
+      })
+      .catch(() => {});
+
+    if (status === 'completed') return done(res, back, `${before.reference} closed, with what was done written down.`);
+    if (status === 'refused') return done(res, back, `${before.reference} refused — the reason is on the row.`);
+    return done(res, back, `${before.reference} is now ${status.replace('_', ' ')}.`);
   } catch (error) {
     return next(error);
   }

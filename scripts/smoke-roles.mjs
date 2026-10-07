@@ -34,7 +34,7 @@ const PAGES_ADMIN = [
   '/admin/hire',
   '/admin/dealers', '/admin/dealers/2',
   '/admin/cms', '/admin/cms/calendar', '/admin/cms/pages', '/admin/cms/faqs', '/admin/cms/testimonials', '/admin/cms/modules',
-  '/admin/settings', '/admin/referrals', '/admin/financing',
+  '/admin/settings', '/admin/referrals', '/admin/financing', '/admin/privacy',
 ];
 
 /**
@@ -47,7 +47,7 @@ const PAGES_ADMIN = [
  */
 const ROLES = [
   { phone: '+2348000000001', role: 'admin', must: PAGES_ADMIN },
-  { phone: '+2348000000002', role: 'ops', must: ['/admin', '/admin/listings', '/admin/leads', '/admin/concierge', '/admin/bookings', '/admin/alerts', '/admin/intel', '/admin/reports', '/admin/marketing', '/admin/hire', '/admin/dealers', '/admin/dealers/2', '/admin/settings', '/admin/referrals', '/admin/financing'] },
+  { phone: '+2348000000002', role: 'ops', must: ['/admin', '/admin/listings', '/admin/leads', '/admin/concierge', '/admin/bookings', '/admin/alerts', '/admin/intel', '/admin/reports', '/admin/marketing', '/admin/hire', '/admin/dealers', '/admin/dealers/2', '/admin/settings', '/admin/referrals', '/admin/financing', '/admin/privacy'] },
   { phone: '+2348000000003', role: 'inspector', must: ['/admin/jobs'] },
   { phone: '+2348000000004', role: 'finance', must: ['/admin', '/admin/orders', '/admin/payments', '/admin/milestones', '/admin/reports', '/admin/subscriptions', '/admin/hire', '/admin/dealers', '/admin/dealers/2', '/admin/referrals', '/admin/financing'] },
   { phone: '+2348000000005', role: 'marketing', must: ['/admin', '/admin/cms', '/admin/cms/calendar', '/admin/cms/pages', '/admin/cms/faqs', '/admin/cms/testimonials', '/admin/cms/modules', '/admin/intel', '/admin/reports', '/admin/marketing'] },
@@ -61,11 +61,14 @@ const ROLES = [
 const MUST_NOT = [
   // Marketing runs the channel report but does not see the ledgers, and finance
   // reads the money without seeing where the traffic came from (§7.4).
-  { phone: '+2348000000005', role: 'marketing', blocked: ['/admin/payments', '/admin/milestones', '/admin/staff', '/admin/audit', '/admin/subscriptions', '/admin/hire', '/admin/dealers', '/admin/referrals'] },
-  { phone: '+2348000000004', role: 'finance', blocked: ['/admin/marketing'] },
+  { phone: '+2348000000005', role: 'marketing', blocked: ['/admin/payments', '/admin/milestones', '/admin/staff', '/admin/audit', '/admin/subscriptions', '/admin/hire', '/admin/dealers', '/admin/referrals', '/admin/privacy'] },
+  { phone: '+2348000000004', role: 'finance', blocked: ['/admin/marketing', '/admin/privacy'] },
   // Renewals are a money queue with a customer attached: ops runs the listings
   // and the leads, and does not need to see what anyone pays us (§7.4).
   { phone: '+2348000000002', role: 'ops', blocked: ['/admin/subscriptions'] },
+  // §18.3's request log is admin/ops only — it is a list of people who asked us
+  // to delete their data, so the inspector and the money desk are refused it.
+  { phone: '+2348000000003', role: 'inspector', blocked: ['/admin/privacy'] },
 ];
 
 const PAGES = [
@@ -79,7 +82,7 @@ const PAGES = [
   '/admin/hire',
   '/admin/dealers', '/admin/dealers/2',
   '/admin/cms', '/admin/cms/calendar', '/admin/cms/pages', '/admin/cms/faqs', '/admin/cms/testimonials', '/admin/cms/modules',
-  '/admin/settings', '/admin/referrals', '/admin/financing',
+  '/admin/settings', '/admin/referrals', '/admin/financing', '/admin/privacy',
 ];
 
 /**

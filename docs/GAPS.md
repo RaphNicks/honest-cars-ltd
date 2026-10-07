@@ -6,7 +6,47 @@ integrations §11, NFRs §12, sitemap §5.1, acceptance §18.3).
 Line references below point at the code that exists. Where an item is missing, the
 note says what "done" would mean, so the work can be scoped without re-reading the PRD.
 
-**Status at this commit:** §5.1's settings screen is finished — the half that
+**Status at this commit:** §18.3's privacy desk is built — the half of NDPA that
+is paperwork, done so the paperwork is true.
+
+- **The request log exists, and the self-service paths file themselves.**
+  `/account/export` and account closure used to discharge the duty and leave no
+  trace. Now both write a row the moment they happen (`self_service`,
+  `completed`, with the act recorded), deduplicated to one per person per day so
+  a refresh is not a second request. Anything that arrives by WhatsApp or over
+  the counter is logged by hand from `/admin/privacy`, and the 30-day clock runs
+  from the day the person asked rather than the day the row was typed.
+- **A closure needs a sentence.** `completed` or `refused` with nothing written
+  down is refused in the data layer — "completed" with nothing behind it is what
+  a log of this kind looks like when it is theatre. Reopening a request clears
+  the handler and the closing stamp, so a row cannot claim to be open and closed.
+- **Consent is events, not a flag.** `consent_records` is append-only: the box
+  that was ticked, the radio card that was chosen, the switch that was turned
+  off, each carrying the wording the person was reading. Withdrawing is a second
+  row, never an edit. The register of wording lives in `src/services/privacy.js`
+  and the suite greps the views for every sentence — so a record cannot quote a
+  sentence the site no longer shows, and every consent checkbox on the site
+  belongs to a notice.
+- **The screen says what each list is right now.** "How many people are on the
+  deal-alert list?" is answered from where the flag actually lives (`users`,
+  `saved_cars`, `saved_searches`), never re-derived by counting log rows
+  backwards; the log answers a different question — what changed lately.
+- **The record keeps who asked.** `data_requests.user_id` is `ON DELETE SET
+  NULL`: closing an account erases the person and leaves the evidence that they
+  asked us to, which is the record the duty is discharged against.
+- **§7.4:** admin and ops hold the desk (`privacy.view` / `privacy.manage`) —
+  a list of people who asked us to delete their data is not a list to hand
+  around, so finance, marketing, inspectors and customers are refused it, and
+  `scripts/smoke-roles.mjs` probes exactly that.
+
+What is still missing from the NDPA row is the **cookie/analytics banner**, which
+is blocked with GA4/Meta on measurement IDs, and consent *withdrawal* for a
+guest who has no account (they write in; the desk logs the event by hand).
+
+One row leaves the list (§18.3). **The list is now 18 rows: 2 buildable in this
+sandbox, 9 blocked on an account, 7 with no home here.**
+
+**Status at `9763e66`:** §5.1's settings screen is finished — the half that
 is not the area list. Business facts, limits and windows, fees and retainers, and
 the channel each message takes are editable at `/admin/settings`, with the
 environment as their default and no deploy in the loop.
@@ -42,8 +82,8 @@ environment as their default and no deploy in the loop.
   database opens onto a screen with a real "changed" badge and a footer that
   reads like a business rather than a placeholder.
 
-One row leaves the list (§5.1 settings). **The list is now 19 rows: 3 buildable
-in this sandbox, 9 blocked on an account, 7 with no home here.**
+One row left the list (§5.1 settings): 19 rows, 3 of them buildable here. The
+§18.3 row has since gone too — see the top of this file.
 
 **Status at `5c28628`:** FR-34 is built — the financing handoff, end to end,
 and the whole module is written so that it cannot read like a lender.
@@ -254,7 +294,6 @@ No external account needed. These are real gaps against the PRD.
 
 | ID | Requirement | What is actually there | What "done" means |
 |---|---|---|---|
-| §18.3 | "Privacy requests actionable in admin" (NDPA) | Self-service works: `/account/export` and account deletion, with the record anonymised (`DELETED-…`). | An admin view of data-subject requests and their handling, so the duty is discharged, not just offered. |
 | §12.2 | MFA for admin roles | Sign-in is phone OTP — one factor, however strong. | TOTP (or WebAuthn) as a second factor for `admin`/`finance`, with recovery codes. |
 | §11 | Turnstile/reCAPTCHA on public forms | Rate limits per route (`src/lib/rate-limit.js`) and server-side validation; no bot challenge. | A site-key-gated invisible challenge, degrading to the current behaviour when unset. |
 
@@ -300,7 +339,10 @@ to have done anything. Each needs an account, keys and (usually) webhook config.
 - Dealer contact info not public — **holds**; dealer name shown, contact routes through Honest Cars.
 - Admin RBAC per §7.4 + audit log — **built**; every cell is probed by `scripts/smoke-roles.mjs`.
 - Sold/expired behaviour + SEO facet rules — **built** (90-day archive, curated facets indexable, raw combos noindex, sitemap curated).
-- NDPA consent records for deal alerts — consent is captured per lead; the admin–visible record and banner are missing (§1, §2).
+- NDPA consent records for deal alerts — **built**. Saving a car files the
+  signup, taking the last one back off records the withdrawal, and the console
+  shows both with the wording the person saw; the cookie/analytics *banner*
+  remains blocked with §2's measurement IDs.
 
 ## 5. Deliberate divergences (not gaps)
 

@@ -32,6 +32,7 @@ const invoiceService = require('../services/invoice');
 const paymentService = require('../services/payments');
 const referralService = require('../services/referrals');
 const financingService = require('../services/financing');
+const privacyService = require('../services/privacy');
 const phone = require('../lib/phone');
 const { helpers } = require('../lib/locals');
 const { sendPage, sendJson, CACHE } = require('../lib/respond');
@@ -520,6 +521,14 @@ router.get('/account/reports/:reference.pdf', auth.requireUser, async (req, res,
 router.get('/account/export', auth.requireUser, async (req, res, next) => {
   try {
     const payload = await db.users.exportData(req.user.id);
+    // §18.3: the right of access is exercised by using the page, so the duty is
+    // discharged the moment the file leaves — and *recorded*, which is what the
+    // console was missing. One row per person per day, so a re-download is not
+    // logged as a second request.
+    const filed = await privacyService
+      .fileSelfService({ type: 'access', user: req.user, ...privacyService.SELF_SERVICE.access, sourcePath: '/account/export' })
+      .catch((error) => ({ ok: false, error: error.message }));
+    if (!filed.ok) console.error(`[privacy] could not file the access request: ${filed.error}`);
     res.status(200);
     res.set('Content-Type', 'application/json; charset=utf-8');
     res.set('Content-Disposition', `attachment; filename="honestcars-account-${req.user.id}.json"`);
@@ -538,6 +547,14 @@ router.post('/api/account/delete', auth.sameOriginOnly, auth.requireUser, async 
       return sendJson(res, { ok: false, error: 'Type “delete” to confirm you want the account closed.' }, { status: 422 });
     }
     await db.analytics.record('account_deleted', { payload: { source: 'account' }, sourcePath: '/account' }).catch(() => {});
+    // §18.3: the request is filed *before* the account goes, because it carries
+    // the person's identity — a record of "someone asked us to delete their
+    // data" that cannot say who asked is not evidence that the duty was
+    // discharged. The row keeps its own copy; the account row is what goes.
+    const filed = await privacyService
+      .fileSelfService({ type: 'erasure', user: req.user, ...privacyService.SELF_SERVICE.erasure, sourcePath: '/account' })
+      .catch((error) => ({ ok: false, error: error.message }));
+    if (!filed.ok) console.error(`[privacy] could not file the erasure request: ${filed.error}`);
     await db.users.deleteAccount(req.user.id);
     auth.clearSessionCookie(res);
     return sendJson(res, { ok: true, redirect: '/?account=deleted' });
@@ -545,6 +562,31 @@ router.post('/api/account/delete', auth.sameOriginOnly, auth.requireUser, async 
     return next(error);
   }
 });
+
+/** How many of this account's saved searches have alerts switched on. */
+async function alertSearchCount(userId) {
+  return (await db.users.savedSearches(userId)).filter((search) => search.alertsEnabled).length;
+}
+
+/**
+ * §18.3 — record the moment a person joins or leaves the deal-alert list. A
+ * toggle inside a list they are already on is not a new agreement, and
+ * switching one of three searches' alerts off is not a withdrawal.
+ */
+async function noteAlertConsent(user, before, after) {
+  if (before === after) return;
+  const joined = before === 0 && after > 0;
+  const left = before > 0 && after === 0;
+  if (!joined && !left) return;
+  await privacyService.recordConsent('deal_alerts', {
+    userId: user.id,
+    phone: user.phone,
+    name: user.name,
+    granted: joined,
+    source: 'saved_search',
+    path: '/account',
+  });
+}
 
 // ---------------------------------------------------------------------------
 // Saved cars (§7.1) — also the target of the “save” button on cards and the VDP
@@ -562,6 +604,21 @@ router.post('/api/account/saved-cars', auth.sameOriginOnly, auth.requireUser, as
     const ids = action === 'remove'
       ? await db.users.removeSavedCar(req.user.id, listingId)
       : await db.users.addSavedCar(req.user.id, listingId, validate.text(body.note, 200) || null);
+
+    // §18.3 — "NDPA consent records exist for deal-alert signups". Saving a car
+    // puts you on the list; taking the last one back off it takes you off. The
+    // event is the *list*, not the tap: unsaving one of five cars is not a
+    // withdrawal, and saving a sixth is not a new agreement.
+    if (action === 'add' ? ids.length === 1 : ids.length === 0) {
+      await privacyService.recordConsent('deal_alerts', {
+        userId: req.user.id,
+        phone: req.user.phone,
+        name: req.user.name,
+        granted: action === 'add',
+        source: 'saved_car',
+        path: '/cars',
+      });
+    }
 
     await db.analytics
       .record(action === 'remove' ? 'saved_car_removed' : 'saved_car_added', {
@@ -583,11 +640,13 @@ router.post('/api/account/saved-searches', auth.sameOriginOnly, auth.requireUser
   try {
     const body = req.body || {};
     const action = validate.oneOf(body.action, ['add', 'delete', 'toggle'], 'add');
+    const alertsBefore = await alertSearchCount(req.user.id);
 
     if (action === 'delete') {
       const id = validate.integer(body.id, { min: 1, fallback: 0 });
       if (!id) return sendJson(res, { ok: false, error: 'That saved search no longer exists.' }, { status: 422 });
       await db.users.deleteSavedSearch(req.user.id, id);
+      await noteAlertConsent(req.user, alertsBefore, await alertSearchCount(req.user.id));
       return sendJson(res, { ok: true, deleted: true });
     }
 
@@ -599,6 +658,7 @@ router.post('/api/account/saved-searches', auth.sameOriginOnly, auth.requireUser
       const priceDrop = body.priceDrop === undefined ? (body.alertsEnabled === undefined ? undefined : Boolean(body.alertsEnabled)) : Boolean(body.priceDrop);
       const newMatch = body.newMatch === undefined ? (body.alertsEnabled === undefined ? undefined : Boolean(body.alertsEnabled)) : Boolean(body.newMatch);
       await db.users.setSearchAlerts(req.user.id, id, { priceDrop, newMatch });
+      await noteAlertConsent(req.user, alertsBefore, await alertSearchCount(req.user.id));
       const [saved] = (await db.users.savedSearches(req.user.id)).filter((row) => row.id === id);
       return sendJson(res, { ok: true, savedSearch: saved || null });
     }
@@ -614,6 +674,8 @@ router.post('/api/account/saved-searches', auth.sameOriginOnly, auth.requireUser
       priceDrop: body.priceDrop !== false,
       newMatch: body.newMatch !== false,
     });
+
+    await noteAlertConsent(req.user, alertsBefore, await alertSearchCount(req.user.id));
 
     await db.analytics
       .record('saved_search_created', {
@@ -647,11 +709,21 @@ router.post('/api/account/profile', auth.sameOriginOnly, auth.requireUser, async
       }
     }
 
-    const user = await db.users.updateProfile(req.user.id, {
-      name,
-      email,
-      marketingOptIn: body.marketingOptIn === undefined ? undefined : Boolean(body.marketingOptIn),
-    });
+    const wanted = body.marketingOptIn === undefined ? undefined : Boolean(body.marketingOptIn);
+    const user = await db.users.updateProfile(req.user.id, { name, email, marketingOptIn: wanted });
+
+    // §18.3: consent is an event, not a flag. When the switch actually moves we
+    // record the event — with the wording of the box the person was looking at
+    // — and withdrawing is a new row rather than an edit of the old one.
+    if (wanted !== undefined && wanted !== Boolean(req.user.marketingOptIn)) {
+      await privacyService.recordConsent('marketing', {
+        userId: req.user.id,
+        phone: user.phone,
+        name: user.name,
+        granted: wanted,
+        path: '/account',
+      });
+    }
 
     return sendJson(res, { ok: true, user: { name: user.name, email: user.email, marketingOptIn: user.marketingOptIn } });
   } catch (error) {

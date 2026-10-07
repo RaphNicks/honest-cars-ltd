@@ -17,6 +17,7 @@
 
 const crypto = require('node:crypto');
 const config = require('../config');
+const privacy = require('./privacy');
 const db = require('../db');
 const phones = require('../lib/phone');
 const roles = require('./roles');
@@ -160,7 +161,7 @@ async function requestCode({ rawPhone, ip, userAgent }) {
   };
 }
 
-async function verifyCode({ rawPhone, code, ip, userAgent, referralCode = null }) {
+async function verifyCode({ rawPhone, code, ip, userAgent, referralCode = null, consent = false }) {
   const phone = normalisePhone(rawPhone);
   if (!phone || !code) return { ok: false, status: 422, error: 'Enter the code we sent you.' };
 
@@ -205,6 +206,21 @@ async function verifyCode({ rawPhone, code, ip, userAgent, referralCode = null }
   await db.users.createSession({ userId: user.id, tokenHash: hashToken(token), expiresAt, ip, userAgent });
 
   await db.analytics.record('otp_verify_succeeded', { payload: { new_account: !user.name }, sourcePath: '/login' }).catch(() => {});
+
+  // §18.3: the sign-in box says "I agree to HonestCars contacting me on this
+  // number about my requests and orders" — service contact, explicitly *not*
+  // marketing. It is recorded only when the box came through, and only on a
+  // sign-in that actually created or completed an account, so the log stays a
+  // record of consent rather than a log of people logging in.
+  if (consent === true) {
+    await privacy.recordConsent('login', {
+      userId: user.id,
+      phone: user.phone,
+      name: user.name,
+      granted: true,
+      path: '/login',
+    });
+  }
 
   // Housekeeping at the one moment we know this person is here: expired and
   // revoked sessions are worthless rows, and this keeps the table from growing

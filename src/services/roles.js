@@ -64,6 +64,13 @@ const MATRIX = {
   'financing.view': ['admin', 'ops', 'finance'],
   'financing.manage': ['admin', 'ops'],
   'referrals.reward': ['admin', 'ops'],
+  // §18.3's privacy desk. §7.4 has no privacy column, so it follows the two
+  // screens nearest to it — the audit log and settings, both admin/ops. A
+  // request log is a list of people who asked us to delete their data, which is
+  // not a list to hand around: ops works the queue, marketing never sees who
+  // asked, and finance reads the ledgers rather than the inbox.
+  'privacy.view': ['admin', 'ops'],
+  'privacy.manage': ['admin', 'ops'],
   'reports.view': ['admin', 'ops', 'finance', 'marketing'],
   // §15.2 marketing dashboard. Read is the CMS-and-marketing column of §7.4
   // (admin, ops, marketing); entering spend is the marketing desk's own job, so

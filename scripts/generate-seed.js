@@ -702,6 +702,10 @@ DELETE FROM settings WHERE setting_key IN ('business.address_note', 'marketing.c
 -- FR-34: financing rows point at leads, listings and partners, so they go first.
 DELETE FROM financing_leads;
 DELETE FROM finance_partners;
+-- §18.3: the request log and the consent events are seed-owned; the accounts
+-- they name are upserted, never deleted.
+DELETE FROM data_requests;
+DELETE FROM consent_records;
 DELETE FROM dealers;
 -- FR-32: the markets and their area lists are seed-owned too.
 DELETE FROM service_areas;
@@ -1526,6 +1530,75 @@ INSERT INTO financing_leads (reference, name, phone, email, lead_id, listing_id,
    'No payslip and no formal employment record — told him the terms a lender will want.',
    (SELECT id FROM \`users\` WHERE phone = '+2348000000002' LIMIT 1),
    '/financing', DATE_SUB(UTC_TIMESTAMP(), INTERVAL 11 DAY));
+
+-- §18.3 — the privacy desk. Three requests between them show every state the
+-- screen has to render honestly:
+--
+--   HC-DSR-000001  the right of access, exercised by using /account/export.
+--                  Filed and completed by the act itself — no human touched it.
+--   HC-DSR-000002  a correction that arrived on WhatsApp and is still open, on
+--                  its 24th day: the clock is visible while there is time left.
+--   HC-DSR-000003  an erasure, completed, with no account on file — which is
+--                  exactly what the row looks like after the account it named
+--                  was deleted (the FK is ON DELETE SET NULL).
+--
+-- The wording quoted in consent_records is the wording on the pages; the test
+-- suite greps the views for each sentence, so these rows cannot drift from what
+-- a customer is actually shown.
+INSERT INTO data_requests (reference, request_type, status, channel, user_id, name, phone, email,
+                           subject, resolution, requested_at, due_at, completed_at, handled_by, source_path, created_at) VALUES
+  ('HC-DSR-000001', 'access', 'completed', 'self_service',
+   (SELECT id FROM \`users\` WHERE phone = '+2348031234567' LIMIT 1),
+   'Ada Okafor', '+2348031234567', 'ada@example.test',
+   'Downloaded their data from /account/export',
+   'Export generated and downloaded immediately (NDPA right of access). No human action needed.',
+   DATE_SUB(UTC_TIMESTAMP(), INTERVAL 4 DAY), DATE_ADD(UTC_TIMESTAMP(), INTERVAL 26 DAY),
+   DATE_SUB(UTC_TIMESTAMP(), INTERVAL 4 DAY), NULL, '/account/export',
+   DATE_SUB(UTC_TIMESTAMP(), INTERVAL 4 DAY)),
+  ('HC-DSR-000002', 'correction', 'in_progress', 'whatsapp', NULL,
+   'Halima Bello', '+2348034440003', NULL,
+   'Says the name on her old enquiry is spelled wrong and wants it fixed on anything we keep',
+   NULL,
+   DATE_SUB(UTC_TIMESTAMP(), INTERVAL 24 DAY), DATE_ADD(UTC_TIMESTAMP(), INTERVAL 6 DAY),
+   NULL, (SELECT id FROM \`users\` WHERE phone = '+2348000000001' LIMIT 1), '/admin/privacy',
+   DATE_SUB(UTC_TIMESTAMP(), INTERVAL 24 DAY)),
+  ('HC-DSR-000003', 'erasure', 'completed', 'self_service', NULL,
+   'Chidi Nwosu', '+2348025000011', NULL,
+   'Closed their account from /account',
+   'Account closed; requests, bookings, orders and leads anonymised in place. Transaction history kept without the person attached (§12.2).',
+   DATE_SUB(UTC_TIMESTAMP(), INTERVAL 30 DAY), UTC_TIMESTAMP(),
+   DATE_SUB(UTC_TIMESTAMP(), INTERVAL 30 DAY), NULL, '/account',
+   DATE_SUB(UTC_TIMESTAMP(), INTERVAL 30 DAY));
+
+-- Consent events: grants and a withdrawal, each carrying the sentence the
+-- person was reading. Halima's pair is the point — withdrawing is a second row,
+-- never an edit of the first, so her history shows what she agreed to and when
+-- she changed her mind.
+INSERT INTO consent_records (user_id, phone, name, purpose, granted, source, path, notice, actor, recorded_by, created_at) VALUES
+  ((SELECT id FROM \`users\` WHERE phone = '+2348031234567' LIMIT 1),
+   '+2348031234567', 'Ada Okafor', 'marketing', 1, 'account', '/account',
+   'Send me deal alerts and new-stock notes on this number or email.',
+   'self', NULL, DATE_SUB(UTC_TIMESTAMP(), INTERVAL 40 DAY)),
+  ((SELECT id FROM \`users\` WHERE phone = '+2348031234567' LIMIT 1),
+   '+2348031234567', 'Ada Okafor', 'deal_alerts', 1, 'saved_car', '/cars',
+   'Price drops and new matches go out on the channel we message you on.',
+   'self', NULL, DATE_SUB(UTC_TIMESTAMP(), INTERVAL 21 DAY)),
+  ((SELECT id FROM \`users\` WHERE phone = '+2348031234567' LIMIT 1),
+   '+2348031234567', 'Ada Okafor', 'lender_share', 1, 'financing', '/financing',
+   'I am happy for Honest Cars to share these details with a lender so they can contact me about this enquiry. Nothing is shared until you send it.',
+   'self', NULL, DATE_SUB(UTC_TIMESTAMP(), INTERVAL 4 DAY)),
+  ((SELECT id FROM \`users\` WHERE phone = '+2348031234567' LIMIT 1),
+   '+2348031234567', 'Ada Okafor', 'service_contact', 1, 'service_form', '/find-my-car',
+   'HonestCars can contact me on WhatsApp about this request. No marketing spam — that is a separate, optional list.',
+   'self', NULL, DATE_SUB(UTC_TIMESTAMP(), INTERVAL 9 DAY)),
+  ((SELECT id FROM \`users\` WHERE phone = '+2348034440003' LIMIT 1),
+   '+2348034440003', 'Halima Bello', 'marketing', 1, 'account', '/account',
+   'Send me deal alerts and new-stock notes on this number or email.',
+   'self', NULL, DATE_SUB(UTC_TIMESTAMP(), INTERVAL 40 DAY)),
+  ((SELECT id FROM \`users\` WHERE phone = '+2348034440003' LIMIT 1),
+   '+2348034440003', 'Halima Bello', 'marketing', 0, 'account', '/account',
+   'Send me deal alerts and new-stock notes on this number or email.',
+   'self', NULL, DATE_SUB(UTC_TIMESTAMP(), INTERVAL 3 DAY));
 
 -- FR-25. Two saved cars: one watched at the price Ada saw (no pending alert),
 -- and one whose price has already moved down since she saved it — which is

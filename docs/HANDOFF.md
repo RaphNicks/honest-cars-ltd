@@ -48,7 +48,8 @@ Every **§9 MUST is built.** The commit trail, most recent first:
 
 | Commit | What it delivered |
 |---|---|
-| *this commit* | **§5.1 settings** — the rest of the screen: business facts, limits, fees, channels |
+| *this commit* | **§18.3 privacy desk** — data-subject requests, the 30-day clock, consent records |
+| `9763e66` | **§5.1 settings** — the rest of the screen: business facts, limits, fees, channels |
 | `b2c08cf` | FR-34 docs — the section, the gates, and the traps it hit |
 | `5c28628` | **FR-34** financing enquiries and the lender handoff |
 | `485bf04` | **FR-30** installable PWA: manifest, generated icons, service worker, `/offline` |
@@ -164,6 +165,69 @@ the DB connection and the auth pepper.
 - `scripts/generate-seed.js` — two changed settings, so a fresh database shows
   the mechanism.
 - `test/settings.test.js` — 17 tests, fixture build and all.
+
+---
+
+## 3a. Just finished: §18.3 the privacy desk (NDPA)
+
+**Built in this commit.** §18.3's acceptance line — "NDPA consent records exist
+for deal-alert signups; privacy requests actionable in admin" — is a claim about
+paperwork, which is the kind of claim software can satisfy on paper and miss in
+fact. So both halves are built against the way they could be false.
+
+**Requests.** §12.2's self-service rights already worked: `/account/export`
+downloads everything and `/api/account/delete` closes the account and anonymises
+its records. What was missing was a *record* that someone asked. Both paths now
+file themselves as rows the moment they happen — `self_service`, already
+`completed`, with the act written down — deduplicated per person per day, so a
+refresh is not a second request. Anything that arrived by WhatsApp, on the phone
+or over the counter is logged by hand at `/admin/privacy`.
+
+**Two rules live in the data layer, not the view:**
+
+- **A closure carries a human sentence.** `completed` or `refused` with nothing
+  written down is refused by `db/privacy.js`. "Completed" with nothing behind it
+  is what a log of this kind looks like when it is theatre. Reopening a request
+  clears the handler and the closing stamp, so a row cannot be both open and
+  closed.
+- **The clock is the person's.** `requested_at` is when they asked — which may be
+  days before the row exists — and `due_at` is 30 days from *that*, stored rather
+  than computed at render time so a request logged late is visibly late.
+
+**Consent is events, not a flag.** `consent_records` is append-only: the box that
+was ticked, the radio card that was chosen, the switch that was turned off, each
+carrying the wording the person was reading. Withdrawing is a second row, never
+an edit, so the history of what somebody agreed to stays intact. The register of
+wording lives in `src/services/privacy.js`; `test/privacy.test.js` greps the
+views for every sentence and requires every consent checkbox on the site to
+belong to a notice — which is how "consent records exist" stays from quietly
+becoming "for the forms somebody remembered".
+
+**The screen answers the obvious question from where the flag lives.**
+"How many people are on the deal-alert list?" is answered from `users`,
+`saved_cars` and `saved_searches`; the log answers a different question — what
+changed in the last 30 days. Deriving the first from the second would be a
+plausible-looking lie.
+
+**Files**
+
+- `db/migrations/028-privacy-desk.sql` + `db/schema.sql` — `consent_records`
+  (with the wording) and `data_requests` (with the clock).
+- `src/db/privacy.js` — the requests, the events, the counts, and the refusal to
+  close without a sentence.
+- `src/services/privacy.js` — the **register of consent notices**, the
+  self-service filing, and the desk view.
+- `src/routes/admin.js` — `GET /admin/privacy`, `/privacy/requests.csv`,
+  `POST /privacy/requests`, `POST /privacy/requests/:id`, audited.
+- `views/pages/admin/privacy.ejs` — the queue, the log form, the consent tables.
+- Hooks: `src/routes/account.js` (export, erasure, marketing switch, saved cars,
+  saved searches), `src/routes/api.js` (every intake form, checkout, financing),
+  `src/routes/auth.js` + `src/services/auth.js` (sign-in), `src/services/roles.js`
+  (`privacy.view` / `privacy.manage`).
+- `scripts/generate-seed.js` — three requests (one open on its 24th day), six
+  consent events including a withdrawal.
+- `test/privacy.test.js` — 17 tests; `scripts/smoke-roles.mjs` probes the desk
+  for every role including the three it must refuse.
 
 ---
 
@@ -546,7 +610,7 @@ other buildable rows).
 ## 5. Gates before any commit
 
 ```bash
-npm test          # 441/441 (17 settings, 24 financing, 15 areas, 16 imports, 12 blog-tags, 11 referrals, 11 pwa …)
+npm test          # 458/458 (17 privacy, 17 settings, 24 financing, 15 areas, 16 imports, 11 referrals, 11 pwa …)
 npm run lint      # type ladder + 18 ES modules / 75 event references
 npm run build:static && npm run crawl && npm run audit:pages
 npm run smoke && npm run smoke:cms      # role matrix + CMS round trip
@@ -594,6 +658,15 @@ who would count and writes nothing).
   (a test that did got away with it until the getter arrived), and do not read one
   at module load: `const perPage = config.listings.perPage` at the top of a file
   freezes the value before `settings.hydrate()` has run.
+- **A consent checkbox that the register does not know about fails the suite.**
+  Add the wording to `NOTICES` in `src/services/privacy.js` *and* keep the
+  sentence in the view byte-identical — the test compares whitespace-collapsed
+  text, so a rewrapped line is fine and a reworded one is not.
+- **Renaming a `purpose` value means three files and a re-seed:** the migration,
+  `db/schema.sql` (whose mirror has its own copy), `db/privacy.js`, the seed, and
+  then `npm run db:seed`. A column that is correct in the schema and wrong in
+  `db/seed.sql` fails as `WARN_DATA_TRUNCATED … at row 4`, which reads like an
+  enum problem rather than a stale seed.
 - **`scripts/generate-seed.js` is one template literal.** Any backtick added
   inside it (`` \`users\` ``, a `` `code` `` sample) must be escaped as `\``, or the
   literal ends early and the next `${...}` becomes a JS syntax error hundreds of
