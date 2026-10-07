@@ -42,7 +42,11 @@ function createApp() {
 
   // --- Security headers (§12.2) --------------------------------------------
   // Note on framing: the site is embedded in a preview iframe in some
-  // environments, so frameguard is off and no frame-ancestors directive is set.
+  // environments, so frameguard is off — and `frame-ancestors` has to be
+  // *unset* explicitly, because helmet adds `frame-ancestors 'self'` by its own
+  // defaults and a preview is served from a different origin, which those
+  // defaults refuse. Unframed is a development affordance: production puts
+  // `'self'` back, because a real site should not be framed by anyone.
   // The CSP still locks scripting to self + the analytics tag.
   app.use(
     helmet({
@@ -57,6 +61,7 @@ function createApp() {
           formAction: ["'self'"],
           baseUri: ["'self'"],
           objectSrc: ["'none'"],
+          frameAncestors: config.isProduction ? ["'self'"] : null,
           // JSON-LD needs 'unsafe-inline' for script-src; every value it emits
           // is escaped in src/services/seo.js and the templates.
         },
