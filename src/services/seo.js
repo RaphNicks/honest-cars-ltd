@@ -117,7 +117,10 @@ function localBusinessSchema() {
     telephone: b.phone,
     email: b.email,
     image: absolute('/og/default.png'),
-    logo: absolute('/img/logo.svg'),
+    // A real, generated, committed file. This used to point at
+    // /img/logo.svg, which was never created — a 404 in the structured data
+    // of every page, invisible because the visible logo is an inline icon.
+    logo: absolute('/icons/icon-512.png'),
     priceRange: '₦₦',
     // FR-32: we run in four markets, and the markup says so. The address is
     // still Port Harcourt — that is where the business sits — while the service

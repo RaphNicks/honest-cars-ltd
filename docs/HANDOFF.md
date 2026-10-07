@@ -48,7 +48,8 @@ Every **§9 MUST is built.** The commit trail, most recent first:
 
 | Commit | What it delivered |
 |---|---|
-| *this commit* | **§12.2 second factor** — TOTP for admin/finance, recovery codes, the challenge gate |
+| *this commit* | **OG cards** — titles wrap and fit instead of clipping; the schema logo stopped 404ing |
+| `4aaa1e4` | **§12.2 second factor** — TOTP for admin/finance, recovery codes, the challenge gate |
 | `fbfa63b` | **§18.3 privacy desk** — data-subject requests, the 30-day clock, consent records |
 | `9763e66` | **§5.1 settings** — the rest of the screen: business facts, limits, fees, channels |
 | `b2c08cf` | FR-34 docs — the section, the gates, and the traps it hit |
@@ -105,7 +106,7 @@ embedded videos. All four clips total 726 KB.
 
 ---
 
-## 3. Earlier: §5.1 settings — the rest of the screen
+## 3z. Earlier: §5.1 settings — the rest of the screen
 
 **Built in this commit.** FR-32 built the market/area half of §5.1's settings
 screen; this is the other half. Business facts, page limits, the sold-car
@@ -169,7 +170,43 @@ the DB connection and the auth pepper.
 
 ---
 
-## 3. Just finished: §12.2 the second factor
+## 3. Just finished: the OG cards that were clipping every title
+
+**Found while answering "are images still missing?"** — the pictures were all
+fine; two things that *point at* pictures were not.
+
+**The card layout clipped text instead of fitting it.** `cardSvg()` drew one
+`<text>` line per field and let librsvg cut whatever ran past the 1200px edge.
+Anything past about thirty characters was chopped mid-word — which is nearly
+every car in stock ("2018 Toyota Land Cruiser Prado" came out as "…Cruiser
+Prad"), and the site-wide fallback card clipped its own headline. A shared link
+is the first thing a customer sees, and it was arriving broken.
+
+The fix measures rather than guesses. Each distinct word is rendered once at
+100px and trimmed to its ink, and every later decision is arithmetic on that
+number — advance widths are linear in font size, and across Inter the error was
+under 0.1%, so a wrap costs one render per word instead of one per candidate
+layout. Titles take the largest size that fits on one line (keeping the card's
+original geometry exactly), then two, then shrink; the subtitle shrinks; the
+badge pill is measured to its label rather than `label.length * 15 + 62`. A
+title that still will not fit is ellipsised, so a preview never shows half a
+word. `test/og.test.js` parses the SVG, measures every `<text>` with the same
+renderer, and fails if any run ends past the edge.
+
+**The structured-data logo was a 404.** `src/services/seo.js` pointed
+`schema.org/Organization.logo` at `/img/logo.svg`, a file that was never
+created — invisible because the visible logo is an inline icon. It now points
+at `/icons/icon-512.png`, which is generated, committed and checked by
+`npm run icons:check`.
+
+**One subtlety worth keeping:** the fallback card is now re-rendered at boot
+rather than only when missing, and the write is skipped when the bytes match.
+A cached PNG from the previous layout would otherwise keep showing the clipped
+headline forever, which is exactly the kind of fix that looks done and is not.
+
+---
+
+## 3a. Just finished: §12.2 the second factor
 
 **Built in this commit.** §12.2 asks for MFA on the admin roles. The reading
 taken here is narrow and deliberate: the two roles that can *move money or grant
@@ -239,7 +276,7 @@ rather than leaving a first-factor foothold open.
 
 ---
 
-## 3a. Just finished: §18.3 the privacy desk (NDPA)
+## 3b. Just finished: §18.3 the privacy desk (NDPA)
 
 **Built in this commit.** §18.3's acceptance line — "NDPA consent records exist
 for deal-alert signups; privacy requests actionable in admin" — is a claim about
@@ -302,7 +339,7 @@ plausible-looking lie.
 
 ---
 
-## 3b. Just finished: FR-34 financing handoff
+## 3c. Just finished: FR-34 financing handoff
 
 **Built in this commit.** FR-34 (COULD): *"financing-lead partner handoff"* — the
 answer to §6.5 step 3, which until now only ever sat in the brief.
@@ -388,7 +425,7 @@ the general channel.
 
 ---
 
-## 3c. Just finished: FR-30 installable PWA
+## 3d. Just finished: FR-30 installable PWA
 
 **Built in this commit.** FR-30 (COULD/P3): *"PWA (installable, offline shell,
 push via web notifications)"* — plus §13.2's *"Offline-tolerant PWA shell COULD:
@@ -447,7 +484,7 @@ gate list below so a renamed asset cannot silently break installability.
 
 ---
 
-## 3d. Just finished: FR-29 instant valuation
+## 3e. Just finished: FR-29 instant valuation
 
 **Built in this commit.** §6.6's last line: *"Instant estimate widget COULD:
 rough band from pricing DB with 'confirm with free human valuation' CTA."*
@@ -485,7 +522,7 @@ from one test can never answer another's question).
 
 ---
 
-## 3e. Just finished: FR-28 referrals
+## 3f. Just finished: FR-28 referrals
 
 **Built in this commit.** §7.1 asked for *"Referrals (personal link + reward
 status)"*. The link and the attribution have existed since migration 007 — the
@@ -535,7 +572,7 @@ happen in the same minute and the queue still gains one row per person.
 
 ---
 
-## 3f. FR-32 multi-city inventory
+## 3g. FR-32 multi-city inventory
 
 **Built in this commit.** FR-32 is *"Multi-city inventory structure (Owerri/Aba/
 Benin) with area switcher"*, COULD/P3 — but the PRD's data model already decided
@@ -599,7 +636,7 @@ harmless while every filter in it was empty, and a 1210 the moment a real filter
 
 ---
 
-## 3g. FR-35 blog enhancements
+## 3h. FR-35 blog enhancements
 
 **Built in this commit.** §6.9 asked for five things on top of the blog that
 existed — author pages, a governed tag taxonomy, a smarter related-posts

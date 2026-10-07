@@ -373,6 +373,15 @@ to have done anything. Each needs an account, keys and (usually) webhook config.
   shows both with the wording the person saw; the cookie/analytics *banner*
   remains blocked with §2's measurement IDs.
 
+## 4b. Fixed 2026-10-07 (were not on this list, found by looking)
+
+| Item | What was wrong | Now |
+|---|---|---|
+| OG cards (§12.4, §14.1) | The card layout drew one `<text>` line per field and let the renderer clip it, so any listing title past ~30 characters was cut mid-word — most of the stock — and the fallback card clipped its own headline. | Text is measured (ink-trimmed at 100px, scaled linearly) and wrapped to fit: one line at 74px where it fits, then two, then smaller; ellipsis rather than a chopped word; the badge pill is measured to its label. `test/og.test.js`. |
+| Structured data logo | `Organization.logo` pointed at `/img/logo.svg`, which was never created — a 404 in the JSON-LD of every page. | `/icons/icon-512.png` — generated, committed, and checked by `npm run icons:check`. |
+
+---
+
 ## 5. Deliberate divergences (not gaps)
 
 - **No frontend build step.** Vanilla ES modules and hand-written CSS by instruction; the "bundle" is a handful of files the lint budgets.
