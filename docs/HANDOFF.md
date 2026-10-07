@@ -48,7 +48,8 @@ Every **§9 MUST is built.** The commit trail, most recent first:
 
 | Commit | What it delivered |
 |---|---|
-| *this commit* | **FR-30** installable PWA: manifest, generated icons, service worker, `/offline` |
+| *this commit* | **FR-34** financing enquiries and the lender handoff |
+| `485bf04` | **FR-30** installable PWA: manifest, generated icons, service worker, `/offline` |
 | `c680d51` | **FR-29** instant valuation widget on /sell-swap, from the price-intel bands |
 | `d1b1da0` | **FR-28** referrals: who came from whom, and the reward status behind it |
 | `c974792` | **FR-32** multi-city inventory + area switcher + `/admin/settings` area manager |
@@ -100,7 +101,93 @@ embedded videos. All four clips total 726 KB.
 
 ---
 
-## 3. Just finished: FR-30 installable PWA
+## 3. Just finished: FR-34 financing handoff
+
+**Built in this commit.** FR-34 (COULD): *"financing-lead partner handoff"* — the
+answer to §6.5 step 3, which until now only ever sat in the brief.
+
+**The honesty rule, first, because everything else follows from it**
+
+There is **no rate, no APR, no approval and no "you qualify" anywhere** in the
+service, the page, the messages or the console. What `plan()` does is arithmetic
+the customer can check themselves:
+
+```
+price − down payment = the gap that has to be financed
+gap ÷ months         = what the principal alone costs per month
+```
+
+A payment that does not cover the principal says *"this plan does not add up
+yet"* and names the three levers (bigger down payment, longer tenor, a monthly
+closer to the principal figure). A price fully covered by the down payment is
+answered *"you do not need financing"*. Every answer carries the caveat: *"This
+is arithmetic, not an offer. No credit decision has been made, and no rate is
+implied."* `test/financing.test.js` fails if that ever stops being true.
+
+**What shipped**
+
+- **`db/migrations/026-financing-handoff.sql`** — `finance_partners` (empty by
+  design: the list is ops') and `financing_leads`. `leads.type` gains
+  `'financing'`, so the enquiry is also an inbox item. Reference
+  `HC-FIN-######`, allocated with a retry on the unique key. The `plan` column
+  stores the exact sentences the customer was shown, so a later dispute is
+  answered from the record rather than from memory.
+  **`db/schema.sql` is mirrored — new tables go in both.**
+- **`src/services/financing.js`** — `plan()`, `capture()`, `route()`,
+  `outcome()`, `accountView()`, `desk()`. `READINESS` is the list of what a
+  Nigerian lender usually asks for, phrased as wording rather than a guarantee.
+- **`src/routes/financing.js` + `views/pages/financing.ejs`** — the public page.
+  It works with JavaScript off (a real form); with JavaScript on,
+  `public/js/financing.js` posts to `/api/financing/plan` and prints the
+  server's own sentences back, so there is **one** implementation of the
+  arithmetic and the page cannot disagree with the record. A named car
+  (`?car=`) is priced from the database, gets canonical `/financing` and
+  `noindex,follow`, and is served through `sendPrebuiltOrRender('/financing?car=')`
+  — the deliberately-different path is what stops the hub's prebuilt HTML being
+  handed to a car URL.
+- **The §6.5 handoff** (`src/routes/api.js`) — a concierge brief with
+  `brief.financing === 'yes'` creates the financing lead itself, linked to the
+  `service_request`, using the brief's budget as the amount, and the response
+  carries `financing: { reference, status }` for the success screen. The
+  customer does not fill in a second form. `public/js/service-forms.js` copies
+  the radio's value into the brief — **a radio group contributes nothing to
+  `FormData` when unchecked, and a missing key would silently mean "no"**.
+- **`/admin/financing`** (`src/routes/admin.js`, `views/pages/admin/financing.ejs`) —
+  the partner book (add, activate, switch off) and the queue, with the two
+  states that need acting on kept apart: *waiting on us* (no partner yet) and
+  *routed, no answer yet*. Capabilities `financing.view` (admin/ops/finance) and
+  `financing.manage` (admin/ops); audit actions `financing.partner_added`,
+  `financing.routed`, `financing.<status>`.
+- **`notify.send` gains `mustDeliver`** (`src/services/notify.js`) — the one
+  cross-cutting change. Where the message *is* the handoff, a console sink is not
+  a delivery: it prints, records `skipped` **with the text intact**, and returns
+  `ok:false`. So the console says *"recorded as routed to X, but nothing was
+  delivered"* instead of *"they have the details"*, and the row carries a
+  WhatsApp deep link so ops can send it by hand. A switched-off partner cannot be
+  routed to at all.
+- **`/account`** shows the customer their own enquiry — reference, car, figures,
+  who it went to, and one sentence per state (`STATUS_SENTENCE`) that never says a
+  lender has answered when they have not. The message and the account page share
+  that sentence, so they cannot drift.
+- **Seed** — two lenders (one switched off) and four enquiries, one per state,
+  one linked to the concierge flow, one owned by the demo customer. The VDP
+  carries a link (`/financing?car=<slug>`) with an honest sentence.
+- **`scripts/generate-seed.js` gained `stockAt(n)`** — listing lookups now
+  resolve from the generator's own list instead of a literal stock number. City
+  prefixes move with the market cycle (FR-32), and a literal
+  `'HC-PH-0018'` silently attaches a lead to **nothing** the moment they do.
+  This closed a live bug: seeded leads were pointing at `NULL` listings.
+- **`public/sw.js`** — the module joins the shell; `/js/admin.js` and
+  `/js/dealer.js` leave it, because `/admin` and `/dealer` are bypassed by the
+  worker and those bytes were paid by every visitor for nothing (the FR-30 test
+  already documents them as deliberately absent).
+
+**Config:** `NOTIFY_CHANNEL_FINANCING` in `.env.example` — empty, so it follows
+the general channel.
+
+---
+
+## 3b. Just finished: FR-30 installable PWA
 
 **Built in this commit.** FR-30 (COULD/P3): *"PWA (installable, offline shell,
 push via web notifications)"* — plus §13.2's *"Offline-tolerant PWA shell COULD:
@@ -159,7 +246,7 @@ gate list below so a renamed asset cannot silently break installability.
 
 ---
 
-## 3b. Just finished: FR-29 instant valuation
+## 3c. Just finished: FR-29 instant valuation
 
 **Built in this commit.** §6.6's last line: *"Instant estimate widget COULD:
 rough band from pricing DB with 'confirm with free human valuation' CTA."*
@@ -197,7 +284,7 @@ from one test can never answer another's question).
 
 ---
 
-## 3c. Just finished: FR-28 referrals
+## 3d. Just finished: FR-28 referrals
 
 **Built in this commit.** §7.1 asked for *"Referrals (personal link + reward
 status)"*. The link and the attribution have existed since migration 007 — the
@@ -247,7 +334,7 @@ happen in the same minute and the queue still gains one row per person.
 
 ---
 
-## 3d. FR-32 multi-city inventory
+## 3e. FR-32 multi-city inventory
 
 **Built in this commit.** FR-32 is *"Multi-city inventory structure (Owerri/Aba/
 Benin) with area switcher"*, COULD/P3 — but the PRD's data model already decided
@@ -311,7 +398,7 @@ harmless while every filter in it was empty, and a 1210 the moment a real filter
 
 ---
 
-## 3e. FR-35 blog enhancements
+## 3f. FR-35 blog enhancements
 
 **Built in this commit.** §6.9 asked for five things on top of the blog that
 existed — author pages, a governed tag taxonomy, a smarter related-posts
@@ -393,8 +480,8 @@ other buildable rows).
 ## 5. Gates before any commit
 
 ```bash
-npm test          # 400/400 (15 areas, 16 imports, 12 blog-tags, 11 referrals, 11 pwa …)
-npm run lint      # type ladder + 17 ES modules / 75 event references
+npm test          # 424/424 (24 financing, 15 areas, 16 imports, 12 blog-tags, 11 referrals, 11 pwa …)
+npm run lint      # type ladder + 18 ES modules / 75 event references
 npm run build:static && npm run crawl && npm run audit:pages
 npm run smoke && npm run smoke:cms      # role matrix + CMS round trip
 npm run images:check && npm run videos:check && npm run icons:check
@@ -432,6 +519,18 @@ who would count and writes nothing).
 
 - The referenced Next.js repo (`RaphNicks/honest-cars-ltd` @ `c765c8a`,
   `src/app/globals.css`) **does not exist**; the PDF is the design source of truth.
+- **A radio group contributes nothing to `FormData` when unchecked.** The
+  concierge's "do you need financing?" is a radio pair, so `buildPayload` has to
+  copy `values.financing` across explicitly — a missing key reads as "no" and the
+  answer is silently dropped. (Pre-filling one is the same trap from the other
+  side: set `checked` per radio, never `.value`.)
+- **Seed lookups by stock number must go through `stockAt(n)`.** The city prefix
+  follows the market cycle (FR-32), so a literal `'HC-PH-0018'` in a subquery
+  returns `NULL` the moment that car moves to Benin — and the lead it was meant to
+  attach to is seeded with no car at all, silently.
+- **`INSERT … SET ?` is invalid under `pool.execute`** — explicit column list plus
+  `COLUMNS.map(() => '?')`. And MySQL 5.7 has no `RETURNING`; `::SIGNED` is
+  Postgres.
 - `honestcarsltd.com` does not resolve; no headless browser is available.
 - Two consecutive pushes to this branch can non-fast-forward:
   `git fetch origin arena/01a0f7df-honest-cars-ltd` + `git reset --mixed FETCH_HEAD`,
