@@ -46,6 +46,7 @@ const referralService = require('../services/referrals');
 const financingService = require('../services/financing');
 const settingsService = require('../services/settings');
 const privacyService = require('../services/privacy');
+const mfaService = require('../services/mfa');
 const csv = require('../lib/csv');
 const { sendPage, CACHE } = require('../lib/respond');
 
@@ -76,6 +77,7 @@ const PATHS = {
   referrals: `${HOME}/referrals`,
   financing: `${HOME}/financing`,
   privacy: `${HOME}/privacy`,
+  security: `${HOME}/security`,
 };
 
 /** Navigation, filtered by what this role may actually open (§7.4). */
@@ -103,6 +105,9 @@ const NAV = [
   { href: PATHS.financing, label: 'Financing', icon: 'scale', capability: 'financing.view' },
   { href: PATHS.settings, label: 'Settings', icon: 'cog', capability: 'settings.manage' },
   { href: PATHS.privacy, label: 'Privacy', icon: 'shield', capability: 'privacy.view' },
+  // Every member of staff has a second factor to look after, so this one is in
+  // everybody's nav — it is their own account, not a module.
+  { href: PATHS.security, label: 'My security', icon: 'lock', capability: 'staff.security' },
 ];
 
 function navFor(user) {
@@ -2667,5 +2672,219 @@ router.post('/privacy/requests/:id', auth.requireStaff('privacy.manage'), auth.s
     return next(error);
   }
 });
+
+// ---------------------------------------------------------------------------
+// §12.2 — the second factor (MFA for admin roles)
+//
+// The screen a person uses to put a second factor on their own account, and the
+// only screen a required role can reach until it has one. It shows the state
+// plainly — on, not on, how many recovery codes are left — because the failure
+// mode of a screen like this is convincing someone they are protected when the
+// enrolment never finished.
+// ---------------------------------------------------------------------------
+router.get('/security', auth.requireStaff('staff.security'), async (req, res, next) => {
+  try {
+    const view = await mfaService.view(req.user);
+    return await page(req, res, {
+      view: 'admin/security',
+      active: PATHS.security,
+      title: 'My security',
+      description: 'The second factor on your account, and the recovery codes that get you back in without it.',
+      data: {
+        ...view,
+        coverage: roles.can(req.user.role, 'users.manage') ? await mfaService.coverage() : null,
+        roleLabels: roles.ROLE_LABELS,
+        setup: req.query.setup === '1' ? await mfaService.beginEnrolment(req.user) : null,
+        issuer: mfaService.ISSUER,
+      },
+    });
+  } catch (error) {
+    return next(error);
+  }
+});
+
+/** Step one: mint a secret and show it. Nothing is confirmed yet. */
+router.post('/security/begin', auth.requireStaff('staff.security'), auth.sameOriginOnly, async (req, res, next) => {
+  const back = PATHS.security;
+  try {
+    const view = await mfaService.view(req.user);
+    if (view.enrolled) return done(res, back, 'You already have a second factor. Turn it off first to set up a new phone.', { error: true });
+    await mfaService.beginEnrolment(req.user);
+    return res.redirect(303, `${back}?setup=1`);
+  } catch (error) {
+    return next(error);
+  }
+});
+
+/** Step two: prove a code from the new secret. Only then is it "on". */
+router.post('/security/confirm', auth.requireStaff('staff.security'), auth.sameOriginOnly, async (req, res, next) => {
+  const back = PATHS.security;
+  try {
+    const result = await mfaService.confirmEnrolment(req.user, (req.body || {}).code);
+    if (!result.ok) return done(res, `${back}?setup=1`, result.error, { error: true });
+
+    // A second factor switched on while three devices stay signed in protects
+    // nothing, so every other session goes now.
+    await db.users.revokeAllForUser(req.user.id);
+    const fresh = await mintSession(req, res);
+    await db.users.clearSessionMfa(fresh);
+
+    await admin
+      .recordAudit({
+        actorId: req.user.id,
+        action: 'mfa.enrolled',
+        entity: 'user',
+        entityId: req.user.id,
+        detail: { role: req.user.role, recovery_codes: result.count, other_sessions_revoked: true },
+      })
+      .catch(() => {});
+
+    // Rendered, not redirected: the recovery codes are credentials, and a
+    // credential in a query string is a credential in the browser history, the
+    // access log and the next request's Referer. This response is the only
+    // place they will ever exist in plaintext.
+    return renderSecurity(req, res, {
+      freshCodes: result.recoveryCodes,
+      ok: `Two-step sign-in is on, and every other device was signed out. Write these ${result.count} recovery codes down now — this is the only time they are shown.`,
+    });
+  } catch (error) {
+    return next(error);
+  }
+});
+
+/** Fresh recovery codes. The old sheet stops working the moment this runs. */
+router.post('/security/recovery', auth.requireStaff('staff.security'), auth.sameOriginOnly, async (req, res, next) => {
+  const back = PATHS.security;
+  try {
+    const result = await mfaService.regenerateRecoveryCodes(req.user, (req.body || {}).code);
+    if (!result.ok) return done(res, back, result.error, { error: true });
+    await admin
+      .recordAudit({
+        actorId: req.user.id,
+        action: 'mfa.recovery_regenerated',
+        entity: 'user',
+        entityId: req.user.id,
+        detail: { count: result.count },
+      })
+      .catch(() => {});
+    return renderSecurity(req, res, {
+      freshCodes: result.codes,
+      ok: `${result.count} fresh recovery codes — the old sheet has stopped working. This is the only time they are shown.`,
+    });
+  } catch (error) {
+    return next(error);
+  }
+});
+
+/** Switching it off needs proof. A click alone would be the hole in the door. */
+router.post('/security/disable', auth.requireStaff('staff.security'), auth.sameOriginOnly, async (req, res, next) => {
+  const back = PATHS.security;
+  try {
+    if (mfaService.requiresMfa(req.user.role)) {
+      return done(
+        res,
+        back,
+        `${roles.ROLE_LABELS[req.user.role] || req.user.role} can move money or grant roles, so §12.2 keeps a second factor on it. Ask an admin if you need to move to a new phone — that is what the recovery codes are for.`,
+        { error: true },
+      );
+    }
+    const result = await mfaService.disable(req.user, (req.body || {}).code);
+    if (!result.ok) return done(res, back, result.error, { error: true });
+    await admin
+      .recordAudit({
+        actorId: req.user.id,
+        action: 'mfa.disabled',
+        entity: 'user',
+        entityId: req.user.id,
+        detail: { via: result.via, self: true },
+      })
+      .catch(() => {});
+    return done(res, back, `Two-step sign-in is off, and the recovery codes went with it. Turned off with your ${result.via === 'recovery' ? 'recovery code' : 'authenticator code'}.`);
+  } catch (error) {
+    return next(error);
+  }
+});
+
+/** An admin turning the factor off for someone else — the lost-phone path. */
+router.post('/staff/:id/mfa/off', auth.requireStaff('users.manage'), auth.sameOriginOnly, async (req, res, next) => {
+  const back = PATHS.staff;
+  try {
+    const id = Number.parseInt(req.params.id, 10);
+    const target = Number.isFinite(id) ? await db.users.findById(id) : null;
+    if (!target) return done(res, back, 'Unknown account.', { error: true });
+    if (!target.mfaEnrolled && !target.mfaPending) return done(res, back, `${target.name || target.phone} has no second factor to remove.`, { error: true });
+
+    await db.users.revokeAllForUser(target.id);
+    await db.mfa.disable(target.id);
+    await admin
+      .recordAudit({
+        actorId: req.user.id,
+        action: 'mfa.reset_for_user',
+        entity: 'user',
+        entityId: target.id,
+        detail: { role: target.role, reason: validate.text(req.body.reason, 160) || null, sessions_revoked: true },
+      })
+      .catch(() => {});
+    const why = validate.text(req.body.reason, 160);
+    return done(
+      res,
+      back,
+      `${target.name || target.phone} signs in with a code only, until they set a new factor.${why ? ` Reason recorded: ${why}.` : ''}`,
+    );
+  } catch (error) {
+    return next(error);
+  }
+});
+
+/**
+ * Render the security screen itself (rather than redirecting to it) so a
+ * one-shot secret never leaves this response. Shares every local with the GET.
+ */
+async function renderSecurity(req, res, { freshCodes = [], ok = null }) {
+  const view = await mfaService.view(req.user);
+  // `page()` reads the flash from the querystring; this render has none, so the
+  // one-line result is handed to it the same way a redirect would have.
+  const previous = req.query.ok;
+  if (ok) req.query.ok = ok;
+  try {
+    return await page(req, res, {
+    view: 'admin/security',
+    active: PATHS.security,
+    title: 'My security',
+    description: 'The second factor on your account, and the recovery codes that get you back in without it.',
+    data: {
+      ...view,
+      coverage: roles.can(req.user.role, 'users.manage') ? await mfaService.coverage() : null,
+      roleLabels: roles.ROLE_LABELS,
+      setup: null,
+      freshCodes,
+      issuer: mfaService.ISSUER,
+      },
+    });
+  } finally {
+    if (ok) req.query.ok = previous;
+  }
+}
+
+/**
+ * Mint a session for the person making this request and hand the new cookie
+ * back. Used after enrolment, where the old session (and every other one) has
+ * just been revoked — the alternative is signing someone out the moment they
+ * finish securing their account, which is a fine way to teach people not to.
+ */
+async function mintSession(req, res) {
+  const token = auth.newSessionToken();
+  const expiresAt = new Date(Date.now() + config.auth.sessionDays * 86_400_000);
+  await db.users.createSession({
+    userId: req.user.id,
+    tokenHash: auth.hashToken(token),
+    expiresAt,
+    ip: req.ip,
+    userAgent: req.get('user-agent'),
+  });
+  auth.setSessionCookie(res, token, { expiresAt });
+  const row = await db.users.findSession(auth.hashToken(token));
+  return row.sessionId;
+}
 
 module.exports = { router };

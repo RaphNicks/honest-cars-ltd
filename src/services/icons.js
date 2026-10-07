@@ -30,6 +30,7 @@ const PATHS = {
   chart: '<path d="M4 20V6"/><path d="M10 20V10"/><path d="M16 20v-7"/><path d="M22 20H2"/>',
   inbox: '<path d="M3 12h4l2 3h6l2-3h4"/><path d="M5 5h14l2 7v7H3v-7l2-7Z"/>',
   key: '<circle cx="8" cy="14" r="4"/><path d="m11 11 8-8"/><path d="m16 6 2 2"/><path d="m19 3 2 2"/>',
+  lock: '<rect x="4.5" y="10.5" width="15" height="10" rx="2"/><path d="M8 10.5V8a4 4 0 0 1 8 0v2.5"/><path d="M12 14.5v2.5"/>',
   check: '<path d="m5 13 4 4 10-11"/>',
   checkCircle: '<circle cx="12" cy="12" r="9"/><path d="m8 12 3 3 5-6"/>',
   clock: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3.5 2"/>',

@@ -35,6 +35,7 @@ const areas = require('./areas');
 const referrals = require('./referrals');
 const financing = require('./financing');
 const privacy = require('./privacy');
+const mfa = require('./mfa');
 const settings = require('./settings');
 const leads = require('./leads');
 const analytics = require('./analytics');
@@ -69,6 +70,7 @@ module.exports = {
   referrals,
   financing,
   privacy,
+  mfa,
   settings,
   leads,
   analytics,

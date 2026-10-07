@@ -1776,3 +1776,37 @@ body[data-scroll-locked='true'] { overflow: hidden; }
   text-decoration: underline;
   cursor: pointer;
 }
+
+/* §12.2 — recovery codes, shown once. Readable aloud and on paper: tabular
+   digits, generous spacing, and no wrapping mid-code. */
+.recovery-codes {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: var(--space-1);
+  list-style: none;
+  padding: var(--space-2);
+  margin: var(--space-1) 0 0;
+  background: var(--green-08);
+  border-radius: var(--radius);
+}
+
+.recovery-codes li {
+  font-size: var(--text-20);
+  letter-spacing: 0.06em;
+  font-weight: 600;
+  color: var(--honest-navy);
+}
+
+/* The enrolment secret: a key someone types into an app, so it wraps in groups
+   rather than mid-group and stays readable at arm's length. */
+.setup-secret {
+  font-size: var(--text-20);
+  letter-spacing: 0.08em;
+  font-weight: 600;
+  background: var(--colour-surface-sunken, #F7FAFC);
+  border: 1px dashed var(--colour-line, #D8E0E8);
+  border-radius: var(--radius);
+  padding: var(--space-2);
+  margin: var(--space-1) 0;
+  word-spacing: 0.3em;
+}

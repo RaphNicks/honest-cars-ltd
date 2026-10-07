@@ -18,6 +18,7 @@
 const crypto = require('node:crypto');
 const config = require('../config');
 const privacy = require('./privacy');
+const mfa = require('./mfa');
 const db = require('../db');
 const phones = require('../lib/phone');
 const roles = require('./roles');
@@ -201,9 +202,14 @@ async function verifyCode({ rawPhone, code, ip, userAgent, referralCode = null, 
     };
   }
 
+  // §12.2: an account with a confirmed second factor gets a session that has
+  // passed the first one only. It can reach the challenge screen and nothing
+  // else — no page, no API, no console module reads it as authenticated.
+  const mfaPending = mfa.mustChallenge(user);
+
   const token = newSessionToken();
   const expiresAt = new Date(Date.now() + config.auth.sessionDays * 86_400_000);
-  await db.users.createSession({ userId: user.id, tokenHash: hashToken(token), expiresAt, ip, userAgent });
+  await db.users.createSession({ userId: user.id, tokenHash: hashToken(token), expiresAt, ip, userAgent, mfaPending });
 
   await db.analytics.record('otp_verify_succeeded', { payload: { new_account: !user.name }, sourcePath: '/login' }).catch(() => {});
 
@@ -227,7 +233,7 @@ async function verifyCode({ rawPhone, code, ip, userAgent, referralCode = null, 
   // forever without a scheduler (§12.2).
   db.users.pruneSessions().catch(() => {});
 
-  return { ok: true, user, token, expiresAt };
+  return { ok: true, user, token, expiresAt, mfaPending };
 }
 
 // ---------------------------------------------------------------------------
@@ -273,7 +279,15 @@ async function attachUser(req, res, next) {
     const session = await db.users.findSession(hashToken(token));
     if (session && session.user.status === 'active') {
       req.user = session.user;
-      req.session = { id: session.sessionId, expiresAt: session.expiresAt, token };
+      req.session = {
+        id: session.sessionId,
+        expiresAt: session.expiresAt,
+        token,
+        // §12.2: a session that has passed the first factor and not the second
+        // is a real session with no authority. Every gate below reads this.
+        mfaPending: Boolean(session.mfaPending),
+        mfaAttempts: session.mfaAttempts || 0,
+      };
       res.locals.user = session.user;
       return next();
     }
@@ -292,8 +306,92 @@ async function attachUser(req, res, next) {
   }
 }
 
+/**
+ * §12.2 — a session that has cleared the one-time code but not the second
+ * factor. It exists so the challenge page has something to attach to; it opens
+ * nothing else.
+ */
+function isMfaPending(req) {
+  return Boolean(req.user && req.session && req.session.mfaPending);
+}
+
+/** Send a half-signed-in session to the challenge, remembering where they were going. */
+function mfaChallenge(req, res) {
+  const wantsJson = req.path.startsWith('/api/') || (req.get('accept') || '').includes('application/json');
+  if (wantsJson) {
+    return res.status(401).json({ ok: false, error: 'Two-step sign-in: enter the code from your authenticator app.', mfa: true });
+  }
+  const target = encodeURIComponent(req.originalUrl || '/account');
+  // A redirect whose target names the page someone was trying to reach is not
+  // for a shared cache to keep.
+  res.set('Cache-Control', 'private, no-store, no-cache, must-revalidate');
+  return res.redirect(302, `/login/mfa?next=${target}`);
+}
+
+/**
+ * §12.2 — the whole-request gate, applied before any route.
+ *
+ * Two rules, and both of them have exactly one door so nobody is trapped:
+ *
+ *   • a required role without a second factor may reach the enrolment screen
+ *     and nothing else — a wall with no door would mean a promoted account is
+ *     simply locked out of its own console;
+ *   • a session waiting on the second factor may reach the challenge and
+ *     nothing else.
+ *
+ * Anything that is not an HTML page and not an API call (fonts, CSS, the
+ * manifest, the service worker) is left alone: a half-signed-in session has no
+ * authority, so there is nothing to protect there, and blocking them would just
+ * render a broken sign-in screen.
+ */
+/**
+ * The paths an un-enrolled required role may still use: the screen that fixes
+ * the problem, and the posts it makes. Both gates read this one function, so
+ * the person who has to enrol can always reach the page that lets them — a
+ * second gate that forgot the exception would bounce them at the door they
+ * were just sent to.
+ */
+/** The path as the visitor typed it: inside a mounted router `req.path` drops
+ *  the mount point, and `/security` is not the page anyone asked for. */
+function fullPath(req) {
+  return `${req.baseUrl || ''}${req.path || ''}` || '/';
+}
+
+function mfaEnrolmentOpen(path) {
+  return path === '/admin/security' || path.startsWith('/admin/security/');
+}
+
+function mfaGate(req, res, next) {
+  if (!req.user) return next();
+  const path = req.path;
+
+  // The doors. `/login` itself is open so someone can abandon and start again.
+  const OPEN = ['/login', '/login/mfa', '/api/auth/mfa', '/api/auth/logout', '/api/auth/otp', '/api/auth/verify'];
+  if (OPEN.includes(path)) return next();
+  if (/^\/(css|js|fonts|img|video|icons)\//.test(path) || path === '/manifest.webmanifest' || path === '/sw.js' || path === '/favicon.svg') {
+    return next();
+  }
+
+  if (isMfaPending(req)) return mfaChallenge(req, res);
+
+  if (mfa.mustEnrol(req.user) && !mfaEnrolmentOpen(path) && !path.startsWith('/api/account/')) {
+    const wantsJson = path.startsWith('/api/') || (req.get('accept') || '').includes('application/json');
+    if (wantsJson) {
+      return res.status(403).json({
+        ok: false,
+        error: 'Your role needs two-step sign-in before this works. Set it up at /admin/security.',
+        mfaEnrolmentRequired: true,
+      });
+    }
+    return res.redirect(302, `/admin/security?err=${encodeURIComponent('Your role can move money or grant roles, so §12.2 asks for a second factor. Set it up here and the console opens.')}`);
+  }
+
+  return next();
+}
+
 /** Gate a page behind a login. HTML redirects to /login?next=…, APIs get 401. */
 function requireUser(req, res, next) {
+  if (isMfaPending(req)) return mfaChallenge(req, res);
   if (req.user) return next();
   const wantsJson = req.path.startsWith('/api/') || (req.get('accept') || '').includes('application/json');
   if (wantsJson) return res.status(401).json({ ok: false, error: 'Sign in to continue.' });
@@ -333,6 +431,10 @@ function requireStaff(options = {}) {
     if (!req.user) {
       const target = encodeURIComponent(req.originalUrl || '/admin');
       return res.redirect(302, `/login?next=${target}`);
+    }
+    if (isMfaPending(req)) return mfaChallenge(req, res);
+    if (mfa.mustEnrol(req.user) && !mfaEnrolmentOpen(fullPath(req))) {
+      return res.redirect(302, `/admin/security?err=${encodeURIComponent('Set up two-step sign-in first — this role can move money or grant roles.')}`);
     }
     if (!roles.isStaff(req.user.role)) return forbidden(req, res);
     if (capability && !roles.can(req.user.role, capability)) return forbidden(req, res);
@@ -418,6 +520,10 @@ module.exports = {
   requestCode,
   verifyCode,
   attachUser,
+  mfaGate,
+  mfaEnrolmentOpen,
+  mfaChallenge,
+  isMfaPending,
   requireUser,
   sameOriginOnly,
   setSessionCookie,

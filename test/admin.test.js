@@ -18,7 +18,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 
-const { dbAvailable, startTestServer, sweepOrphanAudit } = require('./helpers');
+const { dbAvailable, startTestServer, sweepOrphanAudit, enrolMfa, completeMfa } = require('./helpers');
 const roles = require('../src/services/roles');
 
 let available = false;
@@ -107,6 +107,9 @@ async function createAccount(role, label) {
     'active',
   ]);
   const row = await db.queryOne('SELECT id FROM `users` WHERE phone = ? LIMIT 1', [canonical(phone)]);
+  // §12.2: `admin` and `finance` cannot use the console without a second
+  // factor, so the fixture has one — the state a real member of staff is in.
+  if (roles.MFA_ROLES.includes(role)) await enrolMfa(row.id);
   const client = newClient();
   const otp = await client.request('/api/auth/otp', { method: 'POST', body: { phone } });
   assert.equal(otp.status, 200, `OTP request failed for ${label}: ${otp.text}`);
@@ -115,6 +118,10 @@ async function createAccount(role, label) {
     body: { phone, code: otp.json.devCode },
   });
   assert.equal(verify.status, 200, `sign-in failed for ${label}: ${verify.text}`);
+  if (roles.MFA_ROLES.includes(role)) {
+    const finished = await completeMfa(client, { phone });
+    assert.equal(finished.status, 200, `second factor failed for ${label}: ${finished.text}`);
+  }
   return { id: row.id, phone, role, client };
 }
 

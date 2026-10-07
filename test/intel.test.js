@@ -22,7 +22,8 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 
-const { dbAvailable, startTestServer } = require('./helpers');
+const { dbAvailable, startTestServer, enrolMfa, completeMfa } = require('./helpers');
+const roles = require('../src/services/roles');
 
 let available = false;
 let ctx;
@@ -105,6 +106,8 @@ async function createAccount(role, label) {
     'active',
   ]);
   const row = await db.queryOne('SELECT id FROM `users` WHERE phone = ? LIMIT 1', [canonical(phone)]);
+  // §12.2 — `admin` and `finance` carry a second factor before they can work.
+  if (roles.MFA_ROLES.includes(role)) await enrolMfa(row.id);
   const client = newClient();
   const otp = await client.request('/api/auth/otp', { method: 'POST', body: { phone } });
   assert.equal(otp.status, 200, `OTP failed: ${otp.text}`);
@@ -113,6 +116,10 @@ async function createAccount(role, label) {
     body: { phone, code: JSON.parse(otp.text).devCode },
   });
   assert.equal(verify.status, 200, `sign-in failed: ${verify.text}`);
+  if (roles.MFA_ROLES.includes(role)) {
+    const finished = await completeMfa(client, { phone });
+    assert.equal(finished.status, 200, `second factor failed: ${finished.text}`);
+  }
   return { id: row.id, role, client };
 }
 

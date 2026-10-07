@@ -23,7 +23,8 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 
-const { dbAvailable, startTestServer, sweepOrphanAudit } = require('./helpers');
+const { dbAvailable, startTestServer, sweepOrphanAudit, enrolMfa, completeMfa } = require('./helpers');
+const roles = require('../src/services/roles');
 
 let available = false;
 let ctx;
@@ -121,8 +122,15 @@ async function makeOrder({ phone, name, status = 'paid', totalKobo = 4500000 }) 
 /** A throwaway staff account: the role is granted by SQL, then we sign in. */
 async function signInAsRole(role, label) {
   const staff = await makeUser({ name: label, role });
+  // §12.2: `admin` and `finance` carry a second factor, so a fixture with one of
+  // those roles is enrolled before it signs in — exactly as a real account is.
+  if (roles.MFA_ROLES.includes(role)) await enrolMfa(staff.id);
   const verify = await signIn(staff.client, staff.phone);
   assert.equal(verify.status, 200, `sign-in failed for ${role}: ${verify.text}`);
+  if (roles.MFA_ROLES.includes(role)) {
+    const finished = await completeMfa(staff.client, { phone: staff.phone });
+    assert.equal(finished.status, 200, `second factor failed for ${role}: ${finished.text}`);
+  }
   return staff.client;
 }
 

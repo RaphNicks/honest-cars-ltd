@@ -109,6 +109,10 @@ async function customerClient(phone) {
 async function staffClient(phone, role) {
   const user = await db.users.upsertByPhone({ phone });
   await db.query('UPDATE `users` SET role = ? WHERE id = ?', [role, user.id]);
+  // §12.2: a fixture holding a required role carries a second factor, or the
+  // gate sends it to the enrolment screen — which this suite tests on purpose
+  // elsewhere, and not here.
+  if (require('../src/services/roles').MFA_ROLES.includes(role)) await require('./helpers').enrolMfa(user.id);
   made.users.push(user.id);
   const token = auth.newSessionToken();
   await db.users.createSession({

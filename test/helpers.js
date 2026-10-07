@@ -108,4 +108,67 @@ async function sweepOrphanAudit(query) {
   return removed;
 }
 
-module.exports = { ROOT, dbAvailable, startTestServer, runScript, getHtml, sweepOrphanAudit };
+// ---------------------------------------------------------------------------
+// §12.2 — the second factor, for suites that sign in as staff
+// ---------------------------------------------------------------------------
+
+/**
+ * Enrol a fixture account directly, the way a person would have done at
+ * /admin/security before the test started. Fixture accounts created with a
+ * required role (`admin`, `finance`) are otherwise sent to the enrolment screen
+ * by the gate — which is correct behaviour and useless to a suite that wants to
+ * test something else.
+ *
+ * Returns the secret, so a caller can generate codes for that account.
+ */
+async function enrolMfa(userId, { confirm = true } = {}) {
+  const db = require('../src/db');
+  const totp = require('../src/lib/totp');
+  const secret = totp.generateSecret();
+  await db.mfa.beginEnrolment(userId, secret);
+  // Confirmed against a step five minutes *ago*, which is what enrolment really
+  // looks like from the sign-in path's point of view: the code that proved the
+  // secret was spent at setup time, and the current step is still fresh for the
+  // sign-in that follows. (Consuming "now" here would make the fixture's first
+  // sign-in a replay, correctly and unhelpfully.)
+  if (confirm) await db.mfa.confirmEnrolment(userId, totp.stepAt(Date.now()) - 10);
+  return secret;
+}
+
+/**
+ * Finish a sign-in that stopped at the second factor.
+ *
+ * Call it right after `/api/auth/verify`: it reads the account's secret from the
+ * database (a test harness has the database; a person has their phone) and posts
+ * the code the way the challenge page does. Returns the fetch response, so a
+ * caller can assert on it.
+ *
+ * Codes are single-use — `mfa_last_step` refuses a replay — so two sign-ins in
+ * the same 30-second window need different steps. `offset` picks which one.
+ */
+async function completeMfa(client, { request, phone = null, next = '', offset = 0, code = null } = {}) {
+  const db = require('../src/db');
+  const totp = require('../src/lib/totp');
+  const phones = require('../src/lib/phone');
+  // The caller may hold the number in whatever form the fixture used; accounts
+  // are stored canonical, so look it up the way the app does.
+  const canonical = phone ? phones.canonical(phone, { fallback: phone }) : null;
+  const user = canonical ? await db.users.findByPhone(canonical) : null;
+  if (!user) throw new Error(`completeMfa could not find ${phone}`);
+  const row = await db.mfa.secretFor(user.id);
+  if (!row) throw new Error(`no second factor for ${phone} — call enrolMfa first`);
+  const value = code || totp.code(row.secret, { time: Date.now() + offset * totp.STEP_SECONDS * 1000 });
+  const post = request || ((path, options) => client.request(path, options));
+  return post('/api/auth/mfa', { method: 'POST', body: { code: value, next } });
+}
+
+module.exports = {
+  ROOT,
+  dbAvailable,
+  startTestServer,
+  runScript,
+  getHtml,
+  sweepOrphanAudit,
+  enrolMfa,
+  completeMfa,
+};

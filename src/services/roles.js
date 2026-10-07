@@ -77,7 +77,26 @@ const MATRIX = {
   // it is narrower — finance reads the money, it does not enter ad invoices.
   'marketing.view': ['admin', 'ops', 'marketing'],
   'marketing.spend': ['admin', 'marketing'],
+  // §12.2's own screen: every role that works in the console may see and set up
+  // its *own* second factor. A dealer is not in the console (their portal is a
+  // separate surface) and a customer never is, so neither holds it — and the
+  // screen this gates shows one account only, the one asking.
+  'staff.security': ['admin', 'ops', 'inspector', 'marketing', 'finance'],
 };
+
+/**
+ * §12.2 — "MFA for admin roles". That reads narrowly on purpose: the two roles
+ * that can move money or grant a role. `admin` holds `users.manage` (it can
+ * hand out capabilities, including its own) and `payments.approve`; `finance`
+ * holds `payments.approve`. A stolen session for either one is a loss, not a
+ * nuisance.
+ *
+ * Ops, inspectors and marketing are not on the list and are not locked out of a
+ * shift by it: they can enrol voluntarily, the console tells them how many of
+ * their colleagues have, and `mfa.coverage()` reports who is still missing one.
+ * Widening this list is a one-line change in the one file that holds policy.
+ */
+const MFA_ROLES = ['admin', 'finance'];
 
 /** Roles that may open the console at all. */
 const STAFF_ROLES = [...new Set(Object.values(MATRIX).flat())];
@@ -109,4 +128,5 @@ const ROLE_LABELS = {
   admin: 'Super Admin',
 };
 
-module.exports = { ROLES, ROLE_LABELS, MATRIX, STAFF_ROLES, isStaff, can, capabilitiesFor };
+module.exports = {
+  MFA_ROLES, ROLES, ROLE_LABELS, MATRIX, STAFF_ROLES, isStaff, can, capabilitiesFor };

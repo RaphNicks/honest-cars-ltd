@@ -1,0 +1,73 @@
+<%#
+  /login/mfa — §12.2: the second factor at sign-in.
+
+  Reachable only by a session that has passed the phone step and not this one.
+  The gate in src/services/auth.js lets such a session open this page and the
+  endpoint it posts to, and nothing else — so there is no "skip for now" here,
+  because there is nowhere to skip to.
+
+  Locals: next, maskedPhone, attemptsLeft, issuer, contactWhatsapp
+%>
+<section class="page-hero">
+  <div class="container container--narrow">
+    <p class="eyebrow">Two-step sign-in</p>
+    <h1>One more step</h1>
+    <p class="lead">
+      Your phone number checked out. <% if (maskedPhone) { %>It ended in
+      <span class="tabular"><%= maskedPhone.slice(-4) %></span> — and now the code from your authenticator app,
+      so a phone number on its own is not enough to get in.<% } %>
+    </p>
+  </div>
+</section>
+
+<section class="section">
+  <div class="container container--narrow">
+    <div class="auth-card">
+      <form class="auth-form" data-mfa-form data-next="<%= next %>" novalidate>
+        <h2 class="mb-1">Code from your app</h2>
+        <p class="note-inline">
+          Open your authenticator app and type the six digits for <strong><%= issuer %></strong>. Codes change
+          every 30 seconds, and each one works once.
+        </p>
+
+        <div class="field">
+          <label class="field__label" for="mfa-code">Six-digit code</label>
+          <input class="input tabular" id="mfa-code" name="code" type="text" inputmode="numeric"
+                 autocomplete="one-time-code" pattern="[0-9]*" maxlength="8" required autofocus
+                 aria-describedby="mfa-hint" placeholder="000000">
+          <p class="field__hint" id="mfa-hint">
+            Lost the phone? Enter one of your recovery codes here instead — each one works once.
+          </p>
+        </div>
+
+        <% if (attemptsLeft && attemptsLeft < 5) { %>
+          <p class="note-inline">
+            <%= attemptsLeft %> <%= attemptsLeft === 1 ? 'try' : 'tries' %> left before this sign-in is cancelled and
+            you start again from your number.
+          </p>
+        <% } %>
+
+        <p class="note-inline hidden" data-mfa-status role="status" aria-live="polite"></p>
+
+        <div class="btn-row">
+          <button class="btn btn--primary" type="submit" data-submit>Finish signing in</button>
+          <button class="btn btn--ghost" type="button" data-mfa-recovery>Use a recovery code</button>
+        </div>
+      </form>
+
+      <div class="auth-help">
+        <h2 class="mb-1">Nobody should be locked out</h2>
+        <p>
+          If you have neither the app nor your recovery codes, a colleague with the staff screen can switch the
+          second factor off for you from <strong>Staff &amp; roles</strong> — and that is recorded in the audit
+          log along with the reason. There is no way to skip this step by emailing anyone: the point of it is
+          that a phone number alone does not open the console.
+        </p>
+        <p class="mb-0">
+          <a href="/login">Start over with a different number</a> ·
+          <a href="<%= contactWhatsapp %>" target="_blank" rel="noopener" data-event="whatsapp_click" data-source="mfa">WhatsApp the desk</a>
+        </p>
+      </div>
+    </div>
+  </div>
+</section>

@@ -23,7 +23,8 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const zlib = require('node:zlib');
 
-const { dbAvailable, startTestServer } = require('./helpers');
+const { dbAvailable, startTestServer, enrolMfa, completeMfa } = require('./helpers');
+const roles = require('../src/services/roles');
 
 let available = false;
 let ctx;
@@ -109,11 +110,18 @@ async function createAccount(role, label) {
     'active',
   ]);
   const row = await db.queryOne('SELECT id FROM `users` WHERE phone = ? LIMIT 1', [canonical(phone)]);
+  // §12.2: a fixture holding `admin` or `finance` has a second factor, the way
+  // a real account in those roles has to.
+  if (roles.MFA_ROLES.includes(role)) await enrolMfa(row.id);
   const client = newClient();
   const otp = await client.request('/api/auth/otp', { method: 'POST', body: { phone } });
   assert.equal(otp.status, 200, `OTP request failed for ${label}: ${otp.text}`);
   const verify = await client.request('/api/auth/verify', { method: 'POST', body: { phone, code: otp.json.devCode } });
   assert.equal(verify.status, 200, `sign-in failed for ${label}: ${verify.text}`);
+  if (roles.MFA_ROLES.includes(role)) {
+    const finished = await completeMfa(client, { phone });
+    assert.equal(finished.status, 200, `second factor failed for ${label}: ${finished.text}`);
+  }
   return { id: row.id, phone: canonical(phone), local: phone, role, client };
 }
 

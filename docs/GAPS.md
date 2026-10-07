@@ -6,8 +6,37 @@ integrations §11, NFRs §12, sitemap §5.1, acceptance §18.3).
 Line references below point at the code that exists. Where an item is missing, the
 note says what "done" would mean, so the work can be scoped without re-reading the PRD.
 
-**Status at this commit:** §18.3's privacy desk is built — the half of NDPA that
-is paperwork, done so the paperwork is true.
+**Status at this commit:** §12.2's second factor is built — the last row that was
+both buildable and provable here. The list is now **17 rows: 1 buildable (not
+provable without Cloudflare keys), 9 blocked on an account, 7 with no home in
+this sandbox**.
+
+- **The arithmetic is RFC 6238's.** `src/lib/totp.js` is SHA-1, six digits, 30
+  seconds, ±1 step, base32 without padding — and `test/mfa.test.js` checks it
+  against the appendix-B vectors rather than against itself.
+- **A code works once.** `totp_last_step` is compared inside the `UPDATE` that
+  sets it, so a second request racing with the same code loses; a replay is
+  refused with a sentence that says the code was *used*, not that it was wrong,
+  because that difference is the whole reason someone is stuck.
+- **A half-finished enrolment protects nothing.** The factor counts only once a
+  code from it has been proved, and the setup screen says so. A required role
+  with an unfinished setup is sent to `/admin/security` and nowhere else — the
+  gate and the route guard read one function between them, so the page that
+  fixes the problem is always reachable and nothing else is.
+- **Recovery codes are single-use, stored as hashes, shown once.** The
+  confirming response is the only place they ever exist in plaintext: they are
+  rendered, never handed over in a query string (browser history, access log and
+  the next request's Referer all read those). The unit of the code — the
+  alphanumerics — is what is hashed, so `K7QM-3XRX` and `k7qm3xrx` are one code.
+- **Losing a phone is an admin act, recorded.** `/admin/staff` switches the
+  factor off for someone else with a reason, revokes every session that account
+  held, and writes it to the audit log. Turning it off needs a live code, and a
+  role that must have one cannot turn off its own.
+- **§7.4:** `admin` and `finance` are the two roles that can move money or grant
+  a role, so they are the two that must carry a factor (`roles.MFA_ROLES`); every
+  other console role may enrol voluntarily — `staff.security` — and
+  `/admin/security` tells a colleague who has not. Coverage is on the screen, not
+  in a spreadsheet.
 
 - **The request log exists, and the self-service paths file themselves.**
   `/account/export` and account closure used to discharge the duty and leave no
@@ -290,11 +319,11 @@ on a third-party account, and infrastructure that has no home in this sandbox.
 
 ## 1. Not built — and buildable here today
 
-No external account needed. These are real gaps against the PRD.
+One row left. It needs no *account*, but it cannot be **proved** in this sandbox:
+a bot challenge with no keys is a bot challenge nobody has seen work.
 
 | ID | Requirement | What is actually there | What "done" means |
 |---|---|---|---|
-| §12.2 | MFA for admin roles | Sign-in is phone OTP — one factor, however strong. | TOTP (or WebAuthn) as a second factor for `admin`/`finance`, with recovery codes. |
 | §11 | Turnstile/reCAPTCHA on public forms | Rate limits per route (`src/lib/rate-limit.js`) and server-side validation; no bot challenge. | A site-key-gated invisible challenge, degrading to the current behaviour when unset. |
 
 ## 2. Built, but blocked on a third-party account

@@ -375,6 +375,8 @@ async function staffSession(role = 'admin') {
     'active',
   ]);
   const user = await db.queryOne('SELECT id FROM `users` WHERE phone = ? LIMIT 1', [phone]);
+  // §12.2: a required role needs a second factor before the console will answer.
+  if (require('../src/services/roles').MFA_ROLES.includes(role)) await require('./helpers').enrolMfa(user.id);
   const token = auth.newSessionToken();
   await db.query('INSERT INTO sessions (user_id, token_hash, expires_at, user_agent) VALUES (?, ?, ?, ?)', [
     user.id,

@@ -35,6 +35,9 @@ const EVENT_NAMES = new Set([
   'sign_out', 'account_deleted', 'saved_car_added', 'saved_car_removed',
   // FR-28 referrals — server-side only, like the rest of this block.
   'referral_qualified', 'referral_reward_paid',
+  // §12.2 the second factor, recorded where the code is checked, not where the
+  // form is submitted.
+  'mfa_verified', 'mfa_failed',
 ]);
 
 async function record(eventName, { payload = null, sourcePath = null, sessionId = null } = {}) {

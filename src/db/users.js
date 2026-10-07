@@ -33,6 +33,10 @@ function shapeUser(row) {
     // FR-28: when the referral started to count, and the desk's note on it.
     referralQualifiedAt: row.referral_qualified_at || null,
     referralNote: row.referral_note || null,
+    // §12.2: never the secret itself — only whether a *confirmed* factor exists,
+    // so a half-finished enrolment reads as unprotected everywhere.
+    mfaEnrolled: Boolean(row.totp_confirmed_at),
+    mfaPending: Boolean(row.totp_secret) && !row.totp_confirmed_at,
     lastSeenAt: row.last_seen_at,
     createdAt: row.created_at,
     // What the header shows — never render a full phone number back at the user.
@@ -225,17 +229,39 @@ async function countRecentCodes(phone, { withinMinutes = 60 } = {}) {
 // ---------------------------------------------------------------------------
 // Sessions
 // ---------------------------------------------------------------------------
-async function createSession({ userId, tokenHash, expiresAt, ip, userAgent }) {
+async function createSession({ userId, tokenHash, expiresAt, ip, userAgent, mfaPending = false }) {
   await query(
-    'INSERT INTO sessions (user_id, token_hash, expires_at, ip, user_agent) VALUES (?, ?, ?, ?, ?)',
-    [userId, tokenHash, expiresAt, ip || null, userAgent ? String(userAgent).slice(0, 200) : null],
+    'INSERT INTO sessions (user_id, token_hash, expires_at, ip, user_agent, mfa_pending) VALUES (?, ?, ?, ?, ?, ?)',
+    [userId, tokenHash, expiresAt, ip || null, userAgent ? String(userAgent).slice(0, 200) : null, mfaPending ? 1 : 0],
   );
+}
+
+/**
+ * §12.2: the second factor, once given, is part of the session — not a cookie
+ * or a flag the browser holds. Clearing it is what turns a half-signed-in
+ * session into a real one, and it is written here so no route can do it by
+ * accident.
+ */
+async function clearSessionMfa(sessionId) {
+  await query('UPDATE sessions SET mfa_pending = 0, mfa_attempts = 0 WHERE id = ?', [sessionId]);
+  return { ok: true };
+}
+
+/**
+ * Count a wrong second factor against the session and return how many have
+ * failed. Six digits is a million possibilities: without this ceiling a
+ * patient attacker with a stolen first factor simply types until it opens.
+ */
+async function recordMfaFailure(sessionId) {
+  await query('UPDATE sessions SET mfa_attempts = mfa_attempts + 1 WHERE id = ?', [sessionId]);
+  const row = await queryOne('SELECT mfa_attempts FROM sessions WHERE id = ? LIMIT 1', [sessionId]);
+  return row ? Number(row.mfa_attempts) : 1;
 }
 
 /** Returns the session + its user, or null when missing/expired/revoked. */
 async function findSession(tokenHash) {
   const row = await queryOne(
-    `SELECT s.id AS session_id, s.expires_at, s.revoked_at, u.*
+    `SELECT s.id AS session_id, s.expires_at, s.revoked_at, s.mfa_pending, s.mfa_attempts, u.*
        FROM sessions s
        JOIN \`users\` u ON u.id = s.user_id
       WHERE s.token_hash = ? AND s.revoked_at IS NULL AND s.expires_at > UTC_TIMESTAMP()
@@ -243,7 +269,19 @@ async function findSession(tokenHash) {
     [tokenHash],
   );
   if (!row) return null;
-  return { sessionId: row.session_id, expiresAt: row.expires_at, user: shapeUser(row) };
+  return {
+    sessionId: row.session_id,
+    expiresAt: row.expires_at,
+    // §12.2: a session that has not cleared the second factor carries a real
+    // user and no authority — every gate reads this before anything else.
+    mfaPending: Boolean(row.mfa_pending),
+    mfaAttempts: Number(row.mfa_attempts) || 0,
+    user: shapeUser(row),
+  };
+}
+
+async function revokeSessionById(sessionId) {
+  await query('UPDATE sessions SET revoked_at = UTC_TIMESTAMP() WHERE id = ? AND revoked_at IS NULL', [sessionId]);
 }
 
 async function revokeSession(tokenHash) {
@@ -551,6 +589,9 @@ module.exports = {
   createSession,
   findSession,
   revokeSession,
+  revokeSessionById,
+  clearSessionMfa,
+  recordMfaFailure,
   revokeAllForUser,
   pruneSessions,
   newReferralCode,

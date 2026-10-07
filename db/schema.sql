@@ -36,6 +36,9 @@ CREATE TABLE IF NOT EXISTS `users` (
   role             ENUM('customer','dealer','ops','inspector','marketing','finance','admin')
                                  NOT NULL DEFAULT 'customer',   -- §7.4 role matrix
   watchlisted      TINYINT(1)    NOT NULL DEFAULT 0,            -- admin flag (§7.3)
+  totp_secret      VARCHAR(64)   NULL,              -- §12.2 second factor (migration 029)
+  totp_confirmed_at DATETIME     NULL,              -- NULL = started enrolling, never proved a code
+  totp_last_step   BIGINT UNSIGNED NULL,            -- RFC 6238 codes are single-use: the last step spent
   referral_code    VARCHAR(16)   NULL,              -- the holder's personal link code
   referred_by      INT UNSIGNED  NULL,              -- who brought them here (§7.1 referrals)
   referral_qualified_at DATETIME NULL,              -- FR-28: when it started to count
@@ -235,6 +238,8 @@ CREATE TABLE IF NOT EXISTS `sessions` (
   ip         VARCHAR(45)   NULL,
   expires_at DATETIME      NOT NULL,
   revoked_at DATETIME      NULL,
+  mfa_pending  TINYINT(1)      NOT NULL DEFAULT 0,  -- passed the first factor only (§12.2)
+  mfa_attempts SMALLINT UNSIGNED NOT NULL DEFAULT 0, -- brute-force ceiling on a 6-digit code
   created_at TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (id),
   UNIQUE KEY uq_session_token (token_hash),
@@ -1418,4 +1423,23 @@ CREATE TABLE IF NOT EXISTS `data_requests` (
   KEY idx_data_requests_user (user_id, request_type, requested_at),
   CONSTRAINT fk_data_request_user    FOREIGN KEY (user_id)    REFERENCES `users` (id) ON DELETE SET NULL,
   CONSTRAINT fk_data_request_handler FOREIGN KEY (handled_by) REFERENCES `users` (id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ---------------------------------------------------------------------------
+-- mfa_recovery_codes — §12.2's way out of a lost phone (migration 029)
+--
+-- Ten single-use codes per account, stored as SHA-256 hashes so this table is
+-- never a second set of credentials: a dump of it cannot sign anyone in.
+-- `used_at` is how the record answers "was that code already spent?".
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS `mfa_recovery_codes` (
+  id         INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  user_id    INT UNSIGNED NOT NULL,
+  code_hash  CHAR(64)     NOT NULL,               -- sha256 of the code, never the code
+  used_at    DATETIME     NULL,                   -- NULL until it is spent
+  created_at TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  UNIQUE KEY uq_recovery_code (code_hash),
+  KEY idx_recovery_user (user_id, used_at),
+  CONSTRAINT fk_recovery_user FOREIGN KEY (user_id) REFERENCES `users` (id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

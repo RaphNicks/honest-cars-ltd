@@ -55,6 +55,12 @@ const EVENTS = {
     // is paid, never accepted from the browser (money moved).
     'referral_qualified',
     'referral_reward_paid',
+    // §12.2 — the second factor. §15.1 has no security category either, so these
+    // follow the auth block above: recorded by the server at the moment it
+    // checks a code, never accepted from the browser (a client asserting it
+    // passed a factor proves nothing), and the payload is a count, never a code.
+    'mfa_verified',
+    'mfa_failed',
   ],
 };
 
@@ -72,7 +78,8 @@ const SERVER_ONLY = new Set([
   'subscription_renewed',
   'booking_completed',
   ...['otp_requested', 'otp_request_failed', 'otp_verify_succeeded', 'otp_verify_failed', 'sign_out', 'account_deleted',
-    'referral_qualified', 'referral_reward_paid'],
+    'referral_qualified', 'referral_reward_paid',
+    'mfa_verified', 'mfa_failed'],
 ]);
 
 /** Client-side payload allowlist — keeps PII out of analytics (§12.2). */

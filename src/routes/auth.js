@@ -17,6 +17,8 @@ const rateLimit = require('../lib/rate-limit');
 const auth = require('../services/auth');
 const db = require('../db');
 const validate = require('../services/validate');
+const roles = require('../services/roles');
+const mfa = require('../services/mfa');
 const { sendJson } = require('../lib/respond');
 
 const router = express.Router();
@@ -32,6 +34,10 @@ const router = express.Router();
  */
 const otpLimiter = rateLimit({ windowMs: 15 * 60_000, max: 30 });
 const verifyLimiter = rateLimit({ windowMs: 15 * 60_000, max: 60 });
+// A six-digit code is a million possibilities, so the per-session attempt
+// ceiling in services/mfa.js is the real defence; this is the second one, for
+// traffic that never gets as far as a session.
+const mfaLimiter = rateLimit({ windowMs: 5 * 60_000, max: 30 });
 
 router.post('/otp', otpLimiter, async (req, res, next) => {
   try {
@@ -87,7 +93,65 @@ router.post('/verify', verifyLimiter, async (req, res, next) => {
         maskedPhone: result.user.maskedPhone,
         hasName: Boolean(result.user.name),
       },
+      // §12.2: an account with a second factor gets a session that has passed
+      // the phone step and nothing else, and is told where to finish.
+      mfa: result.mfaPending
+        ? { required: true, next: `/login/mfa?next=${encodeURIComponent(auth.safeNextPath(body.next) || (roles.isStaff(result.user.role) ? '/admin' : '/account'))}` }
+        : null,
       redirect: auth.safeNextPath(body.next) || '/account',
+    });
+  } catch (error) {
+    return next(error);
+  }
+});
+
+/**
+ * §12.2 — the second factor at sign-in.
+ *
+ * Only a half-signed-in session can call this: the gate lets such a session
+ * reach this one endpoint and nothing else. A wrong code is counted against the
+ * session, and running out of tries kills the session outright rather than
+ * leaving a first-factor foothold open to keep guessing on.
+ */
+router.post('/mfa', mfaLimiter, async (req, res, next) => {
+  try {
+    if (!req.user || !req.session) {
+      return sendJson(res, { ok: false, error: 'Sign in again — this session has ended.' }, { status: 401 });
+    }
+    if (!req.session.mfaPending) {
+      // Already cleared it. Answer honestly instead of pretending to check.
+      return sendJson(res, {
+        ok: true,
+        alreadyVerified: true,
+        redirect: auth.safeNextPath((req.body || {}).next) || '/account',
+      });
+    }
+
+    const result = await mfa.challenge(req, (req.body || {}).code);
+    if (!result.ok) {
+      await db.analytics
+        .record('mfa_failed', {
+          payload: { attempts_left: result.attemptsLeft ?? 0, exhausted: Boolean(result.exhausted) },
+          sourcePath: '/login/mfa',
+        })
+        .catch(() => {});
+      if (result.exhausted) auth.clearSessionCookie(res);
+      return sendJson(
+        res,
+        { ok: false, error: result.error, attemptsLeft: result.attemptsLeft },
+        { status: result.exhausted ? 401 : 422 },
+      );
+    }
+
+    await db.analytics
+      .record('mfa_verified', { payload: { via: result.via, role: req.user.role }, sourcePath: '/login/mfa' })
+      .catch(() => {});
+
+    const next_ = auth.safeNextPath((req.body || {}).next);
+    return sendJson(res, {
+      ok: true,
+      via: result.via,
+      redirect: next_ || (roles.isStaff(req.user.role) ? '/admin' : '/account'),
     });
   } catch (error) {
     return next(error);

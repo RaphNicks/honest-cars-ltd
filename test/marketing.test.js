@@ -115,6 +115,10 @@ async function createAccount(role, label) {
   ]);
   created.users.push(number);
   const user = await db.queryOne('SELECT id FROM `users` WHERE phone = ? LIMIT 1', [number]);
+  // §12.2: a fixture in a required role carries a second factor, so the gate
+  // lets it into the console. The session is minted already verified — this
+  // suite is about the marketing numbers, not about the sign-in.
+  if (require('../src/services/roles').MFA_ROLES.includes(role)) await require('./helpers').enrolMfa(user.id);
   const token = auth.newSessionToken();
   await db.query('INSERT INTO sessions (user_id, token_hash, expires_at, user_agent) VALUES (?, ?, ?, ?)', [
     user.id,

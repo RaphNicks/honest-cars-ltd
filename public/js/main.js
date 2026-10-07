@@ -28,7 +28,7 @@ import { initPWA } from './pwa.js';
 import { initFinancing } from './financing.js';
 import { initAddToCart, initCartPage, initCheckoutPage, initComparePage } from './cart.js';
 import { initLoadMore, initVideoFacades, initTableOfContents, initHelpful } from './blog.js';
-import { initLogin, initSaveButtons, initAccount, initSaveSearch } from './account.js';
+import { initLogin, initSaveButtons, initAccount, initSaveSearch, initMfaChallenge } from './account.js';
 import { initFormDrafts, initOutbox } from './drafts.js';
 
 function boot() {
@@ -71,6 +71,8 @@ function boot() {
   initGallery();
   initCompare();
   initLogin();
+  // §12.2 — the second factor, when a staff account signs in.
+  initMfaChallenge();
   initSaveButtons();
   initAccount();
   initSaveSearch();

@@ -10,6 +10,8 @@
  * non-zero if any expectation fails.
  */
 
+import { createRequire } from 'node:module';
+
 import { clearDevCodes } from './lib/dev-codes.mjs';
 
 const BASE = process.argv[2] || process.env.SMOKE_BASE_URL || 'http://127.0.0.1:3000';
@@ -18,12 +20,16 @@ const STAFF = {
   marketing: '+2348000000005',  // Content Desk (§7.4 → cms.manage)
   admin: '+2348000000001',
 };
+
+// §12.2 — the admin account carries a second factor, and this script signs in
+// the way a person does. The key is the seeded one; see db/seed.sql.
+const MFA_SECRETS = { '+2348000000001': 'JBSWY3DPEHPK3PXP' };
 const OPS_PHONE = '+2348000000002';
 const CUSTOMER_PHONE = '+2348031234567';
 
 // Repeat runs would otherwise 429 on the 5-codes-per-number-per-hour policy and
 // look like a broken CMS. Clear this run's own spent codes first.
-await clearDevCodes([...Object.values(STAFF), OPS_PHONE, CUSTOMER_PHONE], { label: 'CMS' });
+await clearDevCodes([...Object.values(STAFF), OPS_PHONE, CUSTOMER_PHONE], { label: 'CMS', resetMfa: true });
 
 let failures = 0;
 let checks = 0;
@@ -86,6 +92,12 @@ async function signIn(phone, cookies) {
     throw new Error(`No devCode for ${phone} (HTTP ${otp.status}) — ${hint}`);
   }
   await request('/api/auth/verify', { method: 'POST', form: { phone, code }, cookies });
+  const secret = MFA_SECRETS[phone];
+  if (secret) {
+    const totp = createRequire(import.meta.url)('../src/lib/totp');
+    const challenge = await request('/api/auth/mfa', { method: 'POST', form: { code: totp.code(secret) }, cookies });
+    if (challenge.status !== 200) throw new Error(`Second factor failed for ${phone}: ${challenge.status}`);
+  }
 }
 
 function bodyOf(html) {

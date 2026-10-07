@@ -115,6 +115,18 @@ export function initLogin(root = document) {
 
     if (!result.ok) return setMessage(message, result.error || 'That code did not work.', 'error');
 
+    // §12.2: the phone step is done and the account has a second factor. Save
+    // the car first — that is why they were sent here — then go and finish
+    // signing in. The session it just got cannot open anything else.
+    if (result.mfa && result.mfa.required) {
+      setMessage(message, 'One more step — your authenticator code.', 'ok');
+      if (pendingSave) {
+        await postJson('/api/account/saved-cars', { listingId: Number(pendingSave), action: 'add', source: 'login' });
+      }
+      window.location.assign(result.mfa.next || '/login/mfa');
+      return undefined;
+    }
+
     setMessage(message, 'Signed in. Taking you through…', 'ok');
 
     // The reason we asked them to sign in: save the car they were looking at.
@@ -327,5 +339,58 @@ export function initSaveSearch(root = document) {
       label: button.dataset.label || document.title.split('|')[0].trim(),
     });
     setMessage(message, result.ok ? 'Saved — you will find it in your account.' : result.error || 'Could not save that search.', result.ok ? 'ok' : 'error');
+  });
+}
+
+/**
+ * §12.2 — the second factor at sign-in (/login/mfa).
+ *
+ * Without this file the page is a normal form that posts to /api/auth/mfa and
+ * shows the JSON the server sent; with it, the code is submitted in place and
+ * the person lands where they were going. The "use a recovery code" button
+ * does nothing clever — it widens the field and says what to type, because the
+ * server accepts either in the same box.
+ */
+export function initMfaChallenge(root = document) {
+  const form = root.querySelector('[data-mfa-form]');
+  if (!form) return;
+
+  const input = form.querySelector('#mfa-code');
+  const status = form.querySelector('[data-mfa-status]');
+  const submit = form.querySelector('[data-submit]');
+  const recoveryButton = form.querySelector('[data-mfa-recovery]');
+
+  if (recoveryButton) {
+    recoveryButton.addEventListener('click', () => {
+      input.removeAttribute('pattern');
+      input.removeAttribute('inputmode');
+      input.setAttribute('maxlength', '12');
+      input.placeholder = 'K7QM-3XR9-PT2V';
+      input.value = '';
+      input.focus();
+      setMessage(status, 'Type one of the recovery codes you wrote down. Each one works once.', null);
+    });
+  }
+
+  form.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const code = (input.value || '').trim();
+    if (!code) return setMessage(status, 'Enter the code from your app.', 'error');
+
+    if (submit) submit.disabled = true;
+    const result = await postJson('/api/auth/mfa', { code, next: form.dataset.next || '' });
+    if (submit) submit.disabled = false;
+
+    if (!result.ok) {
+      setMessage(status, result.error || 'That did not work. Try again.', 'error');
+      input.select();
+      // The session is gone: the only honest next step is a fresh sign-in.
+      if (result.status === 401) window.location.assign('/login?reason=expired');
+      return undefined;
+    }
+
+    setMessage(status, result.via === 'recovery' ? 'Recovery code accepted. One down — replace them soon.' : 'Verified.', 'ok');
+    window.location.assign(result.redirect || '/account');
+    return undefined;
   });
 }

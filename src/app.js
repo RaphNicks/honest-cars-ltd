@@ -137,6 +137,11 @@ function createApp() {
   // public site behaves identically for signed-out visitors.
   app.use(auth.attachUser);
 
+  // §12.2: the second-factor gate runs before any route — a half-signed-in
+  // session, or a role that must enrol, is decided in one place rather than in
+  // every module that has to remember to check.
+  app.use(auth.mfaGate);
+
   // --- Routes ---------------------------------------------------------------
   // Account and sign-in come first: /login, /account and the /api/auth and
   // /api/account endpoints must win over the marketing-page routes below.

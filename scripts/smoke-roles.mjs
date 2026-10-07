@@ -19,7 +19,25 @@
  * is refused something it should hold, so it can be wired into CI as-is.
  */
 
+import { createRequire } from 'node:module';
+
 import { clearDevCodes } from './lib/dev-codes.mjs';
+
+const require = createRequire(import.meta.url);
+const totp = require('../src/lib/totp');
+
+/**
+ * §12.2 — the second factor on the two roles that move money or grant roles.
+ *
+ * These are the *seeded* secrets, written in db/seed.sql for a demo database
+ * that has to be sign-in-able by a script. A real install has none of this: a
+ * person enrols their own phone at /admin/security and nobody else holds the
+ * key. The script completes the challenge exactly the way the browser does.
+ */
+const MFA_SECRETS = {
+  '+2348000000001': 'JBSWY3DPEHPK3PXP',
+  '+2348000000004': 'KRSXG5CTMVRXEZLU',
+};
 
 const BASE = (process.argv[2] || process.env.SMOKE_BASE || 'http://127.0.0.1:3000').replace(/\/$/, '');
 
@@ -34,7 +52,7 @@ const PAGES_ADMIN = [
   '/admin/hire',
   '/admin/dealers', '/admin/dealers/2',
   '/admin/cms', '/admin/cms/calendar', '/admin/cms/pages', '/admin/cms/faqs', '/admin/cms/testimonials', '/admin/cms/modules',
-  '/admin/settings', '/admin/referrals', '/admin/financing', '/admin/privacy',
+  '/admin/settings', '/admin/referrals', '/admin/financing', '/admin/privacy', '/admin/security',
 ];
 
 /**
@@ -47,10 +65,10 @@ const PAGES_ADMIN = [
  */
 const ROLES = [
   { phone: '+2348000000001', role: 'admin', must: PAGES_ADMIN },
-  { phone: '+2348000000002', role: 'ops', must: ['/admin', '/admin/listings', '/admin/leads', '/admin/concierge', '/admin/bookings', '/admin/alerts', '/admin/intel', '/admin/reports', '/admin/marketing', '/admin/hire', '/admin/dealers', '/admin/dealers/2', '/admin/settings', '/admin/referrals', '/admin/financing', '/admin/privacy'] },
-  { phone: '+2348000000003', role: 'inspector', must: ['/admin/jobs'] },
-  { phone: '+2348000000004', role: 'finance', must: ['/admin', '/admin/orders', '/admin/payments', '/admin/milestones', '/admin/reports', '/admin/subscriptions', '/admin/hire', '/admin/dealers', '/admin/dealers/2', '/admin/referrals', '/admin/financing'] },
-  { phone: '+2348000000005', role: 'marketing', must: ['/admin', '/admin/cms', '/admin/cms/calendar', '/admin/cms/pages', '/admin/cms/faqs', '/admin/cms/testimonials', '/admin/cms/modules', '/admin/intel', '/admin/reports', '/admin/marketing'] },
+  { phone: '+2348000000002', role: 'ops', must: ['/admin', '/admin/listings', '/admin/leads', '/admin/concierge', '/admin/bookings', '/admin/alerts', '/admin/intel', '/admin/reports', '/admin/marketing', '/admin/hire', '/admin/dealers', '/admin/dealers/2', '/admin/settings', '/admin/referrals', '/admin/financing', '/admin/privacy', '/admin/security'] },
+  { phone: '+2348000000003', role: 'inspector', must: ['/admin/jobs', '/admin/security'] },
+  { phone: '+2348000000004', role: 'finance', must: ['/admin', '/admin/orders', '/admin/payments', '/admin/milestones', '/admin/reports', '/admin/subscriptions', '/admin/hire', '/admin/dealers', '/admin/dealers/2', '/admin/referrals', '/admin/financing', '/admin/security'] },
+  { phone: '+2348000000005', role: 'marketing', must: ['/admin', '/admin/cms', '/admin/cms/calendar', '/admin/cms/pages', '/admin/cms/faqs', '/admin/cms/testimonials', '/admin/cms/modules', '/admin/intel', '/admin/reports', '/admin/marketing', '/admin/security'] },
 ];
 
 /** Pages probed for every role; the verdict comes from `must`. */
@@ -83,6 +101,7 @@ const PAGES = [
   '/admin/dealers', '/admin/dealers/2',
   '/admin/cms', '/admin/cms/calendar', '/admin/cms/pages', '/admin/cms/faqs', '/admin/cms/testimonials', '/admin/cms/modules',
   '/admin/settings', '/admin/referrals', '/admin/financing', '/admin/privacy',
+  '/admin/security',
 ];
 
 /**
@@ -146,7 +165,42 @@ async function signIn(phone) {
   }
   const verify = await client.request('/api/auth/verify', { method: 'POST', body: { phone, code: otp.json.devCode } });
   if (verify.status !== 200) throw new Error(`Sign-in failed for ${phone}: ${verify.status} ${verify.text.slice(0, 120)}`);
+  const secret = MFA_SECRETS[phone];
+  if (secret) {
+    const challenge = await client.request('/api/auth/mfa', { method: 'POST', body: { code: totp.code(secret) } });
+    if (challenge.status !== 200) {
+      throw new Error(`Second factor failed for ${phone}: ${challenge.status} ${challenge.text.slice(0, 140)}`);
+    }
+  }
   return client;
+}
+
+/**
+ * One signed-in client per number for the whole run.
+ *
+ * §12.2 makes a second sign-in inside the same 30-second window a *correct*
+ * refusal — the code was spent by the first one — so a script that signs the
+ * same account in twice would fail on the app behaving properly. A person does
+ * what the error message says and waits for the next code; a script keeps the
+ * session it has.
+ */
+const signedIn = new Map();
+async function clientFor(phone) {
+  if (!signedIn.has(phone)) signedIn.set(phone, await signIn(phone));
+  return signedIn.get(phone);
+}
+
+/**
+ * Sign in *without* the second factor, so the gate can be seen doing its job.
+ * Returns the half-signed-in client and its verdict on a console path.
+ */
+async function signInHalfWay(phone) {
+  const client = newClient();
+  const otp = await client.request('/api/auth/otp', { method: 'POST', body: { phone } });
+  if (!otp.json || !otp.json.devCode) throw new Error(`No devCode for ${phone} (HTTP ${otp.status})`);
+  const verify = await client.request('/api/auth/verify', { method: 'POST', body: { phone, code: otp.json.devCode } });
+  if (verify.status !== 200) throw new Error(`Sign-in failed for ${phone}: ${verify.status}`);
+  return { client, verify };
 }
 
 let failures = 0;
@@ -162,7 +216,10 @@ function report(role, path, status, expected) {
 
 // The 5-codes-per-number-per-hour policy counts codes already sent, so a repeat
 // run would 429 mid-sign-in. Clear this run's own numbers' spent codes first.
-await clearDevCodes([...ROLES.map((entry) => entry.phone), DEALER_PHONE, CUSTOMER_PHONE], { label: 'role' });
+await clearDevCodes([...ROLES.map((entry) => entry.phone), DEALER_PHONE, CUSTOMER_PHONE], {
+  label: 'role',
+  resetMfa: true,
+});
 
 console.log(`Role smoke matrix — ${BASE}\n`);
 
@@ -178,7 +235,7 @@ console.log(`${anonBad ? `${RED}✗${OFF}` : `${GREEN}✓${OFF}`} anonymous   ${
 
 // 2. Each seeded role.
 for (const staff of ROLES) {
-  const client = await signIn(staff.phone);
+  const client = await clientFor(staff.phone);
   console.log(`\n${staff.role.padEnd(10)} ${DIM}${staff.phone}${OFF}`);
   for (const path of PAGES) {
     const response = await client.request(path);
@@ -188,7 +245,7 @@ for (const staff of ROLES) {
 
 // 3. Roles whose remit excludes a screen must be refused it.
 for (const entry of MUST_NOT) {
-  const client = await signIn(entry.phone);
+  const client = await clientFor(entry.phone);
   let leaks = 0;
   for (const path of entry.blocked) {
     const response = await client.request(path);
@@ -201,7 +258,7 @@ for (const entry of MUST_NOT) {
 
 // 4. The dealer portal (§7.2): open to its own lot, closed to the console, and
 //    the console closed to it in turn.
-const dealer = await signIn(DEALER_PHONE);
+const dealer = await clientFor(DEALER_PHONE);
 console.log(`\n${'dealer'.padEnd(10)} ${DIM}${DEALER_PHONE}${OFF}`);
 let dealerBad = 0;
 for (const path of DEALER_PAGES) {
@@ -215,6 +272,37 @@ for (const path of PAGES) {
   report('dealer', path, response.status, false);
 }
 failures += dealerBad;
+
+// 4b. §12.2 — the second factor is a wall, not a suggestion. A session that has
+//     passed the phone step and not the factor opens nothing but the challenge,
+//     and the challenge itself is a form on a page.
+for (const phone of Object.keys(MFA_SECRETS)) {
+  const { client, verify } = await signInHalfWay(phone);
+  const label = `half-signed-in ${phone}`;
+  const checks = [
+    ['/admin', 302],
+    ['/api/account/saved-cars', 401],
+    ['/login/mfa', 200],
+  ];
+  let wrong = 0;
+  for (const [path, expected] of checks) {
+    const response = await client.request(path);
+    if (response.status !== expected) wrong += 1;
+    if (wrong && response.status !== expected) console.log(`  ${RED}✗${OFF} ${path} → ${response.status} (expected ${expected})`);
+  }
+  const form = await client.request('/login/mfa');
+  if (!String(form.text).includes('data-mfa-form')) {
+    wrong += 1;
+    console.log(`  ${RED}✗${OFF} the challenge page carries no form`);
+  }
+  const declared = verify.json && verify.json.mfa && verify.json.mfa.required;
+  if (!declared) {
+    wrong += 1;
+    console.log(`  ${RED}✗${OFF} the sign-in did not say a second factor was next`);
+  }
+  failures += wrong;
+  console.log(`${wrong ? `${RED}✗${OFF}` : `${GREEN}✓${OFF}`} ${label}  challenge opens, console refused`);
+}
 
 // 5. A customer must never see a console page, and never the dealer portal.
 const customer = newClient();

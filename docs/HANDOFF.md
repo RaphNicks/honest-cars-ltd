@@ -1,6 +1,6 @@
 # Handoff — where this build is, and how to continue it
 
-**Written 2026-10-06, updated for FR-30, on branch `arena/01a0f7df-honest-cars-ltd`.**
+**Written 2026-10-07, updated for §12.2, on branch `arena/01a0f7df-honest-cars-ltd`.**
 If you are picking this up (a person or an agent in a new session), read this file
 first, then `docs/GAPS.md` for the row-by-row list of what is left.
 
@@ -48,7 +48,8 @@ Every **§9 MUST is built.** The commit trail, most recent first:
 
 | Commit | What it delivered |
 |---|---|
-| *this commit* | **§18.3 privacy desk** — data-subject requests, the 30-day clock, consent records |
+| *this commit* | **§12.2 second factor** — TOTP for admin/finance, recovery codes, the challenge gate |
+| `fbfa63b` | **§18.3 privacy desk** — data-subject requests, the 30-day clock, consent records |
 | `9763e66` | **§5.1 settings** — the rest of the screen: business facts, limits, fees, channels |
 | `b2c08cf` | FR-34 docs — the section, the gates, and the traps it hit |
 | `5c28628` | **FR-34** financing enquiries and the lender handoff |
@@ -104,7 +105,7 @@ embedded videos. All four clips total 726 KB.
 
 ---
 
-## 3. Just finished: §5.1 settings — the rest of the screen
+## 3. Earlier: §5.1 settings — the rest of the screen
 
 **Built in this commit.** FR-32 built the market/area half of §5.1's settings
 screen; this is the other half. Business facts, page limits, the sold-car
@@ -165,6 +166,76 @@ the DB connection and the auth pepper.
 - `scripts/generate-seed.js` — two changed settings, so a fresh database shows
   the mechanism.
 - `test/settings.test.js` — 17 tests, fixture build and all.
+
+---
+
+## 3. Just finished: §12.2 the second factor
+
+**Built in this commit.** §12.2 asks for MFA on the admin roles. The reading
+taken here is narrow and deliberate: the two roles that can *move money or grant
+a role* — `admin` (holds `users.manage`, so it can hand out capabilities,
+including to itself) and `finance` (holds `payments.approve`). Ops, inspectors
+and marketing are not locked out of a shift by it; they may enrol voluntarily,
+and the console says how many colleagues have.
+
+**What it does.** After the phone step, a session for an enrolled account is
+*nothing*: it can open `/login/mfa`, the static shell, and the endpoint that
+answers it. Everything else is a 302 to the challenge (or a 401 JSON for the
+API). The challenge is a plain form — six digits, or one of ten recovery codes
+typed into the same box. Getting it wrong five times kills the session outright
+rather than leaving a first-factor foothold open.
+
+**The decisions that took the longest, and why:**
+
+- **No QR code anywhere.** A QR is the secret drawn as pixels, and drawing it
+  means either a dependency that writes the secret into a data URL or an outside
+  service receiving it. The setup screen prints the key, grouped in fours, with
+  the `otpauth://` URI beside it for anything that can take one. Ten seconds of
+  typing, and the secret never leaves the server and the phone.
+- **Codes are spent where they are compared.** `UPDATE users SET totp_last_step =
+  ? WHERE id = ? AND (totp_last_step IS NULL OR totp_last_step < ?)` — the second
+  request racing with the same code affects no rows. A replay gets "that code has
+  already been used", not "wrong code", because the two send people to different
+  places.
+- **A half-finished enrolment protects nothing.** `totp_confirmed_at` is what
+  counts, and it is set only by a proved code — the same code that then cannot be
+  used to sign in.
+- **One gate, one door.** A required role without a factor may reach
+  `/admin/security` and nothing else; the whole-request gate and the per-route
+  guard read the same `mfaEnrolmentOpen(path)`, so the screen that fixes the
+  problem can never be closed by the rule it exists to satisfy. (It was, for one
+  afternoon, until the suite caught it.)
+- **Recovery codes are rendered, never redirected to.** The first cut sent
+  `/admin/security?codes=…` — a credential in the browser history, the access log
+  and the next request's `Referer`. They appear in exactly one response body.
+- **Losing a phone is an admin act with a reason**, revoking every session that
+  account held and writing to the audit log. Turning the factor off yourself
+  needs a live code; a role that must have one cannot turn off its own at all.
+- **Demo accounts carry seeded secrets** (`db/seed.sql`, and the smokes' copy of
+  them) because this database has to be sign-in-able by a script. A real install
+  has none: everyone enrols their own phone and nobody else holds the key.
+
+**Files**
+
+- `db/migrations/029-admin-mfa.sql` + `db/schema.sql` — `users.totp_secret` /
+  `totp_confirmed_at` / `totp_last_step`, `sessions.mfa_pending` /
+  `mfa_attempts`, `mfa_recovery_codes` (hashes only).
+- `src/lib/totp.js` — RFC 6238, no dependencies, checked against the published
+  vectors.
+- `src/db/mfa.js` — enrolment, the step claim, recovery codes, coverage.
+- `src/services/mfa.js` — policy, the challenge, the console's view.
+- `src/services/{auth,roles,events,icons}.js`, `src/app.js` — the gate, the
+  matrix (`MFA_ROLES`, `staff.security`), the two server-recorded events.
+- `src/routes/auth.js` (`POST /api/auth/mfa`), `src/routes/account.js`
+  (`GET /login/mfa`), `src/routes/admin.js` (`/admin/security` + its four posts,
+  `/admin/staff/:id/mfa/off`).
+- `views/pages/mfa.ejs`, `views/pages/admin/security.ejs`,
+  `public/js/account.js` (`initMfaChallenge`), `public/css/components.css`.
+- `test/mfa.test.js` — 25 tests; `test/helpers.js` gained `enrolMfa` /
+  `completeMfa` for the nine suites that sign in as staff;
+  `scripts/{smoke-roles,cms-smoke}.mjs` complete the challenge, and
+  `scripts/lib/dev-codes.mjs` clears the spent step for a repeat run (never in
+  production).
 
 ---
 

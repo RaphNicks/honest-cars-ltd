@@ -21,7 +21,7 @@ const require = createRequire(import.meta.url);
  * Delete the one-time codes issued to `phones` so a fresh one can be requested.
  * Returns how many rows went, or 0 when it declined to act.
  */
-export async function clearDevCodes(phones, { label = 'smoke' } = {}) {
+export async function clearDevCodes(phones, { label = 'smoke', resetMfa = false } = {}) {
   if (process.env.NODE_ENV === 'production') return 0;
   const numbers = [...new Set(phones.filter(Boolean))];
   if (!numbers.length) return 0;
@@ -32,6 +32,21 @@ export async function clearDevCodes(phones, { label = 'smoke' } = {}) {
     const result = await db.query(`DELETE FROM auth_codes WHERE phone IN (${placeholders})`, numbers);
     const cleared = Number(result?.affectedRows ?? 0);
     if (cleared) console.log(`· cleared ${cleared} spent ${label} code(s) so this run can sign in`);
+
+    // §12.2 — and the spent second-factor *step* on the demo accounts, for the
+    // same reason: a repeat run inside the same 30-second window would be told,
+    // correctly, that the code had already been used. This is the only place
+    // that clears it, it clears a step and never a secret, and — like the code
+    // deletion above — it never runs in production. The app's own replay rule
+    // is unchanged; it is what makes this necessary.
+    if (resetMfa) {
+      const steps = await db.query(
+        `UPDATE \`users\` SET totp_last_step = NULL WHERE phone IN (${placeholders}) AND totp_secret IS NOT NULL`,
+        numbers,
+      );
+      const reset = Number(steps?.affectedRows ?? 0);
+      if (reset) console.log(`· cleared ${reset} spent ${label} time-step(s) so this run can sign in`);
+    }
     return cleared;
   } finally {
     // The smoke scripts talk to the site over HTTP, not to the database, so

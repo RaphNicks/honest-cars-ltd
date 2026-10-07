@@ -33,6 +33,7 @@ const paymentService = require('../services/payments');
 const referralService = require('../services/referrals');
 const financingService = require('../services/financing');
 const privacyService = require('../services/privacy');
+const mfaService = require('../services/mfa');
 const phone = require('../lib/phone');
 const { helpers } = require('../lib/locals');
 const { sendPage, sendJson, CACHE } = require('../lib/respond');
@@ -80,6 +81,47 @@ router.get('/login', async (req, res, next) => {
       ...loginLocals({ next: req.query.next, reason: req.query.reason, ref: req.query.ref }),
       routePath: '/login',
       cache: CACHE.private,
+    });
+  } catch (error) {
+    return next(error);
+  }
+});
+
+/**
+ * §12.2 — the second factor.
+ *
+ * Reachable only by a session that has cleared the phone step: the gate sends
+ * everything else back to /login, and a signed-out visitor gets the sign-in page
+ * rather than an empty code box that cannot work.
+ */
+router.get('/login/mfa', async (req, res, next) => {
+  try {
+    if (!req.user) return res.redirect(302, `/login?next=${encodeURIComponent(validate.text(req.query.next, 300) || '/account')}`);
+    // Already cleared it (a refresh, or a stale bookmark): send them on rather
+    // than asking for a code that has already been given.
+    if (!auth.isMfaPending(req)) return res.redirect(302, auth.safeNextPath(req.query.next) || '/account');
+
+    return await sendPage(req, res, {
+      view: 'mfa',
+      routePath: '/login/mfa',
+      cache: CACHE.private,
+      page: {
+        title: 'Two-step sign-in',
+        metaTitle: 'Two-step sign-in',
+        titleSuffix: false,
+        description: 'The second factor for a staff account — the code from your authenticator app.',
+        canonical: '/login/mfa',
+        robots: 'noindex,nofollow',
+        bodyClass: 'page-login',
+        jsonLd: [],
+      },
+      data: {
+        next: auth.safeNextPath(req.query.next) || '',
+        maskedPhone: req.user.maskedPhone || null,
+        attemptsLeft: Math.max(0, (db.mfa.MAX_ATTEMPTS || 5) - (req.session.mfaAttempts || 0)),
+        issuer: mfaService.ISSUER,
+        contactWhatsapp: `https://wa.me/${config.business.whatsapp}?text=${encodeURIComponent('Hi HonestCars, I am stuck at the two-step sign-in.')}`,
+      },
     });
   } catch (error) {
     return next(error);

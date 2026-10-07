@@ -706,6 +706,12 @@ DELETE FROM finance_partners;
 -- they name are upserted, never deleted.
 DELETE FROM data_requests;
 DELETE FROM consent_records;
+-- §12.2: the second factor is cleared before it is re-seeded, for the accounts
+-- the seed owns. An account somebody enrolled by hand keeps its secret — the
+-- same rule the settings rows follow.
+DELETE FROM mfa_recovery_codes WHERE user_id IN (SELECT id FROM \`users\` WHERE phone IN ('+2348000000001', '+2348000000004'));
+UPDATE \`users\` SET totp_secret = NULL, totp_confirmed_at = NULL, totp_last_step = NULL
+ WHERE phone IN ('+2348000000001', '+2348000000004');
 DELETE FROM dealers;
 -- FR-32: the markets and their area lists are seed-owned too.
 DELETE FROM service_areas;
@@ -1124,6 +1130,33 @@ INSERT INTO \`users\` (phone, name, role, referral_code, status) VALUES
   ('+2348000000006', 'Woji Car Mart',       'dealer',    'HCWOJI', 'active'),
   ('+2348000000007', 'Aba Road Autos',      'dealer',    'HCABAR', 'active')
 ON DUPLICATE KEY UPDATE role = VALUES(role), name = VALUES(name), status = 'active';
+
+-- §12.2 — the second factor for the two roles that must have one. The secrets
+-- are written down here because this is a *demo* database that has to be
+-- sign-in-able by a script and a person; a real install has none of this and
+-- every staff member enrols their own phone at /admin/security. The step
+-- stays NULL so the first code anyone generates is still fresh.
+--
+--   admin   JBSWY3DPEHPK3PXP  (the key every TOTP tutorial uses — obvious on purpose)
+--   finance KRSXG5CTMVRXEZLU
+UPDATE \`users\` SET totp_secret = 'JBSWY3DPEHPK3PXP', totp_confirmed_at = DATE_SUB(UTC_TIMESTAMP(), INTERVAL 30 DAY),
+                   totp_last_step = NULL
+ WHERE phone = '+2348000000001';
+UPDATE \`users\` SET totp_secret = 'KRSXG5CTMVRXEZLU', totp_confirmed_at = DATE_SUB(UTC_TIMESTAMP(), INTERVAL 12 DAY),
+                   totp_last_step = NULL
+ WHERE phone = '+2348000000004';
+
+-- Recovery codes for the admin account: three issued, one already spent, so the
+-- console's "9 of 10 left" state is visible rather than asserted. Only the
+-- hashes are seeded — which is the point of storing hashes. The hashes are
+-- taken over the code with its dashes removed, as the app does.
+INSERT INTO mfa_recovery_codes (user_id, code_hash, used_at, created_at) VALUES
+  ((SELECT id FROM \`users\` WHERE phone = '+2348000000001'), SHA2('HC2X4PQR7TKM', 256), NULL,
+   DATE_SUB(UTC_TIMESTAMP(), INTERVAL 30 DAY)),
+  ((SELECT id FROM \`users\` WHERE phone = '+2348000000001'), SHA2('HC5N8VWB2XJQ', 256),
+   DATE_SUB(UTC_TIMESTAMP(), INTERVAL 9 DAY), DATE_SUB(UTC_TIMESTAMP(), INTERVAL 30 DAY)),
+  ((SELECT id FROM \`users\` WHERE phone = '+2348000000001'), SHA2('HC9M6CRT3WPD', 256), NULL,
+   DATE_SUB(UTC_TIMESTAMP(), INTERVAL 30 DAY));
 
 -- The CRM-lite inbox (§7.3): every one of these came in through a real form.
 INSERT INTO leads (type, listing_id, name, phone, message, preferred_day, source_path, status,
