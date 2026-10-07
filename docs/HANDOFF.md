@@ -197,35 +197,61 @@ lazily) instead of at module scope, so the shortlist PDF threw
 catch it; the full-suite options-PDF test did. Assert your anchors, then read
 the whole-suite result — not just the file you touched.
 
-## 3y. The brand mark
+## 3y. The brand mark — done
 
-The artwork was uploaded twice and destroyed twice — a sandbox restore at the
-start of the turn empties `/home/user/uploads/` before the turn runs, and the
-bytes are not recoverable from the message. So the *pipeline* is built and the
-master is the only thing missing.
+The company's artwork arrived through GitHub (commit `8910331` on this branch,
+`public/img/logo.png`), because the sandbox destroys uploads: a restore at the
+start of a turn empties `/home/user/uploads/` before the turn runs, and it ate
+this file twice. **Uploads are not a delivery mechanism here; a commit is.**
 
-`assets/brand/logo.png` is the master. `npm run icons` cuts every size from it:
+The master now lives at `assets/brand/logo.png`. `npm run icons` cuts every size
+from it:
 `public/img/logo.png` (header, drawer, console), `public/favicon.png` (tabs —
 `favicon.svg` is retired), `icons/icon-192|512`, `icons/maskable-192|512`,
 `icons/apple-touch-icon.png`, and rewrites `public/manifest.webmanifest`.
 Derived files are committed; `npm run icons:check` byte-compares them.
 
-Two design facts, both measured rather than assumed:
+**The master is gold on transparency** — the black visible in the original
+preview was the viewing backdrop, not the artwork. So where the mark lands
+decides whether it gets a field of its own, and that was settled by looking at
+rendered pixels at the sizes that ship:
 
-- The mark was drawn gold on black, so the black is kept — the art is trimmed of
-  the upload's margin and centred on its own field. The maskable pair keeps
-  every lit pixel inside Android's 80% safe circle; `test/brand.test.js` walks
-  the pixels, so a master that would be cropped fails the suite instead of the
-  home screen.
-- Nothing points at a logo that is not there. `helpers.brandMark`
-  (`src/lib/locals.js`) is null exactly when `public/img/logo.png` is absent, and
-  each brand block draws the mark when it exists and its inline shield when it
-  does not. `views/layouts/admin.ejs` had no favicon at all; it has one now.
+| Surface | Field | Why |
+| --- | --- | --- |
+| Header mark (32px chip) | navy, via CSS | the header is white; gold on white loses the laurel, hand and car |
+| Drawer mark | same 32px chip | the drawer header is white too |
+| Console bar mark | none | the bar is already `--honour-navy` |
+| Favicon (48px) | navy | a tab strip is light in every browser |
+| `icon-192/512`, maskable, apple-touch | navy, flattened | a launcher wants an opaque square; iOS forces black on transparency |
+| Share cards | none | the card is navy |
+
+The install icons are **flattened**, not merely composited: a PNG with a fully
+opaque alpha channel still declares itself transparent, and a launcher that
+believes it paints the icon on white. `test/brand.test.js` asserts both halves —
+opaque install icons, a transparent in-page mark, and the chip rule that makes
+the transparent one legible.
+
+`masterRatio` is height, because the mark is portrait (~0.81). Maskable is
+deliberately smaller than the any-purpose pair: Android may crop it to a circle
+of 80% of the canvas, and the test walks every pixel of the shipped file against
+that circle rather than trusting the number.
+
+Nothing points at a logo that is not there. `helpers.brandMark`
+(`src/lib/locals.js`) is null exactly when `public/img/logo.png` is absent, so
+each brand block draws the mark when it exists and its inline shield when it
+does not. `views/layouts/admin.ejs` had no favicon at all; it has one now.
+
+`assets/brand/logo.png` is the delivered file, committed as received. The icon
+recipe is code (`scripts/generate-icons.js`), so a future master needs no
+hand-exported PNGs — but note the delivered file is what standard tooling
+writes: **an untouched output of an image tool, not the vector source**. Keep
+the original vector when it turns up; an SVG master would render sharper at
+every size and could be embedded in the OG card directly.
 
 Changing the master is one file plus `npm run icons && npm run build:static` —
 no template, test or CSS edit. The OG card carries the mark above the eyebrow
-line when one exists, and the mark is part of the card's cache key, so a logo
-supplied later cannot leave stale cards behind.
+line when one exists, and the mark is part of the card's cache key, so a newly
+supplied logo cannot leave stale cards behind.
 
 ## 3. Just finished: the OG cards that were clipping every title
 
