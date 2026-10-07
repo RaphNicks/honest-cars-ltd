@@ -23,6 +23,7 @@
 const path = require('node:path');
 const fs = require('node:fs');
 const config = require('../config');
+const phone = require('../lib/phone');
 const db = require('../db');
 
 const FONT_DIR = path.join(__dirname, '..', '..', 'assets', 'fonts');
@@ -211,7 +212,7 @@ function pdf(statement, options = {}) {
   doc.rect(0, 0, doc.page.width, 6).fill(navy);
   setFont(20, true).fillColor(navy).text('Honest Cars', left, 40);
   setFont(10).fillColor(slate)
-    .text(`${statement.business.area} · ${statement.business.site.replace(/^https?:\/\//, '')} · ${statement.business.phone}`);
+    .text(`${statement.business.area} · ${statement.business.site.replace(/^https?:\/\//, '')} · ${phone.pretty(statement.business.phone)}`);
   setFont(20, true).fillColor(navy).text('Commission statement', left, 84);
   setFont(11).fillColor(slate).text(`${statement.label} · issued ${statement.generatedAt.toLocaleDateString('en-NG', { day: 'numeric', month: 'long', year: 'numeric' })}`);
 

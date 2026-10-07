@@ -16,6 +16,7 @@
 const path = require('node:path');
 const fs = require('node:fs');
 const config = require('../config');
+const phone = require('../lib/phone');
 const db = require('../db');
 const money = require('../lib/money');
 const hireService = require('./hire');
@@ -161,7 +162,7 @@ function pdf(invoice, options = {}) {
   // --- header ---------------------------------------------------------------
   doc.rect(0, 0, doc.page.width, 6).fill(navy);
   setFont(20, true).fillColor(navy).text('Honest Cars', left, 40);
-  setFont(10).fillColor(slate).text(`${invoice.business.area} · ${invoice.business.site.replace(/^https?:\/\//, '')} · ${invoice.business.phone}`);
+  setFont(10).fillColor(slate).text(`${invoice.business.area} · ${invoice.business.site.replace(/^https?:\/\//, '')} · ${phone.pretty(invoice.business.phone)}`);
   setFont(22, true).fillColor(navy).text(invoice.ready ? 'Hire invoice' : 'Hire quote', left, 84);
   setFont(11).fillColor(slate).text(`Reference ${invoice.reference} · ${invoice.statusLabel} · issued ${longDate(invoice.filedAt)}`);
 

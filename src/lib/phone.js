@@ -52,4 +52,18 @@ function mask(raw) {
   return `+${digits.slice(0, 3)} ${digits.slice(3, 6)} ••• ${digits.slice(-4)}`;
 }
 
-module.exports = { normalise, variants, canonical, mask };
+/**
+ * The same number, grouped for a human: `+234 913 562 6182`.
+ *
+ * Canonical is what links use; this is what eyes read. Anything we cannot
+ * normalise is returned exactly as it came in — a contact detail we do not
+ * recognise is still the contact detail we were given.
+ */
+function pretty(raw) {
+  const normalised = normalise(raw);
+  if (!normalised) return String(raw === null || raw === undefined ? '' : raw).trim();
+  const digits = normalised.slice(1);
+  return `+${digits.slice(0, 3)} ${digits.slice(3, 6)} ${digits.slice(6, 9)} ${digits.slice(9)}`;
+}
+
+module.exports = { normalise, variants, canonical, mask, pretty };

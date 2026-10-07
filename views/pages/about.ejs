@@ -64,7 +64,7 @@
         <dl class="summary-list">
           <div class="summary-list__row"><dt>Legal name</dt><dd><%= site.business.legalName %></dd></div>
           <div class="summary-list__row"><dt>Registered in</dt><dd>Port Harcourt, Rivers State, Nigeria</dd></div>
-          <div class="summary-list__row"><dt>Phone</dt><dd><a href="tel:<%= site.business.phone %>"><%= site.business.phone %></a></dd></div>
+          <div class="summary-list__row"><dt>Phone</dt><dd><a href="tel:<%= site.business.phone %>"><%= helpers.phonePretty(site.business.phone) %></a></dd></div>
           <div class="summary-list__row"><dt>Email</dt><dd><a href="mailto:<%= site.business.email %>"><%= site.business.email %></a></dd></div>
         </dl>
       </div>

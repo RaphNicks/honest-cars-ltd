@@ -31,6 +31,7 @@
 // numbers come from the settings store, which config.js also reads — no cycle,
 // because neither requires this file.
 const overrides = require('../lib/overrides');
+const phone = require('../lib/phone');
 
 const SLA_SHAPE = [
   { key: 'standard', label: 'Standard', note: 'Three verified options inside three working days.', updates: false },
@@ -192,7 +193,7 @@ function pdf({ request, shortlist: list }, options = {}) {
 
   doc.rect(0, 0, doc.page.width, 6).fill(navy);
   setFont(19, true).fillColor(navy).text('Honest Cars', left, 36);
-  setFont(9).fillColor(slate).text(`${business.area} · ${String(business.site).replace(/^https?:\/\//, '')} · ${business.phone}`);
+  setFont(9).fillColor(slate).text(`${business.area} · ${String(business.site).replace(/^https?:\/\//, '')} · ${phone.pretty(business.phone)}`);
   setFont(20, true).fillColor(navy).text('Your shortlist', left, 74);
   setFont(10).fillColor(slate).text(
     `Request ${request.trackingId} · ${list.count} verified ${list.count === 1 ? 'car' : 'cars'} chosen against your brief`,

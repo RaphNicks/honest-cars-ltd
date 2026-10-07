@@ -126,7 +126,7 @@
     <p class="report__disclaimer"><%= report.disclaimer %></p>
     <p class="report__sign">
       <%= report.business.name %> · <%= report.business.area %> ·
-      <a href="tel:<%= report.business.phone %>"><%= report.business.phone %></a> ·
+      <a href="tel:<%= report.business.phone %>"><%= helpers.phonePretty(report.business.phone) %></a> ·
       <a href="mailto:<%= report.business.email %>"><%= report.business.email %></a>
     </p>
   </footer>

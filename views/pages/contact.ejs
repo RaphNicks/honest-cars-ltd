@@ -27,7 +27,7 @@
 
         <div class="card card__body">
           <h2 class="mb-1"><%- helpers.icon('phone', { size: 22 }) %> Phone</h2>
-          <p class="mb-0"><a href="tel:<%= site.business.phone %>"><%= site.business.phone %></a></p>
+          <p class="mb-0"><a href="tel:<%= site.business.phone %>"><%= helpers.phonePretty(site.business.phone) %></a></p>
         </div>
 
         <div class="card card__body">

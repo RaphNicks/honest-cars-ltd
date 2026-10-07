@@ -19,6 +19,7 @@
 const path = require('node:path');
 const fs = require('node:fs');
 const config = require('../config');
+const phone = require('../lib/phone');
 const db = require('../db');
 
 const FONT_DIR = path.join(__dirname, '..', '..', 'assets', 'fonts');
@@ -178,7 +179,7 @@ function pdf(report, options = {}) {
   // --- header ---------------------------------------------------------------
   doc.rect(0, 0, doc.page.width, 6).fill(navy);
   setFont(20, true).fillColor(navy).text('Honest Cars', left, 40);
-  setFont(10).fillColor(slate).text(`${report.business.area} · ${report.business.site.replace(/^https?:\/\//, '')} · ${report.business.phone}`);
+  setFont(10).fillColor(slate).text(`${report.business.area} · ${report.business.site.replace(/^https?:\/\//, '')} · ${phone.pretty(report.business.phone)}`);
   setFont(22, true).fillColor(navy).text('Pre-purchase inspection report', left, 84);
   setFont(11).fillColor(slate).text(`Reference ${report.reference} · filed ${longDate(report.filedAt)}`);
 

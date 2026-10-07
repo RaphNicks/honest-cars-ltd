@@ -17,6 +17,7 @@ const { SORT_LABELS } = require('../db/listings');
 const shape = require('../db/shape');
 const blocks = require('../services/blocks');
 const { icon, SERVICE_ICONS } = require('../services/icons');
+const phone = require('./phone');
 const { buildNav, megaMenuItems, whatsappLink } = require('../services/nav');
 const seo = require('../services/seo');
 const events = require('../services/events');
@@ -131,6 +132,7 @@ function helpers({ saveData = false } = {}) {
     SERVICE_ICONS,
     whatsappLink,
     inlineText: blocks.inline,
+    phonePretty: phone.pretty,
     formatNaira: shape.formatNaira,
     formatNairaCompact: shape.formatNairaCompact,
     formatMileage: shape.formatMileage,

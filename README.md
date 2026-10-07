@@ -425,7 +425,7 @@ assets/fonts/       Inter variable TTF, used only to render OG cards
    CDN + WebP/AVIF variants + per-listing upload, §11) is still to build — the
    schema, `listing_media` shape and the `-600` variant convention are ready.
 3. **Prices, phone number and legal copy are placeholders.** The business phone
-   is `+2348000000000` and the CAC line is a stub — send me the real values
+   is the business number set in `.env` (`+2349135626182`), and the CAC line is a stub — send me the real values
    (§19 open questions) and I will update `.env` and the copy.
 4. **The integrations are seams, not services.** Checkout writes a real
    `payments` row with a `HC-PAY-` reference; the Paystack and Flutterwave
