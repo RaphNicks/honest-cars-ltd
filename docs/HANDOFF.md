@@ -170,6 +170,46 @@ the DB connection and the auth pepper.
 
 ---
 
+## 3z. Just finished: the company number
+
+`0913 562 6182` is the real number. It lives in `src/lib/settings-schema.js` as
+the registry default (`business.phone` = `+2349135626182`, `business.whatsapp` =
+`2349135626182`), which is the single source every surface reads:
+
+- `tel:` links — footer, `/contact`, `/about`, the report-inspection page;
+- every WhatsApp link and button — the floating button, the header, every form's
+  success state, `public/js/nav.js`, all built from `config.business.whatsapp`;
+- the `AutoDealer` JSON-LD `telephone` in `src/services/seo.js`;
+- the letterhead on all four PDFs — `services/{concierge,invoice,report,statement}.js`
+  all print `phone.pretty(x.phone)`.
+
+**Stored canonical, displayed grouped.** Links must be `+2349135626182`; eyes
+read `+234 913 562 6182`. `src/lib/phone.js` gained `pretty()`, exposed to views
+as `helpers.phonePretty` (`src/lib/locals.js`). Anything it cannot parse is
+printed exactly as given — never mangled into a wrong number. `/admin/settings`
+edits both without a deploy, and `.env.example` carries the real number as the
+template.
+
+**The bug worth remembering:** the `require('../lib/phone')` I first added to
+`concierge.js` landed *inside* `businessInfo()` (where `config` is required
+lazily) instead of at module scope, so the shortlist PDF threw
+`ReferenceError: phone is not defined` and 500ed. The file's own test did not
+catch it; the full-suite options-PDF test did. Assert your anchors, then read
+the whole-suite result — not just the file you touched.
+
+## 3y. Outstanding: the logo
+
+The uploaded `image-1.png` (black shield, gold double border, gold laurel and
+three stars over a hand cradling a sedan) never reached this session — the
+sandbox was reset before the turn ran and `/home/user/uploads/` was empty. It
+must be re-attached before the work can start. When it lands: one source PNG in
+`public/`, `sharp` down-scales to 192/512/apple-touch/maskable plus favicon; swap
+the inline shield at `views/partials/header.ejs:6`; repoint the JSON-LD `logo`
+in `src/services/seo.js` (currently `/icons/icon-512.png`); update the manifest
+and the OG default card's mark; then grep for any remaining logo use. Decide
+against the file whether the black background needs transparency or a light
+chip in the header.
+
 ## 3. Just finished: the OG cards that were clipping every title
 
 **Found while answering "are images still missing?"** — the pictures were all
