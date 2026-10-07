@@ -68,7 +68,9 @@ body.admin {
   letter-spacing: 0.02em;
 }
 
-.admin-bar__mark--logo { background: #000; overflow: hidden; }
+/* The console bar is already the brand navy, so the mark needs no field of its
+   own here — it drops straight onto the bar. */
+.admin-bar__mark--logo { background: transparent; overflow: hidden; }
 .admin-bar__mark img { display: block; width: 100%; height: 100%; object-fit: cover; border-radius: inherit; }
 
 .admin-bar__name { font-size: var(--text-16); }

@@ -7,7 +7,7 @@
           until then. helpers.brandMark is null exactly when there is no file,
           so the fallback can never be a broken image. %>
       <% if (helpers.brandMark) { %>
-        <img class="header__logo-mark" src="<%= helpers.brandMark %>" alt="" width="28" height="28" decoding="async">
+        <img class="header__logo-mark" src="<%= helpers.brandMark %>" alt="" width="32" height="32" decoding="async">
       <% } else { %>
         <%- helpers.icon('shield', { size: 28, className: 'header__logo-mark' }) %>
       <% } %>

@@ -24,9 +24,20 @@ shows as "the logo":
 | `public/icons/apple-touch-icon.png` | iOS home screen |
 | `public/manifest.webmanifest` | The install record, listing the icons above |
 
-The master's own black field is kept — the mark was drawn on it — and the
-artwork is trimmed of whatever margin the upload carries first. Derived files
-are committed, so the site deploys without a build step that only runs here.
+The supplied master is gold on transparency, and that is how it is used:
+
+* the **install icons** and the **favicon** get the brand navy behind it — a
+  launcher wants an opaque square, and gold on a light tab strip loses the
+  laurel, the hand and the car at 16–48px;
+* the **header mark** keeps its transparency, and `public/css/components.css`
+  puts it on a navy chip, because the header itself is white;
+* the **console bar** and the **share cards** are navy already, so the gold
+  goes straight on;
+* the **maskable** pair keeps the artwork small enough to survive Android's
+  circular crop — `test/brand.test.js` measures that per pixel.
+
+Derived files are committed, so the site deploys without a build step that only
+runs here.
 
 **Without a master** the script draws the shield-and-check placeholder into the
 same filenames, and `public/img/logo.png` is absent — which is how the header,
