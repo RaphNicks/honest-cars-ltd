@@ -368,7 +368,7 @@ function mfaGate(req, res, next) {
   // The doors. `/login` itself is open so someone can abandon and start again.
   const OPEN = ['/login', '/login/mfa', '/api/auth/mfa', '/api/auth/logout', '/api/auth/otp', '/api/auth/verify'];
   if (OPEN.includes(path)) return next();
-  if (/^\/(css|js|fonts|img|video|icons)\//.test(path) || path === '/manifest.webmanifest' || path === '/sw.js' || path === '/favicon.svg') {
+  if (/^\/(css|js|fonts|img|video|icons)\//.test(path) || path === '/manifest.webmanifest' || path === '/sw.js' || path === '/favicon.png') {
     return next();
   }
 

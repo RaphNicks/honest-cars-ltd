@@ -3,7 +3,14 @@
 <header class="header" id="site-header" data-scrolled="false">
   <div class="container header__inner">
     <a class="header__logo" href="/" aria-label="HonestCars home">
-      <%- helpers.icon('shield', { size: 28, className: 'header__logo-mark' }) %>
+      <%# The company's own mark once assets/brand/ has one; the inline shield
+          until then. helpers.brandMark is null exactly when there is no file,
+          so the fallback can never be a broken image. %>
+      <% if (helpers.brandMark) { %>
+        <img class="header__logo-mark" src="<%= helpers.brandMark %>" alt="" width="28" height="28" decoding="async">
+      <% } else { %>
+        <%- helpers.icon('shield', { size: 28, className: 'header__logo-mark' }) %>
+      <% } %>
       <span>Honest<em>Cars</em></span>
     </a>
 

@@ -432,6 +432,9 @@
 
 .header__logo:hover { text-decoration: none; }
 .header__logo-mark { width: 28px; height: 28px; flex: 0 0 auto; }
+/* When the company's mark is in place it is a raster on its own black field,
+   so the tile takes the house radius instead of a hard square edge. */
+img.header__logo-mark { border-radius: var(--radius-sm); }
 .header__logo em { font-style: normal; color: var(--honest-green); }
 
 .header__nav { display: none; }

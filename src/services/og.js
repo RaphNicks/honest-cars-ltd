@@ -22,6 +22,7 @@ const crypto = require('node:crypto');
 const ROOT = path.join(__dirname, '..', '..');
 const OG_DIR = path.join(ROOT, 'public', 'og');
 const FONT_DIR = path.join(ROOT, 'assets', 'fonts');
+const MARK_FILE = path.join(ROOT, 'public', 'img', 'logo.png');
 
 let sharp = null;
 let fontconfigReady = false;
@@ -315,6 +316,49 @@ const textEl = (x, y, size, weight, fill, content, extra = '') =>
  * `withBackdrop: false` renders only the scrim + text, for compositing over a
  * real car photo. Async because fitting the text measures it first.
  */
+// Where the mark sits when there is one: the top-left of the empty upper band,
+// well clear of the eyebrow line at y=236 and of the title below it.
+const MARK_PX = 88;
+const MARK_TOP = 96;
+
+/**
+ * The company's mark for the card's top-left corner.
+ *
+ * The same file the header draws, base64'd into the SVG because that is how
+ * this module has always handed art to the renderer — one string in, one PNG
+ * out, no temp files. There is no mark until the company supplies a master
+ * (`scripts/generate-icons.js`), and the card then simply starts where it
+ * always did.
+ *
+ * @returns {string} SVG markup, or an empty string
+ */
+function brandMarkMarkup() {
+  let png;
+  try {
+    png = fs.readFileSync(MARK_FILE);
+  } catch {
+    return '';
+  }
+  return `<image x="${TEXT_X}" y="${MARK_TOP}" width="${MARK_PX}" height="${MARK_PX}" href="data:image/png;base64,${png.toString('base64')}"/>`;
+}
+
+/**
+ * A short fingerprint of the mark, for the cache key.
+ *
+ * A card's filename hashes its input — title, subtitle, badge, photo — and the
+ * mark is part of the art but none of those. Without this, every card rendered
+ * before the company's logo arrived would keep its old corner for as long as
+ * the cache file lived, which is exactly the "the fix is deployed and the old
+ * picture is still showing" failure the module already works to avoid.
+ */
+function markStamp() {
+  try {
+    return crypto.createHash('sha1').update(fs.readFileSync(MARK_FILE)).digest('hex').slice(0, 8);
+  } catch {
+    return 'no-mark';
+  }
+}
+
 async function cardSvg({ title, subtitle, badge, withBackdrop = true }) {
   const grade = GRADE_COLOURS[badge] || GRADE_COLOURS.network_listed;
 
@@ -344,6 +388,7 @@ async function cardSvg({ title, subtitle, badge, withBackdrop = true }) {
   ${withBackdrop ? `<rect width="${CARD_WIDTH}" height="630" fill="#0E2A47"/>` : ''}
   <rect width="${CARD_WIDTH}" height="630" fill="url(#scrim)"/>
   <rect x="0" y="0" width="12" height="630" fill="#12A150"/>
+  ${brandMarkMarkup()}
   ${textEl(TEXT_X, 236, 30, 600, '#D8E0E8', 'HONESTCARS · PORT HARCOURT', ' letter-spacing="1"')}
   ${titleLines.join('\n  ')}
   ${sub ? textEl(TEXT_X, subtitleY, sub.size, 700, '#E8A13D', sub.lines[0]) : ''}
@@ -373,7 +418,7 @@ async function renderOgCard(input) {
 
     const hash = crypto
       .createHash('sha1')
-      .update(JSON.stringify(input))
+      .update(JSON.stringify(input) + markStamp())
       .digest('hex')
       .slice(0, 12);
     const filename = `${(input.key || 'card').replace(/[^a-z0-9-]/gi, '-').slice(0, 60)}-${hash}.png`;

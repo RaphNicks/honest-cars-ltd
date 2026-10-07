@@ -6,6 +6,8 @@
   <meta name="theme-color" content="#0E2A47">
   <meta name="robots" content="noindex, nofollow">
   <title><%= page.metaTitle %></title>
+  <link rel="icon" href="/favicon.png" sizes="48x48" type="image/png">
+  <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
   <link rel="preload" as="font" type="font/woff2" href="/fonts/inter-latin-400-normal.woff2" crossorigin>
   <link rel="preload" as="font" type="font/woff2" href="/fonts/inter-latin-700-normal.woff2" crossorigin>
   <link rel="stylesheet" href="/css/tokens.css">
@@ -19,7 +21,9 @@
   <header class="admin-bar">
     <div class="admin-bar__inner">
       <a class="admin-bar__brand" href="<%= admin.brandHref || '/admin' %>">
-        <span class="admin-bar__mark">HC</span>
+        <span class="admin-bar__mark<%= helpers.brandMark ? ' admin-bar__mark--logo' : '' %>"><%
+          if (helpers.brandMark) { %><img src="<%= helpers.brandMark %>" alt="" width="32" height="32"><%
+          } else { %>HC<% } %></span>
         <span class="admin-bar__name"><%= admin.brandName || 'Console' %></span>
       </a>
 

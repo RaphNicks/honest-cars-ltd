@@ -29,7 +29,7 @@
 
 /* eslint-env serviceworker */
 
-const VERSION = 'hc-v1';
+const VERSION = 'hc-v2';
 const SHELL = `${VERSION}-shell`;
 const PAGES = `${VERSION}-pages`;
 const RUNTIME = `${VERSION}-runtime`; // shell assets discovered later (other font weights)
@@ -41,7 +41,7 @@ const ASSETS = `${VERSION}-assets`;
 const SHELL_URLS = [
   '/offline',
   '/manifest.webmanifest',
-  '/favicon.svg',
+  '/favicon.png',
   '/icons/icon-192.png',
   '/css/tokens.css',
   '/css/base.css',

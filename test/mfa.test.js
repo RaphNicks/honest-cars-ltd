@@ -469,7 +469,7 @@ maybe('a half-signed-in session opens nothing but the challenge — and the stat
   const post = await client.post('/api/account/saved-cars', { listingId: 1, action: 'add' });
   assert.equal(post.status, 401, 'and a write is refused the same way');
 
-  for (const path of ['/login/mfa', '/css/tokens.css', '/js/main.js', '/favicon.svg']) {
+  for (const path of ['/login/mfa', '/css/tokens.css', '/js/main.js', '/favicon.png']) {
     const allowed = await client.request(path);
     assert.equal(allowed.status, 200, `${path} must stay reachable while half signed in`);
   }

@@ -11,6 +11,8 @@
  * that (§10). This file owns everything else.
  */
 
+const fs = require('node:fs');
+const path = require('node:path');
 const config = require('../config');
 const db = require('../db');
 const { SORT_LABELS } = require('../db/listings');
@@ -118,6 +120,22 @@ function photoSrc(url, { saveData = false } = {}) {
   return smallSrc(url) || url;
 }
 
+/**
+ * The company's own mark, when one has been generated from `assets/brand/`.
+ *
+ * `scripts/generate-icons.js` writes `public/img/logo.png` only when there is a
+ * master to cut it from, so this file check is the whole switch: with a mark,
+ * the header, the drawer and the console draw it; without one they draw the
+ * inline shield they have always drawn. No template has to know which is in
+ * force, and nothing ever points at a file that is not there.
+ */
+const BRAND_MARK = path.join(__dirname, '..', '..', 'public', 'img', 'logo.png');
+const BRAND_MARK_URL = '/img/logo.png';
+
+function brandMark() {
+  return fs.existsSync(BRAND_MARK) ? BRAND_MARK_URL : null;
+}
+
 function helpers({ saveData = false } = {}) {
   return {
     saveData,
@@ -130,6 +148,7 @@ function helpers({ saveData = false } = {}) {
     formatBytes,
     icon,
     SERVICE_ICONS,
+    brandMark: brandMark(),
     whatsappLink,
     inlineText: blocks.inline,
     phonePretty: phone.pretty,

@@ -2,7 +2,11 @@
 <div class="drawer" id="mobile-drawer" data-open="false" role="dialog" aria-modal="true" aria-label="Menu">
   <div class="drawer__head">
     <a class="header__logo" href="/" tabindex="-1">
-      <%- helpers.icon('shield', { size: 28, className: 'header__logo-mark' }) %>
+      <% if (helpers.brandMark) { %>
+        <img class="header__logo-mark" src="<%= helpers.brandMark %>" alt="" width="28" height="28" decoding="async">
+      <% } else { %>
+        <%- helpers.icon('shield', { size: 28, className: 'header__logo-mark' }) %>
+      <% } %>
       <span>Honest<em>Cars</em></span>
     </a>
     <button class="icon-btn" type="button" aria-label="Close menu" data-drawer-close>
