@@ -220,7 +220,7 @@ rendered pixels at the sizes that ship:
 | --- | --- | --- |
 | Header mark (32px chip) | navy, via CSS | the header is white; gold on white loses the laurel, hand and car |
 | Drawer mark | same 32px chip | the drawer header is white too |
-| Console bar mark | none | the bar is already `--honour-navy` |
+| Console bar mark | none | the bar is already `--colour-navy` (#0E2A47) |
 | Favicon (48px) | navy | a tab strip is light in every browser |
 | `icon-192/512`, maskable, apple-touch | navy, flattened | a launcher wants an opaque square; iOS forces black on transparency |
 | Share cards | none | the card is navy |
