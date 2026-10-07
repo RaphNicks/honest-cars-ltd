@@ -4,9 +4,26 @@
  * Runtime configuration. Everything comes from the environment so the same
  * build runs against the sandbox MySQL and a laptop instance untouched.
  * See .env.example.
+ *
+ * Some of these are also *defaults* for settings the console owns (§5.1):
+ * business facts, page limits, the sold-car windows, the concierge SLA card,
+ * referral and CAC figures, and the channel each message takes. The ones that
+ * are marked below read through `overrides.value(...)`, which returns the saved
+ * override when there is one and this environment-derived default when there is
+ * not — so a fresh `.env` behaves exactly as it always did, and the desk can
+ * change a number without a deploy. Which keys those are, and what each one
+ * controls, is the registry in `src/lib/settings-schema.js`.
  */
 
 require('dotenv').config();
+
+// The console's /admin/settings screen (§5.1) stores overrides in the database,
+// hydrated into this module at boot by `src/services/settings.js`. Reading a
+// setting through `overrides.value()` gives the override when there is one and
+// the registry's default — which is the environment, exactly as it was before
+// that screen existed — when there is not. No cycle: this file and the registry
+// never require each other at load time.
+const overrides = require('./lib/overrides');
 
 const int = (value, fallback) => {
   const n = Number.parseInt(value, 10);
@@ -43,31 +60,56 @@ const config = {
   business: {
     name: 'Honest Cars LTD',
     legalName: 'Honest Cars LTD',
-    phone: process.env.BUSINESS_PHONE || '+2348000000000',
-    whatsapp: process.env.BUSINESS_WHATSAPP || '2348000000000',
-    email: process.env.BUSINESS_EMAIL || 'hello@honestcarsltd.com',
+    // Editable at /admin/settings — see the note on `overrides` at the top.
+    get phone() {
+      return overrides.value('business.phone');
+    },
+    get whatsapp() {
+      return overrides.value('business.whatsapp');
+    },
+    get email() {
+      return overrides.value('business.email');
+    },
     city: 'Port Harcourt',
     region: 'Rivers State',
     country: 'NG',
-    addressNote: 'We operate virtually in Port Harcourt — inspections come to you.',
-    cacLine: 'Honest Cars LTD — RC 0000000 · Port Harcourt, Rivers State, Nigeria',
+    get addressNote() {
+      return overrides.value('business.address_note');
+    },
+    get cacLine() {
+      return overrides.value('business.cac_line');
+    },
     latitude: Number.parseFloat(process.env.BUSINESS_LAT || '4.8156'),
     longitude: Number.parseFloat(process.env.BUSINESS_LNG || '7.0498'),
     // The account customers transfer to while no card processor is live (§18).
-    bankName: process.env.BUSINESS_BANK_NAME || 'GTBank',
-    bankAccount: process.env.BUSINESS_BANK_ACCOUNT || '0123456789',
-    bankAccountName: process.env.BUSINESS_BANK_ACCOUNT_NAME || 'Honest Cars Ltd',
+    get bankName() {
+      return overrides.value('business.bank_name');
+    },
+    get bankAccount() {
+      return overrides.value('business.bank_account');
+    },
+    get bankAccountName() {
+      return overrides.value('business.bank_account_name');
+    },
   },
 
   // Sold-archive rule (§6.2 + §14.1): visible 7 days → archive page → 301 at 90.
   soldArchive: {
-    visibleDays: int(process.env.SOLD_VISIBLE_DAYS, 7),
-    redirectDays: int(process.env.SOLD_REDIRECT_DAYS, 90),
+    get visibleDays() {
+      return overrides.value('sold.visible_days');
+    },
+    get redirectDays() {
+      return overrides.value('sold.redirect_days');
+    },
   },
 
   listings: {
-    perPage: int(process.env.LISTINGS_PER_PAGE, 24),
-    homeFeedLimit: int(process.env.HOME_FEED_LIMIT, 8),
+    get perPage() {
+      return overrides.value('listings.per_page');
+    },
+    get homeFeedLimit() {
+      return overrides.value('listings.home_feed');
+    },
     similarLimit: 3,
   },
 
@@ -115,31 +157,16 @@ const config = {
     get defaultChannel() {
       return process.env.NOTIFY_CHANNEL || 'console';
     },
-    channels: {
-      payment_request: process.env.NOTIFY_CHANNEL_PAYMENT || process.env.NOTIFY_CHANNEL || 'console',
-      payment_receipt: process.env.NOTIFY_CHANNEL_PAYMENT || process.env.NOTIFY_CHANNEL || 'console',
-      payment_refunded: process.env.NOTIFY_CHANNEL_PAYMENT || process.env.NOTIFY_CHANNEL || 'console',
-      booking_dispatched: process.env.NOTIFY_CHANNEL || 'console',
-      booking_completed: process.env.NOTIFY_CHANNEL || 'console',
-      request_options_ready: process.env.NOTIFY_CHANNEL || 'console',
-      milestone_stage: process.env.NOTIFY_CHANNEL_PAYMENT || process.env.NOTIFY_CHANNEL || 'console',
-      booking_reminder: process.env.NOTIFY_CHANNEL || 'console',
-      // FR-25 deal alerts — a nudge, not a receipt, so they follow the general
-      // channel rather than the payment one.
-      price_drop: process.env.NOTIFY_CHANNEL || 'console',
-      new_match: process.env.NOTIFY_CHANNEL || 'console',
-      // FR-20 renewals — a payment prompt, so it follows the payment channel.
-      subscription_renewal: process.env.NOTIFY_CHANNEL_PAYMENT || process.env.NOTIFY_CHANNEL || 'console',
-      // FR-28 referrals — qualifying is a nudge, a paid reward is a receipt.
-      referral_qualified: process.env.NOTIFY_CHANNEL || 'console',
-      referral_reward_approved: process.env.NOTIFY_CHANNEL || 'console',
-      referral_reward_paid: process.env.NOTIFY_CHANNEL_PAYMENT || process.env.NOTIFY_CHANNEL || 'console',
-      // FR-34 — a financing referral leaves for a lender, so it gets its own
-      // knob: the customer receipts and the partner message may not want to
-      // travel the same route, and neither must be silently substituted.
-      financing_received: process.env.NOTIFY_CHANNEL_FINANCING || process.env.NOTIFY_CHANNEL || 'console',
-      financing_handoff: process.env.NOTIFY_CHANNEL_FINANCING || process.env.NOTIFY_CHANNEL || 'console',
-      financing_update: process.env.NOTIFY_CHANNEL_FINANCING || process.env.NOTIFY_CHANNEL || 'console',
+    // Built from the registry in src/lib/settings-schema.js — one row per
+    // template, so a message type cannot be added without a channel decision
+    // (a test asserts the two lists match), and the desk can move a template
+    // between WhatsApp, SMS and email without a deploy.
+    get channels() {
+      const out = {};
+      for (const template of Object.keys(require('./lib/settings-schema').CHANNEL_TEMPLATES)) {
+        out[template] = overrides.value(`notify.channel.${template}`);
+      }
+      return out;
     },
   },
 
@@ -148,8 +175,12 @@ const config = {
   // here and a human entry in the console. `rewardKobo` only pre-fills the form;
   // nothing is ever shown to a customer until the desk approves it.
   referral: {
-    rewardKobo: int(process.env.REFERRAL_REWARD_KOBO, 200_000),
-    qualifyOrders: int(process.env.REFERRAL_QUALIFY_ORDERS, 1),
+    get rewardKobo() {
+      return overrides.value('referral.reward');
+    },
+    get qualifyOrders() {
+      return overrides.value('referral.qualify_orders');
+    },
   },
 
   analytics: {
@@ -165,7 +196,9 @@ const config = {
   // flagged, not hidden. Deliberately configuration, not a hard-coded number —
   // what is expensive in October is not what is expensive in March.
   marketing: {
-    cacGuardrailKobo: int(process.env.MARKETING_CAC_GUARDRAIL_KOBO, 3_500_000),
+    get cacGuardrailKobo() {
+      return overrides.value('marketing.cac_guardrail');
+    },
   },
 
   features: {

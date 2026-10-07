@@ -44,6 +44,7 @@ const statementService = require('../services/statement');
 const dealerApi = require('../services/dealer-api');
 const referralService = require('../services/referrals');
 const financingService = require('../services/financing');
+const settingsService = require('../services/settings');
 const { sendPage, CACHE } = require('../lib/respond');
 
 const router = express.Router();
@@ -2098,10 +2099,16 @@ router.post('/marketing/spend', auth.requireStaff('marketing.spend'), auth.sameO
 // ---------------------------------------------------------------------------
 router.get('/settings', auth.requireStaff('settings.manage'), async (req, res, next) => {
   try {
-    const [cities, areas, unmanaged] = await Promise.all([
+    const [cities, areas, unmanaged, settingsTableMissing] = await Promise.all([
       db.areas.cities({ includeInactive: true }),
       db.areas.areas({ includeInactive: true }),
       db.areas.unmanagedAreas(),
+      // A database that predates migration 027 is not a reason to fail the
+      // screen: the defaults are correct. It is a reason to say so.
+      db.settings
+        .all()
+        .then(() => false)
+        .catch(() => true),
     ]);
     return await page(req, res, {
       view: 'admin/settings',
@@ -2115,6 +2122,13 @@ router.get('/settings', auth.requireStaff('settings.manage'), async (req, res, n
         })),
         unmanaged,
         areaCount: areas.length,
+        // §5.1 — the rest of the screen: business facts, limits and windows,
+        // fees and retainers, message channels. Built from the registry in
+        // src/lib/settings-schema.js, so the form cannot offer a setting the
+        // code does not read.
+        settingGroups: settingsService.view(),
+        settingsSummary: settingsService.summary(),
+        settingsTableMissing: settingsTableMissing,
       },
     });
   } catch (error) {
@@ -2203,6 +2217,69 @@ router.post('/settings/areas/:id/move', auth.requireStaff('settings.manage'), au
     return done(res, back, result.moved
       ? `${result.area.name} moved ${direction}.`
       : `${result.area.name} is already at the ${direction === 'up' ? 'top' : 'bottom'} of its list.`);
+  } catch (error) {
+    return next(error);
+  }
+});
+
+/**
+ * §5.1 — save one group of settings.
+ *
+ * A group at a time, because groups are what change together (a retainer and its
+ * hours, a page size and the feed size), and because validating a pair is easier
+ * when you have both. Everything is validated before anything is written: half a
+ * group applied is worse than none — a retainer changed without its hours bills
+ * the new price against the old promise.
+ */
+router.post('/settings/group/:key', auth.requireStaff('settings.manage'), auth.sameOriginOnly, async (req, res, next) => {
+  const back = PATHS.settings;
+  try {
+    const body = req.body || {};
+    const result = await settingsService.saveGroup(req.params.key, body, { actorId: req.user.id });
+    if (!result.ok) return done(res, back, result.error, { error: true });
+
+    if (result.saved || result.reset) {
+      await admin.recordAudit({
+        actorId: req.user.id,
+        action: 'settings.updated',
+        entity: 'settings_group',
+        entityId: null,
+        detail: `${req.params.key}: ${JSON.stringify(result.detail)}`,
+      });
+      // The public pages bake business facts into HTML, so a changed fact means
+      // the prebuilt copy is stale until the next build. Say so rather than
+      // letting the footer disagree with the console.
+      const facts = req.params.key === 'business';
+      return done(
+        res,
+        back,
+        `Settings saved — ${result.summary}.${
+          facts ? ' Prebuilt pages now render on request until the next static build, so nothing shows the old wording.' : ''
+        }`,
+      );
+    }
+    return done(res, back, 'Nothing to change — every field matched what is already saved.');
+  } catch (error) {
+    return next(error);
+  }
+});
+
+/** Back to the registry defaults: the row goes, the default comes back. */
+router.post('/settings/group/:key/reset', auth.requireStaff('settings.manage'), auth.sameOriginOnly, async (req, res, next) => {
+  const back = PATHS.settings;
+  try {
+    const result = await settingsService.resetGroup(req.params.key, { actorId: req.user.id });
+    if (!result.ok) return done(res, back, result.error, { error: true });
+    if (result.reset) {
+      await admin.recordAudit({
+        actorId: req.user.id,
+        action: 'settings.reset',
+        entity: 'settings_group',
+        entityId: null,
+        detail: `${req.params.key}: ${JSON.stringify(result.detail)}`,
+      });
+    }
+    return done(res, back, result.reset ? `Back to defaults — ${result.summary}.` : result.summary);
   } catch (error) {
     return next(error);
   }

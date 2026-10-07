@@ -7,7 +7,8 @@
   rename leaves the cars filed under the old spelling where they are, and says
   how many that was so the desk can decide.
 
-  Locals: cities (each with its areas), areas, unmanaged, areaCount
+  Locals: cities (each with its areas), areas, unmanaged, areaCount,
+          settingGroups, settingsSummary, settingsTableMissing
 %>
 
 <section class="panel" aria-labelledby="markets-h">
@@ -155,12 +156,156 @@
   </section>
 <% } %>
 
-<section class="panel mt-2" aria-labelledby="settings-rest-h">
-  <h2 class="panel__title" id="settings-rest-h">What else lives here</h2>
+<%# ---------------------------------------------------------------------------
+    §5.1 — the rest of the settings screen.
+
+    Every group here is built from the registry in src/lib/settings-schema.js, so
+    this form cannot offer a setting the code does not read: a row with no
+    consumer is a button that does nothing, and an ops team that changes a number
+    nobody reads has been lied to. Each row shows whether it is running on the
+    default or on a value somebody here saved.
+--------------------------------------------------------------------------- %>
+
+<% if (settingsTableMissing) { %>
+  <section class="panel mt-2">
+    <h2 class="panel__title">Settings cannot be saved yet</h2>
+    <p class="cms-hint mb-0">
+      The <code>settings</code> table is missing on this database — run <code>npm run db:setup</code>
+      (migration 027). Everything below is showing its built-in default, which is what the site is
+      already using.
+    </p>
+  </section>
+<% } %>
+
+<% settingGroups.forEach(function (group) { %>
+  <section class="panel mt-2" id="group-<%= group.key %>" aria-labelledby="group-<%= group.key %>-h">
+    <div class="panel__head">
+      <div>
+        <h2 class="panel__title" id="group-<%= group.key %>-h"><%= group.title %></h2>
+        <p class="cms-hint"><%= group.hint %></p>
+      </div>
+      <div class="muted">
+        <% if (group.changed) { %>
+          <span class="badge badge--ok"><%= group.changed %> changed</span>
+        <% } else { %>
+          <span class="badge badge--draft">all defaults</span>
+        <% } %>
+        <form method="post" action="/admin/settings/group/<%= group.key %>/reset" class="inline-form">
+          <button class="btn btn--ghost btn--sm" type="submit"
+                  <%= group.changed ? '' : 'disabled' %>>Reset to defaults</button>
+        </form>
+      </div>
+    </div>
+
+    <form method="post" action="/admin/settings/group/<%= group.key %>">
+      <% if (group.key === 'channels') { %>
+        <%# One row per message template. The channel a message takes is not a
+            detail: with no provider configured it is recorded skipped, and ops
+            sends it by hand — so an operator needs to see, per message, where it
+            is meant to go. %>
+        <div class="table-wrap mt-1">
+          <table class="table">
+            <thead>
+              <tr>
+                <th scope="col">Message</th>
+                <th scope="col">Where it goes</th>
+                <th scope="col">State</th>
+              </tr>
+            </thead>
+            <tbody>
+              <% group.fields.forEach(function (field) { %>
+                <tr>
+                  <td>
+                    <strong><%= field.label %></strong>
+                    <br><span class="cms-hint"><%= field.hint %></span>
+                  </td>
+                  <td>
+                    <label class="visually-hidden" for="<%= field.key.replace(/\./g, '-') %>"><%= field.label %></label>
+                    <select class="select" id="<%= field.key.replace(/\./g, '-') %>" name="<%= field.key %>">
+                      <option value="" <%= field.changed ? '' : 'selected' %>>Default — <%= field.defaultDisplay %></option>
+                      <% field.options.forEach(function (option) { %>
+                        <option value="<%= option.value %>" <%= field.changed && field.value === option.value ? 'selected' : '' %>><%= option.label %></option>
+                      <% }); %>
+                    </select>
+                  </td>
+                  <td>
+                    <% if (field.changed) { %>
+                      <span class="badge badge--in_review">changed</span>
+                    <% } else { %>
+                      <span class="muted">default</span>
+                    <% } %>
+                  </td>
+                </tr>
+              <% }); %>
+            </tbody>
+          </table>
+        </div>
+      <% } else { %>
+        <div class="admin-grid admin-grid--2 mt-1">
+          <% group.fields.forEach(function (field) { %>
+            <div class="field">
+              <label class="field__label" for="<%= field.key.replace(/\./g, '-') %>">
+                <%= field.label %><% if (field.type === 'money') { %>
+                  <span class="muted">(₦)</span><% } else if (field.unit) { %>
+                  <span class="muted">(<%= field.unit %>)</span><% } %>
+              </label>
+              <% if (field.type === 'textarea') { %>
+                <textarea class="input" id="<%= field.key.replace(/\./g, '-') %>" name="<%= field.key %>"
+                          rows="2" maxlength="<%= field.max || 200 %>"><%= field.display %></textarea>
+              <% } else if (field.type === 'money') { %>
+                <input class="input" id="<%= field.key.replace(/\./g, '-') %>" name="<%= field.key %>"
+                       value="<%= field.display %>" inputmode="decimal" autocomplete="off">
+              <% } else if (field.type === 'enum') { %>
+                <select class="select" id="<%= field.key.replace(/\./g, '-') %>" name="<%= field.key %>">
+                  <option value="" <%= field.changed ? '' : 'selected' %>>Default — <%= field.defaultDisplay %></option>
+                  <% field.options.forEach(function (option) { %>
+                    <option value="<%= option.value %>" <%= field.changed && field.value === option.value ? 'selected' : '' %>><%= option.label %></option>
+                  <% }); %>
+                </select>
+              <% } else { %>
+                <input class="input" id="<%= field.key.replace(/\./g, '-') %>" name="<%= field.key %>"
+                       value="<%= field.display %>" placeholder="<%= field.placeholder || '' %>"
+                       inputmode="<%= field.type === 'int' || field.type === 'money' ? 'numeric' : (field.type === 'phone' || field.type === 'digits' ? 'tel' : 'text') %>"
+                       autocomplete="off">
+              <% } %>
+              <p class="cms-hint"><%= field.hint %></p>
+              <p class="cms-hint mb-0">
+                <% if (field.changed) { %>
+                  <span class="badge badge--in_review">changed</span>
+                <% } else { %>
+                  <span class="muted">default</span>
+                <% } %>
+                <span class="muted">· built-in default: <%= field.defaultDisplay %></span>
+              </p>
+            </div>
+          <% }); %>
+        </div>
+      <% } %>
+
+      <div class="admin-inline-form mt-2">
+        <button class="btn btn--primary btn--sm" type="submit">Save <%= group.title.toLowerCase() %></button>
+        <span class="cms-hint">Leave a field as it is to keep it; “Reset to defaults” above puts a value back.</span>
+      </div>
+    </form>
+  </section>
+<% }); %>
+
+<section class="panel mt-2" aria-labelledby="settings-keys-h">
+  <h2 class="panel__title" id="settings-keys-h">What is deliberately not on this screen</h2>
   <p class="cms-hint">
-    Settings is the home for what ops owns about the shape of the business rather than
-    one listing or one order. Today that is the market and area list above; the other §5.1
-    groups — fee tables, SLAs and the numbers the offers are priced from — still live in
-    configuration and are read-only, and are tracked in <code>docs/GAPS.md</code>.
+    Every setting on this screen is read by the code that uses it. There are no decorative controls here: a field
+    nothing read would be a box that appears to change something and does not, and it is not on the list.
+  </p>
+  <p class="cms-hint">
+    Provider credentials — the payment keys, the SMS and email keys, the GA4 and Meta pixel IDs — live in
+    <code>.env</code> and stay there. They are deployment secrets, and a console page that can read them is a page
+    where they leak. Same for the database connection and the session pepper: those are the deployment, not the
+    business.
+  </p>
+  <p class="cms-hint mb-0">
+    <%= settingsSummary.total %> settings can be changed here; <%= settingsSummary.changed %> currently differ from
+    their defaults. A value that is changed is stored in the <code>settings</code> table with who changed it and
+    when; “Reset to defaults” deletes the row rather than writing the default in, so there is exactly one place a
+    default is written down.
   </p>
 </section>

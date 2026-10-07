@@ -6,7 +6,46 @@ integrations §11, NFRs §12, sitemap §5.1, acceptance §18.3).
 Line references below point at the code that exists. Where an item is missing, the
 note says what "done" would mean, so the work can be scoped without re-reading the PRD.
 
-**Status at this commit:** FR-34 is built — the financing handoff, end to end,
+**Status at this commit:** §5.1's settings screen is finished — the half that
+is not the area list. Business facts, limits and windows, fees and retainers, and
+the channel each message takes are editable at `/admin/settings`, with the
+environment as their default and no deploy in the loop.
+
+- **The registry is the screen.** `src/lib/settings-schema.js` declares every
+  setting: its type, its range, the built-in default and the one sentence an
+  operator needs. The form is drawn from that registry, so a field cannot appear
+  without a definition — and `test/settings.test.js` greps the source tree for
+  every key, so a setting with **no consumer fails the suite** rather than
+  shipping as a button that does nothing. Forty-two keys across four groups.
+- **A default is written down once.** An override is a row in `settings`
+  (migration 027); resetting is a DELETE, and the value that comes back is the
+  registry's default — never a second copy stored in the table where it can
+  drift. A fresh install has an empty table and behaves exactly as it did before
+  this screen existed.
+- **A group is applied whole or not at all.** Validation — types, ranges, naira
+  in and kobo out, plus the pair rules (the sold-car redirect has to come after
+  the visible window) — runs over the whole submission before the transaction
+  opens, so a retainer cannot land without the hours beside it.
+- **It reaches the storefront, including the prebuilt pages.** Editing a setting
+  the footer carries makes the build stale, and `respond.js` will not serve a
+  page it knows is wrong: it renders on request, says why
+  (`X-HonestCars-Stale-Build`), and goes back to the prebuilt file after the next
+  `npm run build:static`. The save flash tells ops the same thing.
+- **One implementation for a moving number.** `config.js` reads the overrides
+  through getters, so `concierge.slaOptions()` — used by the page, the API that
+  charges the retainer and the record it writes — moves as one. The channel each
+  template takes is a settings row built from `notify.TEMPLATES`, so a new
+  message type cannot silently fall back to the general channel.
+- **No secrets on the screen, and it says so.** Keys and the DB credentials stay
+  in `.env`; the panel names the reason rather than leaving ops hunting.
+- Seed: two changed settings (the footer line and the CAC guardrail), so a fresh
+  database opens onto a screen with a real "changed" badge and a footer that
+  reads like a business rather than a placeholder.
+
+One row leaves the list (§5.1 settings). **The list is now 19 rows: 3 buildable
+in this sandbox, 9 blocked on an account, 7 with no home here.**
+
+**Status at `5c28628`:** FR-34 is built — the financing handoff, end to end,
 and the whole module is written so that it cannot read like a lender.
 
 - **The arithmetic is ours; the terms are not.** `POST /api/financing/plan` takes
@@ -57,8 +96,8 @@ and the whole module is written so that it cannot read like a lender.
 - `POST /api/financing` is rate-limited, and `financing_*` messages follow their
   own `NOTIFY_CHANNEL_FINANCING` knob.
 
-One row leaves the list here (FR-34). **The list is now 20 rows: 4 buildable in
-this sandbox, 9 blocked on an account, 7 with no home here.**
+One row left the list here (FR-34): 20 rows, 4 of them buildable in this
+sandbox. The §5.1 settings row has since gone too — see the top of this file.
 
 **Status at `485bf04`:** FR-30 is built — the installable, offline-tolerant
 half of the PWA.
@@ -147,9 +186,10 @@ switcher whose choice is remembered in an `hc_city` cookie — applied server-si
 on /cars, labelled client-side on the prebuilt static pages. A city URL with
 nothing else canonicalises onto the market's curated page; a page filtered only by
 the remembered market is private and noindex. Two rows leave the list: FR-32, and
-the §5.1 "settings has no screen" row — what remains of settings is scoped in row
-§5.1 below. That took the list to 23 rows (8 buildable here, 8 blocked on an
-account, 7 with no home in this sandbox).
+the §5.1 "settings has no screen" row, keeping only the area manager — the rest
+of §5.1 was scoped in that row and has since been built. That took the list to 23
+rows at the time (8 buildable here, 8 blocked on an account, 7 with no home in
+this sandbox).
 
 **Status at `e78fd4c`:** FR-33 is built — the dealer portal imports a
 spreadsheet. `/dealer/imports` takes CSV (picked or pasted, read in the browser)
@@ -214,7 +254,6 @@ No external account needed. These are real gaps against the PRD.
 
 | ID | Requirement | What is actually there | What "done" means |
 |---|---|---|---|
-| §5.1 | **settings** screen: the market/area manager exists, the rest of the group does not | `/admin/settings` (FR-32) manages markets and their area lists with audit rows, and shows cars filed under areas the list does not know. Business facts, thresholds, fee tables, channels and SLAs are still config-only. | Bring the remaining §5.1 settings groups onto `/admin/settings` so the screen is the console's answer to "where do I change that?" |
 | §18.3 | "Privacy requests actionable in admin" (NDPA) | Self-service works: `/account/export` and account deletion, with the record anonymised (`DELETED-…`). | An admin view of data-subject requests and their handling, so the duty is discharged, not just offered. |
 | §12.2 | MFA for admin roles | Sign-in is phone OTP — one factor, however strong. | TOTP (or WebAuthn) as a second factor for `admin`/`finance`, with recovery codes. |
 | §11 | Turnstile/reCAPTCHA on public forms | Rate limits per route (`src/lib/rate-limit.js`) and server-side validation; no bot challenge. | A site-key-gated invisible challenge, degrading to the current behaviour when unset. |

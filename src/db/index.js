@@ -34,6 +34,7 @@ const dealerKeys = require('./dealer-keys');
 const areas = require('./areas');
 const referrals = require('./referrals');
 const financing = require('./financing');
+const settings = require('./settings');
 const leads = require('./leads');
 const analytics = require('./analytics');
 const redirects = require('./redirects');
@@ -66,6 +67,7 @@ module.exports = {
   areas,
   referrals,
   financing,
+  settings,
   leads,
   analytics,
   redirects,

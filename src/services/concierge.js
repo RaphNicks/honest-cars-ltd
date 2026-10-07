@@ -16,29 +16,40 @@
  * shortlist can never disagree with the compare tool a visitor would use.
  */
 
-const SLA_OPTIONS = [
-  {
-    key: 'standard',
-    label: 'Standard — 72 hours',
-    hours: 72,
-    retainerKobo: 5_000_000,
-    note: 'Three verified options inside three working days.',
-  },
-  {
-    key: 'priority',
-    label: 'Priority — 48 hours',
-    hours: 48,
-    retainerKobo: 6_500_000,
-    note: 'Front of the queue: two working days, same three options.',
-  },
-  {
-    key: 'urgent',
-    label: 'Same-week urgent — 48 hours + daily WhatsApp updates',
-    hours: 48,
-    retainerKobo: 7_500_000,
-    note: 'For buyers flying in or holding a deposit deadline.',
-  },
+/**
+ * The SLA card — what a search costs and how long it takes.
+ *
+ * The shape is fixed (three tiers, and the urgent one still carries daily
+ * updates); the numbers come from `/admin/settings` (§5.1, migration 027), whose
+ * defaults are these figures read from `.env`. So the price on /find-my-car, the
+ * price `POST /api/service-requests` charges and the price stored on the
+ * retainer record are the same number from the same place — an ops change moves
+ * all three together, and `test/concierge.test.js` keeps asserting that a
+ * visitor cannot inject a price of their own.
+ */
+// Required at the top: this module is otherwise dependency-free, but the SLA
+// numbers come from the settings store, which config.js also reads — no cycle,
+// because neither requires this file.
+const overrides = require('../lib/overrides');
+
+const SLA_SHAPE = [
+  { key: 'standard', label: 'Standard', note: 'Three verified options inside three working days.', updates: false },
+  { key: 'priority', label: 'Priority', note: 'Front of the queue: two working days, same three options.', updates: false },
+  { key: 'urgent', label: 'Same-week urgent', note: 'For buyers flying in or holding a deposit deadline.', updates: true },
 ];
+
+function slaOptions() {
+  return SLA_SHAPE.map((option) => {
+    const hours = overrides.value(`concierge.sla_${option.key}_hours`);
+    return {
+      key: option.key,
+      label: `${option.label} — ${hours} hours${option.updates ? ' + daily WhatsApp updates' : ''}`,
+      hours,
+      retainerKobo: overrides.value(`concierge.sla_${option.key}_retainer`),
+      note: option.note,
+    };
+  });
+}
 
 const MUST_HAVES = [
   'AC must chill',
@@ -95,7 +106,8 @@ const ADDONS = [
 const DEFAULT_SLA = 'standard';
 
 function slaOption(key) {
-  return SLA_OPTIONS.find((option) => option.key === key) || SLA_OPTIONS[0];
+  const options = slaOptions();
+  return options.find((option) => option.key === key) || options[0];
 }
 
 // ---------------------------------------------------------------------------
@@ -321,6 +333,6 @@ function fileName(request) {
 }
 
 module.exports = {
-  SLA_OPTIONS, MUST_HAVES, INTENDED_USE, TIMELINES, ADDONS, DEFAULT_SLA, slaOption,
+  slaOptions, MUST_HAVES, INTENDED_USE, TIMELINES, ADDONS, DEFAULT_SLA, slaOption,
   shortlist, briefLines, pdf, fileName, business: businessInfo,
 };

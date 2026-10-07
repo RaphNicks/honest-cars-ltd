@@ -1343,3 +1343,21 @@ CREATE TABLE IF NOT EXISTS `financing_leads` (
   CONSTRAINT fk_financing_partner FOREIGN KEY (partner_id) REFERENCES finance_partners (id) ON DELETE SET NULL,
   CONSTRAINT fk_financing_actor   FOREIGN KEY (acted_by)   REFERENCES `users` (id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+
+-- ---------------------------------------------------------------------------
+-- settings — §5.1's settings screen (migration 027)
+--
+-- Overrides only: a setting nobody has changed has no row here, and the default
+-- comes from src/lib/settings-schema.js. "Reset to default" is a DELETE, so the
+-- registry is the only place a default is written down.
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS `settings` (
+  setting_key   VARCHAR(80)  NOT NULL,
+  setting_value VARCHAR(255) NOT NULL,
+  updated_by    INT UNSIGNED NULL,
+  updated_at    TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (setting_key),
+  KEY idx_settings_updated (updated_at),
+  CONSTRAINT fk_settings_actor FOREIGN KEY (updated_by) REFERENCES `users` (id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

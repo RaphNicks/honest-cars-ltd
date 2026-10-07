@@ -8,6 +8,7 @@
 const fs = require('node:fs');
 const config = require('../config');
 const render = require('./render');
+const overrides = require('./overrides');
 const { buildLocals } = require('./locals');
 
 /** HTML cache policy. Static pages can sit at the edge; SSR pages must be fresh. */
@@ -72,6 +73,18 @@ async function sendPrebuiltOrRender(req, res, options) {
   if (config.features.serveStaticPages && !req.user) {
     const manifest = req.app.locals.staticManifest || { routes: new Map() };
     const file = render.staticFileFor(config.features.staticPath, manifest, options.routePath);
+    // §5.1: a prebuilt page has the footer's phone number, the CAC line and the
+    // retainer prices baked in. If the console has saved a setting since the
+    // build, that HTML is wrong — so render on request until the next
+    // `npm run build:static`, rather than serving a page we know to be stale.
+    if (file && overrides.changedSince(manifest.generatedAt)) {
+      // Say what happened and why: the header names the reason the prebuilt file
+      // was skipped, and the render header still reports the path taken — this is
+      // a dynamic render like any other, just for an unusual reason.
+      res.set('X-HonestCars-Stale-Build', 'settings-changed-since-build');
+      res.set('X-HonestCars-Render', 'dynamic');
+      return sendPage(req, res, options);
+    }
     if (file) {
       res.set('Cache-Control', CACHE.static);
       res.set('X-HonestCars-Render', 'static');

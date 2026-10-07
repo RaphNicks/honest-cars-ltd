@@ -293,11 +293,15 @@ maybe('a channel with no provider records the alert as skipped, with its text ke
   const before = await fixture();
   assert.ok(before.car && before.listing);
 
-  // Point alerts at a channel that has no credentials configured.
-  const notifyConfig = require('../src/config').notifications;
-  const originalChannel = notifyConfig.channels.price_drop;
+  // Point alerts at a channel that has no credentials configured. Channels are a
+  // setting (§5.1 / migration 027) now, so the test moves the setting the way the
+  // console does — through the override store — rather than editing config, which
+  // is a getter over the registry and refuses the write anyway.
+  const overrides = require('../src/lib/overrides');
+  const originalChannel = overrides.raw('notify.channel.price_drop');
   try {
-    notifyConfig.channels.price_drop = 'whatsapp';
+    overrides.set('notify.channel.price_drop', 'whatsapp');
+    assert.equal(require('../src/config').notifications.channels.price_drop, 'whatsapp', 'the setting is in force');
     await db.query('UPDATE saved_cars SET last_price_kobo = ?, last_alerted_at = NULL WHERE id = ?', [
       before.listing.asking_price_kobo, before.car.id,
     ]);
@@ -318,7 +322,8 @@ maybe('a channel with no provider records the alert as skipped, with its text ke
     assert.equal(row.channel, 'whatsapp');
     assert.match(row.body, /₦/, 'the message text survives, ready to send by hand');
   } finally {
-    notifyConfig.channels.price_drop = originalChannel;
+    if (originalChannel === null) overrides.remove('notify.channel.price_drop');
+    else overrides.set('notify.channel.price_drop', originalChannel);
     await restore(before);
   }
 });

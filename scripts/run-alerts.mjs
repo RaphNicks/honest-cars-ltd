@@ -41,6 +41,11 @@ const userId = userIndex >= 0 ? Number(args[userIndex + 1]) || null : null;
 const limit = limitIndex >= 0 ? Number(args[limitIndex + 1]) || null : undefined;
 
 async function main() {
+  // The sweeps run outside the web process, so the hydrate the server does at
+  // boot has not happened for them: read the console's settings first, or this
+  // run would use .env defaults the desk has already changed.
+  await require('../src/services/settings').hydrate();
+
   const report = await alerts.runWatch({ dryRun, userId, limit });
 
   console.log(`${dryRun ? 'DRY RUN — nothing sent, nothing written' : 'Alert sweep'} · ${report.at}`);

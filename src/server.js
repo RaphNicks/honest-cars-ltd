@@ -24,6 +24,16 @@ async function start() {
     process.exit(1);
   }
 
+  // §5.1 settings (migration 027) — the overrides the console has saved are read
+  // once here and again after every save, so the storefront, the API and the
+  // messages all use the same numbers without a query per read.
+  const settings = require('./services/settings');
+  const loaded = await settings.hydrate();
+  if (loaded.loaded) console.log(`  settings: ${loaded.loaded} override${loaded.loaded === 1 ? '' : 's'} in force from /admin/settings`);
+  if (loaded.ignored && loaded.ignored.length) {
+    console.warn(`  ! ${loaded.ignored.length} setting row(s) ignored — not in the registry: ${loaded.ignored.join(', ')}`);
+  }
+
   const counts = await db.listings.networkCounters().catch(() => null);
   if (counts) {
     console.log(`  inventory: ${counts.carsLive} live cars · ${counts.partnerDealers} verified dealers · ${counts.certified} certified`);

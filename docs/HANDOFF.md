@@ -48,7 +48,9 @@ Every **§9 MUST is built.** The commit trail, most recent first:
 
 | Commit | What it delivered |
 |---|---|
-| *this commit* | **FR-34** financing enquiries and the lender handoff |
+| *this commit* | **§5.1 settings** — the rest of the screen: business facts, limits, fees, channels |
+| `b2c08cf` | FR-34 docs — the section, the gates, and the traps it hit |
+| `5c28628` | **FR-34** financing enquiries and the lender handoff |
 | `485bf04` | **FR-30** installable PWA: manifest, generated icons, service worker, `/offline` |
 | `c680d51` | **FR-29** instant valuation widget on /sell-swap, from the price-intel bands |
 | `d1b1da0` | **FR-28** referrals: who came from whom, and the reward status behind it |
@@ -101,7 +103,71 @@ embedded videos. All four clips total 726 KB.
 
 ---
 
-## 3. Just finished: FR-34 financing handoff
+## 3. Just finished: §5.1 settings — the rest of the screen
+
+**Built in this commit.** FR-32 built the market/area half of §5.1's settings
+screen; this is the other half. Business facts, page limits, the sold-car
+windows, the concierge SLA card, the referral and CAC figures, and the channel
+each message takes are now editable at `/admin/settings` — off `.env`, without a
+deploy.
+
+**The registry is the screen**
+
+`src/lib/settings-schema.js` declares all 42 settings: type, range, built-in
+default, and one sentence an operator needs. `services/settings.js` draws the
+form from it. Two rules make the screen trustworthy rather than decorative:
+
+- **If it is on the screen, the code reads it.** `test/settings.test.js` walks
+  `src/`, `views/` and `scripts/` and requires every key to appear in a consumer
+  file. A row with no reader fails the suite — which is the failure mode this
+  screen actually has: an operator changes a number, believes something
+  happened, and nothing did.
+- **The default is the environment, and it is written down once.** An override is
+  a row in `settings` (migration 027); **resetting is a DELETE**, and what comes
+  back is the registry's default. A fresh install has an empty table and behaves
+  exactly as the site did before this screen existed.
+
+**How a value travels**
+
+`config.js` reads overrides through getters — `overrides.value('listings.per_page')`
+— so nothing has to know whether a value came from `.env` or the console. That
+also means the numbers the *same* code path uses move together:
+`concierge.slaOptions()` feeds the card on /find-my-car, the price
+`POST /api/service-requests` charges, and the amount on the payment record.
+
+**Prebuilt pages and a changed setting**
+
+A static page has the footer's phone number, the CAC line and the retainer prices
+baked in. So `respond.js` refuses to serve a build that predates the newest
+setting: it renders on request, sets `X-HonestCars-Stale-Build`, and returns to
+the prebuilt file after the next `npm run build:static`. Self-healing, visible in
+a header and in the save flash — and the alternative (a footer quietly showing
+last month's phone number) is exactly the kind of lie this project does not ship.
+
+**What is deliberately absent**
+
+Provider credentials — PSP, SMS, SMTP, GA4, Meta — are not settings and never
+appear on the screen; they are deployment secrets and the panel says so. Same for
+the DB connection and the auth pepper.
+
+**Files**
+
+- `src/lib/settings-schema.js` — the registry, with `parse`/`coerce`/`display`.
+- `src/lib/overrides.js` — the in-memory overrides, `changedSince()` for the
+  stale-build rule.
+- `src/db/settings.js`, `src/services/settings.js` — load, save a group, reset,
+  and the console's view.
+- `db/migrations/027-site-settings.sql` + `db/schema.sql` — one table.
+- `src/routes/admin.js` — `POST /admin/settings/group/:key` and `.../reset`,
+  audited as `settings.updated` / `settings.reset`.
+- `views/pages/admin/settings.ejs` — the four groups, drawn from the registry.
+- `scripts/generate-seed.js` — two changed settings, so a fresh database shows
+  the mechanism.
+- `test/settings.test.js` — 17 tests, fixture build and all.
+
+---
+
+## 3b. Just finished: FR-34 financing handoff
 
 **Built in this commit.** FR-34 (COULD): *"financing-lead partner handoff"* — the
 answer to §6.5 step 3, which until now only ever sat in the brief.
@@ -187,7 +253,7 @@ the general channel.
 
 ---
 
-## 3b. Just finished: FR-30 installable PWA
+## 3c. Just finished: FR-30 installable PWA
 
 **Built in this commit.** FR-30 (COULD/P3): *"PWA (installable, offline shell,
 push via web notifications)"* — plus §13.2's *"Offline-tolerant PWA shell COULD:
@@ -246,7 +312,7 @@ gate list below so a renamed asset cannot silently break installability.
 
 ---
 
-## 3c. Just finished: FR-29 instant valuation
+## 3d. Just finished: FR-29 instant valuation
 
 **Built in this commit.** §6.6's last line: *"Instant estimate widget COULD:
 rough band from pricing DB with 'confirm with free human valuation' CTA."*
@@ -284,7 +350,7 @@ from one test can never answer another's question).
 
 ---
 
-## 3d. Just finished: FR-28 referrals
+## 3e. Just finished: FR-28 referrals
 
 **Built in this commit.** §7.1 asked for *"Referrals (personal link + reward
 status)"*. The link and the attribution have existed since migration 007 — the
@@ -334,7 +400,7 @@ happen in the same minute and the queue still gains one row per person.
 
 ---
 
-## 3e. FR-32 multi-city inventory
+## 3f. FR-32 multi-city inventory
 
 **Built in this commit.** FR-32 is *"Multi-city inventory structure (Owerri/Aba/
 Benin) with area switcher"*, COULD/P3 — but the PRD's data model already decided
@@ -398,7 +464,7 @@ harmless while every filter in it was empty, and a 1210 the moment a real filter
 
 ---
 
-## 3f. FR-35 blog enhancements
+## 3g. FR-35 blog enhancements
 
 **Built in this commit.** §6.9 asked for five things on top of the blog that
 existed — author pages, a governed tag taxonomy, a smarter related-posts
@@ -480,7 +546,7 @@ other buildable rows).
 ## 5. Gates before any commit
 
 ```bash
-npm test          # 424/424 (24 financing, 15 areas, 16 imports, 12 blog-tags, 11 referrals, 11 pwa …)
+npm test          # 441/441 (17 settings, 24 financing, 15 areas, 16 imports, 12 blog-tags, 11 referrals, 11 pwa …)
 npm run lint      # type ladder + 18 ES modules / 75 event references
 npm run build:static && npm run crawl && npm run audit:pages
 npm run smoke && npm run smoke:cms      # role matrix + CMS round trip
@@ -509,6 +575,10 @@ who would count and writes nothing).
   FETCH_HEAD`, then `bash scripts/sandbox/bootstrap.sh`, start MySQL **with a
   process tool** (`bash scripts/sandbox/mysql-start.sh` — run from a one-shot
   shell it dies with the shell), `node scripts/db-setup.js`, `npm run build:static`.
+- **Prebuilt pages carry settings.** After changing a business fact in the console
+  the build is stale: the server renders on request (`X-HonestCars-Stale-Build`)
+  until `npm run build:static` runs again. If a footer looks old in a screenshot,
+  that is the reason — rebuild, do not chase the template.
 - **A fully clean `db:setup` was verified on 2026-10-06** on a freshly initialised
   data directory: schema, then all 25 migrations in order (including 025's plain
   `ALTER TABLE`, the one that had no `IF NOT EXISTS`), 79 listings, 44 service
@@ -519,6 +589,15 @@ who would count and writes nothing).
 
 - The referenced Next.js repo (`RaphNicks/honest-cars-ltd` @ `c765c8a`,
   `src/app/globals.css`) **does not exist**; the PDF is the design source of truth.
+- **`config.js` is getters over the settings registry now** — `config.listings.perPage`
+  reads `overrides.value('listings.per_page')`. Do not assign to a config value
+  (a test that did got away with it until the getter arrived), and do not read one
+  at module load: `const perPage = config.listings.perPage` at the top of a file
+  freezes the value before `settings.hydrate()` has run.
+- **`scripts/generate-seed.js` is one template literal.** Any backtick added
+  inside it (`` \`users\` ``, a `` `code` `` sample) must be escaped as `\``, or the
+  literal ends early and the next `${...}` becomes a JS syntax error hundreds of
+  lines later. This has now bitten twice — once on financing, once on settings.
 - **A radio group contributes nothing to `FormData` when unchecked.** The
   concierge's "do you need financing?" is a radio pair, so `buildPayload` has to
   copy `values.financing` across explicitly — a missing key reads as "no" and the

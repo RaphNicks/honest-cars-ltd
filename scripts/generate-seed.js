@@ -695,6 +695,10 @@ DELETE FROM dealer_addons;
 -- FR-28: the referral queue is seed-owned (the accounts themselves are upserted,
 -- never deleted, because a real login may be using one).
 DELETE FROM referral_rewards;
+-- §5.1: the settings the seed sets, so a re-seed is the demo written down and
+-- not whatever the last walkthrough left behind. Rows the seed does not name are
+-- left alone — they belong to whoever set them.
+DELETE FROM settings WHERE setting_key IN ('business.address_note', 'marketing.cac_guardrail');
 -- FR-34: financing rows point at leads, listings and partners, so they go first.
 DELETE FROM financing_leads;
 DELETE FROM finance_partners;
@@ -1439,6 +1443,17 @@ INSERT INTO referral_rewards (referrer_id, referred_user_id, status, basis, amou
    'Approved and paid by transfer on the same day.',
    DATE_SUB(UTC_TIMESTAMP(), INTERVAL 4 DAY), DATE_SUB(UTC_TIMESTAMP(), INTERVAL 3 DAY),
    (SELECT id FROM \`users\` WHERE phone = '+2348000000002' LIMIT 1));
+
+-- §5.1 — two settings the desk has actually changed, so a fresh database shows
+-- the screen doing its job: a "changed" badge, a value that differs from its
+-- built-in default, and a footer line that reads like the business instead of
+-- the placeholder in .env. Everything else on that screen is on its default.
+INSERT INTO settings (setting_key, setting_value, updated_by) VALUES
+  ('business.address_note',
+   'We work out of Port Harcourt and cover Owerri, Aba and Benin — the inspection comes to the car, wherever it is.',
+   (SELECT id FROM \`users\` WHERE phone = '+2348000000001' LIMIT 1)),
+  ('marketing.cac_guardrail', '4000000',
+   (SELECT id FROM \`users\` WHERE phone = '+2348000000001' LIMIT 1));
 
 -- FR-34 — the financing desk. Two lenders, one switched off, and enquiries in
 -- every state the console has to render. The amounts are the seeded cars' real

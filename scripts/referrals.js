@@ -22,6 +22,12 @@ const referrals = require('../src/services/referrals');
 const money = require('../src/lib/money');
 
 async function main() {
+  // Read the settings the console manages before deciding who qualifies — the
+  // sweep runs outside the web process, so the hydrate the server does at boot
+  // does not happen for it. Without this, "one paid order" would silently mean
+  // the .env default rather than what the desk set at /admin/settings.
+  await require('../src/services/settings').hydrate();
+
   const dryRun = process.argv.includes('--dry-run') || process.argv.includes('-n');
   const limitArg = process.argv.find((arg) => arg.startsWith('--limit='));
   const limit = limitArg ? Number(limitArg.split('=')[1]) : undefined;

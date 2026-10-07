@@ -29,6 +29,11 @@ async function main() {
   const started = Date.now();
   const staticDir = config.features.staticPath;
 
+  // §5.1 settings: static pages bake the footer's phone number, the CAC line and
+  // the home feed size into HTML, so the build has to read the same overrides the
+  // server does — otherwise a rebuild silently reverts the desk's change.
+  await require('../src/services/settings').hydrate();
+
   if (!quiet) console.log(`→ building static pages into ${staticDir}`);
 
   const routes = await staticRoutes({ db });

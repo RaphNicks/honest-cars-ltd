@@ -49,7 +49,7 @@ async function buildFindMyCarLocals() {
         seo.faqSchema(faqs),
       ],
     },
-    data: { facets, faqs, counters, service, trail, slaOptions: concierge.SLA_OPTIONS, spec: concierge },
+    data: { facets, faqs, counters, service, trail, slaOptions: concierge.slaOptions(), spec: concierge },
   };
 }
 

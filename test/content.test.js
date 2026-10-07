@@ -110,8 +110,9 @@ test('SLA hours are limited to the 48–72 hour window the PRD promises', () => 
 // Concierge flow spec (§6.5)
 // ---------------------------------------------------------------------------
 test('the concierge flow offers three SLA options, all inside 48–72 hours', () => {
-  assert.equal(concierge.SLA_OPTIONS.length, 3);
-  for (const option of concierge.SLA_OPTIONS) {
+  const options = concierge.slaOptions();
+  assert.equal(options.length, 3);
+  for (const option of options) {
     assert.ok(option.hours >= 48 && option.hours <= 72, `${option.key} promises ${option.hours}h`);
     assert.ok(option.retainerKobo > 0);
     assert.ok(option.note.length > 10);
