@@ -22,23 +22,24 @@ next*.
 
 ## Quick start
 
-### 1. Against the bundled sandbox MySQL (already running here)
+**On your own machine: `docs/RUN-LOCALLY.md`** — prerequisites, the two ways to
+get MySQL (Docker or your own), the seeded sign-in numbers, and what to look at
+first. The short version, against a MySQL you can reach:
 
 ```bash
+cp .env.example .env    # then edit the DB_* block
 npm install
-npm run db:setup     # creates the database, applies db/schema.sql, loads db/seed.sql
-npm start            # http://localhost:3000
+npm run db:setup        # creates the database, applies db/schema.sql, loads db/seed.sql
+npm start               # http://localhost:3000
 ```
 
-### 2. Against MySQL on your own laptop
+The work lives on `arena/01a0f7df-honest-cars-ltd` until PR #1 is signed off;
+`main` carries only the spec document. There is no build step: pages render on
+demand, and `npm run build:static` is only the optional speed-up that writes the
+stable pages into `dist/`.
 
-```bash
-cp .env.example .env
-# edit DB_HOST / DB_PORT / DB_USER / DB_PASSWORD / DB_NAME
-npm install
-npm run db:setup     # needs an account with CREATE privileges (DB_ADMIN_USER)
-npm start
-```
+In the sandbox this was built in, MySQL lives at `127.0.0.1:3307` and
+`scripts/sandbox/up.sh` brings the whole stack back after a reset.
 
 Everything the app knows about persistence lives behind one module —
 `src/db/index.js`. Nothing else in the codebase opens a connection, so pointing

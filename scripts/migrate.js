@@ -19,6 +19,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const mysql = require('mysql2/promise');
 const config = require('../src/config');
+const { statementsOf } = require('./lib/sql-statements');
 
 const MIGRATIONS_DIR = path.join(__dirname, '..', 'db', 'migrations');
 
@@ -43,16 +44,6 @@ function listMigrations() {
 }
 
 /** Split a migration file into statements, ignoring comments and blank lines. */
-function statementsOf(sql) {
-  return sql
-    .split('\n')
-    .filter((line) => !/^\s*--/.test(line))
-    .join('\n')
-    .split(';')
-    .map((statement) => statement.trim())
-    .filter(Boolean);
-}
-
 async function main() {
   const listOnly = process.argv.includes('--list');
 

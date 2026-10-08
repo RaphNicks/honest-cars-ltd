@@ -17,6 +17,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const mysql = require('mysql2/promise');
 const config = require('../src/config');
+const { statementsOf } = require('./lib/sql-statements');
 
 const args = new Set(process.argv.slice(2));
 const schemaOnly = args.has('--schema-only');
@@ -50,14 +51,7 @@ async function runMigrations(conn) {
   let count = 0;
   for (const file of fs.readdirSync(dir).filter((f) => f.endsWith('.sql')).sort()) {
     if (done.has(file)) continue;
-    const statements = fs
-      .readFileSync(path.join(dir, file), 'utf8')
-      .split('\n')
-      .filter((line) => !/^\s*--/.test(line))
-      .join('\n')
-      .split(';')
-      .map((statement) => statement.trim())
-      .filter(Boolean);
+    const statements = statementsOf(fs.readFileSync(path.join(dir, file), 'utf8'));
 
     for (const statement of statements) {
       try {

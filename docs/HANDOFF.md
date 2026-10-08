@@ -770,6 +770,41 @@ other buildable rows).
 `docs/GAPS.md` is canonical: 21 rows — 5 buildable here, 9 blocked on an account
 (FR-30's push half is one), 7 with no home in this sandbox.
 
+## 3x. Running it on a laptop
+
+`docs/RUN-LOCALLY.md` is the guide: prerequisites (Node 20+, one MySQL),
+`docker-compose.yml` for the Docker path, the seeded sign-in numbers, the
+admin/finance second factor, and a symptom→cause table. `README.md`'s quick
+start points there.
+
+Two facts worth keeping:
+
+- **There is no build step.** The site renders every page on demand, so
+  `npm install && npm run db:setup && npm start` is the whole laptop path —
+  verified by moving `dist/` aside and curling `/`, `/cars`, `/contact`, `/shop`
+  (all 200). `npm run build:static` is only the speed-up that fills `dist/`.
+- **`docker-compose.yml` is for local testing, not deployment.** It is a MySQL
+  container whose credentials already match `.env.example`, so `cp
+  .env.example .env` needs no editing beyond `DB_ADMIN_PASSWORD=honestcars-root`.
+  The production Dockerfile is still on `docs/GAPS.md`.
+
+### The bug that found: migrations hardcoded the database name
+
+`db/migrations/012-dealer-ledger.sql` and `013-cms.sql` opened with `USE
+honestcars;`. On any install whose database is named anything else, that
+switches the *session* — so the rest of the file ran against a different
+database, and so did the `INSERT INTO schema_migrations` that records it.
+`npm run db:setup` died with `ER_DUP_ENTRY Duplicate entry
+'012-dealer-ledger.sql'`, which says nothing about the cause. It only ever
+worked here because this sandbox's database happens to be called `honestcars`.
+
+Fixed at both ends: the two `USE` lines are gone, both runners share
+`scripts/lib/sql-statements.js` which drops any `USE` statement rather than
+passing it on, and `test/migrations.test.js` fails if a migration file contains
+one. Verified by running the guide's commands on an empty database called
+`honestcars_laptop` — 28 migrations, seed loaded, pages served — and then
+dropping it.
+
 ## 4. Conventions that are not negotiable
 
 - **Money** in kobo, integer, through `src/lib/money.js`. Phones through
@@ -878,6 +913,9 @@ who would count and writes nothing).
   no PDF rasteriser (`pdftoppm`/`gs`/`mutool` are absent and ImageMagick's PDF
   coder is disabled by policy), so a PDF's *appearance* cannot be verified here
   — only its text and structure. The OG cards are PNGs and can be looked at.
+- **A migration must never contain `USE <database>;`.** The session is already on
+  the right database; a `USE` silently moves it, taking the `schema_migrations`
+  row with it. Add the file to `db/migrations/` and let the runner connect.
 - **Uploads do not survive a sandbox restore.** `/home/user/uploads/` is emptied
   before the next turn runs, and the file cannot be reconstructed from the
   message it arrived in. If an attachment is missing, ask for it again; for the

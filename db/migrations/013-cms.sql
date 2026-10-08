@@ -21,8 +21,6 @@
 -- Deliberately no semicolons inside comments: both SQL runners split on “;”.
 -- ============================================================================
 
-USE honestcars;
-
 ALTER TABLE blog_posts
   ADD COLUMN meta_title       VARCHAR(200) NULL,
   ADD COLUMN meta_description VARCHAR(320) NULL,

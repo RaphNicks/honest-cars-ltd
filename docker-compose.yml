@@ -1,0 +1,45 @@
+# Local MySQL for testing this site on your laptop.
+#
+#   docker compose up -d db     # start it
+#   npm run db:setup            # create the database, tables and sample data
+#   npm start                   # http://localhost:3000
+#
+# The credentials below are the same ones `.env.example` already carries, so
+# copying the template needs no editing at all. The root password is only used
+# by `npm run db:setup`, which creates the database — put it in `.env` as
+# DB_ADMIN_PASSWORD (see docs/RUN-LOCALLY.md).
+#
+# This is a local-testing convenience, not a production deployment: the data
+# lives in a Docker volume on this machine, and the passwords are public.
+
+services:
+  db:
+    image: mysql:8.0
+    container_name: honestcars-db
+    restart: unless-stopped
+    command:
+      # utf8mb4 throughout, and the same collation the schema declares.
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+    environment:
+      MYSQL_ROOT_PASSWORD: honestcars-root
+      MYSQL_DATABASE: honestcars
+      MYSQL_USER: honestcars
+      MYSQL_PASSWORD: honestcars
+    ports:
+      # 3306 on the host, matching .env.example. Change the left-hand side if
+      # you already run MySQL locally (e.g. "3307:3306") and set DB_PORT to match.
+      - "3306:3306"
+    volumes:
+      - honestcars-db:/var/lib/mysql
+    healthcheck:
+      # `npm run db:setup` should wait for this to go healthy rather than race
+      # the server's first-boot initialisation, which takes a few seconds.
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-uroot", "-phonestcars-root"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 30s
+
+volumes:
+  honestcars-db:

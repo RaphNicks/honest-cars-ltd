@@ -16,8 +16,6 @@
 -- against whichever listing or payment it came from.
 -- ============================================================================
 
-USE honestcars;
-
 CREATE TABLE IF NOT EXISTS dealer_ledger (
   id          INT UNSIGNED NOT NULL AUTO_INCREMENT,
   dealer_id   INT UNSIGNED NOT NULL,
