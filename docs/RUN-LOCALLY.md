@@ -185,7 +185,14 @@ git pull
 npm install     # only needed when package.json changed — harmless otherwise
 ```
 
-Then restart the server (Ctrl-C, `npm start`). Three things are worth knowing:
+**Then restart the server: Ctrl-C, then `npm start` again.** That step is not a
+formality — the running process holds the old code in memory, and Node re-reads
+the *templates* from disk on every request but not the modules. Restarting is
+what makes a pull take effect, and the server now says so itself: at boot it
+prints how many cities the picker holds, and if the code changes while it is
+running it warns you in the terminal.
+
+Four things are worth knowing:
 
 - **A pull never touches your database.** The schema and sample data are files in
   the repository, not state on your machine, and `.env` is not tracked, so your
@@ -200,6 +207,19 @@ Then restart the server (Ctrl-C, `npm start`). Three things are worth knowing:
 - **If it refuses**, your database came from an older `schema.sql`. On a test
   database, rebuild it — drop `honestcars` in phpMyAdmin and follow step 4
   again. Your `.env` and the code are unaffected.
+- **`dist/` is optional, and the server will not serve a stale one.** If you ever
+  ran `npm run build:static`, that folder holds pre-rendered pages from that day.
+  After a pull they are a revision behind, so the server checks at boot and, when
+  the folder is older than the code, renders every page freshly instead and tells
+  you to run `npm run build:static`. You can also just delete `dist/` — the site
+  is identical without it, only slightly slower. On the browser side, the service
+  worker fetches scripts and styles from the network first, so a page can never
+  end up running last release's JavaScript.
+
+**If the browser still shows something old after all that**, the service worker
+is holding a page: hard-refresh with **Ctrl-Shift-R** (Cmd-Shift-R on a Mac). A
+page that looks half-updated — new layout, old behaviour — is that. One reload
+with the new worker in place and it stops happening.
 
 ## 10. If something goes wrong
 
@@ -212,6 +232,7 @@ Then restart the server (Ctrl-C, `npm start`). Three things are worth knowing:
 | `db:setup` says the database is missing parts of the current schema | It was built from an older `schema.sql`. Drop it in phpMyAdmin and repeat step 4 — the message names what it found missing. |
 | `EADDRINUSE: address already in use :::3000` | Something else is on port 3000 — usually another copy of the site. Stop it, or run `PORT=3001 npm start` (`set PORT=3001&& npm start` in Command Prompt). |
 | The page loads but with no styling | `npm start` is not the process serving it — check the terminal, and use the URL it prints. |
+| A brand-new feature is missing, or a control is half-working (an empty list, a search that finds nothing) | The server was not restarted after the pull, so the page is new and the code behind it is not. Ctrl-C, `npm start`, then Ctrl-Shift-R in the browser. The terminal says `the code changed while this process was running` when this has happened. |
 | Sign-in code never appears | It is in the terminal *and* on the page. If not, the server is running with `NODE_ENV=production`; the `.env` template sets `AUTH_SHOW_CODE=true`. |
 | `npm install` fails on `sharp` | Node is too old, or the download was interrupted. Check `node -v` is 20+, then delete `node_modules` and run `npm install` again. |
 

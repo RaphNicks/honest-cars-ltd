@@ -3,6 +3,9 @@
 
   Locals: site.cityDirectory (every city we list, most stock first),
   site.city (the market the page is about, or null), variant ('header' | 'drawer').
+  If site.cityDirectory is absent the switcher falls back to site.cities — the
+  markets — rather than rendering an empty panel: see the note at the top of the
+  file's variable block.
 
   Two layers, one list:
 
@@ -21,11 +24,29 @@
   the control — the same cookie the server has already applied on the
   server-rendered pages.
 %>
-<% var cities = (site && site.cityDirectory) || (site && site.cities) || []; %>
-<% var currentCity = (site && site.city) || null; %>
-<% var variant = (typeof variant === 'undefined' ? 'header' : variant); %>
-<% var markets = cities.filter(function (city) { return city.served; }); %>
-<% var networkLive = cities.reduce(function (sum, city) { return sum + (city.live || 0); }, 0); %>
+<%
+  // `site.cityDirectory` is the catalogue — every city, most stock first.
+  //
+  // The fallback below is not decoration. `site.cities` is the *markets* list,
+  // and a process started before this partial existed still has exactly that in
+  // memory: a pull without a restart hands this template old locals. Falling
+  // back — and reading a row with no `served` flag as a market, because that is
+  // what the markets list is — renders four real links. Without it the panel
+  // came up with no cities at all and a search box that could only ever answer
+  // "no city matches", which is a broken control, not a degraded one.
+  var catalogue = (site && site.cityDirectory && site.cityDirectory.length) ? site.cityDirectory : [];
+  var degraded = !catalogue.length;
+  var cities = degraded
+    ? ((site && site.cities) || []).map(function (city) {
+        return { slug: city.slug, name: city.name, state: city.state, stateLabel: city.stateLabel, live: city.live, served: true };
+      })
+    : catalogue;
+  var currentCity = (site && site.city) || null;
+  var variant = (typeof variant === 'undefined' ? 'header' : variant);
+  // `served !== false`: a row that does not say it is a market came from the
+  // markets list, where every row is one.
+  var markets = cities.filter(function (city) { return city.served !== false; });
+  var networkLive = cities.reduce(function (sum, city) { return sum + (city.live || 0); }, 0); %>
 <% if (cities.length > 1) { %>
   <div class="area-switcher area-switcher--<%= variant %>" data-area-switcher
        <%= currentCity ? 'data-city-pinned="1"' : '' %>>
@@ -41,7 +62,8 @@
       <% if (cities.length > markets.length) { %>
         <%# Only worth showing when there is more than the rendered markets to
             search. It is inside a panel JavaScript opens, so it is never a
-            control that does nothing. %>
+            control that does nothing — and in the fallback above there is
+            nothing beyond the markets, so it is not drawn at all. %>
         <div class="area-switcher__search">
           <label class="visually-hidden" for="area-search-<%= variant %>">Search cities</label>
           <input class="input area-switcher__input" id="area-search-<%= variant %>" type="search"

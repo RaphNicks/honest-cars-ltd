@@ -117,10 +117,33 @@ function createApp() {
 
   // Build manifest (what `npm run build:static` produced). Absent is fine:
   // every static-capable route then renders at request time.
-  app.locals.staticManifest = config.features.serveStaticPages
+  const manifest = config.features.serveStaticPages
     ? render.loadManifest(config.features.staticPath)
     : { routes: new Map() };
+  app.locals.staticManifest = manifest;
   app.locals.staticManifestPath = path.join(config.features.staticPath, '.static-manifest.json');
+
+  // Is that build older than the code? A `git pull` leaves `dist/` untouched, so
+  // a prebuilt page would keep rendering yesterday's markup — correctly, and
+  // wrongly. One walk of `views/`, `src/` and the asset folders answers it, and
+  // `respond.js` then refuses to serve the stale file. (The same rule already
+  // exists for a saved setting; this is the other way a build goes out of date.)
+  app.locals.staticManifestStale = null;
+  if (manifest.routes.size) {
+    const newestSource = render.newestSourceTime(path.join(__dirname, '..'));
+    const builtAt = new Date(manifest.generatedAt || 0).getTime();
+    if (newestSource && Number.isFinite(builtAt) && newestSource > builtAt) {
+      app.locals.staticManifestStale = {
+        builtAt: manifest.generatedAt || null,
+        newestSource: new Date(newestSource).toISOString(),
+      };
+    }
+  }
+  app.locals.staticBuild = {
+    generatedAt: manifest.generatedAt || null,
+    routeCount: manifest.routes.size,
+    stale: app.locals.staticManifestStale,
+  };
   // Content saves revalidate the affected pages; publish.js refreshes this map
   // so a newly published post is served from disk straight away.
   publish.setApp(app);

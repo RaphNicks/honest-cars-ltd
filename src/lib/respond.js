@@ -77,11 +77,21 @@ async function sendPrebuiltOrRender(req, res, options) {
     // retainer prices baked in. If the console has saved a setting since the
     // build, that HTML is wrong — so render on request until the next
     // `npm run build:static`, rather than serving a page we know to be stale.
-    if (file && overrides.changedSince(manifest.generatedAt)) {
+    //
+    // The same applies to a build older than the code, which is what a pull
+    // without a rebuild leaves behind: the markup on disk is the previous
+    // revision's. `app.js` works that out once at boot (`staticManifestStale`),
+    // because it is a property of the process, not of the request.
+    // Two independent reasons a build goes out of date, and the setting is named
+    // first when both are true: it is the recent, deliberate act whose operator
+    // was told the page would rebuild.
+    const codeStale = req.app.locals.staticManifestStale || null;
+    const settingStale = overrides.changedSince(manifest.generatedAt);
+    if (file && (settingStale || codeStale)) {
       // Say what happened and why: the header names the reason the prebuilt file
       // was skipped, and the render header still reports the path taken — this is
       // a dynamic render like any other, just for an unusual reason.
-      res.set('X-HonestCars-Stale-Build', 'settings-changed-since-build');
+      res.set('X-HonestCars-Stale-Build', settingStale ? 'settings-changed-since-build' : 'build-older-than-code');
       res.set('X-HonestCars-Render', 'dynamic');
       return sendPage(req, res, options);
     }

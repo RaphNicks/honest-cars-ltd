@@ -48,7 +48,8 @@ Every **§9 MUST is built.** The commit trail, most recent first:
 
 | Commit | What it delivered |
 |---|---|
-| *this commit* | **opening a market from the console** — the switch the picker was built around |
+| *this commit* | **a pull is not a deploy** — a half-updated page, and the three things that now stop it |
+| `f53876d` | **opening a market from the console** — the switch the picker was built around |
 | `f00907d` | **the city picker + the Services chevron** — 48 cities, searchable, deepest stock first |
 | `79e0dd2` | **the Services menu + the hidden attribute** — hover no longer drops the panel; `[hidden]` is a real rule; the badge corner wraps |
 | `cb74267` | **Services mega-menu** — the 8px dead band bridged, close delayed, hover gated to hover devices |
@@ -110,6 +111,67 @@ resilience ask:
 `size_bytes`, `poster_url` on `listing_media`), a `video` content block with a
 `[clip:…]` directive, clips on two listings' galleries, and 8 blog posts with 3
 embedded videos. All four clips total 726 KB.
+
+---
+
+## 3s. Just fixed: a pull is not a deploy
+
+A reader sent two screenshots of the city picker: a panel with no cities in it, a
+search box reading **“Search 4 cities”**, and a search for “kano” answering *“No
+city matches”*. Nothing in the picker was broken. The **page was new and the
+server was old**: the process had been started before the pull, so Express was
+rendering the new `views/` from disk against modules loaded from the previous
+release, where `site.cityDirectory` does not exist yet.
+
+Reproduced exactly, in a two-minute probe: render `partials/area-switcher.ejs`
+with the old locals (`site.cities` = the four markets, no directory) and you get
+a search box, `placeholder="Search 4 cities"`, one row (“All cities”), and no
+catalogue island. Why it looked so completely empty is worth writing down: the
+fallback list is the *markets*, whose rows come from `db.areas.cities()` and
+carry `active`, not `served` — so `cities.filter(city => city.served)` returned
+nothing, the market rows were dropped, and the picker kept only the reset link.
+
+Three fixes, one per layer, because each is a different way for "the code on disk"
+and "the code answering the request" to disagree:
+
+1. **The partial degrades instead of breaking.** A row that does not say it is a
+   market is treated as one (`served !== false`, which is what the markets list
+   is), and the search box is drawn only when there is something beyond the
+   rendered markets to search. Rendered with locals that predate it, the switcher
+   now lists the four markets, with their counts, and no box that can only answer
+   "no match". A control that cannot succeed is worse than no control.
+2. **A build older than the code is not served.** `git pull` leaves `dist/`
+   exactly as it was, so the server now walks `views/`, `src/`, `public/css` and
+   `public/js` at boot and compares the newest mtime with the manifest's
+   `generatedAt` (`render.newestSourceTime`, `app.locals.staticManifestStale`).
+   Older means the prebuilt HTML is the previous revision's: `respond.js` renders
+   per request and says so — `X-HonestCars-Stale-Build: build-older-than-code` —
+   and the terminal says why in one line. The setting rule keeps priority when
+   both are true (it is the recent, deliberate act whose operator was told).
+3. **Scripts and styles cannot outlive a deploy.** The worker was cache-first for
+   its shell assets, which is how a fresh page ends up running last release's
+   modules with no way for the reader to fix it. `.js` and `.css` are now
+   network-first with the cache as the offline fallback (`networkFirst` grew a
+   `readFrom` so it can still find what install precached); fonts and icons keep
+   stale-while-revalidate, where an old icon is a much smaller lie than old code.
+   `hc-v4` → `hc-v5`.
+
+And it is said out loud in the terminal, which is where a local operator is
+looking: boot prints `picker: 48 cities, 4 of them markets we operate`, a stale
+build prints the warning and the command that fixes it, and a **drift watcher**
+(one minute, `unref`'d) notices the code changing under a running process and
+says `the code changed while this process was running — restart`. That last one
+is the exact bug, caught by the server instead of by a screenshot.
+
+`docs/RUN-LOCALLY.md` §9 grew the sentence it was missing — *restart is what
+makes a pull take effect* — plus the `dist/` note, the service-worker note, and a
+row in the troubleshooting table for "a new feature is missing or a control is
+half-working". `test/stale-code.test.js` pins all of it: the degraded render, the
+island being skipped rather than empty, the current render still drawing the
+country, a stale build refused with its header and a fresh one served, and the
+worker's strategy split. (That suite boots the real app, so it closes the MySQL
+pool in `test.after` — the redirect middleware opens it on the first request, and
+a pool left open hangs `node --test` on a suite whose assertions all passed.)
 
 ---
 

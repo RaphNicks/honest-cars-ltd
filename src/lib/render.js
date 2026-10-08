@@ -87,6 +87,51 @@ function loadManifest(staticDir) {
   }
 }
 
+/**
+ * The newest mtime under the directories a build reads.
+ *
+ * This is what makes "the build is older than the code" detectable rather than a
+ * mystery. A `git pull` rewrites the files it changed and leaves `dist/` exactly
+ * where it was, so the server would go on serving HTML built from yesterday's
+ * templates — a page that renders, and is wrong. Comparing the manifest's
+ * `generatedAt` with the newest source mtime says so in one number.
+ *
+ * Only the directories a build actually reads are walked: `views`, `src`,
+ * `public/css`, `public/js`. A touched file elsewhere (a migration, a test, an
+ * uploaded photo) does not invalidate 74 pages, and pretending it does would
+ * make the warning noise rather than signal.
+ */
+const BUILD_SOURCES = ['views', 'src', 'public/css', 'public/js'];
+const IGNORED_DIRS = new Set(['node_modules', 'dist', '.git', '.test-static', 'uploads']);
+
+function newestSourceTime(root, dirs = BUILD_SOURCES) {
+  let newest = 0;
+  const walk = (dir) => {
+    let entries;
+    try {
+      entries = fs.readdirSync(dir, { withFileTypes: true });
+    } catch {
+      return;
+    }
+    for (const entry of entries) {
+      if (entry.name.startsWith('.') || IGNORED_DIRS.has(entry.name)) continue;
+      const full = path.join(dir, entry.name);
+      if (entry.isDirectory()) {
+        walk(full);
+        continue;
+      }
+      try {
+        const { mtimeMs } = fs.statSync(full);
+        if (mtimeMs > newest) newest = mtimeMs;
+      } catch {
+        /* a file that vanished mid-walk cannot make a build stale */
+      }
+    }
+  };
+  for (const dir of dirs) walk(path.join(root, dir));
+  return newest || null;
+}
+
 /** Serve a prebuilt file when it exists; otherwise signal "render me". */
 function staticFileFor(staticDir, manifest, routePath) {
   if (!manifest.routes.has(routePath)) return null;
@@ -154,6 +199,7 @@ module.exports = {
   writeStaticFile,
   filePathFor,
   loadManifest,
+  newestSourceTime,
   staticFileFor,
   buildStaticSite,
   hashOf,

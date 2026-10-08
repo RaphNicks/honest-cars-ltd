@@ -6,7 +6,10 @@
  * has no useful degraded mode without inventory.
  */
 
+const path = require('node:path');
+
 const config = require('./config');
+const render = require('./lib/render');
 const { createApp } = require('./app');
 const db = require('./db');
 
@@ -41,10 +44,45 @@ async function start() {
     console.warn('  ! listings tables look empty — run `npm run db:setup` to load schema + seed data');
   }
 
+  // The picker's size, printed because it is the number that tells a stale
+  // process from a broken one. The catalogue lives in `src/lib/nigeria-cities.js`,
+  // so anything less than the whole country here means the code in memory is not
+  // the code on disk — which is what a pull without a restart leaves behind, and
+  // what a reader then sees as "no cities are coming up".
+  const directory = await require('./services/city-directory').directory().catch(() => null);
+  if (directory) {
+    const markets = directory.filter((city) => city.served).length;
+    console.log(`  picker: ${directory.length} cities, ${markets} of them markets we operate`);
+  }
+
+  // And the build. `git pull` does not rebuild `dist/`, so a prebuilt page can be
+  // a revision behind while everything about it looks fine; app.js refuses to
+  // serve those, and this says why rather than leaving it to be noticed later.
+  const build = app.locals.staticBuild || null;
+  if (build && build.stale) {
+    console.warn(`  ! ${config.features.staticDir}/ was built ${build.generatedAt || 'before this checkout was written'} — older than the code.`);
+    console.warn('    Run `npm run build:static` to use the prebuilt pages; until then every page renders per request.');
+  }
+
   const server = app.listen(config.port, config.host, () => {
     console.log(`✓ honestcarsltd listening on http://${config.host}:${config.port} (${config.env})`);
     console.log(`  static pages: ${config.features.serveStaticPages ? config.features.staticDir : 'disabled (always dynamic)'}`);
   });
+
+  // A pull while this process is running leaves the views new and the modules
+  // old: Express re-reads `.ejs` from disk on every render, but `require()`
+  // cached everything else at boot. The result is a page that half-exists — new
+  // markup, old locals — which is confusing to debug from a browser and obvious
+  // in a terminal. So: watch the same directories a build reads, and say it once.
+  const startedAt = Date.now();
+  const watcher = setInterval(() => {
+    const newest = render.newestSourceTime(path.join(__dirname, '..'));
+    if (newest && newest > startedAt) {
+      console.warn('  ! the code changed while this process was running — restart (Ctrl-C, then `npm start`) to run it');
+      clearInterval(watcher);
+    }
+  }, 60_000);
+  watcher.unref();
 
   const shutdown = (signal) => () => {
     console.log(`\n${signal} received — closing server`);

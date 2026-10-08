@@ -21,15 +21,22 @@
      respecting the header — rather than a hand-kept path list — is what keeps a
      cache from ever handing one person another person's page.
    • Never touch anything but GET, and never intercept /api/.
-   • Never serve a stale page in preference to a working network. Assets go
-     stale-while-revalidate, HTML goes network-first.
+   • Never serve a stale page in preference to a working network, **and the same
+     goes for scripts and styles.** HTML is network-first; so is every `.css` and
+     `.js`, which is a correction rather than a preference. Cache-first for the
+     shell meant a visitor whose HTML was fresh still ran the *previous*
+     release's modules — the pull that added the city picker shipped a new
+     `area.js` and a new panel, and a reader with the old module got an empty
+     picker and a search box that could only answer "no city matches". Photos go
+     stale-while-revalidate, where a slightly old image is a much smaller lie
+     than slightly old code.
 
    Bump VERSION to ship new shell assets; activate() deletes every older cache.
    ========================================================================== */
 
 /* eslint-env serviceworker */
 
-const VERSION = 'hc-v4'; // v4: the city picker and the nav row changed base.css, components.css and area.js
+const VERSION = 'hc-v5'; // v5: scripts and styles are network-first — v4 could outlive its own HTML
 const SHELL = `${VERSION}-shell`;
 const PAGES = `${VERSION}-pages`;
 const RUNTIME = `${VERSION}-runtime`; // shell assets discovered later (other font weights)
@@ -135,9 +142,12 @@ function storable(response) {
 
 /** Network first, with a ceiling: a slow connection should get the last copy
     rather than a spinner, but a working network always wins. */
-async function networkFirst(request, { cacheName, cap, fallbackUrl }) {
+async function networkFirst(request, { cacheName, cap, fallbackUrl, readFrom = [] }) {
   const cache = await caches.open(cacheName);
-  const cached = await cache.match(request, { ignoreSearch: true });
+  // `readFrom` matters for the same reason it does below: the core files live in
+  // SHELL because install put them there, and the network-first branch needs to
+  // find them there before it gives up.
+  const cached = (await readFromAny(request, readFrom)) || (await cache.match(request, { ignoreSearch: true }));
   try {
     const response = await Promise.race([
       fetch(request),
@@ -214,13 +224,25 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  const isShellAsset = /^\/(css|js|fonts|icons)\//.test(url.pathname);
+  const isScriptOrStyle = /^\/(css|js)\//.test(url.pathname);
+  if (isScriptOrStyle) {
+    // Scripts and styles: network-first, falling back to the cache — so the page
+    // in front of the reader is never assembled from two releases, and a page
+    // opened offline still renders with its styles and its modules. Writes go to
+    // RUNTIME, never to SHELL, so the precached shell cannot be evicted by
+    // whatever else the visitor loads; reads check SHELL first, because that is
+    // where install put the core files.
+    event.respondWith(
+      networkFirst(request, { cacheName: RUNTIME, cap: RUNTIME_CAP, readFrom: [SHELL] }),
+    );
+    return;
+  }
+
+  const isShellAsset = /^\/(fonts|icons)\//.test(url.pathname);
   if (isShellAsset) {
-    // CSS, JS, fonts and icons: cache-first with a background refresh, so a
-    // page opened offline is not rendered with missing styles or no JS. Writes
-    // go to RUNTIME, never to SHELL — the precached shell must not be evicted by
-    // whatever else the visitor happens to load — but reads check SHELL first,
-    // because that is where install put the core files.
+    // Fonts and icons keep the older bargain: they change with the brand, not
+    // with a deploy, and a slightly stale icon is a much smaller lie than
+    // slightly stale code.
     event.respondWith(
       staleWhileRevalidate(request, { cacheName: RUNTIME, cap: RUNTIME_CAP, readFrom: [SHELL] }),
     );
