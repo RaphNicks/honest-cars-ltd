@@ -102,3 +102,86 @@ test('every migration says what it is for, and new ones how to undo it', () => {
     }
   }
 });
+
+// ---------------------------------------------------------------------------
+// schema.sql versus the migrations — the distinction the runners now enforce.
+// ---------------------------------------------------------------------------
+
+const { declaredObjects, compare, describeGaps } = require('../scripts/lib/schema-state');
+
+test('the declarations are read out of schema.sql, tables and columns and views', () => {
+  const { tables, views } = declaredObjects(fs.readFileSync(path.join(__dirname, '..', 'db', 'schema.sql'), 'utf8'));
+
+  assert.ok(tables.size > 40, `expected the whole schema, found ${tables.size} tables`);
+  assert.equal(views.size, 3, 'the three sold-archive views');
+
+  // A named table, with its columns and without its keys.
+  const consent = tables.get('consent_records');
+  assert.ok(consent, 'consent_records must be found');
+  assert.ok(consent.has('purpose') && consent.has('notice'), 'columns come through');
+  assert.ok(!consent.has('primary'), 'PRIMARY KEY is not a column');
+  assert.ok(!consent.has('key'), 'KEY is not a column');
+  assert.ok(!consent.has('constraint'), 'CONSTRAINT is not a column');
+});
+
+test('a wrapped definition is not mistaken for a column', () => {
+  // The trap this parser first fell into: a definition continued on the next
+  // line read as a column named `references` or `not`, which made a perfectly
+  // current database look like it was missing thirteen columns.
+  const { tables } = declaredObjects([
+    'CREATE TABLE IF NOT EXISTS `t` (',
+    '  id      INT UNSIGNED NOT NULL,',
+    '  status  ENUM(\'active\',\'inactive\')',
+    '            NOT NULL DEFAULT \'active\',',
+    '  owner   INT UNSIGNED NULL,',
+    '  PRIMARY KEY (id),',
+    '  CONSTRAINT fk_t_owner  FOREIGN KEY (owner)',
+    '                         REFERENCES `users` (id) ON DELETE SET NULL',
+    ') ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;',
+  ].join('\n'));
+  assert.deepEqual([...tables.get('t')].sort(), ['id', 'owner', 'status']);
+});
+
+test('an inline comment on a column line does not become a column', () => {
+  const { tables } = declaredObjects([
+    'CREATE TABLE IF NOT EXISTS `t` (',
+    '  id      INT UNSIGNED NOT NULL,',
+    '  phone   VARCHAR(40)  NULL,   -- canonical, when we have one',
+    '  PRIMARY KEY (id)',
+    ') ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;',
+  ].join('\n'));
+  assert.deepEqual([...tables.get('t')].sort(), ['id', 'phone']);
+});
+
+test('compare names what is missing, and nothing when nothing is', () => {
+  const declared = declaredObjects([
+    'CREATE TABLE IF NOT EXISTS `a` (\n  id INT NOT NULL,\n  name VARCHAR(10),\n  PRIMARY KEY (id)\n) ENGINE=InnoDB;',
+    'CREATE TABLE IF NOT EXISTS `b` (\n  id INT NOT NULL\n) ENGINE=InnoDB;',
+    'CREATE OR REPLACE VIEW v AS SELECT 1;',
+  ].join('\n'));
+
+  // A database that matches.
+  const same = new Map([['a', new Set(['id', 'name'])], ['b', new Set(['id'])]]);
+  assert.equal(describeGaps(compare(declared, { tables: same, views: new Set(['v']) })), '');
+
+  // One missing column, one missing table, one missing view.
+  const short = new Map([['a', new Set(['id'])]]);
+  const gaps = compare(declared, { tables: short, views: new Set() });
+  assert.deepEqual(gaps.missingColumns, ['a.name']);
+  assert.deepEqual(gaps.missingTables, ['b']);
+  assert.deepEqual(gaps.missingViews, ['v']);
+  assert.match(describeGaps(gaps), /tables: b/);
+});
+
+test('a long gap list is truncated rather than printed whole', () => {
+  const declared = declaredObjects(
+    ['CREATE TABLE IF NOT EXISTS `t` ('].concat(
+      // Zero-padded so the alphabetical sort in `compare` is what a reader expects.
+      Array.from({ length: 20 }, (_, i) => `  col${String(i).padStart(2, '0')} INT NOT NULL,`),
+      ['  PRIMARY KEY (col00)', ') ENGINE=InnoDB;'],
+    ).join('\n'),
+  );
+  const gaps = compare(declared, { tables: new Map([['t', new Set()]]), views: new Set() });
+  const text = describeGaps(gaps, 3);
+  assert.match(text, /columns: t\.col00, t\.col01, t\.col02 \(\+17 more\)/, `got: ${text}`);
+});

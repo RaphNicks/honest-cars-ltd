@@ -20,6 +20,7 @@ const path = require('node:path');
 const mysql = require('mysql2/promise');
 const config = require('../src/config');
 const { statementsOf } = require('./lib/sql-statements');
+const schemaState = require('./lib/schema-state');
 
 const MIGRATIONS_DIR = path.join(__dirname, '..', 'db', 'migrations');
 
@@ -58,6 +59,52 @@ async function main() {
     multipleStatements: false,
   });
 
+  // Ask before creating: this file is about to make the table that answers the
+  // question. See scripts/lib/schema-state.js for why a database with no
+  // migration history must not have the migrations replayed onto it.
+  const [[{ history }]] = await conn.query(
+    `SELECT COUNT(*) AS history FROM information_schema.tables
+      WHERE table_schema = ? AND table_name = 'schema_migrations'`,
+    [config.db.database],
+  );
+
+  if (!history) {
+    const declared = schemaState.declaredObjects(fs.readFileSync(path.join(__dirname, '..', 'db', 'schema.sql'), 'utf8'));
+    const actual = await schemaState.actualObjects(conn, config.db.database);
+    const gaps = schemaState.compare(declared, actual);
+    const described = schemaState.describeGaps(gaps);
+
+    if (actual.tables.size === 0) {
+      console.error(
+        '\n✗ this database has no tables, and the migrations are not a schema —\n' +
+          '  they are the path an existing database takes to the current one.\n\n' +
+          '  Run this first, which applies db/schema.sql:\n\n' +
+          '      npm run db:setup\n',
+      );
+      await conn.end();
+      process.exit(1);
+    }
+
+    if (described) {
+      console.error(
+        `\n✗ \`${config.db.database}\` is missing parts of the current schema:\n    ${described}\n\n` +
+          '  It was built from an older db/schema.sql, and replaying the migrations onto\n' +
+          '  a database in this state is not safe to guess at. On a test database:\n\n' +
+          `      DROP DATABASE \`${config.db.database}\`;\n      npm run db:setup\n`,
+      );
+      await conn.end();
+      process.exit(1);
+    }
+
+    // It matches schema.sql, so it already contains every migration's effect.
+    if (listOnly) {
+      console.log('Migrations: this database matches db/schema.sql — none have been run here,');
+      console.log('and none need to be. `npm run db:setup` records them as applied.');
+      await conn.end();
+      return;
+    }
+  }
+
   await conn.query(
     `CREATE TABLE IF NOT EXISTS schema_migrations (
        filename   VARCHAR(120) NOT NULL,
@@ -66,6 +113,19 @@ async function main() {
        PRIMARY KEY (filename)
      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
   );
+
+  if (!history) {
+    let recorded = 0;
+    for (const file of listMigrations()) {
+      await conn.query('INSERT INTO schema_migrations (filename, statements) VALUES (?, 0)', [file]);
+      recorded += 1;
+    }
+    console.log(`✓ migrations recorded as applied (${recorded}) — this database matches db/schema.sql`);
+    console.log('  Nothing was executed: schema.sql already contains their effect, and running');
+    console.log('  them would rewind columns through their intermediate shapes.');
+    await conn.end();
+    return;
+  }
 
   const [applied] = await conn.query('SELECT filename, applied_at FROM schema_migrations ORDER BY filename');
   const appliedSet = new Set(applied.map((row) => row.filename));

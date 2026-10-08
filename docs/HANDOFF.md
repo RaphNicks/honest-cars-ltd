@@ -813,6 +813,50 @@ The terminal route with XAMPP credentials was verified too — `DB_USER=root`,
 blank password, database absent: `npm run db:setup` created it, applied 28
 migrations and loaded the seed.
 
+### The bug that found: migrations must never run on a current database
+
+Second one, and worse than the first. The guide told laptop users that after a
+pull they should run `npm run db:setup` to pick up a new table. On a database
+built by importing `schema.sql` by hand — the phpMyAdmin route — that command
+**rewound the schema and truncated data**:
+
+    ✗ setup failed: WARN_DATA_TRUNCATED Data truncated for column 'purpose' at row 12
+
+`db/schema.sql` is the *state* of the database. `db/migrations/` is the path an
+older database takes to reach it, and a path passes through intermediate shapes
+that are sometimes narrower than the destination: `020-hire-management.sql`
+narrows `payments.purpose` to an enum without `'addon'`, which `022` adds back.
+Replaying the series against a database that is already current moves it
+*bacwards* through that narrowing, and MySQL truncates the rows that use the
+value the intermediate shape does not know. It only ever passed on an empty
+database here, where there were no rows to truncate — luck, not correctness.
+
+Both runners now decide, before touching the migrations:
+
+    has the database ever run one?   (a schema_migrations row)
+      yes → run the pending ones          (the genuine upgrade path)
+      no  → compare the database against db/schema.sql
+              matches    → record every migration as applied, execute none
+              does not   → refuse, name what is missing, and say to rebuild
+
+`scripts/lib/schema-state.js` does the comparison (tables, columns and views, by
+parsing `schema.sql`). `migrate.js` asks *before* it creates `schema_migrations`,
+because creating it destroys the very signal the question needs. Exit code 1 on
+refusal, so a script can rely on it.
+
+Seven scenarios verified against real databases: hand-import then db:setup
+(data preserved — the `addon` rows survive and the enum keeps its value); empty
+database; the normal history path, unchanged; a stale hand-import with and
+without history (both refuse, one naming the raw error as well as the gap);
+`db:migrate` on a hand-imported database (records, executes nothing);
+`db:migrate --list`; and `db:migrate` on an empty one (says to run db:setup).
+
+One parser trap worth remembering: a wrapped definition — `CONSTRAINT …
+FOREIGN KEY (x)` on one line and `REFERENCES y (z)` on the next, or an enum with
+its `NOT NULL` on the following line — read as columns named `references` and
+`not`, which made a perfectly current database look like it was missing thirteen
+columns. A definition now only starts on a line following a comma.
+
 ### The bug that found: migrations hardcoded the database name
 
 `db/migrations/012-dealer-ledger.sql` and `013-cms.sql` opened with `USE

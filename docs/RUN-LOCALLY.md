@@ -1,147 +1,26 @@
-# Run it on your laptop
+# Run it on your laptop — start to finish
 
-Once you have Node 20+ and a MySQL to talk to — with **XAMPP that is Option A
-below: the whole database, built by clicking Import in phpMyAdmin**, no command
-line involved — it is:
+Everything from an empty machine to the site running in a browser. XAMPP is
+assumed for the database (it is the common case, and it means the database is
+built by **clicking Import in phpMyAdmin** — no command line). Alternatives are
+in Appendix A.
 
-```bash
-npm install
-npm start            # → http://localhost:3000
-```
-
-If you would rather the terminal built the database too, add `npm run db:setup`
-in the middle. Both routes are verified on a fresh database; Option A is
-probably the one you want.
+Total time: about ten minutes, most of it downloads.
 
 ---
 
-## What you need
+## 1. Install two things
 
-| | |
-| --- | --- |
-| **Node.js 20 or newer** | check with `node -v`. Get it from [nodejs.org](https://nodejs.org) or `brew install node`. |
-| **MySQL** | XAMPP (Option A), a container (Option C), or one you already run (Option D). This is the only choice that matters. |
+| What | Where | Check it worked |
+| --- | --- | --- |
+| **Node.js 20 or newer** | [nodejs.org](https://nodejs.org) — take the LTS installer, click through | open a terminal, run `node -v` → `v20.x` or higher |
+| **XAMPP** | [apachefriends.org](https://www.apachefriends.org) — the default download is fine | open the XAMPP Control Panel |
 
-Nothing else. There is no build step, no bundler, no second process: the server
-renders pages on demand, and the photos, icons, fonts and videos are already in
-the repository (about 60 MB of them, hence the clone size).
+A terminal on Windows means **Command Prompt**, **PowerShell**, or **Git Bash** —
+any of them works. Every command below is shown for both Windows and
+macOS/Linux where they differ.
 
-## Which MySQL?
-
-### Option A — XAMPP, set up in phpMyAdmin (no command line)
-
-The whole database can be built from phpMyAdmin's **Import** tab. Two files in
-`db/` are all it takes: `schema.sql` is every table and view the app uses, and
-`seed.sql` is the sample data. There is no migration step — `schema.sql` already
-describes the current database, and a test keeps it that way.
-
-1. **Start MySQL.** In the XAMPP Control Panel, click **Start** next to MySQL.
-   Apache is not needed.
-2. **Open phpMyAdmin** — <http://localhost/phpmyadmin>.
-3. **Create the database.** Click **New** in the left sidebar → *Database name*:
-   `honestcars` → *Collation*: `utf8mb4_unicode_ci` → **Create**.
-4. **Import the schema.** With `honestcars` selected, open the **Import** tab →
-   *Choose File* → `db/schema.sql` → **Go**. You should see *"Import has been
-   successfully finished"*, and 56 tables plus 3 views listed on the left.
-5. **Import the data.** **Import** tab again → `db/seed.sql` → **Go**. The
-   listings, photos, dealers, blog posts and demo accounts are now in.
-6. **Point the site at it.** In the project folder:
-
-   ```bash
-   cp .env.example .env
-   ```
-
-   then make these lines in `.env` read exactly this (XAMPP's `root` has no
-   password by default, and 3306 is XAMPP's port):
-
-   ```
-   DB_HOST=127.0.0.1
-   DB_PORT=3306
-   DB_USER=root
-   DB_PASSWORD=
-   DB_NAME=honestcars
-   DB_ADMIN_USER=
-   DB_ADMIN_PASSWORD=
-   ```
-
-   Nothing else needs changing. (`DB_PASSWORD=` really is blank — do not add
-   quotes or spaces.)
-7. **Run it.**
-
-   ```bash
-   npm install
-   npm start        # → http://localhost:3000
-   ```
-
-   `npm run db:setup` is **not** needed on this path — phpMyAdmin has already
-   done its job. Running it anyway is harmless: it notices the tables exist.
-
-**Two notes for XAMPP specifically.**
-
-- XAMPP ships **MariaDB**, not MySQL — that is supported, and the code says so
-  where it matters (`src/db/pool.js`, `src/db/shape.js`). Every JSON function the
-  project uses (`JSON_ARRAY`, `JSON_EXTRACT`, `JSON_OBJECT`, `JSON_UNQUOTE`)
-  exists in MariaDB 10.2+, and XAMPP ships 10.4.
-- phpMyAdmin's default upload limit is 2 MB per import. The two files are 80 kB
-  and 380 kB, so nothing needs raising. If a future import ever does, it is
-  `upload_max_filesize` in `php.ini`.
-
-### Option B — let the terminal do it (`npm run db:setup`)
-
-If you would rather not import by hand — including on XAMPP — this does all of
-the above and is safe to run twice:
-
-```bash
-cp .env.example .env     # DB_USER=root, DB_PASSWORD= (blank) for XAMPP
-npm install
-npm run db:setup         # creates the database, applies the schema, loads the seed
-npm start
-```
-
-With XAMPP's default `root` account that is the entire setup, because `root`
-may create databases. Set `DB_ADMIN_USER`/`DB_ADMIN_PASSWORD` only when
-`DB_USER` is an ordinary account that cannot.
-
-### Option C — Docker (fewest steps, nothing to install but Docker)
-
-```bash
-docker compose up -d db
-cp .env.example .env
-```
-
-Then add these two lines to `.env` — they let `npm run db:setup` create the
-database:
-
-```
-DB_ADMIN_USER=root
-DB_ADMIN_PASSWORD=honestcars-root
-```
-
-Everything else in `.env.example` already points at the container
-(`127.0.0.1:3306`, user `honestcars`), so `npm run db:setup` needs no other
-edit. Continue with the three commands above.
-
-### Option D — MySQL you already have
-
-```bash
-cp .env.example .env
-```
-
-Edit the `DB_*` block in `.env` to match your server. If you sign in as `root`,
-set `DB_USER=root` and `DB_PASSWORD=your root password` and leave
-`DB_ADMIN_USER`/`DB_ADMIN_PASSWORD` blank — `root` can create the database
-itself.
-
-If your `DB_USER` is an ordinary account, the setup script needs a privileged
-one as well: set `DB_ADMIN_USER` / `DB_ADMIN_PASSWORD`, or grant your account
-the right first:
-
-```sql
-CREATE DATABASE honestcars CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-GRANT ALL PRIVILEGES ON honestcars.* TO 'youruser'@'localhost';
-```
-
-## Getting the code
+## 2. Get the code
 
 ```bash
 git clone https://github.com/RaphNicks/honest-cars-ltd.git
@@ -149,77 +28,269 @@ cd honest-cars-ltd
 git checkout arena/01a0f7df-honest-cars-ltd
 ```
 
-The work lives on that branch until PR #1 is signed off; `main` is only the
-original spec document. `.env` is not in the repository — the template is.
+That branch is where the work lives; `main` only holds the original spec
+document. If you do not have `git`, the same thing without it:
 
----
+1. Open the branch page:
+   <https://github.com/RaphNicks/honest-cars-ltd/tree/arena/01a0f7df-honest-cars-ltd>
+2. **Code → Download ZIP** (this exact link downloads the right branch):
+   <https://github.com/RaphNicks/honest-cars-ltd/archive/refs/heads/arena/01a0f7df-honest-cars-ltd.zip>
+3. Unzip it somewhere you can find again.
 
-## What to look at
+Either way you should end up with a folder containing `package.json`, `db/`,
+`src/` and `views/`. Open a terminal in that folder — that is where every
+remaining command runs.
 
-The public site needs no sign-in: `/`, `/cars`, a car page, `/services`,
+> **Use `git clone` if you can.** The work is still being added to, and a
+> zip cannot be updated — you would have to download it again each time. With a
+> clone, staying current is one command:
+>
+> ```bash
+> git pull
+> ```
+>
+> and the same command does nothing when there is nothing new.
+
+## 3. Start MySQL
+
+In the XAMPP Control Panel, click **Start** next to **MySQL**. Apache is not
+needed. The panel should report MySQL running on port **3306**.
+
+## 4. Create the database in phpMyAdmin
+
+1. Open <http://localhost/phpmyadmin>
+2. Click **New** in the left sidebar
+3. *Database name*: `honestcars` — *Collation*: `utf8mb4_unicode_ci` — click **Create**
+4. With `honestcars` selected, open the **Import** tab
+5. *Choose File* → pick **`db/schema.sql`** from the project folder → **Go**
+
+   You should see *"Import has been successfully finished"*, and the left
+   sidebar should fill with **56 tables and 3 views**.
+6. **Import** tab again → pick **`db/seed.sql`** → **Go**
+
+   That is the sample data: 79 cars with photos, 16 dealers, 8 blog posts, the
+   demo accounts, and the site's settings.
+
+There is nothing else to run. `db/schema.sql` is the complete current database
+and `db/seed.sql` is its data, so **`npm run db:setup` is not needed on this
+route** — phpMyAdmin has already done it. (Running it anyway is harmless.)
+
+## 5. Tell the site how to reach the database
+
+In the project folder, make a file called `.env` from the template:
+
+```bash
+cp .env.example .env        # macOS / Linux / Git Bash
+copy .env.example .env      # Windows Command Prompt
+Copy-Item .env.example .env # PowerShell
+```
+
+Open `.env` in any text editor and make these lines read exactly this — XAMPP's
+`root` account has **no password** by default, and its port is 3306:
+
+```
+DB_HOST=127.0.0.1
+DB_PORT=3306
+DB_USER=root
+DB_PASSWORD=
+DB_NAME=honestcars
+DB_ADMIN_USER=
+DB_ADMIN_PASSWORD=
+```
+
+`DB_PASSWORD=` is deliberately empty — no quotes, no spaces after the `=`, and
+no `localhost` (use `127.0.0.1`, which avoids a Windows IPv6 quirk). Everything
+else in the file can stay as it is.
+
+## 6. Install and run
+
+```bash
+npm install
+npm start
+```
+
+`npm install` takes a minute or two and puts about 140 MB in `node_modules`. Then:
+
+```
+✓ MySQL 5.7.29 · database "honestcars"
+  inventory: 63 live cars · 16 verified dealers · 33 certified
+✓ honestcarsltd listening on http://0.0.0.0:3000 (development)
+```
+
+Open **<http://localhost:3000>**. That is the site.
+
+There is no build step — no bundler, no second process, no `npm run build`. The
+server renders pages as they are requested, and every photo, icon, font and
+video is already in the folder you cloned (21 MB of them).
+
+To stop it: **Ctrl-C** in the terminal.
+
+## 7. Sign in and look around
+
+The public pages need no account: `/`, `/cars`, a car page, `/services`,
 `/shop`, `/hire`, `/blog`, `/how-it-works`, `/find-my-car`.
 
-**Signing in is by phone, not password.** In development the one-time code is
-printed in the terminal *and* returned on screen (`AUTH_SHOW_CODE=true`), so you
-never need a phone. Use one of the seeded numbers:
+**Signing in is by phone number, not a password.** In development the one-time
+code is printed in the terminal *and* shown on screen, so you never need a real
+phone. Use one of the seeded numbers:
 
-| Number | Who | Lands on |
+| Number | Who | Where it lands |
 | --- | --- | --- |
-| `+2348000000001` | Admin | `/admin` — then a second factor, see below |
+| `+2348000000001` | Admin | `/admin` — asks for a second factor, see below |
 | `+2348000000002` | Ops desk | `/admin` |
 | `+2348000000003` | Field inspector | `/admin` |
 | `+2348000000004` | Finance | `/admin` — second factor |
 | `+2348000000006` | A dealer | `/dealer` |
-| any other number | New customer | `/account` |
+| anything else | A new customer | `/account` |
 
-**The admin and finance roles carry a second factor** (PRD §12.2). Add the
-seeded secret to any authenticator app — `JBSWY3DPEHPK3PXP` for admin,
-`KRSXG5CTMVRXEZLU` for finance — or use a seeded recovery code. This only
-applies to those two roles; everyone else signs in with the OTP alone.
+To sign in: go to <http://localhost:3000/login>, enter the number, press the
+button, and type the code it shows you.
 
-Payments, SMS and email are deliberately unconfigured: with no provider keys the
-site takes bank transfers, prints messages to the terminal, and records anything
-it could not send as `skipped` at `/admin/payments`. Nothing is ever reported as
-sent when it was not.
+**Admin and finance also ask for a 6-digit code from an authenticator app**
+(this is PRD §12.2). Add the seeded secret to Google Authenticator, Authy, 1Password
+or any TOTP app — *enter setup key manually*:
 
-## Useful commands
+- admin — `JBSWY3DPEHPK3PXP`
+- finance — `KRSXG5CTMVRXEZLU`
 
-```bash
-npm test             # the whole suite (~500 tests, ~40s)
-npm run lint         # front-end lint: type scale, event names
-npm run build:static # optional: pre-render the stable pages into dist/
-npm run db:seed      # put the sample cars back the way they were
-npm start            # run in the foreground; Ctrl-C stops it
-npm run dev          # same, but restarts on file changes
-```
+Every other role signs in with the OTP alone. If a code is rejected, wait for
+the next 30-second window; a used code is refused for its step.
 
-`dist/` is what keeps the stable pages instant in production. **You do not need
-it locally** — without it every page is rendered on the spot, which is what you
-want while you are changing templates anyway.
+Payments, SMS and email are deliberately unconfigured, because there are no
+provider keys in a test install. Bank transfer is the working payment method,
+messages are printed to the terminal, and anything that could not be sent is
+recorded as **`skipped`** at `/admin/payments` — never reported as sent when it
+was not.
 
-## Starting over
+## 8. Everyday commands
 
 ```bash
-npm run db:seed              # reset the sample data
-docker compose down -v       # Option A: throw the database away entirely
+npm start             # run it (Ctrl-C to stop)
+npm run dev           # run it, restarting automatically when files change
+npm test              # the whole suite, ~500 tests, about 40 seconds
+npm run lint          # front-end lint: the type scale and event names
+npm run db:seed       # put the sample cars back the way they were
 ```
 
-Deleting `dist/` is always safe; it is generated. `public/og/` holds generated
-share cards and is safe to delete too — they are re-rendered as they are
-requested.
+Nothing else is required. `npm run build:static` pre-renders the stable pages
+into `dist/`, which makes a production site fast; locally it is unnecessary,
+and deleting `dist/` at any time is safe.
 
-## If something goes wrong
+## 9. Staying up to date
 
-| Symptom | Cause |
+If you cloned (not zipped), picking up new work is:
+
+```bash
+git pull
+npm install     # only needed when package.json changed — harmless otherwise
+```
+
+Then restart the server (Ctrl-C, `npm start`). Three things are worth knowing:
+
+- **A pull never touches your database.** The schema and sample data are files in
+  the repository, not state on your machine, and `.env` is not tracked, so your
+  database settings survive every pull.
+- **`npm run db:setup` is the right command after a pull**, and it is safe to run
+  on a database you built in phpMyAdmin. It compares your database against
+  `db/schema.sql`: if they match, it records the migrations as applied without
+  executing anything — because a database built from `schema.sql` already
+  contains their effect, and *running* them would rewind columns through the
+  intermediate shapes they pass through. If they do not match, it stops and
+  tells you exactly what is missing, rather than corrupting anything.
+- **If it refuses**, your database came from an older `schema.sql`. On a test
+  database, rebuild it — drop `honestcars` in phpMyAdmin and follow step 4
+  again. Your `.env` and the code are unaffected.
+
+## 10. If something goes wrong
+
+| What you see | What it means |
 | --- | --- |
-| `ECONNREFUSED 127.0.0.1:3306` | MySQL is not running. `docker compose up -d db`, or start your own. |
-| `ER_ACCESS_DENIED_ERROR` | The `DB_*` values in `.env` do not match your server. |
-| `ER_DBACCESS_DENIED_ERROR` during `db:setup` | Your user cannot create databases — see Option D, or set `DB_ADMIN_USER`. |
-| `ER_BAD_DB_ERROR: Unknown database 'honestcars'` | The database name in `.env` does not exist in phpMyAdmin. Create it and import `db/schema.sql`, or run `npm run db:setup`. |
-| Import in phpMyAdmin says a table already exists | You are importing into a database that is not empty. Drop it, create it again, and import `schema.sql` before `seed.sql`. |
-| `EADDRINUSE :3000` | Something else is on 3000. `PORT=3001 npm start`. |
-| Ports 3000 or 3306 already taken | Change them: `PORT` in `.env`, and the left-hand side of the port mapping in `docker-compose.yml` (then `DB_PORT` to match). |
-| Sign-in code never arrives | It is in the terminal, and on screen in development. Check `AUTH_SHOW_CODE=true` in `.env`. |
+| `ECONNREFUSED 127.0.0.1:3306` | MySQL is not running. Start it in the XAMPP panel. |
+| `ER_ACCESS_DENIED_ERROR` | The `DB_USER` / `DB_PASSWORD` in `.env` do not match your MySQL. On a default XAMPP that is `root` with an empty password. |
+| `ER_BAD_DB_ERROR: Unknown database 'honestcars'` | Step 4 was skipped, or `DB_NAME` in `.env` does not match the database you created. |
+| Import fails: *table already exists* | You imported into a database that is not empty. Drop it in phpMyAdmin, create it again, and import `schema.sql` before `seed.sql`. |
+| `db:setup` says the database is missing parts of the current schema | It was built from an older `schema.sql`. Drop it in phpMyAdmin and repeat step 4 — the message names what it found missing. |
+| `EADDRINUSE: address already in use :::3000` | Something else is on port 3000 — usually another copy of the site. Stop it, or run `PORT=3001 npm start` (`set PORT=3001&& npm start` in Command Prompt). |
+| The page loads but with no styling | `npm start` is not the process serving it — check the terminal, and use the URL it prints. |
+| Sign-in code never appears | It is in the terminal *and* on the page. If not, the server is running with `NODE_ENV=production`; the `.env` template sets `AUTH_SHOW_CODE=true`. |
+| `npm install` fails on `sharp` | Node is too old, or the download was interrupted. Check `node -v` is 20+, then delete `node_modules` and run `npm install` again. |
 
-Log files from the sandbox this was built in live in `docs/HANDOFF.md`, along
-with everything else worth knowing about how the site is put together.
+---
+
+# Appendix A — other ways to build the database
+
+Everything below is optional. Step 4 is the recommended route; these are the
+alternatives, and all of them leave you at the same place.
+
+### A1. Let the terminal do it (still XAMPP)
+
+Skip step 4 entirely and do step 5 with `DB_USER=root` and a blank password.
+Then:
+
+```bash
+npm install
+npm run db:setup     # creates the database, applies the schema, loads the seed
+npm start
+```
+
+Safe to run twice: it notices what already exists. `root` can create databases,
+so `DB_ADMIN_USER` is not needed with XAMPP. Set it only when `DB_USER` is an
+ordinary account that cannot create databases — give it a privileged account:
+
+```
+DB_ADMIN_USER=root
+DB_ADMIN_PASSWORD=your root password
+```
+
+### A2. Docker, if you have it
+
+```bash
+docker compose up -d db
+cp .env.example .env
+```
+
+Then add these two lines to `.env` so the setup script may create the database:
+
+```
+DB_ADMIN_USER=root
+DB_ADMIN_PASSWORD=honestcars-root
+```
+
+and run `npm install && npm run db:setup && npm start`. The container's port,
+user and password already match `.env.example`, so nothing else needs editing.
+This is a local convenience, not a deployment.
+
+### A3. A MySQL or MariaDB you already run
+
+Set the `DB_*` block in `.env` to match it, then follow A1. If your account
+cannot create databases:
+
+```sql
+CREATE DATABASE honestcars CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+GRANT ALL PRIVILEGES ON honestcars.* TO 'youruser'@'localhost';
+```
+
+---
+
+# Appendix B — what is in the database files
+
+| File | What it is |
+| --- | --- |
+| `db/schema.sql` | Every table and view the app uses — the current shape, not a history |
+| `db/seed.sql` | The sample data: 79 cars, 555 photos, 16 dealers, 8 posts, demo accounts |
+| `db/migrations/` | The path an *existing* database takes to reach this shape, one file per change |
+
+The first two are all a new install needs; the migrations exist so a database
+created months ago can be brought forward with `npm run db:setup` or
+`npm run db:migrate` instead of being rebuilt. A test fails if a migration ever
+creates a table that `schema.sql` does not also create, so the phpMyAdmin route
+cannot quietly fall behind.
+
+---
+
+# Appendix C — what you need to change for a real deployment
+
+Nothing in this guide is production. Before this is public it needs: a real
+MySQL with a dedicated (non-root) user, `AUTH_PEPPER` set to a random value,
+`NODE_ENV=production`, HTTPS, a payment provider's keys, and the rest of the
+gaps list in `docs/GAPS.md`.

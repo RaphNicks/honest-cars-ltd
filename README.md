@@ -22,16 +22,24 @@ next*.
 
 ## Quick start
 
-**On your own machine: `docs/RUN-LOCALLY.md`** — prerequisites, the two ways to
-get MySQL (Docker or your own), the seeded sign-in numbers, and what to look at
-first. The short version, against a MySQL you can reach:
+**Full instructions: `docs/RUN-LOCALLY.md`** — from an empty machine to the site
+in a browser, written for XAMPP with the database built by importing two files in
+phpMyAdmin. The shape of it:
 
 ```bash
-cp .env.example .env    # then edit the DB_* block
+git clone https://github.com/RaphNicks/honest-cars-ltd.git
+cd honest-cars-ltd && git checkout arena/01a0f7df-honest-cars-ltd
+
+# 1. create the database in phpMyAdmin, importing db/schema.sql then db/seed.sql
+# 2. cp .env.example .env   → DB_USER=root, DB_PASSWORD= (blank), DB_NAME=honestcars
+
 npm install
-npm run db:setup        # creates the database, applies db/schema.sql, loads db/seed.sql
 npm start               # http://localhost:3000
 ```
+
+`npm run db:setup` does the phpMyAdmin step from the terminal instead, and is
+safe to run twice. If you already have MySQL and would rather not read the
+guide, that is the whole of it.
 
 The work lives on `arena/01a0f7df-honest-cars-ltd` until PR #1 is signed off;
 `main` carries only the spec document. There is no build step: pages render on
