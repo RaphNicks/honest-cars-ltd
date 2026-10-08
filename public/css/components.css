@@ -596,11 +596,17 @@ img.header__logo-mark {
 /* Mega-menu (Services ▾) — desktop */
 .mega {
   position: relative;
+  /* The air between the trigger and its panel, named once. The panel sits this
+     far below the link, and its bridge (below) covers exactly the same
+     distance — because that band belongs to neither the link nor the panel, and
+     a pointer crossing it leaves .mega, which is what used to close this menu
+     the moment anybody reached for an item. */
+  --mega-gap: var(--space-1);
 }
 
 .mega__panel {
   position: absolute;
-  top: calc(100% + var(--space-1));
+  top: calc(100% + var(--mega-gap));
   left: -var(--space-3);
   width: min(680px, 82vw);
   padding: var(--space-2);
@@ -611,6 +617,18 @@ img.header__logo-mark {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: var(--space-05);
+}
+
+/* The bridge. Absolutely positioned, so it is not a grid item and cannot
+   disturb the two-column layout; invisible, and part of the panel, so it
+   disappears with it and leaves no stray hover target on the page. */
+.mega__panel::before {
+  content: '';
+  position: absolute;
+  top: calc(var(--mega-gap) * -1);
+  left: 0;
+  right: 0;
+  height: var(--mega-gap);
 }
 
 .mega__panel[hidden] { display: none; }

@@ -62,12 +62,54 @@ export function initHeader() {
   // --- mega-menu -----------------------------------------------------------
   const megas = Array.from(document.querySelectorAll('[data-mega]'));
 
+  // Closing is delayed, and coming back cancels it. The panel is bridged so a
+  // pointer can cross the gap between the trigger and the panel without
+  // leaving the menu (see `.mega__panel::before`), but two things that bridge
+  // cannot help with remain: leaving the trigger's box sideways on the way to
+  // a panel that is wider than the trigger, and an unsteady hand. Opening
+  // stays immediate, so the menu still feels attached to the pointer.
+  //
+  // A keyboard user has neither problem and no pointer to hold still, so
+  // focusout and Escape close at once — a delayed close there would only read
+  // as the menu refusing to go away.
+  const CLOSE_DELAY_MS = 160;
+  const closeTimers = new WeakMap();
+
+  // Hover only where there is such a thing. A touchscreen fires an emulated
+  // mouseenter just before its click, so opening on hover and toggling on click
+  // would open and immediately shut again — the same "it vanishes as I reach for
+  // it" complaint, on a tablet.
+  const canHover = typeof window.matchMedia === 'function' ? window.matchMedia('(hover: hover)').matches : true;
+
+  function cancelClose(mega) {
+    const timer = closeTimers.get(mega);
+    if (timer === undefined) return;
+    clearTimeout(timer);
+    closeTimers.delete(mega);
+  }
+
+  function closeMega(mega) {
+    cancelClose(mega);
+    mega.querySelector('[data-mega-trigger]')?.setAttribute('aria-expanded', 'false');
+    const panel = mega.querySelector('[data-mega-panel]');
+    if (panel) panel.hidden = true;
+  }
+
+  function closeMegaSoon(mega) {
+    cancelClose(mega);
+    closeTimers.set(
+      mega,
+      setTimeout(() => {
+        closeTimers.delete(mega);
+        closeMega(mega);
+      }, CLOSE_DELAY_MS),
+    );
+  }
+
   function closeAllMegas(except) {
     megas.forEach((mega) => {
       if (mega === except) return;
-      mega.querySelector('[data-mega-trigger]')?.setAttribute('aria-expanded', 'false');
-      const panel = mega.querySelector('[data-mega-panel]');
-      if (panel) panel.hidden = true;
+      closeMega(mega);
     });
   }
 
@@ -77,17 +119,21 @@ export function initHeader() {
     if (!trigger || !panel) return;
 
     const open = () => {
+      cancelClose(mega);
       closeAllMegas(mega);
       panel.hidden = false;
       trigger.setAttribute('aria-expanded', 'true');
     };
     const close = () => {
+      cancelClose(mega);
       panel.hidden = true;
       trigger.setAttribute('aria-expanded', 'false');
     };
 
-    mega.addEventListener('mouseenter', open);
-    mega.addEventListener('mouseleave', close);
+    if (canHover) {
+      mega.addEventListener('mouseenter', open);
+      mega.addEventListener('mouseleave', () => closeMegaSoon(mega));
+    }
     trigger.addEventListener('click', (event) => {
       event.preventDefault();
       if (panel.hidden) open();
