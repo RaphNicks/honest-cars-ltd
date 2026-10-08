@@ -300,6 +300,17 @@ hr {
   border: 0;
 }
 
+/* The `hidden` attribute means "do not render this", and the UA stylesheet
+   implements it as `display: none` — which any author rule setting `display`
+   quietly beats. The failure is never loud: it is an empty card where the
+   instant estimate will appear, a car field that shows before a car is chosen,
+   a tab panel that shows alongside its siblings. Five of those were patched one
+   element at a time before this rule replaced the whole pattern; a single
+   declaration below ends it for every element that will ever ship the
+   attribute. Untouchable on purpose: losing `!important` here silently
+   resurrects all of them. */
+[hidden] { display: none !important; }
+
 .hidden { display: none !important; }
 
 @media (max-width: 768px) {

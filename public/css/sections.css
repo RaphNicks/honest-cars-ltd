@@ -133,7 +133,6 @@ body:has(.sticky-cta) main { padding-bottom: var(--space-8); }
 .flow__steps span[data-state="current"] { color: var(--honest-navy); font-weight: var(--weight-semibold); }
 .flow__saved { font-size: var(--text-12); color: var(--honest-green); min-height: 1.2em; }
 .flow__panel { border: var(--border); border-radius: var(--radius); background: var(--white); padding: var(--space-3); }
-.flow__panel[hidden] { display: none; }
 .flow__panel h2 { font-size: var(--text-24); margin-bottom: var(--space-1); }
 .flow__panel .field + .field { margin-top: var(--space-2); }
 .flow__nav { display: flex; gap: var(--space-1); justify-content: space-between; }

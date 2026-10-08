@@ -48,7 +48,12 @@ Every **§9 MUST is built.** The commit trail, most recent first:
 
 | Commit | What it delivered |
 |---|---|
-| *this commit* | **OG cards** — titles wrap and fit instead of clipping; the schema logo stopped 404ing |
+| *this commit* | **the Services menu + the hidden attribute** — hover no longer drops the panel; `[hidden]` is a real rule; the badge corner wraps |
+| `cb74267` | **Services mega-menu** — the 8px dead band bridged, close delayed, hover gated to hover devices |
+| `7213505` | **migrations refuse to run on a current database** — the schema-state guard, and the parser that read continuation lines as columns |
+| `c62f42f` | phpMyAdmin route documented and proved for XAMPP users |
+| `5d03e87` | `docs/RUN-LOCALLY.md` + the `USE` bug that hijacked the migration session |
+| `95c1fd4` | **OG cards** — titles wrap and fit instead of clipping; the schema logo stopped 404ing |
 | `4aaa1e4` | **§12.2 second factor** — TOTP for admin/finance, recovery codes, the challenge gate |
 | `fbfa63b` | **§18.3 privacy desk** — data-subject requests, the 30-day clock, consent records |
 | `9763e66` | **§5.1 settings** — the rest of the screen: business facts, limits, fees, channels |
@@ -103,6 +108,64 @@ resilience ask:
 `size_bytes`, `poster_url` on `listing_media`), a `video` content block with a
 `[clip:…]` directive, clips on two listings' galleries, and 8 blog posts with 3
 embedded videos. All four clips total 726 KB.
+
+---
+
+## 3v. Just finished: the Services menu, and the hidden attribute
+
+Two defects the user found by using the site, and a third, fourth and fifth
+found while fixing the second. Both fixes are in `public/css/` and are about the
+same habit of mind: a component solving a problem locally that belongs to the
+stylesheet as a whole.
+
+**The Services menu closed as you reached for it.** `.mega` is the trigger's
+box, and `.mega__panel` was positioned `top: calc(100% + var(--space-1))` — an
+8px band belonging to neither the trigger nor the panel. A pointer crossing it
+leaves `.mega`, which fired `mouseleave`, whose listener hid the panel outright.
+Fixed at both layers: the air is named once (`--mega-gap`), the panel is offset
+by it, and `.mega__panel::before` bridges exactly that distance (absolutely
+positioned, or it becomes a grid item in the panel's two-column layout); and the
+close is delayed 160ms and cancelled by coming back, which also covers the
+sideways step from the narrow trigger onto the wider panel. Hover listeners now
+bind only where `(hover: hover)` matches — a touchscreen fires an emulated
+`mouseenter` just before its click, which would open and immediately shut it.
+Keyboard stays immediate.
+
+**The `hidden` attribute was being beaten by `display`.** The UA stylesheet
+implements the attribute as `display: none`, and any author rule that sets a
+`display` silently outranks it. Five components had each grown a guard of their
+own — `.mega__panel`, `.area-switcher__panel`, `.footer__install`,
+`.flow__panel`, `.info-tip__panel` — and the ones that had not were visible
+while marked hidden: the instant-estimate result card on `/sell-swap` (an empty
+card under the button, `display: grid`), `.field` on `/financing` ("The car you
+asked about" showing before any car was chosen, `display: flex`), and the home
+page's four tab feeds, which all rendered at once because toggling the attribute
+did nothing (`display: grid`). One rule replaced the whole pattern:
+
+    [hidden] { display: none !important; }
+
+The five guards went with it, and `test/hidden-attribute.test.js` fails if the
+rule loses its `!important`, leaves `base.css`, or is joined by a sixth local
+guard. **The general lesson: when the same one-line fix appears in N components,
+the N+1th has already been forgotten — the pattern is the bug.**
+
+**The "Certified report" ribbon sat on top of the grade.** The ribbon was
+absolute with `right: 8px; top: 8px` *inside* `.car-card__badges`, which is
+itself positioned — so those 8px measured from the badge column, and the column
+shrink-wraps to the grade chip. The ribbon therefore sat 8px inside the chip's
+own right edge, over the end of "HonestCars-Certified" and the tooltip button,
+at every card width. The corner is now a wrapping flex row spanning the photo
+(`left` **and** `right`), the ribbon rides it with `margin-left: auto`, and
+`flex-wrap` guarantees the two chips can never overlap however long the label
+gets. `.badge--reserved` keeps its own line, as it sat under the grade before.
+`test/car-card-badges.test.js` pins the row, the ribbon's place in flow, and
+re-derives the desktop width budget from the tokens (1200px container, padding,
+grid gap, insets) against the shipped Inter.
+
+**Remember:** a guard is a smell when it is the fifth copy of itself; `public/sw.js`
+`VERSION` must be bumped whenever `base.css` or `components.css` changes, or a
+returning visitor keeps the old shell from cache and the fix looks like it did
+not work (bumped to `hc-v3` here).
 
 ---
 

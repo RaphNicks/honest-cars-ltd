@@ -29,7 +29,7 @@
 
 /* eslint-env serviceworker */
 
-const VERSION = 'hc-v2';
+const VERSION = 'hc-v3'; // v3: the [hidden] rule and the car-card badge row changed base.css and components.css
 const SHELL = `${VERSION}-shell`;
 const PAGES = `${VERSION}-pages`;
 const RUNTIME = `${VERSION}-runtime`; // shell assets discovered later (other font weights)

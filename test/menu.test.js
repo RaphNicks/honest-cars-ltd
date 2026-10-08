@@ -87,11 +87,17 @@ test('the panel is offset by exactly the gap the bridge fills', () => {
 });
 
 test('the panel still hides with the hidden attribute', () => {
-  // `display: grid` beats the `hidden` attribute's default display, so this rule
-  // is what makes `panel.hidden = true` actually hide anything.
-  const components = read('public/css/components.css');
-  const hidden = rule(components, '.mega__panel[hidden]');
+  // `display: grid` beats the `hidden` attribute's default display, which is
+  // why the panel used to have a `.mega__panel[hidden]` guard of its own. That
+  // guard is gone: `base.css` now makes the attribute unbeatable for every
+  // element that ships it (see test/hidden-attribute.test.js), so the toggle
+  // this module drives works with no component-level rule at all.
+  const base = read('public/css/base.css');
+  const hidden = rule(base, '[hidden]');
   assert.match(declaration(hidden, 'display'), /none/);
+  assert.match(hidden, /!important/, 'the attribute must outrank any display rule');
+  const components = read('public/css/components.css');
+  assert.ok(!/\.mega__panel\[hidden\]/.test(components), 'the local guard is redundant again');
 });
 
 test('the markup ships the panel hidden, which the toggle depends on', () => {

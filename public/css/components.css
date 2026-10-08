@@ -211,8 +211,6 @@
   line-height: var(--leading-normal);
 }
 
-.info-tip__panel[hidden] { display: none; }
-
 /* --------------------------------------------------------------------------
    Card shell
    -------------------------------------------------------------------------- */
@@ -266,18 +264,30 @@
   position: absolute;
   top: var(--space-1);
   left: var(--space-1);
+  right: var(--space-1);
+  /* One wrapping row that spans the photo, not a shrink-wrapped column. The
+     chips lay themselves out, so they cannot overlap however long the grade
+     label or the ribbon gets, at any card width, in any font: when there is
+     room the ribbon is pushed to the photo's top-right (its margin does that),
+     and when there is not it drops to a second line instead of landing on top
+     of the grade. A width in px here would have to be wrong in both
+     directions — too narrow a card and the ribbon wraps for no reason, too
+     wide and it overlaps again — which is exactly the old bug. */
   display: flex;
-  flex-direction: column;
+  flex-wrap: wrap;
   align-items: flex-start;
   gap: var(--space-05);
-  max-width: calc(100% - var(--space-2));
 }
 
-/* “Certified report” ribbon when an inspection exists */
+/* “Reserved” keeps its own line, the way it sat under the grade before. */
+.car-card__badges .badge--reserved { flex-basis: 100%; }
+
+/* “Certified report” ribbon when an inspection exists. In normal flow in the
+   row above — it used to be absolutely positioned inside the badge column,
+   whose shrink-wrapped box is only as wide as the grade chip, so `right: 8px`
+   measured from the chip and the ribbon covered it. */
 .car-card__ribbon {
-  position: absolute;
-  right: var(--space-1);
-  top: var(--space-1);
+  margin-left: auto;
   background: var(--honest-green);
   color: var(--white);
   border-radius: var(--radius-pill);
@@ -539,8 +549,6 @@ img.header__logo-mark {
   box-shadow: var(--shadow-raised);
 }
 
-.area-switcher__panel[hidden] { display: none; }
-
 .area-switcher__hint {
   font-size: var(--text-12);
   text-transform: uppercase;
@@ -630,8 +638,6 @@ img.header__logo-mark {
   right: 0;
   height: var(--mega-gap);
 }
-
-.mega__panel[hidden] { display: none; }
 
 .mega__item {
   display: flex;
@@ -1647,7 +1653,6 @@ body[data-scroll-locked='true'] { overflow: hidden; }
   text-underline-offset: 3px;
   cursor: pointer;
 }
-.footer__install[hidden] { display: none; }
 .footer__install:focus-visible { outline: 2px solid var(--white); outline-offset: 2px; border-radius: var(--radius-sm); }
 .footer__pay {
   padding: 2px var(--space-1);
