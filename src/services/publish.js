@@ -45,6 +45,13 @@ const TOUCHES = {
   testimonial: () => ['/', '/about'],
   homepage: () => ['/'],
   service: (slug) => [`/services/${slug}`, '/services', '/sitemap.xml'],
+  // FR-32: the market list is in the header of *every* stable page — the picker
+  // and the footer's city links — so opening or closing a market is not a change
+  // to one page, and there is no smaller set to name. '*' re-renders the build
+  // as it stands; it never invents a route, so a market opening adds no URL
+  // (its own city page is a curated facet, which is a separate decision at
+  // /admin/facets).
+  market: () => ['*'],
 };
 
 /**
@@ -59,8 +66,15 @@ function setApp(app) {
 }
 
 async function revalidate(paths = []) {
-  const wanted = [...new Set((paths || []).filter(Boolean))];
-  if (!wanted.length) return { ok: true, rebuilt: [], skipped: [], bytes: 0 };
+  const asked = (paths || []).filter(Boolean);
+  if (!asked.length) return { ok: true, rebuilt: [], skipped: [], bytes: 0 };
+
+  // `'*'` means "whatever the build holds" — used by changes that touch every
+  // page (the header, the footer). It is deliberately not a way to add a route:
+  // the set is read from the manifest, so a path that is not in the build yet
+  // still waits for the next `npm run build:static`.
+  const everywhere = asked.includes('*');
+  const wanted = everywhere ? [] : [...new Set(asked)];
 
   const staticDir = config.features.staticPath;
   const manifest = render.loadManifest(staticDir);
@@ -78,7 +92,7 @@ async function revalidate(paths = []) {
   const skipped = [];
   let bytes = 0;
 
-  for (const routePath of wanted) {
+  for (const routePath of everywhere ? [...manifest.routes.keys()] : wanted) {
     const route = byPath.get(routePath);
     if (!route || !manifest.routes.has(routePath)) {
       skipped.push(routePath);

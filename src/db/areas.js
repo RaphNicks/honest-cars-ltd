@@ -295,9 +295,153 @@ async function moveArea(id, direction = 'up') {
   return { ok: true, moved: true, area: await areaById(area.id) };
 }
 
+// ---------------------------------------------------------------------------
+// Markets — opening a city we do not operate in yet
+// ---------------------------------------------------------------------------
+
+/** A stock series: `HC-OW`. Eight characters is the column's width. */
+const PREFIX = /^[A-Z0-9]{2,4}-[A-Z0-9]{2,4}$/;
+
+/** `Port Harcourt` → `port-harcourt`: the `?city=` token, from a name if needed. */
+function slugFrom(value) {
+  return String(value || '')
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 60);
+}
+
+async function cityById(id) {
+  return shapeCity(await queryOne('SELECT * FROM service_cities WHERE id = ? LIMIT 1', [Number(id)]));
+}
+
+/**
+ * Open a market — the switch that promotes a city in the national catalogue
+ * (`src/lib/nigeria-cities.js`) to a market we operate. It is the one thing a
+ * `service_cities` row cannot do by itself from the console.
+ *
+ * A market is not a name on a list. It owns a stock series, it is what `?city=`
+ * resolves to, and it is where areas live — and three refusals follow from that:
+ *
+ *   • two markets cannot share a stock series. The series is how a stock number
+ *     identifies its market (`HC-OW-0142`), so a duplicate makes the number
+ *     ambiguous at exactly the moment somebody is quoting it on the phone.
+ *   • two markets cannot share a name. `listing-query.buildWhere` filters by the
+ *     *name*, so duplicates would pool two cities' stock into one grid and
+ *     neither city's count would be true.
+ *   • a market that is already open is not opened twice.
+ *
+ * Re-opening a retired market is a correction rather than a duplicate, exactly
+ * as `addArea` treats a retired area: the row comes back with the details just
+ * entered.
+ */
+async function addCity({ slug, name, state, stockPrefix, position = undefined } = {}) {
+  const cleanName = String(name || '').trim().replace(/\s+/g, ' ').slice(0, 80);
+  const cleanState = String(state || '').trim().replace(/\s+/g, ' ').slice(0, 60);
+  const cleanSlug = slugFrom(slug || cleanName);
+  const prefix = String(stockPrefix || '').trim().toUpperCase();
+
+  if (!cleanName) return { ok: false, error: 'A market needs a city name.' };
+  if (!cleanState) return { ok: false, error: 'A market needs a state.' };
+  if (cleanSlug.length < 2) return { ok: false, error: 'A market needs a URL token — letters and dashes.' };
+  if (!PREFIX.test(prefix)) {
+    return { ok: false, error: 'A stock series reads like HC-OW: two to four capitals, a dash, then two to four more.' };
+  }
+
+  const series = await queryOne('SELECT name FROM service_cities WHERE stock_prefix = ? AND slug <> ? LIMIT 1', [prefix, cleanSlug]);
+  if (series) return { ok: false, error: `${prefix} is ${series.name}'s stock series already.` };
+
+  const named = await queryOne('SELECT name FROM service_cities WHERE name = ? AND slug <> ? LIMIT 1', [cleanName, cleanSlug]);
+  if (named) {
+    return { ok: false, error: `${named.name} is already a market — two markets cannot share a city name, because the name is what the grid filters by.` };
+  }
+
+  const existing = await queryOne('SELECT * FROM service_cities WHERE slug = ? LIMIT 1', [cleanSlug]);
+  if (existing) {
+    if (existing.is_active) return { ok: false, error: `${existing.name} is already a market.`, city: shapeCity(existing) };
+    await query('UPDATE service_cities SET is_active = 1, name = ?, state = ?, stock_prefix = ? WHERE id = ?', [
+      cleanName,
+      cleanState,
+      prefix,
+      existing.id,
+    ]);
+    return { ok: true, restored: true, city: await cityById(existing.id) };
+  }
+
+  const next = position === undefined
+    ? await queryOne('SELECT COALESCE(MAX(position), 0) + 10 AS position FROM service_cities')
+    : { position };
+  const result = await query(
+    'INSERT INTO service_cities (slug, name, state, stock_prefix, position) VALUES (?, ?, ?, ?, ?)',
+    [cleanSlug, cleanName, cleanState, prefix, Number(next.position || 10)],
+  );
+  return { ok: true, city: await cityById(result.insertId) };
+}
+
+/**
+ * Retire or re-open a market, or change the details that are safe to change.
+ *
+ * **Not the name, and that is a decision rather than an omission.** Listings
+ * carry the city's *name* — it is the column `buildWhere` filters by — so
+ * renaming a market here would leave every car in it filed under a city that no
+ * longer exists: a silent data loss dressed up as a convenience. A market
+ * changes its name when its lots do, and until there is a screen that re-files
+ * stock, offering the box would be the lie. (Same rule as PT-29 for areas, one
+ * level up.)
+ *
+ * **Retiring refuses while stock is live.** A retired market leaves the picker,
+ * so closing one with cars in it would either answer "we are not there yet" over
+ * a grid of forty cars, or drop the filter and show the rest of the country as
+ * if the buyer had not asked. Sell, move or expire them first; then it closes
+ * cleanly.
+ */
+async function updateCity(id, { active = undefined, stockPrefix = undefined } = {}) {
+  const city = await cityById(id);
+  if (!city) return { ok: false, error: 'That market does not exist.' };
+
+  if (active === false) {
+    const row = await queryOne(
+      `SELECT COUNT(*) AS n FROM vehicle_listings
+        WHERE city = ? AND status IN ('live','reserved')
+          AND (expires_at IS NULL OR expires_at > UTC_TIMESTAMP())`,
+      [city.name],
+    );
+    const live = Number(row?.n || 0);
+    if (live) {
+      return {
+        ok: false,
+        error: `${city.name} still has ${live} live car${live === 1 ? '' : 's'} — sell, move or expire them before closing the market.`,
+      };
+    }
+  }
+
+  const sets = [];
+  const params = [];
+  if (active !== undefined) {
+    sets.push('is_active = ?');
+    params.push(active ? 1 : 0);
+  }
+  if (stockPrefix !== undefined) {
+    const prefix = String(stockPrefix).trim().toUpperCase();
+    if (!PREFIX.test(prefix)) {
+      return { ok: false, error: 'A stock series reads like HC-OW: two to four capitals, a dash, then two to four more.' };
+    }
+    const series = await queryOne('SELECT name FROM service_cities WHERE stock_prefix = ? AND id <> ? LIMIT 1', [prefix, city.id]);
+    if (series) return { ok: false, error: `${prefix} is ${series.name}'s stock series already.` };
+    sets.push('stock_prefix = ?');
+    params.push(prefix);
+  }
+  if (!sets.length) return { ok: true, changed: false, city };
+
+  await query(`UPDATE service_cities SET ${sets.join(', ')} WHERE id = ?`, [...params, city.id]);
+  return { ok: true, changed: true, city: await cityById(city.id), previous: city };
+}
+
 module.exports = {
   LIVE,
   cities,
+  cityById,
   cityBySlug,
   cityByName,
   cityByToken,
@@ -310,4 +454,7 @@ module.exports = {
   addArea,
   updateArea,
   moveArea,
+  addCity,
+  updateCity,
+  slugFrom,
 };

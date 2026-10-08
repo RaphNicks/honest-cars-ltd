@@ -7,9 +7,75 @@
   rename leaves the cars filed under the old spelling where they are, and says
   how many that was so the desk can decide.
 
-  Locals: cities (each with its areas), areas, unmanaged, areaCount,
+  Locals: cities (each with its areas), areas, unmanaged, areaCount, catalogue,
           settingGroups, settingsSummary, settingsTableMissing
 %>
+
+<%# ---------------------------------------------------------------------------
+    FR-32 — opening a market.
+
+    A `service_cities` row is what makes a city a market: it owns the stock
+    series, it is what `?city=` resolves to, and it is where the area list
+    lives. Until now that row was SQL-only, so the picker could offer forty-eight
+    cities and the desk could only operate four of them.
+
+    The form promotes a city that is *already* in the national catalogue
+    (src/lib/nigeria-cities.js) rather than accepting free text. That is the
+    point: one list of Nigerian cities, so the picker and the country cannot
+    drift — and a typo cannot open a market nobody can find. A city that is
+    genuinely missing gets a line in that file, which is reviewable.
+--------------------------------------------------------------------------- %>
+<section class="panel" aria-labelledby="open-market-h">
+  <div class="panel__head">
+    <div>
+      <h2 class="panel__title" id="open-market-h">Open a new market</h2>
+      <p class="cms-hint mb-0">
+        <%= catalogue.markets %> of the <%= catalogue.total %> cities in the national list are markets we operate.
+        Opening one puts it in the city picker, gives <code>/cars?city=…</code> something real to filter by, and gives it
+        a stock series for the numbers it issues — then add its neighbourhoods below.
+      </p>
+    </div>
+  </div>
+
+  <% if (!catalogue.open.length) { %>
+    <p class="empty-line mb-0">
+      Every city in the national list is a market already. Another one needs a line in
+      <code>src/lib/nigeria-cities.js</code> first — the picker and the country list are the same list on purpose.
+    </p>
+  <% } else { %>
+    <form method="post" action="/admin/settings/markets" class="admin-inline-form">
+      <label class="visually-hidden" for="open-market-slug">City to open as a market</label>
+      <select class="select select--compact" id="open-market-slug" name="slug" required>
+        <option value="">Choose a city…</option>
+        <% catalogue.byState.forEach(function (group) { %>
+          <optgroup label="<%= group.state %>">
+            <% group.cities.forEach(function (city) { %>
+              <option value="<%= city.slug %>"><%= city.name %><% if (city.live) { %> — <%= city.live %> live<% } %></option>
+            <% }); %>
+          </optgroup>
+        <% }); %>
+      </select>
+      <label class="visually-hidden" for="open-market-prefix">Stock series</label>
+      <input class="input input--compact" id="open-market-prefix" name="stock_prefix"
+             placeholder="HC-XX — its own series, or blank for the default" maxlength="8">
+      <button class="btn btn--primary btn--sm" type="submit">Open market</button>
+    </form>
+    <p class="cms-hint mt-2 mb-0">
+      A stock number identifies the market that issued it, so two markets cannot share a series.
+      A city we have no cars in is fine — it opens with an empty shelf and the site says so rather than
+      pretending the filter matched something.
+    </p>
+  <% } %>
+
+  <% if (catalogue.uncatalogued.length) { %>
+    <p class="cms-hint mt-2 mb-0">
+      Market<%= catalogue.uncatalogued.length === 1 ? '' : 's' %> not in the national list:
+      <%= catalogue.uncatalogued.map(function (city) { return city.name; }).join(', ') %>.
+      Real, and missing from the picker's country list — add
+      <%= catalogue.uncatalogued.length === 1 ? 'it' : 'them' %> to <code>src/lib/nigeria-cities.js</code>.
+    </p>
+  <% } %>
+</section>
 
 <section class="panel" aria-labelledby="markets-h">
   <div class="panel__head">
@@ -30,13 +96,32 @@
         <div class="panel__head">
           <div>
             <h3 class="panel__title" id="city-<%= city.id %>">
-              <%= city.name %> <span class="muted"><%= city.state %> State</span>
+              <%= city.name %> <span class="muted"><%= city.stateLabel %></span>
+              <% if (!city.active) { %><span class="tag tag--muted">closed</span><% } %>
             </h3>
             <p class="cms-hint">
               <span class="tabular"><%= city.live %></span> live ·
               <span class="tabular"><%= city.cars %></span> in the 7-day sold window ·
               series <code><%= city.stockPrefix %></code>
             </p>
+          </div>
+
+          <%# Two forms, not one: a series is a detail and closing a market is a
+              decision. One submit for both makes it possible to close a city
+              while correcting a typo. %>
+          <div class="market-controls">
+            <form method="post" action="/admin/settings/markets/<%= city.id %>" class="inline-form">
+              <label class="visually-hidden" for="series-<%= city.id %>">Stock series for <%= city.name %></label>
+              <input class="input input--compact input--series" id="series-<%= city.id %>" name="stock_prefix"
+                     value="<%= city.stockPrefix %>" maxlength="8">
+              <button class="btn btn--secondary btn--sm" type="submit">Save series</button>
+            </form>
+            <form method="post" action="/admin/settings/markets/<%= city.id %>" class="inline-form">
+              <input type="hidden" name="active" value="<%= city.active ? '' : '1' %>">
+              <button class="btn btn--ghost btn--sm" type="submit">
+                <%= city.active ? 'Close market' : 'Re-open market' %>
+              </button>
+            </form>
           </div>
         </div>
 

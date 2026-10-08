@@ -48,7 +48,8 @@ Every **§9 MUST is built.** The commit trail, most recent first:
 
 | Commit | What it delivered |
 |---|---|
-| *this commit* | **the city picker + the Services chevron** — 48 cities, searchable, deepest stock first |
+| *this commit* | **opening a market from the console** — the switch the picker was built around |
+| `f00907d` | **the city picker + the Services chevron** — 48 cities, searchable, deepest stock first |
 | `79e0dd2` | **the Services menu + the hidden attribute** — hover no longer drops the panel; `[hidden]` is a real rule; the badge corner wraps |
 | `cb74267` | **Services mega-menu** — the 8px dead band bridged, close delayed, hover gated to hover devices |
 | `7213505` | **migrations refuse to run on a current database** — the schema-state guard, and the parser that read continuation lines as columns |
@@ -109,6 +110,77 @@ resilience ask:
 `size_bytes`, `poster_url` on `listing_media`), a `video` content block with a
 `[clip:…]` directive, clips on two listings' galleries, and 8 blog posts with 3
 embedded videos. All four clips total 726 KB.
+
+---
+
+## 3t. Just finished: opening a market from the console
+
+The city picker offers forty-eight Nigerian cities and the site operates in four.
+The gap between those two numbers was the last thing FR-32 was missing: a city
+became a market by somebody inserting a `service_cities` row, which made the one
+action the picker's whole design depends on invisible to the desk that owns it.
+`/admin/settings` now has the form, and this is what it decided.
+
+**The form offers the country, not a text box.** The select is the national
+catalogue (`src/lib/nigeria-cities.js`) minus the markets that already exist,
+grouped by state — forty-four options, Lagos and Kano among them. Free text was
+the other choice and it is the wrong one: the picker and the country list are the
+same list precisely so they cannot drift, and a typo in a text box opens a market
+nobody can find. A city genuinely missing from the catalogue gets a line in that
+file, which is reviewable in a diff.
+
+**A market owns a stock series, so it cannot share one.** `HC-OW-0142` is how a
+stock number says which market issued it, which is exactly the moment an
+ambiguous prefix becomes a phone call. Two markets also cannot share a *name* —
+`listing-query.buildWhere` filters by the name, so duplicates would pool two
+cities' stock into one grid and make both counts untrue. Both are refusals with a
+sentence, not silent overwrites.
+
+**Closing is the part with a guard.** A retired market leaves the picker, so
+retiring one with cars in it would either answer *"we are not there yet"* over a
+grid of forty cars or drop the filter and show the rest of the country as if the
+buyer had not asked. `db.areas.updateCity` refuses while live or reserved stock
+remains and says the count: *"Port Harcourt still has 43 live cars — sell, move
+or expire them before closing the market."* An empty city closes cleanly, the row
+stays (its areas and its history are filed under it), and the **picker falls back
+to the catalogue entry** — served `false`, live `0` — so `/cars?city=lagos` keeps
+its honest empty state instead of 404ing. Re-opening is a correction rather than
+a duplicate, the rule `addArea` already follows for a retired area.
+
+**Not a rename, and that is a decision.** Listings carry the city's name and the
+area's name; a rename here would leave every car filed under a city that no
+longer exists — a silent data loss wearing a convenience. Both screens refuse it
+and say how many listings still carry the old spelling. The screen that would
+*re-file* them is now the FR-32 row in `docs/GAPS.md`, which is a smaller and
+more honest gap than the one it replaced.
+
+**The reach is every stable page.** The market list is in the header (and the
+footer's city links), so opening or closing a market is not one page's problem:
+`TOUCHES.market` is `['*']`, and `publish.revalidate` re-renders the build as it
+stands — 74 pages in about a second — never inventing a route (a path that is not
+in the manifest is skipped, so a new market's own city page is still a curated
+facet decision, not a side effect). The flash says how many pages moved.
+
+**One bug worth keeping in mind, caught by the test rather than by a person.**
+`src/lib/locals.js` caches the site chrome — services, counters, the markets —
+for 60 seconds, and `invalidateChrome()` was exported and **never called
+anywhere**. So the first version re-rendered the build *before* dropping the
+cache: every page it had just written carried the market list from before the
+change, and would have kept carrying it until the next full `npm run build:static`
+— a stale header baked into 74 files, with a success message on top. The test
+that opens Kano and then greps the built home page for `href="/cars?city=kano"`
+is what failed, which is exactly what it was written for. `invalidateChrome()`
+now runs **before** the re-render, and has its first caller.
+
+`test/market-admin.test.js` is nine tests over the whole loop: the select's
+contents and grouping (`<optgroup label="FCT">` — the label rule is shared with
+the storefront, so it is not spelled again as "FCT State"), opening, the series
+and name refusals, the close guard with its count, the close/re-open round trip
+and the catalogue fallback, `/cars?city=lagos` becoming a remembered market, and
+the re-render itself. It builds its own fixture build in `.test-static/market`
+(set through `TEST_STATIC_DIR` before `./helpers` is imported) rather than
+asserting about a developer's `dist/`, and it deletes it afterwards — no other
+suite's build is read or written.
 
 ---
 

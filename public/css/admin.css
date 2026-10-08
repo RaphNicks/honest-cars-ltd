@@ -1130,3 +1130,21 @@ a.hire-cal__ref:hover { text-decoration: underline; }
 .key-reveal { margin: 0; padding: var(--space-2); background: var(--surface, #F5F7FA); border: 1px solid var(--color-border, #D8E0E8); border-radius: var(--radius, 12px); overflow-x: auto; letter-spacing: 0.02em; }
 .code-block { margin: 0 0 var(--space-2); padding: var(--space-2); background: var(--surface, #F5F7FA); border: 1px solid var(--color-border, #D8E0E8); border-radius: var(--radius, 12px); font-size: var(--text-14); line-height: 1.6; white-space: pre; overflow-x: auto; }
 .note-inline--error { color: var(--danger, #B3261E); }
+
+/* ------------------------------------------------------------- markets (FR-32) */
+/* A market's controls in its own card head: the stock series and the decision to
+   close it, side by side. The series box is narrow on purpose — `HC-OW` is five
+   characters, and a wide box invites a sentence. */
+.market-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1) var(--space-2);
+  align-items: center;
+}
+
+.input--series {
+  width: 96px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-variant-numeric: tabular-nums;
+}

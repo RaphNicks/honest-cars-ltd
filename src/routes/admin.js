@@ -45,6 +45,10 @@ const dealerApi = require('../services/dealer-api');
 const referralService = require('../services/referrals');
 const financingService = require('../services/financing');
 const settingsService = require('../services/settings');
+const cityDirectory = require('../services/city-directory');
+const publish = require('../services/publish');
+const { findCity } = require('../lib/nigeria-cities');
+const locals = require('../lib/locals');
 const privacyService = require('../services/privacy');
 const mfaService = require('../services/mfa');
 const csv = require('../lib/csv');
@@ -2098,6 +2102,52 @@ router.post('/marketing/spend', auth.requireStaff('marketing.spend'), auth.sameO
 });
 
 // ---------------------------------------------------------------------------
+/**
+ * The city picker's list, split by what the desk can do with it next.
+ *
+ * `open` is every city in the national catalogue that is not a market yet,
+ * grouped by state because the select is a country rather than a list of four.
+ * A market the catalogue does not know is counted separately: it is real (it is
+ * in the grid below) and its absence from the national list is something the
+ * desk should see rather than discover.
+ */
+async function marketCatalogue() {
+  const rows = await cityDirectory.directory();
+  const open = rows.filter((row) => !row.served);
+  const byState = new Map();
+  for (const city of open) {
+    const state = city.stateLabel || city.state;
+    if (!byState.has(state)) byState.set(state, []);
+    byState.get(state).push(city);
+  }
+  return {
+    total: rows.length,
+    markets: rows.length - open.length,
+    open,
+    byState: [...byState.entries()]
+      .map(([state, cities]) => ({ state, cities }))
+      .sort((a, b) => a.state.localeCompare(b.state)),
+    uncatalogued: rows.filter((row) => row.served && !findCity(row.slug)),
+  };
+}
+
+/**
+ * The line the desk reads after a market changes: what happened, and whether the
+ * pages that carry the market list were rebuilt.
+ *
+ * A failed rebuild never loses the change — the row is saved either way — but it
+ * is said out loud, because a market that is open in the database and absent
+ * from the header is exactly the half-done state this console refuses to imply
+ * away. (The market list is in every stable page, so `publish` re-renders the
+ * build; see TOUCHES.market.)
+ */
+function marketFlash(headline, build) {
+  if (!build || build.ok === undefined) return headline;
+  if (!build.ok) return `${headline} The pages could not be rebuilt: ${build.message}`.slice(0, 220);
+  const pages = build.result?.rebuilt?.length || 0;
+  return pages ? `${headline} ${pages} page${pages === 1 ? '' : 's'} rebuilt.` : `${headline} ${build.message}`;
+}
+
 // Settings — markets & service areas (FR-32, §5.1's settings screen)
 //
 // The PRD's data model says the area list is admin-managed, and this is that
@@ -2127,10 +2177,19 @@ router.get('/settings', auth.requireStaff('settings.manage'), async (req, res, n
       data: {
         cities: cities.map((city) => ({
           ...city,
+          // “Rivers State”, but just “FCT” — the label rule is shared with the
+          // storefront rather than spelled a second time here.
+          stateLabel: cityDirectory.stateLabel(city),
           areas: areas.filter((area) => area.cityId === city.id),
         })),
         unmanaged,
         areaCount: areas.length,
+        // FR-32 — the other half of this screen, and the half that used to need
+        // SQL: which of the national catalogue's cities are markets, and which
+        // are still only places a buyer can be. `open` is what the form offers;
+        // anything the database knows and the catalogue does not is counted so
+        // the two lists cannot drift without the desk seeing it.
+        catalogue: await marketCatalogue(),
         // §5.1 — the rest of the screen: business facts, limits and windows,
         // fees and retainers, message channels. Built from the registry in
         // src/lib/settings-schema.js, so the form cannot offer a setting the
@@ -2140,6 +2199,102 @@ router.get('/settings', auth.requireStaff('settings.manage'), async (req, res, n
         settingsTableMissing: settingsTableMissing,
       },
     });
+  } catch (error) {
+    return next(error);
+  }
+});
+
+/**
+ * FR-32 — open a market.
+ *
+ * The city is picked from the national catalogue rather than typed: the picker
+ * and the country list are then the same list, and a typo cannot open a market
+ * nobody can find. The stock series *may* be overridden, because that is a
+ * business decision — `HC-LA` is a thing the desk may have printed on cards.
+ *
+ * Nothing is written to any listing. A market with no stock is a real market
+ * with an empty shelf, which is what the picker will say.
+ */
+router.post('/settings/markets', auth.requireStaff('settings.manage'), auth.sameOriginOnly, async (req, res, next) => {
+  const back = PATHS.settings;
+  try {
+    const slug = validate.text(req.body.slug, 60);
+    const entry = slug ? findCity(slug) : null;
+    if (!entry) {
+      return done(res, back, 'Pick a city from the list. A city that is not in the national catalogue needs a line there first, so the picker and the country cannot drift apart.', { error: true });
+    }
+
+    const result = await db.areas.addCity({
+      slug: entry.slug,
+      name: entry.name,
+      state: entry.state,
+      stockPrefix: validate.text(req.body.stock_prefix, 8) || entry.prefix,
+    });
+    if (!result.ok) return done(res, back, result.error, { error: true });
+
+    await admin.recordAudit({
+      actorId: req.user.id,
+      action: result.restored ? 'service_city.restored' : 'service_city.opened',
+      entity: 'service_city',
+      entityId: result.city.id,
+      detail: `${result.city.name}, ${result.city.state} — stock series ${result.city.stockPrefix}`,
+    });
+
+    // Order matters: the site chrome — the markets, the counters, the picker's
+    // own list — is cached for a minute (src/lib/locals.js), so invalidating
+    // *after* the re-render would bake the list from before this market into
+    // every page just rebuilt, where it would sit until the next full build.
+    locals.invalidateChrome();
+
+    // The market list is in the header of every stable page, so there is no
+    // smaller set to re-render than the build itself.
+    const build = await publish.afterChange('market');
+    const headline = result.restored ? `${result.city.name} is open again.` : `${result.city.name} is open.`;
+    return done(res, back, marketFlash(headline, build));
+  } catch (error) {
+    return next(error);
+  }
+});
+
+/**
+ * A market's stock series, or its state: open (restore) and closed (retire).
+ *
+ * Two forms rather than one, as the area rows do it — a series is a detail and
+ * retiring a market is a decision, and folding them into one submit would make
+ * it possible to close a city by accident while correcting a typo.
+ */
+router.post('/settings/markets/:id', auth.requireStaff('settings.manage'), auth.sameOriginOnly, async (req, res, next) => {
+  const back = PATHS.settings;
+  try {
+    const id = Number.parseInt(req.params.id, 10);
+    const active = req.body.active === undefined ? undefined : Boolean(req.body.active);
+    const stockPrefix = req.body.stock_prefix === undefined ? undefined : validate.text(req.body.stock_prefix, 8);
+
+    const result = await db.areas.updateCity(id, { active, stockPrefix });
+    if (!result.ok) return done(res, back, result.error, { error: true });
+    if (!result.changed) return done(res, back, 'Nothing changed.');
+
+    const action = active === undefined
+      ? 'service_city.series_changed'
+      : active
+        ? 'service_city.restored'
+        : 'service_city.retired';
+    await admin.recordAudit({
+      actorId: req.user.id,
+      action,
+      entity: 'service_city',
+      entityId: result.city.id,
+      detail: `${result.city.name}, ${result.city.state} — ${active === undefined ? `stock series ${result.city.stockPrefix}` : active ? 'open' : 'closed'}`,
+    });
+
+    const headline = active === undefined
+      ? `${result.city.name}'s stock series is ${result.city.stockPrefix}.`
+      : active
+        ? `${result.city.name} is open again.`
+        : `${result.city.name} is closed.`;
+    if (active !== undefined) locals.invalidateChrome();
+    const build = active === undefined ? null : await publish.afterChange('market');
+    return done(res, back, marketFlash(headline, build));
   } catch (error) {
     return next(error);
   }
