@@ -36,7 +36,7 @@
 
 /* eslint-env serviceworker */
 
-const VERSION = 'hc-v5'; // v5: scripts and styles are network-first — v4 could outlive its own HTML
+const VERSION = 'hc-v6'; // v6: pwa.js now asks a waiting worker to take over, so a new shell is never left waiting on 'close every tab'
 const SHELL = `${VERSION}-shell`;
 const PAGES = `${VERSION}-pages`;
 const RUNTIME = `${VERSION}-runtime`; // shell assets discovered later (other font weights)

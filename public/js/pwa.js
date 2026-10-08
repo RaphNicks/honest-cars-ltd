@@ -26,7 +26,22 @@ function canRegister() {
   return 'serviceWorker' in navigator && location.protocol !== 'file:';
 }
 
-/** Keep the site honest about what is new: no auto-reload, no repeated toast. */
+/**
+ * Keep the site honest about what is new: no auto-reload, no repeated toast —
+ * and no old release left in charge when there is a new one waiting.
+ *
+ * A worker installs, then *waits*: it does not take over until every tab that
+ * the previous worker controls has closed. That is the safe default for a site
+ * mid-task, and it is also how a browser ends up running last release's
+ * JavaScript for days — the reader reloads, gets fresh HTML, and the old worker
+ * answers with the modules it cached, with nothing on screen to say so.
+ *
+ * So when a new worker is ready we tell it to take over (it handles
+ * `SKIP_WAITING`). Nothing is reloaded underneath the reader: this page keeps
+ * the files it has already loaded, and the *next* navigation is served by the
+ * new worker. The toast is unchanged, and now it is true in one page rather than
+ * once the last tab is closed.
+ */
 function watchForUpdates(registration) {
   const announce = (worker) => {
     if (!worker) return;
@@ -34,6 +49,7 @@ function watchForUpdates(registration) {
       if (worker.state !== 'installed') return;
       if (!navigator.serviceWorker.controller) return; // first ever install
       announceOnce();
+      if (registration.waiting) registration.waiting.postMessage({ type: 'SKIP_WAITING' });
     });
   };
 
@@ -51,7 +67,13 @@ function watchForUpdates(registration) {
       .catch(() => {});
   };
 
-  announce(registration.waiting);
+  // A worker can already be waiting when this page loads — the tab that
+  // triggered the update is usually not the one that visits next.
+  if (registration.waiting) {
+    announceOnce();
+    registration.waiting.postMessage({ type: 'SKIP_WAITING' });
+  }
+  announce(registration.installing);
   registration.addEventListener('updatefound', () => announce(registration.installing));
 }
 

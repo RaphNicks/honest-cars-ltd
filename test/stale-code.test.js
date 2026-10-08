@@ -245,3 +245,35 @@ test('scripts and styles are network-first, so a deploy cannot be outrun by the 
   assert.match(source, /request\.mode === 'navigate'/, 'navigations keep their own strategy');
   assert.match(source, /self\.addEventListener\('fetch'/, 'and the worker still handles fetches');
 });
+
+test('a new worker takes over, instead of waiting for every tab to close', () => {
+  const swSource = fs.readFileSync(path.join(ROOT, 'public/sw.js'), 'utf8');
+  const pwaSource = fs.readFileSync(path.join(ROOT, 'public/js/pwa.js'), 'utf8');
+
+  // The worker accepts the request...
+  assert.match(swSource, /SKIP_WAITING'\) self\.skipWaiting\(\)/, 'the message has a handler');
+  // ...and the page makes it. Without a sender, a worker installs and then waits
+  // for every controlled tab to close — which is how a browser runs last
+  // release's modules for days while showing fresh HTML.
+  assert.match(pwaSource, /postMessage\(\{ type: 'SKIP_WAITING' \}\)/, 'the page asks the waiting worker to take over');
+  assert.match(pwaSource, /if \(registration\.waiting\) \{/, 'including a worker that was already waiting at load');
+
+  // Taking over is not a reload: the reader keeps the page they are on. (The
+  // one reload in this file is the /offline retry button, which is a person
+  // pressing a button — so the check is scoped to the update path.)
+  const updatePath = pwaSource.slice(pwaSource.indexOf('function watchForUpdates'), pwaSource.indexOf('function initInstallPrompt'));
+  assert.doesNotMatch(updatePath, /location\.reload\(\)/, 'a page is never reloaded underneath the reader');
+  // And the toast still tells them what will happen.
+  assert.match(pwaSource, /newer version of HonestCars is ready/);
+});
+
+test('hydration is lazy but the panel never depends on it being possible', () => {
+  const areaSource = fs.readFileSync(path.join(ROOT, 'public/js/area.js'), 'utf8');
+  // The catalogue costs nothing until the panel is opened...
+  assert.match(areaSource, /let hydrated = false;/);
+  assert.match(areaSource, /if \(hydrated \|\| !list \|\| !index\.length\) return;/);
+  // ...and every path through the module leaves the server-rendered links alone
+  // when there is no island to read. That is the difference between a picker
+  // that degrades to four markets and one that renders an empty panel.
+  assert.match(areaSource, /function readIndex\(\)[\s\S]*?catch \(error\) \{[\s\S]*?return \[\];/);
+});
