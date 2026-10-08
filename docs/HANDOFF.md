@@ -788,6 +788,31 @@ Two facts worth keeping:
   .env.example .env` needs no editing beyond `DB_ADMIN_PASSWORD=honestcars-root`.
   The production Dockerfile is still on `docs/GAPS.md`.
 
+### The phpMyAdmin route (XAMPP)
+
+Most people testing this have XAMPP, which means MariaDB and phpMyAdmin rather
+than a terminal. That path is **Option A** in the guide: create the database in
+phpMyAdmin, import `db/schema.sql` then `db/seed.sql`, set `.env` to XAMPP's
+defaults (`root`, blank password, port 3306) and `npm start`. No migration step,
+and no `npm run db:setup`.
+
+That route is only sound while `db/schema.sql` describes the *current* database
+— it is the phpMyAdmin path's entire schema. Verified by doing exactly it on an
+empty database: both files imported, 56 tables + 3 views, 79 listings, then the
+app booted against it, signed in as admin, and reached the MFA challenge. A new
+test in `test/migrations.test.js` fails if a migration ever creates a table that
+`schema.sql` does not also create, so the route cannot rot silently.
+
+XAMPP specifics worth keeping: it is **MariaDB**, which the code already
+anticipated (`src/db/pool.js`, `src/db/shape.js`); every JSON function in use
+(`JSON_ARRAY`, `JSON_EXTRACT`, `JSON_OBJECT`, `JSON_UNQUOTE`) is MariaDB 10.2+
+and XAMPP ships 10.4; phpMyAdmin's 2 MB default import limit is far above the
+80 kB + 380 kB the two files take.
+
+The terminal route with XAMPP credentials was verified too — `DB_USER=root`,
+blank password, database absent: `npm run db:setup` created it, applied 28
+migrations and loaded the seed.
+
 ### The bug that found: migrations hardcoded the database name
 
 `db/migrations/012-dealer-ledger.sql` and `013-cms.sql` opened with `USE

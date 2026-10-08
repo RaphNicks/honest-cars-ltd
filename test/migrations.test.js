@@ -59,6 +59,33 @@ test('the migrations are numbered, unique and in order', () => {
   }
 });
 
+test('schema.sql already contains every table the migrations create', () => {
+  // The phpMyAdmin / "import the two files by hand" route is documented in
+  // docs/RUN-LOCALLY.md and deliberately has no migration step: db/schema.sql
+  // is the current state of the database, db/seed.sql is its data. That is only
+  // true while schema.sql keeps up with the migrations — the moment one adds a
+  // table and schema.sql is not updated, a laptop user importing by hand gets a
+  // database the app cannot boot against, and nothing in the suite would say so.
+  const schema = fs.readFileSync(path.join(__dirname, '..', 'db', 'schema.sql'), 'utf8');
+  const created = new Set(
+    [...schema.matchAll(/CREATE\s+TABLE(?:\s+IF\s+NOT\s+EXISTS)?\s+`?([\w]+)`?/gi)].map((m) => m[1].toLowerCase()),
+  );
+
+  const wanted = new Map();
+  for (const file of files) {
+    for (const match of read(file).matchAll(/CREATE\s+TABLE(?:\s+IF\s+NOT\s+EXISTS)?\s+`?([\w]+)`?/gi)) {
+      wanted.set(match[1].toLowerCase(), file);
+    }
+  }
+
+  const missing = [...wanted.entries()].filter(([table]) => !created.has(table));
+  assert.deepEqual(
+    missing.map(([table, file]) => `${table} (${file})`),
+    [],
+    'db/schema.sql must describe the current database — regenerate it when a migration adds a table',
+  );
+});
+
 test('every migration says what it is for, and new ones how to undo it', () => {
   // §12.3: reversible changes. Every migration opens with a header saying what
   // it changes and why. A commented DOWN block is the other half — but only 17
