@@ -1,0 +1,33 @@
+<%#
+  FR-32 — the city catalogue, as data, once per page.
+
+  The picker appears twice on a page (in the header and in the mobile drawer) and
+  both instances list the same country. Rendering the catalogue into each of them
+  would roughly double the cost, so it is built here and read at document level
+  by js/area.js — which is also the honest description of it: what cities exist
+  is a property of the page, not of one control. The per-instance markup that
+  cannot be shared (the item template) stays in area-switcher.ejs.
+
+  <script type="application/json"> is data, not code: the browser never executes
+  it, it renders nothing, and it holds the same catalogue the panel draws.
+%>
+<% var cityIndex = (site && site.cityDirectory) || []; %>
+<% if (cityIndex.length) { %>
+  <%
+    // '<' must not appear in the payload, or a city named "</script>" would end
+    // the tag. JSON.stringify does not escape it, so the escape sequence is
+    // written here as \u003c — built from a char code rather than a backslash
+    // literal, which is one fewer layer of escaping to get wrong.
+    var LESS_THAN = String.fromCharCode(92) + 'u003c';
+    var indexJson = JSON.stringify(cityIndex.map(function (city) {
+      return {
+        slug: city.slug,
+        name: city.name,
+        stateLabel: city.stateLabel,
+        live: city.live,
+        served: Boolean(city.served),
+      };
+    })).split('<').join(LESS_THAN);
+  %>
+  <script type="application/json" data-city-index><%- indexJson %></script>
+<% } %>

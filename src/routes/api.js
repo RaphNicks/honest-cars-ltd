@@ -29,6 +29,7 @@ const validate = require('../services/validate');
 const seo = require('../services/seo');
 const og = require('../services/og');
 const listingQuery = require('../services/listing-query');
+const cityDirectory = require('../services/city-directory');
 const imports = require('../services/imports');
 const valuation = require('../services/valuation');
 const financing = require('../services/financing');
@@ -656,7 +657,11 @@ router.get('/listings', rateLimit({ windowMs: 60_000, max: 90 }), async (req, re
     // FR-32: the filter rail posts the market as a slug (`city=owerri`), and the
     // grid refresh has to resolve it against service_cities exactly as /cars
     // does — otherwise the AJAX update would quietly show an empty grid.
-    const city = await db.areas.cityByToken(parsed.view.city);
+    // Resolved through the directory, exactly as /cars does: the grid refresh
+    // carries whatever market the page is showing, and a city the catalogue
+    // knows but service_cities does not must filter here too — otherwise the
+    // AJAX update would silently drop the filter and repaint the whole network.
+    const city = await cityDirectory.resolve(parsed.view.city);
     if (city) {
       parsed.filters.city = city.name;
       parsed.view.city = city.slug;

@@ -2,6 +2,25 @@
   §6.2 empty state: “No exact matches — {n} near matches” + concierge CTA.
   Every empty state routes to the concierge (Appendix D microcopy).
 %>
+<% var city = (typeof city === 'undefined' ? null : city); %>
+<% var noStockHere = Boolean(city) && city.live === 0; %>
+<% if (noStockHere) { %>
+  <%# A city we list but have no lots in. Not a filter problem — say so. %>
+  <div class="empty-state">
+    <h3>We don’t have partner lots in <%= city.name %> yet</h3>
+    <p>
+      <%= city.name %>, <%= city.stateLabel %> is on the list but the shelf is empty today — we would rather
+      tell you that than show you cars that are not there. Send us what you want and a human will find it,
+      verify it and bring you the paperwork, usually inside 72 hours.
+    </p>
+    <div class="btn-row mt-2" style="justify-content:center">
+      <a class="btn btn--primary" href="/find-my-car" data-event="concierge_started" data-source="empty_city">Find It For Me</a>
+      <a class="btn btn--secondary" href="<%= site.nav.whatsapp.general %>" target="_blank" rel="noopener"
+         data-event="whatsapp_click" data-source="empty_city">Chat on WhatsApp</a>
+      <a class="btn btn--secondary" href="/cars">See every car we do have</a>
+    </div>
+  </div>
+<% } else { %>
 <div class="empty-state">
   <h3>No exact matches in the network right now</h3>
   <p>
@@ -16,3 +35,4 @@
        data-event="whatsapp_click" data-source="empty_state">Chat on WhatsApp</a>
   </div>
 </div>
+<% } %>

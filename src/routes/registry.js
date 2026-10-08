@@ -65,7 +65,7 @@ async function facetRoutes({ db }) {
           nearMatches: 0,
           hiddenQuery: {},
           locationLabel: built.serviceCity
-            ? `${built.serviceCity.name}, ${built.serviceCity.state} State`
+            ? `${built.serviceCity.name}, ${built.serviceCity.stateLabel || built.serviceCity.state} State`
             : 'All markets',
         },
       };

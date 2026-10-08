@@ -100,6 +100,25 @@ test('the panel still hides with the hidden attribute', () => {
   assert.ok(!/\.mega__panel\[hidden\]/.test(components), 'the local guard is redundant again');
 });
 
+test('the trigger is a row, so its chevron cannot wrap onto a second line', () => {
+  // Reported from a screenshot: "Services" with the arrow underneath it. As a
+  // plain inline `<a>`, the chevron's own inline-level box did not reliably
+  // share the line box, so it dropped. The fix is the box model the city
+  // control next to it has always used — an inline-flex row, centred, with a
+  // gap — which is exactly what the report asked for ("just like the all
+  // cities own").
+  const components = read('public/css/components.css');
+  const link = rule(components, '.header__nav-link');
+  const toggle = rule(components, '.area-switcher__toggle');
+
+  for (const [name, block] of [['the nav link', link], ['the city toggle', toggle]]) {
+    assert.equal(declaration(block, 'display'), 'inline-flex', `${name} must lay its children out in a row`);
+    assert.equal(declaration(block, 'align-items'), 'center', `${name} must centre the icon against the label`);
+    assert.ok(declaration(block, 'gap'), `${name} must space the icon from the label`);
+  }
+  assert.match(link, /white-space:\s*nowrap/, 'and a label may still never break mid-word');
+});
+
 test('the markup ships the panel hidden, which the toggle depends on', () => {
   // `panel.hidden` being truthy is "closed". If the template ever drops the
   // attribute the first click would close an already-hidden panel and the menu

@@ -6,10 +6,11 @@ integrations §11, NFRs §12, sitemap §5.1, acceptance §18.3).
 Line references below point at the code that exists. Where an item is missing, the
 note says what "done" would mean, so the work can be scoped without re-reading the PRD.
 
-**Status at this commit:** §12.2's second factor is built — the last row that was
-both buildable and provable here. The list is now **17 rows: 1 buildable (not
-provable without Cloudflare keys), 9 blocked on an account, 7 with no home in
-this sandbox**.
+**Status at this commit:** §12.2's second factor is built, and the city picker
+became a national one (which added a row of its own, below). The list is now
+**18 rows: 2 buildable, 9 blocked on an account, 7 with no home in this
+sandbox** — the two buildable being §11's Turnstile (needs Cloudflare keys to
+prove) and FR-32's "add a market" screen (needs only the form).
 
 - **The arithmetic is RFC 6238's.** `src/lib/totp.js` is SHA-1, six digits, 30
   seconds, ±1 step, base32 without padding — and `test/mfa.test.js` checks it
@@ -341,6 +342,7 @@ to have done anything. Each needs an account, keys and (usually) webhook config.
 | §11 | Storage + CDN (S3-compatible) | Images are prepared locally by `scripts/prepare-images.js` (sharp, WebP variants) and served from `/public`. | Bucket + CDN; the media pipeline becomes an upload path rather than a build step. |
 | §11 | Telematics partner portal (P2) | Subscription rows carry `device_state`; nothing connects to a partner. | Partner API or a manual-sync screen. |
 | §11 | Google Maps/Places (P2) | Delivery areas and inspection locations are curated lists, which works offline and on low data. | Places autocomplete + map pins for inspection meets. |
+| FR-32 | **Promoting a catalogue city to a market, in the console** | The city picker offers the whole national catalogue (`src/lib/nigeria-cities.js`) because `service_cities` means *a market we operate* — it carries the stock prefix and the area list, and `db.listings.filterFacets` reads it into the /cars filter rail. A city becomes a market by gaining a `service_cities` row, and **there is no screen that creates one**: ops can add, rename and reorder *areas* at `/admin/settings`, not cities. | An "add a market" form on that screen (slug, name, state, stock prefix), reusing `db.areas.addArea`'s shape — and the switch that promotes a catalogue entry. |
 | FR-30 | Web push notifications (the push half of the PWA) | Installable app, offline shell and install prompt are built; there is no push subscription, no VAPID key pair and no consent record for one. | VAPID keys, a push service and a consented reason to send — the consent banner row above is a prerequisite, not a nicety. |
 
 ## 3. Infrastructure with no home in this sandbox

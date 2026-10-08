@@ -10,6 +10,10 @@
  *
  *   • a market is a *governed* thing — a hand-typed `?city=` is dropped, never
  *     filtered on, and a city facet's rule narrows stock to that city
+ *   • the city *picker*, unlike the rail, offers the whole national catalogue:
+ *     a city we have no lots in is a real filter that honestly returns nothing,
+ *     is never remembered as the visitor's market, and never becomes a market
+ *     in `service_cities` merely by being listed (see city-directory.test.js)
  *   • the filter rail is scoped to the market in view: makes, areas and budget
  *     all come from the same set of cars the grid is showing
  *   • a listing inherits its lot's market and that market's stock-number series
@@ -111,14 +115,31 @@ maybe('every market has partner lots and real stock, not a token listing', async
   }
 });
 
-maybe('a city token resolves by slug or by name, and anything else resolves to nothing', async () => {
+maybe('a market token resolves by slug or by name, and anything else resolves to nothing', async () => {
   assert.equal((await db.areas.cityByToken('owerri')).name, 'Owerri');
   assert.equal((await db.areas.cityByToken('Benin City')).name, 'Benin City');
   assert.equal((await db.areas.cityByToken('OWERRI')).name, 'Owerri', 'case is not a reason to fail');
-  assert.equal(await db.areas.cityByToken('Lagos'), null, 'a city we do not serve is not a filter');
+  assert.equal(await db.areas.cityByToken('Lagos'), null, 'the market table is only the markets we operate');
   assert.equal(await db.areas.cityByToken('<script>alert(1)</script>'), null);
   assert.equal(await db.areas.cityByToken(''), null);
   assert.equal(await db.areas.cityByToken('x'.repeat(200)), null);
+});
+
+maybe('the picker resolves a city we do not operate in, and says what that means', async () => {
+  const directory = require('../src/services/city-directory');
+  const lagos = await directory.resolve('Lagos');
+  assert.equal(lagos.name, 'Lagos');
+  assert.equal(lagos.state, 'Lagos');
+  assert.equal(lagos.stateLabel, 'Lagos State');
+  assert.equal(lagos.served, false, 'listed, but not a market we operate');
+  assert.equal(lagos.live, 0, 'and no stock is claimed for it');
+
+  const owerri = await directory.resolve('owerri');
+  assert.equal(owerri.served, true, 'a market is served');
+  assert.equal(owerri.live > 0, true, 'with its own live count');
+
+  assert.equal(await directory.resolve('Atlantis'), null, 'a city nobody lists is still not a filter');
+  assert.equal(await directory.resolve(''), null);
 });
 
 maybe('areas belong to exactly one market, and carry that market\'s stock counts', async () => {

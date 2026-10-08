@@ -64,6 +64,9 @@
     </div>
   </div>
 
+  <%# FR-32 — the city catalogue for the picker, once per page (see the partial). %>
+  <%- include('./city-index') %>
+
   <div class="container hidden" id="header-search" data-search-panel>
     <form class="search-bar" action="/cars" method="get" role="search" aria-label="Search cars">
       <div class="field">

@@ -17,6 +17,7 @@ const seo = require('../services/seo');
 const compare = require('../services/compare');
 const listingQuery = require('../services/listing-query');
 const areaPref = require('../services/area-pref');
+const cityDirectory = require('../services/city-directory');
 const sitemap = require('../services/sitemap');
 const slice = require('../services/slice');
 const { sendPage, sendPrebuiltOrRender, CACHE } = require('../lib/respond');
@@ -109,12 +110,14 @@ router.get('/cars', async (req, res, next) => {
   try {
     const parsed = listingQuery.parseListingQuery(req.query);
     // FR-32 — which market is this visitor looking at? An explicit ?city= wins,
-    // otherwise the remembered preference, otherwise the whole network. Either
-    // way the token is resolved against service_cities before it filters
-    // anything; a city we do not serve is dropped rather than applied.
+    // otherwise the remembered preference, otherwise the whole network. The
+    // token is resolved against service_cities first (the markets we operate),
+    // then the national catalogue: a city we list but have no lots in is a real
+    // filter that honestly returns nothing, while a token we do not recognise
+    // at all is still dropped rather than applied.
     const requested = parsed.view.city || null;
     const remembered = requested ? null : areaPref.readCityPreference(req);
-    const city = await db.areas.cityByToken(requested || remembered);
+    const city = await cityDirectory.resolve(requested || remembered);
 
     if (city) {
       parsed.filters.city = city.name;
@@ -123,9 +126,12 @@ router.get('/cars', async (req, res, next) => {
       delete parsed.filters.city;
       delete parsed.view.city;
     }
-    // An explicit choice becomes the preference; a city we do not serve clears
-    // a stale one instead of leaving it to mislead the next visit.
-    if (requested && city) areaPref.setCityPreference(res, city.slug);
+    // An explicit choice becomes the preference — but only for a city we
+    // operate in. Remembering "Lagos" for a visitor who would land on an empty
+    // grid on every future visit is not the memory they asked for. A city we
+    // list but have no lots in is a one-visit look; anything unrecognised
+    // clears a stale preference instead of leaving it to mislead.
+    if (requested && city && city.served) areaPref.setCityPreference(res, city.slug);
     if (requested && !city) areaPref.clearCityPreference(res);
 
     // The preference case has no URL token for it, so the page is a variant of
@@ -152,16 +158,21 @@ router.get('/cars', async (req, res, next) => {
     const queryString = listingQuery.buildQueryString(parsed.view, { sort: parsed.sort });
     const activePills = listingQuery.activeFilterPills(parsed.view, helpers()).map((pill) => (
       // The URL carries `owerri`; a person reads “Owerri, Imo State”.
-      pill.key === 'city' && city ? { ...pill, value: `${city.name}, ${city.state} State` } : pill
+      pill.key === 'city' && city ? { ...pill, value: `${city.name}, ${city.stateLabel}` } : pill
     ));
 
-    const locationLabel = city ? `${city.name}, ${city.state} State` : 'All markets';
+    const locationLabel = city ? `${city.name}, ${city.stateLabel}` : 'All markets';
     // §6.2's hero copy follows the market: a buyer who filtered to Owerri should
     // not read a Port Harcourt introduction.
     const heading = city ? `Cars for sale in ${city.name}` : 'Cars for sale in Port Harcourt, Owerri, Aba & Benin City';
-    const intro = city
-      ? `Live stock from partner lots in ${city.name}, ${city.state} State — with the mileage, documents status and verification grade shown before you travel. Prices are what the dealer is asking; we tell you where each one sits against the current market band.`
-      : 'Live stock from partner lots across four markets — Port Harcourt, Owerri, Aba and Benin City — with the mileage, documents status and verification grade shown before you travel. Prices are what the dealer is asking; we tell you where each one sits against the current market band.';
+    // A market with stock gets the market intro. A city we list but have no lots
+    // in says so, and offers the thing that can actually help; the network view
+    // keeps the four-market line.
+    const intro = city && city.live > 0
+      ? `Live stock from partner lots in ${city.name}, ${city.stateLabel} — with the mileage, documents status and verification grade shown before you travel. Prices are what the dealer is asking; we tell you where each one sits against the current market band.`
+      : city
+        ? `We do not have partner lots in ${city.name} yet. Tell us what you are looking for and a human will find it, verify it and bring you the paperwork — usually inside 72 hours. Every car we do have is one click away.`
+        : 'Live stock from partner lots across four markets — Port Harcourt, Owerri, Aba and Benin City — with the mileage, documents status and verification grade shown before you travel. Prices are what the dealer is asking; we tell you where each one sits against the current market band.';
 
     const data = {
       ...built,
@@ -174,6 +185,10 @@ router.get('/cars', async (req, res, next) => {
       hiddenQuery: parsed.view,
       locationLabel,
       serviceCity: city,
+      // A city we list but have no stock in: the empty state says so in words
+      // instead of showing the generic "no exact matches", which would read as
+      // a filter problem rather than an honest "we are not there yet".
+      marketEmpty: Boolean(city) && city.live === 0,
     };
 
     await sendPage(req, res, {
@@ -182,15 +197,30 @@ router.get('/cars', async (req, res, next) => {
       cache: fromPreference ? CACHE.private : CACHE.ssr,
       headers: fromPreference ? { Vary: 'Cookie' } : {},
       page: {
-        title: city ? `Cars for sale in ${city.name} — verified stock` : 'Cars for sale in Port Harcourt & South-East Nigeria',
-        metaTitle: city
-          ? `Cars for sale in ${city.name}, ${city.state} State — verified stock`
-          : 'Cars for sale in Port Harcourt & South-East Nigeria',
-        description: city
-          ? `Filter live verified stock in ${city.name}, ${city.state} State by budget, make, body type, mileage and verification grade. Prices shown against the current market band.`
-          : 'Filter live verified stock across Port Harcourt, Owerri, Aba and Benin City by budget, make, body type, mileage and verification grade. Prices shown against the current market band.',
+        // A market with stock is the page a buyer searched for. A city we list
+        // but have no lots in must not promise "verified stock" in a title or a
+        // meta description — it says what is true and points at the concierge.
+        title: !city
+          ? 'Cars for sale in Port Harcourt & South-East Nigeria'
+          : city.live > 0
+            ? `Cars for sale in ${city.name} — verified stock`
+            : `Cars for sale in ${city.name} — we are not there yet`,
+        metaTitle: !city
+          ? 'Cars for sale in Port Harcourt & South-East Nigeria'
+          : city.live > 0
+            ? `Cars for sale in ${city.name}, ${city.stateLabel} — verified stock`
+            : `Cars for sale in ${city.name}, ${city.stateLabel} — find one for me`,
+        description: !city
+          ? 'Filter live verified stock across Port Harcourt, Owerri, Aba and Benin City by budget, make, body type, mileage and verification grade. Prices shown against the current market band.'
+          : city.live > 0
+            ? `Filter live verified stock in ${city.name}, ${city.stateLabel} by budget, make, body type, mileage and verification grade. Prices shown against the current market band.`
+            : `No partner lots in ${city.name} yet. Send us the car you want and a human will find it, verify it and bring you the paperwork — usually inside 72 hours.`,
         canonical: onlyCity && cityFacet ? cityFacet.canonicalPath : raw || fromPreference ? '/cars' : `/cars${queryString}`,
-        robots: onlyCity && cityFacet ? 'index,follow' : raw || fromPreference ? 'noindex,follow' : 'index,follow',
+        // Only a city with a curated facet is a page we want indexed. Every
+        // other city view is a filter of /cars — including a city we list but
+        // have no stock in, which would otherwise publish an empty page as
+        // "Cars for sale in Lagos" and mean it.
+        robots: onlyCity && cityFacet ? 'index,follow' : raw || fromPreference || (city && !cityFacet) ? 'noindex,follow' : 'index,follow',
         jsonLd: [seo.itemListSchema(built.result.listings, {
           name: city ? `Cars for sale in ${city.name}` : 'Cars for sale in Port Harcourt, Owerri, Aba and Benin City',
         })],
@@ -346,7 +376,7 @@ router.get('/cars/*', async (req, res, next) => {
           nearMatches: 0,
           hiddenQuery: {},
           locationLabel: built.serviceCity
-            ? `${built.serviceCity.name}, ${built.serviceCity.state} State`
+            ? `${built.serviceCity.name}, ${built.serviceCity.stateLabel || built.serviceCity.state} State`
             : 'All markets',
         },
       });

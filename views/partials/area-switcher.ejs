@@ -1,18 +1,34 @@
 <%#
-  FR-32 — the area switcher.
-  Locals: site.cities (governed list with live counts), site.city (the market the
-  page is about, or null), variant ('header' | 'drawer').
+  FR-32 — the area switcher, now a city picker across the whole country.
 
-  It is a plain list of links, so it works with JavaScript off. Where a prebuilt
-  static page cannot know the visitor's choice (the HTML is shared by everyone),
-  js/area.js reads the hc_city cookie and labels the control — the same cookie
-  the server has already applied on the server-rendered pages.
+  Locals: site.cityDirectory (every city we list, most stock first),
+  site.city (the market the page is about, or null), variant ('header' | 'drawer').
+
+  Two layers, one list:
+
+    • Server-rendered: "All cities" and the markets we operate, as ordinary
+      links — the list a crawler sees, and the whole list for anybody whose
+      JavaScript never runs. Those are also the only cities with stock to show.
+    • The rest of the catalogue: data, rendered once per page by
+      city-index.ejs and turned into the same list items by js/area.js. The
+      panel only opens with JavaScript, so writing forty-eight cities as markup
+      into every page would cost every visitor bytes they cannot reach without
+      it. Each switcher keeps its own item template to clone from.
+
+  It is a plain list of links, so nothing here depends on JavaScript to be
+  correct. Where a prebuilt static page cannot know the visitor's choice (the
+  HTML is shared by everyone), js/area.js reads the hc_city cookie and labels
+  the control — the same cookie the server has already applied on the
+  server-rendered pages.
 %>
-<% var cities = (site && site.cities) || []; %>
+<% var cities = (site && site.cityDirectory) || (site && site.cities) || []; %>
 <% var currentCity = (site && site.city) || null; %>
 <% var variant = (typeof variant === 'undefined' ? 'header' : variant); %>
+<% var markets = cities.filter(function (city) { return city.served; }); %>
+<% var networkLive = cities.reduce(function (sum, city) { return sum + (city.live || 0); }, 0); %>
 <% if (cities.length > 1) { %>
-  <div class="area-switcher area-switcher--<%= variant %>" data-area-switcher>
+  <div class="area-switcher area-switcher--<%= variant %>" data-area-switcher
+       <%= currentCity ? 'data-city-pinned="1"' : '' %>>
     <button class="area-switcher__toggle" type="button" aria-expanded="false"
             aria-controls="area-switcher-panel-<%= variant %>" data-area-toggle>
       <%- helpers.icon('mapPin', { size: 18 }) %>
@@ -21,31 +37,66 @@
     </button>
     <div class="area-switcher__panel" id="area-switcher-panel-<%= variant %>" hidden data-area-panel>
       <p class="area-switcher__hint">Show stock in</p>
-      <ul class="area-switcher__list">
+
+      <% if (cities.length > markets.length) { %>
+        <%# Only worth showing when there is more than the rendered markets to
+            search. It is inside a panel JavaScript opens, so it is never a
+            control that does nothing. %>
+        <div class="area-switcher__search">
+          <label class="visually-hidden" for="area-search-<%= variant %>">Search cities</label>
+          <input class="input area-switcher__input" id="area-search-<%= variant %>" type="search"
+                 placeholder="Search <%= cities.length %> cities" data-area-search autocomplete="off"
+                 aria-describedby="area-status-<%= variant %>">
+        </div>
+      <% } %>
+
+      <ul class="area-switcher__list" data-area-list>
         <li>
           <a class="area-switcher__item<%= currentCity ? '' : ' is-current' %>" href="/cars" data-area-option="all"
              <%= currentCity ? '' : 'aria-current="true"' %>>
             <span>All cities</span>
-            <span class="count"><%= cities.reduce(function (sum, city) { return sum + city.live; }, 0) %></span>
+            <span class="count"><%= networkLive %></span>
           </a>
         </li>
-        <% cities.forEach(function (city) { %>
+        <% markets.forEach(function (city) { %>
           <li>
             <a class="area-switcher__item<%= currentCity && currentCity.slug === city.slug ? ' is-current' : '' %>"
-               href="/cars?city=<%= city.slug %>" data-area-option="<%= city.slug %>"
+               href="/cars?city=<%= city.slug %>" data-area-option="<%= city.slug %>" data-served="1"
                <%= currentCity && currentCity.slug === city.slug ? 'aria-current="true"' : '' %>>
               <span>
                 <strong><%= city.name %></strong>
-                <span class="area-switcher__state"><%= city.state %> State</span>
+                <span class="area-switcher__state"><%= city.stateLabel %></span>
               </span>
               <span class="count"><%= city.live %></span>
             </a>
           </li>
         <% }); %>
       </ul>
-      <p class="area-switcher__foot">
-        Live stock in each market. Picking one remembers it on this device.
+
+      <p class="area-switcher__status" id="area-status-<%= variant %>" data-area-status role="status" aria-live="polite"></p>
+      <p class="area-switcher__empty hidden" data-area-empty>
+        Nothing there yet. <a href="/find-my-car">Tell us what you want</a> and we will find and verify it.
       </p>
+
+      <p class="area-switcher__foot">
+        Live stock in each city, deepest first. Picking a market remembers it on this device.
+      </p>
+
+      <% if (cities.length > markets.length) { %>
+        <%# One item, cloned per city by js/area.js, so the markup lives in one
+            place instead of being written twice in two languages. %>
+        <template data-area-item-template>
+          <li>
+            <a class="area-switcher__item" href="" data-area-option="">
+              <span>
+                <strong data-city-name></strong>
+                <span class="area-switcher__state" data-city-state></span>
+              </span>
+              <span class="count" data-city-count></span>
+            </a>
+          </li>
+        </template>
+      <% } %>
     </div>
   </div>
 <% } %>

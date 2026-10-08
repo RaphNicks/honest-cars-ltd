@@ -468,6 +468,14 @@ img.header__logo-mark {
 }
 
 .header__nav-link {
+  /* An inline-flex row, like the area switcher's toggle. As a plain inline `<a>`
+     the chevron was an inline-level SVG whose own box could not share the line
+     box reliably, so "Services ⌄" broke into two lines and the arrow dropped
+     under the word. Same box model as the city control, which never had the
+     problem. */
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-05);
   font-size: var(--text-14);
   font-weight: var(--weight-medium);
   color: var(--honest-navy);
@@ -558,7 +566,41 @@ img.header__logo-mark {
   margin-bottom: var(--space-05);
 }
 
-.area-switcher__list { display: grid; gap: 2px; margin: 0; padding: 0; list-style: none; }
+.area-switcher__search { margin-bottom: var(--space-1); }
+
+.area-switcher__input {
+  height: 40px;
+  padding-inline: var(--space-1);
+  font-size: var(--text-14);
+}
+
+/* Forty-eight cities do not fit in a popover. The list scrolls instead, and the
+   panel keeps its shape: the search box, the status line and the footnote stay
+   put while the cities move under them. */
+.area-switcher__list {
+  display: grid;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  max-height: min(48vh, 340px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.area-switcher__status {
+  margin: var(--space-05) 0 0;
+  min-height: 1.2em;
+  font-size: var(--text-12);
+  color: var(--ink-muted, var(--ink));
+  opacity: 0.85;
+}
+
+.area-switcher__empty {
+  margin: var(--space-05) 0 0;
+  font-size: var(--text-12);
+  color: var(--ink-muted, var(--ink));
+}
 
 .area-switcher__item {
   display: flex;

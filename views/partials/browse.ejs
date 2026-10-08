@@ -68,7 +68,7 @@
   <div class="listings__results" data-results-region aria-live="polite">
     <% if (result.listings.length === 0) { %>
       <div style="grid-column: 1 / -1">
-        <%- include('../partials/empty-state', { nearMatches: nearMatches }) %>
+        <%- include('../partials/empty-state', { nearMatches: nearMatches, city: (typeof serviceCity !== 'undefined' ? serviceCity : null) }) %>
       </div>
     <% } else { %>
       <% result.listings.forEach(function (listing, index) { %>

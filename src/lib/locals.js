@@ -21,6 +21,7 @@ const blocks = require('../services/blocks');
 const { icon, SERVICE_ICONS } = require('../services/icons');
 const phone = require('./phone');
 const { buildNav, megaMenuItems, whatsappLink } = require('../services/nav');
+const cityDirectory = require('../services/city-directory');
 const seo = require('../services/seo');
 const events = require('../services/events');
 
@@ -30,15 +31,19 @@ const CHROME_TTL_MS = 60_000;
 
 async function siteChrome() {
   if (chromeCache.data && Date.now() - chromeCache.at < CHROME_TTL_MS) return chromeCache.data;
-  const [services, counters, cities] = await Promise.all([
+  const [services, counters, cities, directory] = await Promise.all([
     db.content.serviceSuite(),
     db.listings.networkCounters(),
-    // FR-32: the markets we cover, in ops order with live counts — the header
-    // switcher is on every page, static ones included, so this has to live in
-    // the shared chrome rather than in one route.
+    // FR-32: the markets we operate, in ops order with live counts. Note the
+    // wording — `cities` is *markets*, and things that mean "where we do
+    // business" (the home page's dealer count, the filter rail) read it. The
+    // city picker wants the wider national list instead, which is why the
+    // directory below is a second, differently-ordered list.
     db.areas.cities(),
+    // Every city the picker offers, sorted by how much stock is there.
+    cityDirectory.directory(),
   ]);
-  const data = { services, counters, cities };
+  const data = { services, counters, cities, directory };
   chromeCache = { at: Date.now(), data };
   return data;
 }
@@ -204,6 +209,9 @@ async function buildLocals(routePath, page = {}, extra = {}) {
       megaMenu: megaMenuItems(chrome.services),
       counters: chrome.counters,
       cities: chrome.cities,
+      // The city picker: the catalogue, most stock first. `cities` above stays
+      // markets-only on purpose — see the comment in siteChrome().
+      cityDirectory: chrome.directory,
       // The market this particular page is about, when the route knows one
       // (a city facet, or /cars filtered to a market). Null means “the whole
       // network”, and the client fills the label from the visitor's cookie.

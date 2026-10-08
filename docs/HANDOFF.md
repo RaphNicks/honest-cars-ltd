@@ -48,7 +48,8 @@ Every **§9 MUST is built.** The commit trail, most recent first:
 
 | Commit | What it delivered |
 |---|---|
-| *this commit* | **the Services menu + the hidden attribute** — hover no longer drops the panel; `[hidden]` is a real rule; the badge corner wraps |
+| *this commit* | **the city picker + the Services chevron** — 48 cities, searchable, deepest stock first |
+| `79e0dd2` | **the Services menu + the hidden attribute** — hover no longer drops the panel; `[hidden]` is a real rule; the badge corner wraps |
 | `cb74267` | **Services mega-menu** — the 8px dead band bridged, close delayed, hover gated to hover devices |
 | `7213505` | **migrations refuse to run on a current database** — the schema-state guard, and the parser that read continuation lines as columns |
 | `c62f42f` | phpMyAdmin route documented and proved for XAMPP users |
@@ -108,6 +109,92 @@ resilience ask:
 `size_bytes`, `poster_url` on `listing_media`), a `video` content block with a
 `[clip:…]` directive, clips on two listings' galleries, and 8 blog posts with 3
 embedded videos. All four clips total 726 KB.
+
+---
+
+## 3u. Just finished: the city picker, and the Services chevron
+
+Two requests from the site: the Services arrow had dropped onto a second line
+under the word, and "All cities" should offer the whole country, searchable, with
+the cities that have the most cars at the top.
+
+**The chevron.** `.header__nav-link` was a plain inline `<a>` with an inline
+`<svg>` in it, and the icon's box did not reliably share the line box — so
+"Services ⌄" broke, with the arrow underneath. It is now an inline-flex row with
+`align-items: center` and a gap: **the box model the city control beside it has
+always used**, which is exactly what the report asked for. Pinned in
+`test/menu.test.js` by comparing the two rules, so the two controls cannot drift
+apart again.
+
+**The city list — the decision that shaped everything.** "All cities" is now
+forty-eight Nigerian cities: the 36 state capitals, the FCT, and the major
+commercial towns (Aba, Onitsha, Nnewi, Warri, Ijebu-Ode, Zaria, Ile-Ife and
+the rest — see the file).
+The obvious way to do that was to insert rows into `service_cities`, and it is
+the wrong way: that table means **a market we operate**. It carries the stock
+prefix and the area list, and `db.listings.filterFacets` reads it straight into
+the /cars filter rail — deliberately, so "a market with no stock still shows as a
+real 0". Forty-eight rows there would put forty-eight radio buttons in that rail
+on every /cars request and four hundred-odd links on every static page.
+
+So the catalogue lives in code (`src/lib/nigeria-cities.js`) and is **merged**
+with the markets in `src/services/city-directory.js`:
+
+- a market row wins for a city we operate (ops own its name, state and prefix);
+- anything the database knows that the catalogue does not is still listed, so
+  adding a market can never make it disappear from the picker;
+- every row carries a live count and orders by it — **deepest stock first**,
+  ties by ops position then name, so the list is deterministic;
+- `cityDirectory.resolve()` resolves a catalogue city too, which is what makes
+  `/cars?city=lagos` filter to Lagos and tell the truth, rather than silently
+  dropping the filter and showing the whole network.
+
+**A city we have no lots in is honest, not hidden.** `/cars?city=lagos` is a real
+page: its own title ("we are not there yet"), a description that offers the
+concierge instead of stock, an empty state that names the city and says why, and
+`noindex,follow` — only a city with a curated facet is a page worth indexing
+(the previous rule would have published that empty page as *"Cars for sale in
+Lagos — verified stock"*, and meant it). It is also **never written to the
+visitor's cookie**: remembering "Lagos" for someone who would land on an empty
+grid on every future visit is not the memory they asked for, and the server and
+`js/area.js` apply the same rule so the two cannot disagree.
+
+**Weight was a design constraint, not an afterthought.** The picker appears
+twice per page (header and drawer), so forty-eight cities of list markup would
+have cost every page about 20 KB — bytes a visitor cannot reach without
+JavaScript anyway, since the panel only opens with it. Instead:
+
+- the markets we operate are server-rendered links, as before (that is also the
+  whole list for a crawler, and it keeps the raw-combo link count where §14.1
+  wants it);
+- the catalogue rides along once per page as a `type="application/json"` island
+  (`views/partials/city-index.ejs`, read at document level by both switchers);
+- `js/area.js` clones one `<template>` per city on first open, so the item markup
+  is written once, in one language.
+
+Net: the build went from 4,623 kB to 5,106 kB (+6.5 kB/page, island included),
+and the /cars page — server-rendered per request — grows by the same order.
+
+**Search.** By city name *or* state ("rivers" finds Port Harcourt, "fct" finds
+Abuja, because the label is what a person reads and so it is what the search
+matches). Case-insensitive, "All cities" hides while a query is up (it is a
+reset, not a city), a no-match line says so and offers the concierge, Escape
+clears the query before it closes the panel, and Enter takes the first city still
+showing. `test/city-search.test.js` drives all of it against the minimal DOM in
+`test/dom.js`.
+
+**Two traps worth keeping.** A `<template>`'s children are not in the document:
+`switcher.querySelectorAll('[data-area-option]')` cannot reach them in a browser,
+and the first version of the DOM stub *did* — which deleted the template's own
+row during hydration and broke every city. The stub now models the real rule, and
+`hydrate()` reads `list.children` instead of a document-wide query, so the code
+says what it means either way. And a test file that touches the database must
+close the pool (`test.after` → `db.pool.end()`): `npm test` hung for 900 seconds
+because `city-directory.test.js` did not.
+
+**Remember:** `public/sw.js` `VERSION` → `hc-v4` (base.css, components.css and
+area.js are all precached), and `docs/GAPS.md` gained a row for the one thing
+this leaves undone — there is still no screen that creates a *city*, only areas.
 
 ---
 
