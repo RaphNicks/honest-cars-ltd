@@ -1,0 +1,182 @@
+<%#
+  /admin/staff — people, roles and the watchlist (§7.4).
+  Shows the capability matrix as it is actually enforced, plus the role setter.
+  Locals: staff, customers, dealerAccounts, unclaimedLots, roleLabels, matrix, assignableRoles
+%>
+<%
+  var rolesInUse = {};
+  // capabilitiesFor() is the same helper the navigation uses, handed in by the route.
+
+  staff.forEach(function (person) { rolesInUse[person.role] = true; });
+%>
+<div class="admin-grid admin-grid--3">
+  <div class="kpi kpi--sm">
+    <span class="kpi__label">Staff accounts</span>
+    <strong class="kpi__value tabular"><%= staff.length %></strong>
+    <span class="kpi__foot">a staff role, not customers</span>
+  </div>
+  <div class="kpi kpi--sm">
+    <span class="kpi__label">Customers</span>
+    <strong class="kpi__value tabular"><%= customers.total %></strong>
+    <span class="kpi__foot"><%= customers.watchlisted %> on the watchlist</span>
+  </div>
+  <div class="kpi kpi--sm">
+    <span class="kpi__label">Roles in use</span>
+    <strong class="kpi__value tabular"><%= Object.keys(rolesInUse).length %></strong>
+    <span class="kpi__foot">of <%= assignableRoles.length %> defined</span>
+  </div>
+</div>
+
+<section class="panel">
+  <h2 class="panel__title">Staff</h2>
+  <% if (!staff.length) { %>
+    <p class="empty-line">No staff accounts yet.</p>
+  <% } else { %>
+    <table class="table table--stack">
+      <thead>
+        <tr>
+          <th scope="col">Name</th>
+          <th scope="col">Phone</th>
+          <th scope="col">Role</th>
+          <th scope="col">Status</th>
+          <th scope="col">Watchlist</th>
+          <th scope="col">Set role</th>
+        </tr>
+      </thead>
+      <tbody>
+        <% staff.forEach(function (person) { %>
+          <tr>
+            <th scope="row"><%= person.name %></th>
+            <td class="tabular"><%= person.maskedPhone %></td>
+            <td>
+              <span class="badge badge--role-<%= person.role %>"><%= roleLabels[person.role] || person.role %></span>
+              <br><span class="muted">may <%= capabilitiesFor(person.role).slice(0, 3).join(' · ') %><%= capabilitiesFor(person.role).length > 4 ? ' …' : '' %></span>
+            </td>
+            <td><span class="badge badge--<%= person.status %>"><%= person.status %></span></td>
+            <td>
+              <form method="post" action="/admin/staff/<%= person.id %>/watchlist" class="inline-form">
+                <label class="visually-hidden" for="watch-<%= person.id %>">Watchlist</label>
+                <select class="select select--compact" id="watch-<%= person.id %>" name="watchlisted">
+                  <option value="0" <%= person.watchlisted ? '' : 'selected' %>>Not watched</option>
+                  <option value="1" <%= person.watchlisted ? 'selected' : '' %>>Watch</option>
+                </select>
+                <button class="btn btn--secondary btn--sm" type="submit">Save</button>
+              </form>
+            </td>
+            <td>
+              <form method="post" action="/admin/staff/<%= person.id %>/role" class="inline-form">
+                <label class="visually-hidden" for="role-<%= person.id %>">Role</label>
+                <select class="select select--compact" id="role-<%= person.id %>" name="role">
+                  <% assignableRoles.forEach(function (role) { %>
+                    <option value="<%= role %>" <%= person.role === role ? 'selected' : '' %>><%= roleLabels[role] || role %></option>
+                  <% }); %>
+                </select>
+                <button class="btn btn--secondary btn--sm" type="submit">Apply</button>
+              </form>
+            </td>
+          </tr>
+        <% }); %>
+      </tbody>
+    </table>
+  <% } %>
+  <p class="note-inline mb-0">
+    Setting a role is audited. You cannot drop your own admin role — a second admin has to do it.
+  </p>
+</section>
+
+<section class="panel">
+  <h2 class="panel__title">Dealer accounts &amp; lots (§7.2 onboarding)</h2>
+  <p class="note-inline">
+    A dealer login sees exactly one lot — the one linked here. Until a lot is linked, the account
+    lands on the “not linked yet” page instead of a dashboard of zeroes.
+  </p>
+
+  <% if (!dealerAccounts.length) { %>
+    <p class="empty-line">No dealer-role accounts yet. Create one the same way as any account, then link it to a lot.</p>
+  <% } else { %>
+    <div class="table-scroll">
+      <table class="table">
+        <caption class="visually-hidden">Dealer-role accounts and the lot each one runs</caption>
+        <thead>
+          <tr><th scope="col">Account</th><th scope="col">Runs</th><th scope="col">Link</th></tr>
+        </thead>
+        <tbody>
+          <% dealerAccounts.forEach(function (account) { %>
+            <tr>
+              <th scope="row">
+                <%= account.name %>
+                <span class="listing-row__meta tabular"><%= account.phone %><%= account.status !== 'active' ? ' · ' + account.status : '' %></span>
+              </th>
+              <td>
+                <% if (account.lotId) { %>
+                  <%= account.lotName %>
+                  <span class="listing-row__meta"><%= account.tier %></span>
+                <% } else { %>
+                  <span class="badge badge--attention">not linked</span>
+                <% } %>
+              </td>
+              <td>
+                <% if (account.lotId) { %>
+                  <form method="post" action="/admin/staff/dealer-unlink"
+                        onsubmit="return confirm('Unlink <%= account.name %> from <%= account.lotName %>? The portal closes for that login.')">
+                    <input type="hidden" name="dealer_id" value="<%= account.lotId %>">
+                    <button class="btn btn--ghost btn--sm" type="submit">Unlink</button>
+                  </form>
+                <% } else if (unclaimedLots.length) { %>
+                  <form class="admin-inline-form" method="post" action="/admin/staff/dealer-link">
+                    <input type="hidden" name="user_id" value="<%= account.id %>">
+                    <label class="visually-hidden" for="lot-for-<%= account.id %>">Lot for <%= account.name %></label>
+                    <select class="select select--compact" id="lot-for-<%= account.id %>" name="dealer_id">
+                      <% unclaimedLots.forEach(function (lot) { %>
+                        <option value="<%= lot.id %>"><%= lot.name %> — <%= lot.lotArea %></option>
+                      <% }); %>
+                    </select>
+                    <button class="btn btn--primary btn--sm" type="submit">Link</button>
+                  </form>
+                <% } else { %>
+                  <span class="muted">every lot is claimed</span>
+                <% } %>
+              </td>
+            </tr>
+          <% }); %>
+        </tbody>
+      </table>
+    </div>
+    <% if (unclaimedLots.length) { %>
+      <p class="cms-hint mt-2">
+        <%= unclaimedLots.length %> lot<%= unclaimedLots.length === 1 ? '' : 's' %> on the network still
+        <span class="tabular">unclaimed</span>: <%= unclaimedLots.map(function (lot) { return lot.name; }).join(', ') %>.
+        Those keep their stock and commission ledger; linking an account just gives the lot a way in.
+      </p>
+    <% } %>
+  <% } %>
+</section>
+
+<section class="panel">
+  <h2 class="panel__title">The §7.4 capability matrix, as enforced</h2>
+  <div class="table-scroll">
+    <table class="table table--matrix">
+      <thead>
+        <tr>
+          <th scope="col">Capability</th>
+          <% assignableRoles.forEach(function (role) { %>
+            <th scope="col"><%= roleLabels[role] || role %></th>
+          <% }); %>
+        </tr>
+      </thead>
+      <tbody>
+        <% Object.keys(matrix).forEach(function (capability) { %>
+          <tr>
+            <th scope="row"><%= capability %></th>
+            <% assignableRoles.forEach(function (role) { %>
+              <td class="check-cell"><%= (matrix[capability] || []).indexOf(role) !== -1 ? '✓' : '·' %></td>
+            <% }); %>
+          </tr>
+        <% }); %>
+      </tbody>
+    </table>
+  </div>
+  <p class="note-inline mb-0">
+    This table is rendered from the same object the routes check, so it cannot drift from what the console allows.
+  </p>
+</section>

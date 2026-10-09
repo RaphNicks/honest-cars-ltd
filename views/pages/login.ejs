@@ -1,0 +1,118 @@
+<%#
+  /login — §7.1 phone-number-first sign-in. Two steps on one page:
+    1. phone number  → POST /api/auth/otp
+    2. six-digit code → POST /api/auth/verify
+  The code step is revealed by account.js; without JavaScript the page still
+  posts to the API and shows the JSON response, and the WhatsApp fallback link
+  is right there.
+  Locals: next, reason, ref, otp { length, ttlMinutes, provider, whatsappLink }
+%>
+<section class="page-hero">
+  <div class="container container--narrow">
+    <% if (trail) { %><%- include('../partials/breadcrumbs', { crumbs: trail }) %><% } %>
+    <p class="eyebrow">Account</p>
+    <h1>Sign in with your phone number</h1>
+    <p class="lead">
+      We send a one-time code to the WhatsApp number you already use with us — no password to forget and
+      nothing to leak. New here? The same form creates your account.
+    </p>
+  </div>
+</section>
+
+<section class="section">
+  <div class="container container--narrow">
+    <% if (reason === 'expired') { %>
+      <p class="auth-message auth-message--banner" data-state="error">
+        Your session ended, so we asked you to sign in again. Nothing was lost.
+      </p>
+    <% } %>
+
+    <div class="auth-card" data-auth-card data-next="<%= next %>" data-ref="<%= ref %>" data-channel="<%= otp.provider %>">
+      <%# ---- Step 1: the phone number ---------------------------------- %>
+      <form class="auth-form" data-auth-step="phone" novalidate>
+        <h2 class="mb-1">Your phone number</h2>
+        <p class="note-inline">
+          Any format works — <span class="tabular">0803 123 4567</span>, <span class="tabular">+234 803 123 4567</span>.
+        </p>
+
+        <% if (ref) { %>
+          <p class="note-inline">
+            Invitation code <strong class="tabular"><%= ref %></strong> — it is recorded on your account when you
+            sign in for the first time.
+          </p>
+        <% } %>
+
+        <div class="field">
+          <label class="field__label" for="login-phone">WhatsApp number</label>
+          <input class="input" id="login-phone" name="phone" type="tel" inputmode="tel"
+                 autocomplete="tel" placeholder="0803 123 4567" required
+                 aria-describedby="login-phone-hint">
+          <p class="field__hint" id="login-phone-hint">
+            We only use this number to sign you in and to answer your requests. <a href="/privacy">Privacy</a>.
+          </p>
+        </div>
+
+        <label class="checkbox-row">
+          <input type="checkbox" name="consent" value="1" checked>
+          <span>I agree to HonestCars contacting me on this number about my requests and orders.</span>
+        </label>
+
+        <div class="btn-row">
+          <button class="btn btn--primary" type="submit" data-event="booking_started" data-source="login">Send my code</button>
+          <a class="btn btn--ghost" href="<%= otp.whatsappLink %>" target="_blank" rel="noopener"
+             data-event="whatsapp_click" data-source="login">Code not arriving? WhatsApp us</a>
+        </div>
+
+        <p class="auth-message" data-auth-message role="status" aria-live="polite"></p>
+      </form>
+
+      <%# ---- Step 2: the code ----------------------------------------- %>
+      <form class="auth-form hidden" data-auth-step="code" novalidate hidden>
+        <h2 class="mb-1">Enter your code</h2>
+        <p class="note-inline">
+          We sent a <%= otp.length %>-digit code to <strong data-auth-phone>your number</strong>.
+          It expires in <%= otp.ttlMinutes %> minutes.
+        </p>
+
+        <div class="field">
+          <label class="field__label" for="login-code">Login code</label>
+          <input class="input input--code tabular" id="login-code" name="code" type="text"
+                 inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]*"
+                 maxlength="<%= otp.length %>" placeholder="<%= '0'.repeat(otp.length) %>" required>
+        </div>
+
+        <div class="btn-row">
+          <button class="btn btn--primary" type="submit">Sign in</button>
+          <button class="btn btn--ghost" type="button" data-auth-restart>Use a different number</button>
+          <button class="btn btn--secondary" type="button" data-auth-resend>Send a new code</button>
+        </div>
+
+        <p class="auth-message" data-auth-message role="status" aria-live="polite"></p>
+      </form>
+
+      <% if (otp.provider === 'console') { %>
+        <p class="auth-devnote">
+          <strong>Development:</strong> no SMS or WhatsApp provider is configured yet, so the code is written to the
+          server log (and returned by the API) instead of being sent. Set <code>AUTH_OTP_PROVIDER</code> when the
+          WhatsApp Cloud API account is ready.
+        </p>
+      <% } %>
+    </div>
+
+    <div class="grid grid--3 mt-4">
+      <div class="card card__body">
+        <h3 class="mb-1">Requests</h3>
+        <p class="mb-0">Concierge, sell, swap, parts and hire requests — with the same tracking link you got on WhatsApp.</p>
+      </div>
+      <div class="card card__body">
+        <h3 class="mb-1">Bookings &amp; orders</h3>
+        <p class="mb-0">Inspections, installs and consultations, plus shop orders and tracker subscription status.</p>
+      </div>
+      <div class="card card__body">
+        <h3 class="mb-1">Saved cars &amp; searches</h3>
+        <p class="mb-0">Shortlist what you like, save a filter, and come back to it from any device.</p>
+      </div>
+    </div>
+  </div>
+</section>
+

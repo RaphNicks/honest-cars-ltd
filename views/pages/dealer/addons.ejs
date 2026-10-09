@@ -1,0 +1,113 @@
+<%
+/**
+ * Add-ons — FR-18, §7.2 “pay for add-on services (media shoot, featured
+ * placement, intelligence subscription) via PSP”.
+ *
+ * While no PSP credentials exist the purchase is paid by transfer, and the page
+ * says so plainly rather than pretending a card form is coming. What matters
+ * is that the *benefit* is real: the purchase page after this one names exactly
+ * what goes live and when the money lands.
+ *
+ * Locals: catalogue, purchases, listings
+ */
+%>
+
+<div class="admin-grid admin-grid--2">
+  <section class="panel">
+    <div class="panel__head">
+      <h2 class="panel__title">Buy an add-on</h2>
+      <span class="cms-hint">Runs until the money lands, then it is live</span>
+    </div>
+
+    <% catalogue.forEach(function (addon) { %>
+      <article class="addon">
+        <div class="addon__head">
+          <h3 class="mb-0"><%= addon.name %></h3>
+          <strong class="tabular"><%= helpers.formatNaira(addon.priceKobo) %></strong>
+        </div>
+        <p class="addon__tagline"><%= addon.tagline %></p>
+        <% if (addon.description) { %><p class="muted"><%= addon.description %></p><% } %>
+        <p class="cms-hint">
+          <%= addon.effectLabel %><%= addon.durationDays ? ` · ${addon.durationDays} days` : ' · runs until cancelled' %>
+          · <%= addon.intervalLabel %>
+        </p>
+
+        <form method="post" action="/dealer/addons/<%= addon.slug %>" class="admin-inline-form">
+          <% if (addon.needsListing) { %>
+            <div class="field">
+              <label class="field__label" for="car-<%= addon.slug %>">Which car</label>
+              <select class="select" id="car-<%= addon.slug %>" name="listing_id" required>
+                <option value="">Choose a car on your lot…</option>
+                <% listings.forEach(function (car) { %>
+                  <option value="<%= car.id %>"><%= car.title %> · <%= car.stockNo %></option>
+                <% }); %>
+              </select>
+            </div>
+            <% if (!listings.length) { %>
+              <p class="field__hint">You have no cars that can take this add-on yet — a sold car cannot be shot or featured.</p>
+            <% } %>
+          <% } %>
+          <button class="btn btn--primary" type="submit" <%= addon.needsListing && !listings.length ? 'disabled' : '' %>>
+            Buy <%= addon.name %> — <%= helpers.formatNaira(addon.priceKobo) %>
+          </button>
+        </form>
+      </article>
+    <% }); %>
+
+    <% if (!catalogue.length) { %>
+      <p class="empty-line">No add-ons are on sale at the moment. The desk will list them here.</p>
+    <% } %>
+  </section>
+
+  <section class="panel">
+    <div class="panel__head">
+      <h2 class="panel__title">What you have bought</h2>
+      <span class="cms-hint">Newest first</span>
+    </div>
+
+    <% if (!purchases.length) { %>
+      <p class="empty-line">Nothing yet. A media shoot is the one most lots start with — the photos are what buyers scroll.</p>
+    <% } else { %>
+      <div class="table-scroll">
+        <table class="table">
+          <caption class="visually-hidden">This lot’s add-on purchases</caption>
+          <thead>
+            <tr>
+              <th scope="col">Add-on</th>
+              <th scope="col">For</th>
+              <th scope="col">Amount</th>
+              <th scope="col">Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            <% purchases.forEach(function (purchase) { %>
+              <tr>
+                <th scope="row">
+                  <a href="<%= purchase.url %>"><%= purchase.addonName %></a>
+                  <span class="listing-row__meta tabular"><%= purchase.reference %></span>
+                </th>
+                <td>
+                  <% if (purchase.listing) { %>
+                    <%= purchase.listing.title %>
+                    <span class="listing-row__meta"><%= purchase.listing.stockNo %></span>
+                  <% } else { %>
+                    <span class="muted">The whole lot</span>
+                  <% } %>
+                </td>
+                <td class="tabular"><%= helpers.formatNaira(purchase.amountKobo) %></td>
+                <td>
+                  <span class="badge badge--<%= purchase.status === 'active' ? 'ok' : purchase.status === 'pending' ? 'attention' : 'closed' %>"><%= purchase.statusLabel %></span>
+                  <% if (purchase.endsAt && purchase.status === 'active') { %>
+                    <span class="listing-row__meta">until <%= new Date(purchase.endsAt).toLocaleDateString('en-NG', { day: 'numeric', month: 'short', year: 'numeric' }) %></span>
+                  <% } else if (purchase.paymentReference) { %>
+                    <span class="listing-row__meta tabular"><%= purchase.paymentReference %></span>
+                  <% } %>
+                </td>
+              </tr>
+            <% }); %>
+          </tbody>
+        </table>
+      </div>
+    <% } %>
+  </section>
+</div>

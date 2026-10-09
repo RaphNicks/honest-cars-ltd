@@ -1,0 +1,651 @@
+<%#
+  /account — §7.1 dashboard, card for card:
+    Requests · Hire bookings · Bookings · Orders + tracker subscriptions ·
+    Documents (receipts + inspection reports) · Escrow · Saved cars · Saved searches (price-drop and
+    new-match switches) · Your details · Referrals
+  Every card reads a record the public site already wrote, matched by phone.
+  Locals: user, requests, hireRequests, hires, bookings, orders, subscriptions,
+          documents, savedCars, savedSearches, referral, financing, counts, trail
+%>
+<section class="page-hero page-hero--account">
+  <div class="container">
+    <%- include('../partials/breadcrumbs', { crumbs: trail }) %>
+    <div class="row row--between">
+      <div>
+        <p class="eyebrow">Your account</p>
+        <h1><%= user.name ? user.shortName + '’s cars and requests' : 'Your cars and requests' %></h1>
+        <p class="lead mb-0">
+          Signed in as <strong class="tabular"><%= user.maskedPhone %></strong>. Everything below is keyed to that
+          number, and to nothing else.
+        </p>
+      </div>
+      <div class="btn-row btn-row--tight">
+        <% if (typeof consoleHome !== 'undefined' && consoleHome) { %>
+          <a class="btn btn--primary btn--sm" href="<%= consoleHome %>">Open the console</a>
+        <% } %>
+        <a class="btn btn--secondary btn--sm" href="/cars">Browse cars</a>
+        <button class="btn btn--ghost btn--sm" type="button" data-sign-out>Sign out</button>
+      </div>
+    </div>
+
+    <div class="dash-counts">
+      <% [['Requests', counts.requests], ['Hire', counts.hireRequests + counts.hires], ['Bookings', counts.bookings],
+          ['Orders', counts.orders], ['Trackers', counts.subscriptions], ['Saved cars', counts.savedCars],
+          ['Saved searches', counts.savedSearches]]
+         .forEach(function (pair) { %>
+        <span class="trust-chip"><strong class="tabular"><%= pair[1] %></strong> <%= pair[0] %></span>
+      <% }); %>
+    </div>
+  </div>
+</section>
+
+<section class="section">
+  <div class="container">
+    <nav class="account-nav" aria-label="Account sections">
+      <a href="#requests">Requests</a>
+      <a href="#hire">Hire</a>
+      <a href="#bookings">Bookings</a>
+      <a href="#orders">Orders &amp; trackers</a>
+      <a href="#documents">Documents</a>
+      <a href="#saved">Saved cars</a>
+      <a href="#searches">Saved searches</a>
+      <a href="#profile">Your details</a>
+      <a href="#financing">Financing</a>
+      <a href="#referrals">Referrals</a>
+    </nav>
+    <div class="dash-grid">
+
+      <%# ---------------------------------------------------- Requests %>
+      <div class="dash-card" id="requests">
+        <div class="dash-card__head">
+          <h2 class="mb-0">Requests</h2>
+          <a class="section-head__link" href="/find-my-car">Start a search →</a>
+        </div>
+
+        <% if (!requests.length) { %>
+          <div class="empty-state">
+            <p class="mb-1">No requests yet. When you hand us a brief — a concierge search, a sell or swap, documents, parts — it shows up here with its tracking id and stage.</p>
+            <a class="btn btn--primary btn--sm" href="/find-my-car">Start a concierge search</a>
+          </div>
+        <% } else { %>
+          <ul class="account-list">
+            <% requests.forEach(function (request) { %>
+              <li class="account-item">
+                <div class="account-item__main">
+                  <span class="badge badge--ghost"><%= request.type %></span>
+                  <a class="account-item__title" href="<%= request.url %>"><%= request.trackingId %></a>
+                  <span class="account-item__meta">
+                    <span class="status-pill status-pill--<%= request.status %>"><%= request.statusLabel %></span>
+                    · opened <%= helpers.relativeDays(request.createdAt) %>
+                  </span>
+                </div>
+                <div class="account-item__side">
+                  <% if (request.slaDueAt) { %>
+                    <span class="note-inline">SLA <%= helpers.relativeDays(request.slaDueAt) %></span>
+                  <% } %>
+                  <a class="btn btn--secondary btn--sm" href="<%= request.url %>">Track</a>
+                </div>
+              </li>
+            <% }); %>
+          </ul>
+        <% } %>
+      </div>
+
+      <%# ----------------------------------------------- Hire bookings %>
+      <div class="dash-card" id="hire">
+        <div class="dash-card__head">
+          <h2 class="mb-0">Hire bookings</h2>
+          <a class="section-head__link" href="/hire">Book a car →</a>
+        </div>
+
+        <% if (!hires.length && !hireRequests.length) { %>
+          <div class="empty-state">
+            <p class="mb-1">No hire bookings yet — daily, weekly and corporate hire around Port Harcourt, with or without a driver.</p>
+            <a class="btn btn--primary btn--sm" href="/hire">See the fleet</a>
+          </div>
+        <% } else { %>
+          <%# Quoted hires first: they have a price, dates and a car, which is what
+              a client actually wants to see. %>
+          <% if (hires.length) { %>
+            <ul class="account-list">
+              <% hires.forEach(function (hire) { %>
+                <li class="account-item">
+                  <div class="account-item__main">
+                    <a class="account-item__title" href="/account/hire/<%= hire.reference %>">
+                      <%= hire.className %><%= hire.plate ? ' · ' + hire.plate : '' %>
+                    </a>
+                    <span class="account-item__meta">
+                      <%= new Date(hire.pickupAt).toLocaleDateString('en-NG', { day: 'numeric', month: 'short' }) %>
+                      → <%= new Date(hire.dropoffAt).toLocaleDateString('en-NG', { day: 'numeric', month: 'short' }) %>
+                      · <%= hire.days %> day<%= hire.days === 1 ? '' : 's' %>
+                      <%= hire.withDriver ? ' · with driver' : '' %>
+                      · <span class="tabular"><%= helpers.formatNaira(hire.totalKobo) %></span>
+                      <% if (hire.paymentStatus) { %> · <%= hire.paymentStatus %><% } %>
+                    </span>
+                  </div>
+                  <div class="account-item__side">
+                    <span class="status-pill status-pill--<%= hire.status %>"><%= hire.statusLabel %></span>
+                    <% if (['requested', 'quoted', 'accepted'].includes(hire.status) && hire.paymentStatus !== 'paid') { %>
+                      <form method="post" action="/account/hire/<%= hire.reference %>/accept">
+                        <button class="btn btn--primary btn--sm" type="submit">
+                          <%= hire.status === 'accepted' ? 'Pay' : 'Accept & pay' %>
+                        </button>
+                      </form>
+                    <% } %>
+                    <a class="btn btn--secondary btn--sm" href="/account/hire/<%= hire.reference %>">
+                      <%= hire.status === 'completed' ? 'Invoice' : 'Details' %>
+                    </a>
+                  </div>
+                </li>
+              <% }); %>
+            </ul>
+          <% } %>
+
+          <% if (hireRequests.length) { %>
+            <ul class="account-list">
+              <% hireRequests.forEach(function (hire) { %>
+                <% var brief = hire.brief || {}; %>
+                <li class="account-item">
+                  <div class="account-item__main">
+                    <a class="account-item__title" href="<%= hire.url %>">
+                      <%= brief.vehicle_class || brief.class || 'Car hire' %>
+                      <% if (brief.with_driver === 'yes') { %>· with driver<% } %>
+                    </a>
+                    <span class="account-item__meta">
+                      <% if (brief.date_from && brief.date_to) { %>
+                        <% var days = Math.round((new Date(brief.date_to) - new Date(brief.date_from)) / 86400000) + 1; %>
+                        <%= brief.date_from %> → <%= brief.date_to %>
+                        <% if (days > 0) { %> · <%= days %> day<%= days === 1 ? '' : 's' %><% } %>
+                      <% } else { %>
+                        Dates to confirm
+                      <% } %>
+                      <% if (brief.location) { %> · <%= brief.location %><% } %>
+                      <% if (brief.airport_pickup === 'yes') { %> · airport pickup<% } %>
+                      <% if (brief.corporate === 'yes') { %> · corporate<% } %>
+                    </span>
+                  </div>
+                  <div class="account-item__side">
+                    <span class="status-pill status-pill--<%= hire.status %>"><%= hire.statusLabel %></span>
+                    <a class="btn btn--secondary btn--sm" href="<%= hire.url %>">Track</a>
+                  </div>
+                </li>
+              <% }); %>
+            </ul>
+          <% } %>
+
+          <p class="note-inline mb-0">
+            A hire is confirmed once the money lands, and the driver's details come with the handover on the day.
+            The invoice and the deposit note live on each hire.
+          </p>
+        <% } %>
+
+        <% if (escrow && escrow.length) { %>
+          <div class="escrow-list" id="escrow">
+            <h3 class="mb-1">Money we are holding for you</h3>
+            <% escrow.forEach(function (item) { %>
+              <div class="escrow-item">
+                <p class="mb-0">
+                  <strong class="tabular"><%= item.reference %></strong> ·
+                  <%= helpers.formatNaira(item.amountKobo) %> · <%= item.subject %>
+                </p>
+                <ol class="ms-ladder" aria-label="Stages for <%= item.reference %>">
+                  <% ['funds_received','inspection_passed','documents_verified','released'].forEach(function (stage, index) { %>
+                    <li class="ms-ladder__step <%= item.stageIndex > index ? 'is-done' : item.stageIndex === index ? 'is-current' : '' %>">
+                      <span class="ms-ladder__dot" aria-hidden="true"><%= item.stageIndex > index ? '✓' : index + 1 %></span>
+                      <span class="ms-ladder__label"><%= stage.replace(/_/g, ' ') %></span>
+                    </li>
+                  <% }); %>
+                </ol>
+                <% if (item.stageNote) { %><p class="note-inline mb-0">Latest note: <%= item.stageNote %></p><% } %>
+                <p class="note-inline mb-0">Nothing is released without your confirmation.</p>
+              </div>
+            <% }); %>
+          </div>
+        <% } %>
+      </div>
+
+      <%# ---------------------------------------------------- Bookings %>
+      <div class="dash-card" id="bookings">
+        <div class="dash-card__head">
+          <h2 class="mb-0">Bookings</h2>
+          <a class="section-head__link" href="/services/inspection">Book an inspection →</a>
+        </div>
+
+        <% if (!bookings.length) { %>
+          <div class="empty-state">
+            <p class="mb-1">No inspections, installs or consultations booked yet. Pick a date and we come to the car.</p>
+            <a class="btn btn--primary btn--sm" href="/services/inspection">Book an inspection</a>
+          </div>
+        <% } else { %>
+          <ul class="account-list">
+            <% bookings.forEach(function (booking) { %>
+              <li class="account-item">
+                <div class="account-item__main">
+                  <span class="badge badge--ghost"><%= booking.type %></span>
+                  <span class="account-item__title tabular"><%= booking.reference %></span>
+                  <span class="account-item__meta">
+                    <%= booking.slotAt ? new Date(booking.slotAt).toDateString() : 'Date to confirm' %>
+                    <% if (booking.location) { %> · <%= booking.location %><% } %>
+                  </span>
+                </div>
+                <div class="account-item__side">
+                  <span class="status-pill status-pill--<%= booking.status %>"><%= booking.status %></span>
+                </div>
+              </li>
+            <% }); %>
+          </ul>
+        <% } %>
+      </div>
+
+      <%# ------------------------------------------------------ Orders %>
+      <div class="dash-card" id="orders">
+        <div class="dash-card__head">
+          <h2 class="mb-0">Orders</h2>
+          <a class="section-head__link" href="/shop">Go to the shop →</a>
+        </div>
+
+        <% if (!orders.length) { %>
+          <div class="empty-state">
+            <p class="mb-1">No shop orders yet — trackers, OBD2 scanners and care kits are delivered around Port Harcourt.</p>
+            <a class="btn btn--primary btn--sm" href="/shop">Browse the shop</a>
+          </div>
+        <% } else { %>
+          <ul class="account-list">
+            <% orders.forEach(function (order) { %>
+              <li class="account-item">
+                <div class="account-item__main">
+                  <a class="account-item__title tabular" href="/order/<%= order.orderNo %>"><%= order.orderNo %></a>
+                  <span class="account-item__meta">
+                    <%= helpers.formatNaira(order.totalKobo) %> · <%= order.deliveryArea %> ·
+                    <%= helpers.relativeDays(order.createdAt) %>
+                  </span>
+                </div>
+                <div class="account-item__side">
+                  <span class="status-pill status-pill--<%= order.status %>"><%= order.status.replace(/_/g, ' ') %></span>
+                  <a class="btn btn--secondary btn--sm" href="/order/<%= order.orderNo %>">View</a>
+                </div>
+              </li>
+            <% }); %>
+          </ul>
+        <% } %>
+
+        <% if (subscriptions.length) { %>
+          <h3 class="mt-3 mb-1" id="subscriptions">My tracked vehicles</h3>
+          <ul class="account-list account-list--tight">
+            <% subscriptions.forEach(function (subscription) { %>
+              <li class="account-item">
+                <div class="account-item__main">
+                  <span class="account-item__title"><%= subscription.planName || subscription.kindLabel %></span>
+                  <span class="account-item__meta">
+                    <% if (subscription.unitLabel) { %><%= subscription.unitLabel %> · <% } %>
+                    <% if (subscription.orderNo) { %>order <a href="/order/<%= subscription.orderNo %>" class="tabular"><%= subscription.orderNo %></a> · <% } %>
+                    <%= subscription.renewalAt
+                          ? `renews ${new Date(subscription.renewalAt).toLocaleDateString('en-NG', { day: 'numeric', month: 'short', year: 'numeric' })}`
+                          : 'renewal date not set yet' %>
+                    <% if (subscription.daysRemaining !== null && subscription.daysRemaining >= 0) { %>
+                      · <span class="tabular"><%= subscription.daysRemaining %> day<%= subscription.daysRemaining === 1 ? '' : 's' %> to go</span>
+                    <% } else if (subscription.overdue) { %>
+                      · <strong class="text-amber">overdue</strong>
+                    <% } %>
+                  </span>
+                </div>
+                <div class="account-item__side">
+                  <span class="status-pill status-pill--<%= subscription.state %>"><%= subscription.stateLabel %></span>
+                  <%# FR-20: renewal is a real POST (§7.3 “online renewals”). An
+                      unpaid renewal already raised shows the way back to it rather
+                      than a second button that would raise a second reference. %>
+                  <% if (subscription.paymentId && subscription.paymentStatus === 'pending' && subscription.paymentReference) { %>
+                    <a class="btn btn--secondary btn--sm" href="/account/renewals/<%= subscription.paymentReference %>">Finish paying</a>
+                  <% } else if (subscription.amountKobo && subscription.state !== 'cancelled') { %>
+                    <form method="post" action="/account/subscriptions/<%= subscription.id %>/renew">
+                      <button class="btn btn--secondary btn--sm" type="submit">
+                        Renew · <%= helpers.formatNaira(subscription.amountKobo) %>
+                      </button>
+                    </form>
+                  <% } %>
+                </div>
+              </li>
+            <% }); %>
+          </ul>
+          <p class="note-inline mb-0">
+            Reminders go out 30, 7 and 1 day before the renewal date, to the number on this account. Device tracking
+            itself lives in the telematics partner app (§11) — if a tracker stops reporting, message us and we will
+            look at the unit rather than the bill.
+          </p>
+        <% } %>
+      </div>
+
+      <%# ------------------------------------------------- Documents %>
+      <div class="dash-card" id="documents">
+        <div class="dash-card__head">
+          <h2 class="mb-0">Documents</h2>
+          <span class="note-inline">Receipts and memos, one file per job</span>
+        </div>
+
+        <% if (!documents.length) { %>
+          <div class="empty-state">
+            <p class="mb-1">
+              Nothing to file yet. Shop receipts appear here the moment a payment is confirmed, and an inspection
+              report appears the moment the inspector files it — with its PDF.
+            </p>
+          </div>
+        <% } else { %>
+          <ul class="account-list">
+            <% documents.forEach(function (doc) { %>
+              <li class="account-item">
+                <div class="account-item__main">
+                  <a class="account-item__title" href="<%= doc.url %>"><%= doc.title %></a>
+                  <span class="account-item__meta">
+                    <span class="badge badge--ghost"><%= doc.kind %></span>
+                    · <%= helpers.relativeDays(doc.createdAt) %>
+                    <% if (doc.amountKobo) { %> · <%= helpers.formatNaira(doc.amountKobo) %><% } %>
+                  </span>
+                </div>
+                <div class="account-item__side">
+                  <span class="status-pill status-pill--<%= doc.status %>"><%= doc.status.replace(/_/g, ' ') %></span>
+                  <a class="btn btn--secondary btn--sm" href="<%= doc.url %>">Open</a>
+                </div>
+              </li>
+            <% }); %>
+          </ul>
+          <p class="note-inline mb-0">
+            <% if (counts.receipts && counts.reports) { %>
+              <%= counts.receipts %> receipt<%= counts.receipts === 1 ? '' : 's' %> and <%= counts.reports %>
+              inspection report<%= counts.reports === 1 ? '' : 's' %> on file.
+            <% } %>
+            Receipts open as a printable page; reports open as the same document the inspector filed, with its PDF.
+            NDPA export copies are under <a href="/account#your-details">your details</a>.
+          </p>
+        <% } %>
+      </div>
+
+      <%# ----------------------------------------------- Saved cars %>
+      <div class="dash-card" id="saved">
+        <div class="dash-card__head">
+          <h2 class="mb-0">Saved cars</h2>
+          <span class="note-inline">We watch the price on every one of these and tell you when one drops</span>
+        </div>
+
+        <% if (!savedCars.length) { %>
+          <div class="empty-state">
+            <p class="mb-1">Nothing saved yet. Tap <strong>Save</strong> on any car and it lands here — even if it sells, it stays for your own records.</p>
+            <a class="btn btn--primary btn--sm" href="/cars">Find something to save</a>
+          </div>
+        <% } else { %>
+          <div class="saved-grid">
+            <% savedCars.forEach(function (listing) { %>
+              <div class="saved-car" data-saved-car="<%= listing.id %>">
+                <a class="saved-car__media" href="<%= listing.url %>">
+                  <% if (listing.primaryImage) { %>
+                    <img src="<%= helpers.photoSrc(listing.primaryImage.url) %>" alt="<%= helpers.esc(listing.primaryImage.alt) %>"
+                         <%= helpers.srcsetFor(listing.primaryImage.url) ? `srcset="${helpers.srcsetFor(listing.primaryImage.url)}" sizes="(min-width: 768px) 180px, 40vw"` : '' %>
+                         width="1200" height="900" loading="lazy" decoding="async">
+                  <% } %>
+                </a>
+                <div class="saved-car__body">
+                  <a class="saved-car__title" href="<%= listing.url %>"><%= listing.title %></a>
+                  <span class="saved-car__price tabular"><%= helpers.formatNaira(listing.priceKobo) %></span>
+                  <span class="account-item__meta">
+                    <%= listing.mileageKm ? helpers.formatMileage(listing.mileageKm) : 'Mileage TBC' %> ·
+                    <%= listing.area %> · saved <%= helpers.relativeDays(listing.savedAt) %>
+                  </span>
+                  <%# FR-25: the price watched, and a drop since you saved it %>
+                  <% if (listing.priceDropKobo > 0) { %>
+                    <span class="note-inline cms-check--ok">
+                      ↓ <%= helpers.formatNaira(listing.priceDropKobo) %> below the
+                      <%= helpers.formatNaira(listing.watchedKobo) %> you saw — we have told you
+                    </span>
+                  <% } else if (listing.watchedKobo !== null) { %>
+                    <span class="note-inline muted">Watching from <%= helpers.formatNaira(listing.watchedKobo) %></span>
+                  <% } %>
+                  <div class="btn-row btn-row--tight">
+                    <span class="badge <%= listing.status === 'sold' ? 'badge--sold' : 'badge--ghost' %>"><%= listing.status %></span>
+                    <button class="btn btn--ghost btn--sm" type="button"
+                            data-save-car data-listing-id="<%= listing.id %>" data-action="remove"
+                            data-source="account" data-saved="true">Remove</button>
+                  </div>
+                </div>
+              </div>
+            <% }); %>
+          </div>
+        <% } %>
+      </div>
+
+      <%# ------------------------------------------- Saved searches %>
+      <div class="dash-card" id="searches">
+        <div class="dash-card__head">
+          <h2 class="mb-0">Saved searches</h2>
+          <a class="section-head__link" href="/cars">Run a new search →</a>
+        </div>
+
+        <% if (!savedSearches.length) { %>
+          <div class="empty-state">
+            <p class="mb-1">Filter <a href="/cars">/cars</a> the way you like it, then use <strong>Save this search</strong> to keep the filter — and the alerts — here.</p>
+          </div>
+        <% } else { %>
+          <ul class="account-list">
+            <% savedSearches.forEach(function (search) { %>
+              <li class="account-item" data-saved-search="<%= search.id %>">
+                <div class="account-item__main">
+                  <a class="account-item__title" href="<%= search.url %>"><%= search.label %></a>
+                  <span class="account-item__meta">
+                    <% if (search.chips && search.chips.length) { %>
+                      <% search.chips.forEach(function (chip) { %><span class="query-chip"><%= chip %></span><% }); %>
+                    <% } else { %>
+                      <code class="query-chip"><%= search.query %></code>
+                    <% } %>
+                  </span>
+                </div>
+                <div class="account-item__side">
+                  <label class="checkbox-row checkbox-row--tight">
+                    <input type="checkbox" data-search-alerts="price_drop" data-id="<%= search.id %>"
+                           <%= search.priceDrop ? 'checked' : '' %>>
+                    <span>Price drops</span>
+                  </label>
+                  <label class="checkbox-row checkbox-row--tight">
+                    <input type="checkbox" data-search-alerts="new_match" data-id="<%= search.id %>"
+                           <%= search.newMatch ? 'checked' : '' %>>
+                    <span>New matches</span>
+                  </label>
+                  <button class="btn btn--ghost btn--sm" type="button" data-delete-search data-id="<%= search.id %>">Delete</button>
+                </div>
+              </li>
+            <% }); %>
+          </ul>
+          <p class="note-inline mb-0">
+            Price drops and new matches go out on the channel we message you on. We only ever move a saved
+            search forward — saving it does not send you the entire current inventory.
+          </p>
+        <% } %>
+      </div>
+
+      <%# ----------------------------------------------- Profile %>
+      <div class="dash-card" id="profile">
+        <div class="dash-card__head">
+          <h2 class="mb-0">Your details</h2>
+          <span class="note-inline">Keyed to <span class="tabular"><%= user.maskedPhone %></span></span>
+        </div>
+
+        <form class="stack" data-profile-form>
+          <div class="field">
+            <label class="field__label" for="profile-name">Name</label>
+            <input class="input" id="profile-name" name="name" type="text" autocomplete="name"
+                   value="<%= user.name || '' %>" placeholder="Ada Obi" required>
+          </div>
+          <div class="field">
+            <label class="field__label" for="profile-email">Email <span class="field__optional">optional</span></label>
+            <input class="input" id="profile-email" name="email" type="email" autocomplete="email"
+                   value="<%= user.email || '' %>" placeholder="you@example.com">
+            <p class="field__hint">Used for receipts and documents. We never sell it.</p>
+          </div>
+          <label class="checkbox-row">
+            <input type="checkbox" name="marketingOptIn" <%= user.marketingOptIn ? 'checked' : '' %>>
+            <span>Send me deal alerts and new-stock notes on this number or email.</span>
+          </label>
+          <div class="btn-row">
+            <button class="btn btn--primary" type="submit">Save details</button>
+            <span class="auth-message" data-profile-message role="status" aria-live="polite"></span>
+          </div>
+        </form>
+      </div>
+
+      <%# ------------------------------------------------- Financing (FR-34) %>
+      <div class="dash-card" id="financing">
+        <div class="dash-card__head">
+          <h2 class="mb-0">Financing enquiries</h2>
+          <span class="note-inline">§6.5 · FR-34</span>
+        </div>
+        <% if (!financing || !financing.length) { %>
+          <p class="mb-0">
+            No financing enquiry on this number. If you want to know what a car costs before interest,
+            <a href="/financing">the calculator is here</a> — we do not lend, and we do not quote rates.
+          </p>
+        <% } else { %>
+          <div class="account-list">
+            <% financing.forEach(function (item) { %>
+              <div class="account-item">
+                <div class="account-item__main">
+                  <strong class="tabular"><%= item.reference %></strong>
+                  <span class="account-item__meta">
+                    <%= item.car || 'Budget' %> · <%= item.amount %> · down <%= item.down %> · <%= item.monthly %>/mo over <%= item.tenor %>
+                  </span>
+                  <span class="note-inline">
+                    <%= item.statusSentence %>
+                    <% if (item.partner) { %>Lender: <strong><%= item.partner %></strong>.<% } %>
+                  </span>
+                </div>
+                <div class="account-item__side">
+                  <span class="status-pill status-pill--<%= item.status === 'approved' ? 'confirmed' : item.status === 'declined' || item.status === 'withdrawn' ? 'cancelled' : 'new' %>">
+                    <%= item.status === 'approved' ? 'Approved by the lender' : item.status.replace(/^\w/, function (c) { return c.toUpperCase(); }) %>
+                  </span>
+                  <span class="account-item__meta">
+                    updated <%= new Date(item.lastUpdate).toLocaleDateString('en-NG', { day: 'numeric', month: 'short', year: 'numeric' }) %>
+                  </span>
+                </div>
+              </div>
+            <% }); %>
+          </div>
+          <p class="note-inline mb-0">
+            We are not a lender. The partner decides, their written offer is what counts, and we never quote
+            their rates on their behalf. <a href="/financing">How the handoff works</a>.
+          </p>
+        <% } %>
+      </div>
+
+      <%# ------------------------------------------------ Referrals %>
+      <div class="dash-card" id="referrals">
+        <div class="dash-card__head">
+          <h2 class="mb-0">Referrals</h2>
+          <span class="note-inline">§7.1 personal link</span>
+        </div>
+
+        <% if (!referral) { %>
+          <p class="mb-0">Your referral link appears here once your account has a code.</p>
+        <% } else { %>
+          <p class="mb-2">
+            Anyone who signs in for the first time through your link is attached to your account — that is how the
+            ops desk knows who to credit.
+          </p>
+          <div class="referral-box">
+            <label class="visually-hidden" for="referral-link">Your referral link</label>
+            <input class="input referral-box__input tabular" id="referral-link" type="text" readonly
+                   value="<%= site.url %><%= referral.path %>" data-referral-link>
+            <button class="btn btn--secondary btn--sm" type="button" data-copy-referral>Copy link</button>
+          </div>
+          <p class="account-item__meta mt-2">
+            Code <strong class="tabular"><%= referral.code %></strong> ·
+            <strong class="tabular"><%= referral.joined %></strong> signed up ·
+            <strong class="tabular"><%= referral.orders %></strong> order<%= referral.orders === 1 ? '' : 's' %> placed ·
+            <strong class="tabular"><%= referral.qualified %></strong> counted
+          </p>
+          <p class="note-inline">
+            A referral counts when the person you invited has bought something — that is what the desk reviews.
+            <% if (referral.approvedKobo) { %>
+              <strong><%= helpers.formatNaira(referral.approvedKobo) %></strong> approved and not yet paid.
+            <% } %>
+            <% if (referral.paidKobo) { %>
+              <strong><%= helpers.formatNaira(referral.paidKobo) %></strong> paid to date.
+            <% } %>
+          </p>
+
+          <% if (!referral.people.length) { %>
+            <p class="mb-0">
+              Nobody has used your link yet. Share it and whoever signs in through it is attached to your account
+              automatically — no code to type.
+            </p>
+          <% } else { %>
+            <div class="account-list account-list--tight mt-2">
+              <% referral.people.forEach(function (person) { %>
+                <div class="account-item">
+                  <div class="account-item__main">
+                    <span class="account-item__title"><%= person.name || 'Your invite' %></span>
+                    <span class="account-item__meta">
+                      joined <%= new Date(person.joinedAt).toLocaleDateString('en-NG', { day: 'numeric', month: 'short', year: 'numeric' }) %>
+                      <% if (person.phoneMasked) { %> · <%= person.phoneMasked %><% } %>
+                      · <%= person.orders %> order<%= person.orders === 1 ? '' : 's' %>
+                    </span>
+                    <% if (!person.counted) { %>
+                      <span class="note-inline">
+                        Not counted yet — it counts once they have bought something.
+                        <% if (referral.qualifyOrders > 1) { %>This programme counts from <%= referral.qualifyOrders %> paid orders.<% } %>
+                      </span>
+                    <% } else if (person.reward && person.reward.status === 'pending') { %>
+                      <span class="note-inline">Counted. Your reward is with the desk for review.</span>
+                    <% } else if (person.reward && person.reward.status === 'void') { %>
+                      <span class="note-inline">Reviewed and not paid<%= person.reward.note ? ` — ${person.reward.note}` : '' %>.</span>
+                    <% } %>
+                  </div>
+                  <div class="account-item__side">
+                    <% if (person.reward) { %>
+                      <span class="status-pill status-pill--<%= person.reward.status === 'paid' ? 'completed' : person.reward.status === 'approved' ? 'confirmed' : person.reward.status === 'void' ? 'cancelled' : 'new' %>">
+                        <%= person.reward.label %><%= person.reward.amountLabel ? ` · ${person.reward.amountLabel}` : '' %>
+                      </span>
+                      <% if (person.reward.paidAt) { %>
+                        <span class="account-item__meta">
+                          paid <%= new Date(person.reward.paidAt).toLocaleDateString('en-NG', { day: 'numeric', month: 'short', year: 'numeric' }) %>
+                        </span>
+                      <% } %>
+                    <% } else if (person.counted) { %>
+                      <span class="status-pill status-pill--new">With the desk</span>
+                    <% } else { %>
+                      <span class="status-pill status-pill--new">Not counted yet</span>
+                    <% } %>
+                  </div>
+                </div>
+              <% }); %>
+            </div>
+          <% } %>
+
+          <p class="note-inline mb-0">
+            Reward amounts and payouts are set by the ops desk, not by this page — the records above are what they
+            work from, and nothing is promised until a reward shows as approved here.
+          </p>
+        <% } %>
+
+        <hr class="rule">
+
+        <div class="btn-row">
+          <a class="btn btn--secondary btn--sm" href="/account/export" download>Download my data (JSON)</a>
+          <button class="btn btn--ghost btn--sm" type="button" data-account-delete>Close my account</button>
+        </div>
+
+        <form class="stack hidden" data-delete-form hidden>
+          <div class="field">
+            <label class="field__label" for="delete-confirm">Type <strong>delete</strong> to confirm</label>
+            <input class="input" id="delete-confirm" name="confirm" type="text" autocomplete="off" placeholder="delete">
+            <p class="field__hint">
+              Your account, sessions and saved cars are deleted. Requests, bookings and orders are kept for finance
+              and warranty, with your name and number removed.
+            </p>
+          </div>
+          <div class="btn-row">
+            <button class="btn btn--primary btn--danger" type="submit">Close my account</button>
+            <button class="btn btn--ghost" type="button" data-account-delete-cancel>Keep my account</button>
+          </div>
+          <p class="auth-message" data-delete-message role="status" aria-live="polite"></p>
+        </form>
+      </div>
+
+    </div>
+  </div>
+</section>

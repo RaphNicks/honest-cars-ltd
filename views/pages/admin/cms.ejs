@@ -1,0 +1,174 @@
+<%#
+  /admin/cms — §7.3 content hub.
+  The workflow board is the first thing on the screen: what is a draft, what is
+  waiting on a reviewer, what is scheduled, and what is live. Everything the CMS
+  owns sits below it.
+  Locals: stats, board, pages, awaitingCounsel, recent, testimonials, modules,
+          faqCount, faqActive, categories, workflow, statusLabels, limits
+%>
+<%
+  var columns = [
+    { key: 'draft', label: 'Draft' },
+    { key: 'in_review', label: 'In review' },
+    { key: 'scheduled', label: 'Scheduled' },
+    { key: 'published', label: 'Published' },
+  ];
+%>
+
+<div class="admin-grid admin-grid--4">
+  <div class="kpi kpi--sm">
+    <span class="kpi__label">In review</span>
+    <strong class="kpi__value tabular"><%= stats.posts_review %></strong>
+    <span class="kpi__foot">waiting on a decision</span>
+  </div>
+  <div class="kpi kpi--sm">
+    <span class="kpi__label">Scheduled</span>
+    <strong class="kpi__value tabular"><%= stats.posts_scheduled %></strong>
+    <span class="kpi__foot">going out on their own</span>
+  </div>
+  <div class="kpi kpi--sm">
+    <span class="kpi__label">Published posts</span>
+    <strong class="kpi__value tabular"><%= stats.posts_published %></strong>
+    <span class="kpi__foot">live on the blog</span>
+  </div>
+  <div class="kpi kpi--sm">
+    <span class="kpi__label">Drafts</span>
+    <strong class="kpi__value tabular"><%= stats.posts_draft %></strong>
+    <span class="kpi__foot">nobody can see them yet</span>
+  </div>
+</div>
+
+<section class="panel">
+  <div class="panel__head">
+    <h2 class="panel__title">Workflow</h2>
+    <a class="btn btn--secondary btn--sm" href="/admin/cms/posts/new"><%- helpers.icon('plus', { size: 16 }) %> New post</a>
+  </div>
+
+  <div class="admin-grid admin-grid--4">
+    <% columns.forEach(function (column) { %>
+      <div class="cms-column">
+        <h3 class="cms-column__title">
+          <%= column.label %>
+          <span class="cms-column__count tabular"><%= (board[column.key] || []).length %></span>
+        </h3>
+        <% if (!(board[column.key] || []).length) { %>
+          <p class="empty-line">Nothing here.</p>
+        <% } %>
+        <% (board[column.key] || []).forEach(function (post) { %>
+          <article class="cms-card">
+            <a class="cms-card__title" href="/admin/cms/posts/<%= post.id %>"><%= post.title %></a>
+            <p class="cms-card__meta">
+              <span class="badge badge--<%= post.status === 'published' ? 'active' : 'pending' %>"><%= post.statusLabel %></span>
+              <span class="muted"><%= post.category.replace(/_/g, ' ') %></span>
+            </p>
+            <p class="cms-card__rules">
+              <% if (post.metaTitle && post.metaDescription) { %>
+                <span class="muted">meta ✓</span>
+              <% } else { %>
+                <span class="cms-flag">meta missing</span>
+              <% } %>
+              <% if (post.reviewNote) { %><br><span class="cms-flag">reviewer: <%= post.reviewNote %></span><% } %>
+            </p>
+            <p class="cms-card__foot muted">
+              <%= post.revisions %> revision<%= post.revisions === 1 ? '' : 's' %>
+              <% if (post.updatedByName) { %> · <%= post.updatedByName %><% } %>
+              <% if (post.status === 'published') { %>
+                · <a href="<%= post.url %>" target="_blank" rel="noopener">open</a>
+              <% } %>
+            </p>
+          </article>
+        <% }); %>
+      </div>
+    <% }); %>
+  </div>
+</section>
+
+<div class="admin-grid admin-grid--2 mt-3">
+  <section class="panel">
+    <div class="panel__head">
+      <h2 class="panel__title">Pages (§6.10)</h2>
+      <a class="btn btn--secondary btn--sm" href="/admin/cms/pages">Open</a>
+    </div>
+    <p class="muted"><%= stats.pages_total %> pages · <%= stats.pages_awaiting_counsel %> still marked as awaiting legal review.</p>
+    <% if (awaitingCounsel.length) { %>
+      <ul class="cms-list">
+        <% awaitingCounsel.forEach(function (row) { %>
+          <li><a href="/admin/cms/pages/<%= row.id %>"><%= row.slug %></a> <span class="cms-flag">counsel review pending</span></li>
+        <% }); %>
+      </ul>
+    <% } else { %>
+      <p class="empty-line">Every page has been cleared by counsel.</p>
+    <% } %>
+  </section>
+
+  <section class="panel">
+    <div class="panel__head">
+      <h2 class="panel__title">FAQs &amp; testimonials</h2>
+      <a class="btn btn--secondary btn--sm" href="/admin/cms/faqs">FAQs</a>
+      <a class="btn btn--secondary btn--sm" href="/admin/cms/testimonials">Testimonials</a>
+    </div>
+    <p class="muted">
+      <strong class="tabular"><%= faqActive %></strong> of <%= faqCount %> FAQs switched on ·
+      <strong class="tabular"><%= stats.testimonials_live %></strong> testimonials published
+      <% if (stats.testimonials_hidden) { %>(<%= stats.testimonials_hidden %> hidden)<% } %>
+    </p>
+  </section>
+</div>
+
+<section class="panel mt-3" style="margin-top: var(--space-3);">
+  <div class="panel__head">
+    <h2 class="panel__title">Homepage modules</h2>
+    <a class="btn btn--secondary btn--sm" href="/admin/cms/modules">Edit</a>
+  </div>
+  <% if (!modules.length) { %>
+    <p class="empty-line">No modules defined.</p>
+  <% } else { %>
+    <table class="table">
+      <thead>
+        <tr><th scope="col">Module</th><th scope="col">State</th><th scope="col">Notes</th></tr>
+      </thead>
+      <tbody>
+        <% modules.forEach(function (module) { %>
+          <tr>
+            <th scope="row"><%= module.key %></th>
+            <td>
+              <span class="badge badge--<%= module.isActive ? 'active' : 'pending' %>"><%= module.isActive ? 'Live' : 'Off' %></span>
+            </td>
+            <td class="muted"><%= module.title || '—' %></td>
+          </tr>
+        <% }); %>
+      </tbody>
+    </table>
+  <% } %>
+</section>
+
+<section class="panel" style="margin-top: var(--space-3);">
+  <h2 class="panel__title">Recent revisions</h2>
+  <% if (!recent.length) { %>
+    <p class="empty-line">Nothing saved yet. Every save lands here with who did it and when.</p>
+  <% } else { %>
+    <table class="table">
+      <thead>
+        <tr><th scope="col">When</th><th scope="col">Who</th><th scope="col">What</th><th scope="col">State</th><th scope="col">Note</th></tr>
+      </thead>
+      <tbody>
+        <% recent.forEach(function (row) { %>
+          <tr>
+            <td class="tabular muted"><%= new Date(row.created_at).toLocaleString('en-NG', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) %></td>
+            <td><%= row.actorName %></td>
+            <td>
+              <% if (row.entity === 'post' && row.slug) { %>
+                <a href="/admin/cms/posts/<%= row.entity_id %>"><%= row.title || row.slug %></a>
+              <% } else { %>
+                <%= row.title || row.slug || row.entity %>
+              <% } %>
+              <span class="muted">(<%= row.entity %>)</span>
+            </td>
+            <td><%= statusLabels[row.status] || row.status %></td>
+            <td class="muted"><%= row.note || '—' %></td>
+          </tr>
+        <% }); %>
+      </tbody>
+    </table>
+  <% } %>
+</section>

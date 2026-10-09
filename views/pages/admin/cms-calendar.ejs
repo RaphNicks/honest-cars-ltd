@@ -1,0 +1,94 @@
+<%#
+  Editorial calendar — FR-35, §6.9 “editorial calendar view in the CMS”.
+  One month at a glance: a cell per day, each post a chip in its workflow
+  colour. Publishing twice on one morning is the mistake this prevents.
+  Locals: calendar, authors, tags, statusLabels, workflow
+%>
+
+<section class="panel">
+  <div class="panel__head">
+    <h2><%= calendar.monthLabel %></h2>
+    <div class="btn-row">
+      <a class="btn btn--sm btn--secondary" href="/admin/cms/calendar?month=<%= calendar.previous %>">← <%= calendar.previous %></a>
+      <a class="btn btn--sm btn--secondary" href="/admin/cms/calendar">This month</a>
+      <a class="btn btn--sm btn--secondary" href="/admin/cms/calendar?month=<%= calendar.next %>"><%= calendar.next %> →</a>
+    </div>
+  </div>
+
+  <p class="cms-hint">
+    <strong><%= calendar.total %></strong> post date<%= calendar.total === 1 ? '' : 's' %> inside this month.
+    <% Object.keys(statusLabels).forEach(function (key) { %>
+      <% if (calendar.counts[key]) { %>
+        <span class="edcal__chip edcal__chip--<%= key %>"><%= calendar.counts[key] %> <%= statusLabels[key].toLowerCase() %></span>
+      <% } %>
+    <% }); %>
+    <span class="cms-hint">All-time counts, not just this month.</span>
+  </p>
+
+  <table class="edcal">
+    <thead>
+      <tr>
+        <th scope="col">Mon</th><th scope="col">Tue</th><th scope="col">Wed</th>
+        <th scope="col">Thu</th><th scope="col">Fri</th><th scope="col">Sat</th><th scope="col">Sun</th>
+      </tr>
+    </thead>
+    <tbody>
+      <% var cell = 0; %>
+      <% while (cell < calendar.lead + calendar.days.length) { %>
+        <tr>
+          <% for (var col = 0; col < 7; col += 1) { %>
+            <% var index = cell - calendar.lead; %>
+            <% if (index < 0 || index >= calendar.days.length) { %>
+              <td class="edcal__lead"></td>
+            <% } else { %>
+              <% var entry = calendar.days[index]; %>
+              <td>
+                <span class="edcal__day"><%= entry.day %></span>
+                <% entry.posts.forEach(function (post) { %>
+                  <a class="edcal__post" href="/admin/cms/posts/<%= post.id %>" title="<%= post.status %> — <%= post.categoryLabel %>">
+                    <%= post.title %>
+                  </a>
+                  <span class="edcal__chip edcal__chip--<%= post.status %>"><%= statusLabels[post.status] || post.status %></span>
+                <% }); %>
+                <% if (!entry.posts.length) { %><span class="edcal__empty">·</span><% } %>
+              </td>
+            <% } %>
+            <% cell += 1; %>
+          <% } %>
+        </tr>
+      <% } %>
+    </tbody>
+  </table>
+</section>
+
+<div class="admin-grid admin-grid--2 mt-3">
+  <section class="panel">
+    <div class="panel__head"><h2>By authors</h2></div>
+    <p class="cms-hint">Bios live on <code>blog_authors</code>; the byline on each post is the printed name.</p>
+    <% if (authors.length) { %>
+      <ul class="mini-list">
+        <% authors.forEach(function (person) { %>
+          <li>
+            <strong><%= person.name %></strong> — <%= person.role %>
+            <span class="mini-list__side muted"><%= person.count %> published</span>
+          </li>
+        <% }); %>
+      </ul>
+    <% } else { %>
+      <p class="mb-0">No author pages yet — add one to <code>blog_authors</code> and link it in the editor.</p>
+    <% } %>
+  </section>
+
+  <section class="panel">
+    <div class="panel__head"><h2>Governed tags</h2></div>
+    <p class="cms-hint">
+      The fixed taxonomy (§6.9 “categories fixed, tags governed”). A tag with no
+      posts is still listed — it is a decision that was made, not a gap.
+    </p>
+    <div class="cms-checks">
+      <% tags.forEach(function (tag) { %>
+        <span class="chip"><%= tag.label %> · <%= tag.kind %><%= tag.count ? ' (' + tag.count + ')' : '' %></span>
+      <% }); %>
+    </div>
+  </section>
+</div>

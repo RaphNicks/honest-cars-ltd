@@ -1,0 +1,77 @@
+<%#
+  /checkout — §6.8 guest checkout. Name, WhatsApp number, delivery area and a
+  note. The delivery fee comes from the admin table; totals are recomputed on
+  the server (/api/orders), never trusted from the browser.
+%>
+<section class="page-hero">
+  <div class="container">
+    <%- include('../partials/breadcrumbs', { crumbs: trail }) %>
+    <h1>Guest checkout</h1>
+    <p class="lead">No account, no password. Name, WhatsApp number, where it should go — that is the whole form.</p>
+  </div>
+</section>
+
+<section class="section">
+  <div class="container">
+    <div class="grid grid--2" style="align-items:start">
+      <form class="card card__body service-form" data-checkout-form novalidate>
+        <h2 class="mb-1">Where should it go?</h2>
+
+        <div class="form-grid">
+          <div class="field">
+            <label class="field__label" for="co-name">Your name</label>
+            <input class="input" id="co-name" name="name" type="text" autocomplete="name" required>
+          </div>
+          <div class="field">
+            <label class="field__label" for="co-phone">WhatsApp number</label>
+            <input class="input" id="co-phone" name="phone" type="tel" inputmode="numeric" autocomplete="tel" required>
+          </div>
+        </div>
+
+        <div class="field">
+          <label class="field__label" for="co-area">Delivery area</label>
+          <select class="select" id="co-area" name="deliveryArea">
+            <% delivery.forEach(function (area) { %>
+              <option value="<%= helpers.esc(area.name) %>" data-fee="<%= area.feeKobo %>">
+                <%= area.name %> — <%= area.feeKobo ? helpers.formatNaira(area.feeKobo) : 'free' %>
+              </option>
+            <% }); %>
+          </select>
+          <p class="field__hint"><%= delivery[0] ? delivery[0].note : '' %></p>
+        </div>
+
+        <div class="field">
+          <label class="field__label" for="co-notes">Anything we should know</label>
+          <textarea class="textarea" id="co-notes" name="notes" rows="2"
+                    placeholder="Tracker: I park at Trans-Amadi, install there if possible."></textarea>
+        </div>
+
+        <label class="checkbox-row">
+          <input type="checkbox" name="consent" required>
+          <span>HonestCars can contact me on WhatsApp to confirm this order and payment.</span>
+        </label>
+
+        <button class="btn btn--primary btn--lg btn--block" type="submit" data-submit>Place order</button>
+        <p class="field__error hidden" data-form-error role="alert"></p>
+        <p class="field__hint mb-0">
+          Card checkout (Paystack / Flutterwave) is not wired in this build. Placing the order creates it as
+          <strong>pending payment</strong> and ops sends the payment link on WhatsApp — nothing is charged here.
+          See <a href="/refunds">refunds</a> for how cancellations work.
+        </p>
+      </form>
+
+      <aside class="cart-summary">
+        <h2 class="mb-0">Order summary</h2>
+        <div data-checkout-summary></div>
+        <div class="empty-state hidden" data-checkout-empty>
+          <h3>Nothing to check out yet</h3>
+          <p>Add a product from the shop and come back — or source a part by VIN.</p>
+          <div class="btn-row mt-2" style="justify-content:center">
+            <a class="btn btn--primary" href="/shop">Browse the shop</a>
+          </div>
+        </div>
+        <a class="btn btn--ghost btn--block" href="/cart">Back to cart</a>
+      </aside>
+    </div>
+  </div>
+</section>

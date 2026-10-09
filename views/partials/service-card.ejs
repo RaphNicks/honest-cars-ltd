@@ -1,0 +1,9 @@
+<%# Service card — homepage module 6 (§6.1) and the services hub grid (§6.7) %>
+<a class="service-card" href="/services/<%= service.slug %>">
+  <span class="service-card__icon"><%- helpers.icon(helpers.SERVICE_ICONS[service.slug] || service.icon || 'info', { size: 22 }) %></span>
+  <span class="service-card__name"><%= service.name %></span>
+  <p class="service-card__promise"><%= service.promise %></p>
+  <% if (service.fromPriceKobo) { %>
+    <span class="service-card__price">from <%= helpers.formatNaira(service.fromPriceKobo) %></span>
+  <% } %>
+</a>

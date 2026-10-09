@@ -1,0 +1,151 @@
+<%#
+  Blog home — §6.9:
+    Featured post hero card (admin-pinned)
+    Category chip bar: All · Honest Buyer's Guide · Ownership & Maintenance ·
+      Market Intel & Prices · Company News · Video
+    Latest-posts grid (9 per “load more”), search box, tag links,
+    “Get hot verified deals on WhatsApp” opt-in band, RSS link.
+%>
+
+<section class="page-hero">
+  <div class="container">
+    <%- include('../partials/breadcrumbs', { crumbs: trail }) %>
+    <p class="eyebrow">The Honest Buyer’s Guide</p>
+    <h1>Car advice for Port Harcourt, written by people who inspect the cars</h1>
+    <p class="lead">
+      No listicles, no recycled foreign advice. Every post comes out of a real inspection, a real
+      price check or a real mistake — usually ours.
+    </p>
+    <p class="page-hero__meta">
+      <a href="/blog/rss.xml">RSS feed</a> ·
+      <a href="/guide">Start here: the evergreen shelf →</a>
+    </p>
+  </div>
+</section>
+
+<% if (featured && !category && !q) { %>
+  <section class="section">
+    <div class="container">
+      <article class="blog-hero blog-hero--card">
+        <div>
+          <span class="badge badge--verified">Featured</span>
+          <h2 class="mt-1"><a href="<%= featured.url %>"><%= featured.title %></a></h2>
+          <p class="blog-hero__excerpt"><%= featured.excerpt %></p>
+          <p class="page-hero__meta">
+            <span><%= featured.author.name %></span> ·
+            <span><%= new Date(featured.publishedAt).toLocaleDateString('en-NG', { day: 'numeric', month: 'long', year: 'numeric' }) %></span> ·
+            <span><%= featured.readMinutes %> min read</span>
+          </p>
+          <a class="btn btn--primary" href="<%= featured.url %>">Read the guide</a>
+        </div>
+        <% var featuredBlur = helpers.blurFor(featured.heroImage); %>
+        <div class="blog-hero__media media-blur"<% if (featuredBlur) { %> style="background-image:url('<%= featuredBlur %>')"<% } %>>
+          <img data-blur-img src="<%= helpers.photoSrc(featured.heroImage) %>" alt="<%= helpers.esc(featured.heroAlt) %>"
+           <% if (helpers.srcsetFor(featured.heroImage)) { %>srcset="<%= helpers.srcsetFor(featured.heroImage) %>" sizes="(min-width: 1024px) 760px, 92vw"<% } %>
+           width="1200" height="900" fetchpriority="high" decoding="async">
+        </div>
+      </article>
+    </div>
+  </section>
+<% } %>
+
+<section class="section">
+  <div class="container">
+    <nav class="chip-bar" aria-label="Categories">
+      <a class="chip" href="/blog" <%= !category ? 'aria-current="page"' : '' %>>All</a>
+      <% feed.categories.forEach(function (entry) { %>
+        <% if (!entry.count) return; %>
+        <a class="chip" href="/blog?category=<%= entry.key %>"
+           <%= category === entry.key ? 'aria-current="page"' : '' %>><%= entry.label %> (<%= entry.count %>)</a>
+      <% }); %>
+    </nav>
+
+    <div class="blog-tools mt-2">
+      <form class="blog-search" method="get" action="/blog" role="search">
+        <div class="field">
+          <label class="field__label" for="blog-q">Search the guide</label>
+          <input class="input" id="blog-q" name="q" type="search" value="<%= q || '' %>" placeholder="Camry, mileage, customs…">
+        </div>
+        <button class="btn btn--secondary" type="submit">Search</button>
+        <% if (q || category) { %><a class="btn btn--ghost" href="/blog">Clear</a><% } %>
+      </form>
+      <p class="mb-0 page-hero__meta">
+        <strong><%= feed.total %></strong> post<%= feed.total === 1 ? '' : 's' %>
+        <% if (q) { %>matching “<%= q %>”<% } else if (category) { %>in <%
+          var catLabel = (feed.categories.find(function (c) { return c.key === category; }) || {}).label || category;
+        %><%= catLabel %><% } %>
+      </p>
+    </div>
+
+    <% if (feed.posts.length) { %>
+      <% if (feed.page === 1 && !q && !category) { %>
+      <div class="blog-index mt-3">
+        <%- include('../partials/post-card', { post: feed.posts[0], helpers: helpers, featured: true }) %>
+        <div class="blog-index__more" data-post-grid>
+          <% feed.posts.slice(1).forEach(function (post) { %>
+            <%- include('../partials/post-card', { post: post, helpers: helpers }) %>
+          <% }); %>
+        </div>
+      </div>
+      <% } else { %>
+      <div class="grid grid--3 mt-3" data-post-grid>
+        <% feed.posts.forEach(function (post) { %>
+          <%- include('../partials/post-card', { post: post, helpers: helpers }) %>
+        <% }); %>
+      </div>
+      <% } %>
+
+      <div class="btn-row mt-3" style="justify-content:center">
+        <% if (feed.page < feed.pages) { %>
+          <a class="btn btn--primary" data-load-more
+             data-next-page="<%= feed.page + 1 %>"
+             data-category="<%= category || '' %>"
+             data-query="<%= q || '' %>"
+             href="/blog?page=<%= feed.page + 1 %><%= category ? `&category=${category}` : '' %><%= q ? `&q=${encodeURIComponent(q)}` : '' %>">
+            Load 9 more
+          </a>
+        <% } else { %>
+          <p class="mb-0 page-hero__meta">That is everything published so far.</p>
+        <% } %>
+      </div>
+    <% } else { %>
+      <div class="empty-state mt-3">
+        <h3>Nothing published matches that yet</h3>
+        <p>Try a broader search, or tell us what you are buying and we will answer it directly.</p>
+        <div class="btn-row mt-2" style="justify-content:center">
+          <a class="btn btn--primary" href="/find-my-car">Ask the concierge</a>
+          <a class="btn btn--secondary" href="/blog">See all posts</a>
+        </div>
+      </div>
+    <% } %>
+  </div>
+</section>
+
+<section class="section section--surface">
+  <div class="container">
+    <div class="alert-band">
+      <div>
+        <h2>Get hot verified deals on WhatsApp</h2>
+        <p class="mb-0">One message when a car matches your budget and grade — the same list our buyers are on.</p>
+      </div>
+      <form class="alert-form" data-lead-form data-lead-type="deal_alert" data-draft="deal-alert" novalidate>
+        <label class="visually-hidden" for="blog-alert-phone">WhatsApp number</label>
+        <input class="input" id="blog-alert-phone" name="phone" type="tel" inputmode="numeric"
+               placeholder="080 0000 0000" autocomplete="tel" required>
+        <button class="btn btn--primary" type="submit" data-submit>Send me deals</button>
+        <p class="field__error hidden full-width" data-form-error role="alert"></p>
+      </form>
+    </div>
+  </div>
+</section>
+
+<% if (faqs.length) { %>
+<section class="section" aria-labelledby="blog-faq">
+  <div class="container container--narrow">
+    <div class="section-head">
+      <h2 id="blog-faq">Questions readers send us</h2>
+    </div>
+    <%- include('../partials/accordion', { faqs: faqs, idPrefix: 'blog-faq' }) %>
+  </div>
+</section>
+<% } %>

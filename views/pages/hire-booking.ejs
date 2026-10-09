@@ -1,0 +1,154 @@
+<%
+  /**
+   * /account/hire/:reference — the client's own hire (FR-22, J6).
+   *
+   * J6 asks for a quote/accept/pay trail that is digital end to end, so the
+   * client can read what was quoted, accept it, and pay it without phoning. This
+   * page is that trail: the lines that make up the price, the car if it is
+   * allocated, and the honest payment shape the rest of the site uses — while no
+   * PSP keys exist, the bank account and the reference, and a plain statement
+   * that nothing was charged here.
+   *
+   * Locals: booking, doc, bank, trail, canAccept, invoiceUrl
+   */
+%>
+<% var naira = helpers.formatNaira; %>
+<section class="page-hero page-hero--account">
+  <div class="container">
+    <%- include('../partials/breadcrumbs', { crumbs: trail }) %>
+    <p class="eyebrow">Car hire</p>
+    <h1><%= booking.className %> · <span class="tabular"><%= booking.reference %></span></h1>
+    <p class="lead mb-0">
+      <%= doc.period.label %> · <%= booking.days %> day<%= booking.days === 1 ? '' : 's' %>
+      <%= booking.withDriver ? ' · with a driver' : ' · self-drive' %>.
+      Status: <strong><%= booking.statusLabel %></strong>.
+    </p>
+  </div>
+</section>
+
+<section class="section">
+  <div class="container container--narrow">
+    <% if (booking.status === 'completed') { %>
+      <div class="panel panel--paid">
+        <h2 class="panel__title">Hire closed — thank you</h2>
+        <p class="mb-0">
+          <%= booking.plate ? booking.plate + ' came back' : 'The car came back' %> on
+          <%= new Date(booking.completedAt || booking.dropoffAt).toLocaleDateString('en-NG', { day: 'numeric', month: 'long', year: 'numeric' }) %>.
+          <% if (doc.chargedIncidents.length) { %>
+            <%= doc.chargedIncidents.length %> incident charge<%= doc.chargedIncidents.length === 1 ? '' : 's' %> is itemised in the invoice below.
+          <% } %>
+          <% if (booking.depositKobo) { %>
+            Your <%= naira(booking.depositKobo) %> deposit is released back to you — it can take up to 5 working days to land.
+          <% } %>
+        </p>
+      </div>
+    <% } else if (booking.status === 'cancelled') { %>
+      <div class="panel">
+        <h2 class="panel__title">This hire was cancelled</h2>
+        <p class="mb-0">
+          <%= booking.cancelReason ? booking.cancelReason : 'Nothing was taken for it.' %>
+          If a payment was made, it is refunded to the account it came from.
+        </p>
+      </div>
+    <% } else if (booking.status === 'on_hire') { %>
+      <div class="panel panel--paid">
+        <h2 class="panel__title">The car is with you</h2>
+        <p class="mb-0">
+          <%= booking.plate ? booking.plate : booking.className %> is out on hire until
+          <%= new Date(booking.dropoffAt).toLocaleDateString('en-NG', { day: 'numeric', month: 'long' }) %>.
+          <% if (booking.fuelOut !== null && booking.fuelOut !== undefined) { %>
+            It left with a <%= booking.fuelOut %>% tank<%= booking.odometerOut ? ' and ' + Number(booking.odometerOut).toLocaleString('en-NG') + ' km' : '' %> —
+            the same readings are taken when it comes back.
+          <% } %>
+          <% if (booking.driverName) { %> <%= booking.driverName %> has the handover sheet.<% } %>
+        </p>
+      </div>
+    <% } %>
+
+    <% if (booking.paymentReference && booking.paymentStatus === 'paid') { %>
+      <div class="panel panel--paid mt-3">
+        <h2 class="panel__title">Paid — nothing outstanding</h2>
+        <p class="mb-0">
+          <%= naira(booking.totalKobo) %> received against <span class="tabular"><%= booking.paymentReference %></span>.
+          Your receipt is in <a href="/account#documents">your documents</a>.
+        </p>
+      </div>
+    <% } else if (canAccept && booking.paymentReference) { %>
+      <div class="panel panel--pay mt-3">
+        <h2 class="panel__title">Pay <%= naira(booking.totalKobo) %></h2>
+        <p class="mb-2">
+          Transfer to the account below with <strong class="tabular"><%= booking.paymentReference %></strong> as the
+          narration. The hire is confirmed the moment the money lands — nothing was charged on this page, and the car
+          is not held until it is confirmed.
+        </p>
+        <dl class="summary-list">
+          <div class="summary-list__row"><dt>Account name</dt><dd><%= bank.name %></dd></div>
+          <div class="summary-list__row"><dt>Bank</dt><dd><%= bank.bank %></dd></div>
+          <div class="summary-list__row"><dt>Account number</dt><dd class="tabular"><strong><%= bank.account %></strong></dd></div>
+          <div class="summary-list__row"><dt>Amount</dt><dd class="tabular"><strong><%= naira(booking.totalKobo) %></strong></dd></div>
+          <div class="summary-list__row"><dt>Payment reference</dt><dd class="tabular"><strong><%= booking.paymentReference %></strong></dd></div>
+        </dl>
+        <p class="field__hint mb-0"><%= bank.note %></p>
+      </div>
+    <% } else if (canAccept) { %>
+      <div class="panel panel--pay mt-3">
+        <h2 class="panel__title">Quote ready — accept it to hold the car</h2>
+        <p class="mb-2">
+          The price below is what the hire costs, with the refundable deposit shown separately. Accepting raises the
+          payment; the car is confirmed when it lands. If anything looks wrong, reply on WhatsApp and we will requote.
+        </p>
+        <form method="post" action="/account/hire/<%= booking.reference %>/accept" class="stack">
+          <button class="btn btn--primary" type="submit">Accept and set up payment</button>
+        </form>
+      </div>
+    <% } else if (booking.status === 'quoted' || booking.status === 'requested') { %>
+      <div class="panel mt-3">
+        <h2 class="panel__title">With our ops desk</h2>
+        <p class="mb-0">
+          We are confirming the car and the dates. You will get a message when the quote is ready — usually the same
+          working day.
+        </p>
+      </div>
+    <% } %>
+
+    <div class="panel mt-3">
+      <div class="panel__head">
+        <h2 class="panel__title">The hire</h2>
+        <% if (invoiceUrl) { %>
+          <div class="admin-actions">
+            <a class="btn btn--secondary btn--sm" href="<%= invoiceUrl %>">Invoice PDF</a>
+          </div>
+        <% } %>
+      </div>
+      <div class="hire-doc">
+        <div class="hire-doc__row">
+          <span class="muted">Vehicle</span>
+          <span><%= booking.plate ? booking.vehicleTitle + ' (' + booking.plate + ')' : booking.className + ' — assigned at handover' %></span>
+        </div>
+        <div class="hire-doc__row">
+          <span class="muted">Dates</span>
+          <span><%= doc.period.label %> · <%= booking.days %> day<%= booking.days === 1 ? '' : 's' %></span>
+        </div>
+        <% if (booking.pickupPoint) { %>
+          <div class="hire-doc__row"><span class="muted">Delivery</span><span><%= booking.pickupPoint %></span></div>
+        <% } %>
+        <% doc.lines.forEach(function (line) { %>
+          <div class="hire-doc__row">
+            <span>
+              <%= line.label %>
+              <% if (line.detail) { %><br><span class="muted"><%= line.detail %></span><% } %>
+            </span>
+            <span class="tabular"><%= naira(line.amountKobo) %></span>
+          </div>
+        <% }); %>
+        <div class="hire-doc__row hire-doc__total">
+          <span>Total</span>
+          <span class="tabular"><%= naira(doc.totalKobo) %></span>
+        </div>
+      </div>
+      <p class="field__hint mb-0">
+        <%= doc.terms %>
+      </p>
+    </div>
+  </div>
+</section>

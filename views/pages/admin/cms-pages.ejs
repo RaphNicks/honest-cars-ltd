@@ -1,0 +1,67 @@
+<%#
+  /admin/cms/pages — the CMS page list (§6.10).
+  Meta status is shown per row, because a missing description is the thing that
+  quietly costs search visibility.
+  Locals: pages, awaitingCounsel
+%>
+<div class="admin-head">
+  <h1>Pages</h1>
+  <p class="admin-head__lead">
+    <%= pages.length %> pages. Legal wording comes from counsel — the console edits the
+    envelope (§6.10): H1, hero copy, meta, body and whether the page is indexable.
+  </p>
+</div>
+
+<section class="panel">
+  <table class="table table--stack">
+    <thead>
+      <tr>
+        <th scope="col">Page</th>
+        <th scope="col">Meta</th>
+        <th scope="col">Indexable</th>
+        <th scope="col">Counsel</th>
+        <th scope="col">Revisions</th>
+        <th scope="col"></th>
+      </tr>
+    </thead>
+    <tbody>
+      <% pages.forEach(function (row) { %>
+        <tr>
+          <th scope="row">
+            <a href="/admin/cms/pages/<%= row.id %>">/<%= row.slug %></a>
+            <br><span class="muted"><%= row.title %></span>
+          </th>
+          <td>
+            <% if (row.meta_title && row.meta_description) { %>
+              <span class="cms-check--ok">✓ complete</span>
+            <% } else { %>
+              <span class="cms-flag">missing <%= [row.meta_title ? null : 'title', row.meta_description ? null : 'description'].filter(Boolean).join(' + ') %></span>
+            <% } %>
+          </td>
+          <td>
+            <span class="badge badge--<%= row.indexable ? 'active' : 'pending' %>"><%= row.indexable ? 'Indexable' : 'Noindex' %></span>
+          </td>
+          <td>
+            <% if (row.legal_review) { %>
+              <span class="cms-flag">Awaiting counsel</span>
+            <% } else { %>
+              <span class="muted">Cleared</span>
+            <% } %>
+          </td>
+          <td class="tabular"><%= row.revisions %></td>
+          <td><a class="btn btn--secondary btn--sm" href="/admin/cms/pages/<%= row.id %>">Edit</a></td>
+        </tr>
+      <% }); %>
+    </tbody>
+  </table>
+</section>
+
+<% if (awaitingCounsel.length) { %>
+  <section class="panel" style="margin-top: var(--space-3);">
+    <h2 class="panel__title">Waiting on counsel</h2>
+    <p class="muted">
+      These pages carry a visible “pending legal review” callout on the public site until an
+      admin clears the flag: <%= awaitingCounsel.map(function (row) { return '/' + row.slug; }).join(', ') %>.
+    </p>
+  </section>
+<% } %>

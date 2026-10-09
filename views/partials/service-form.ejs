@@ -1,0 +1,224 @@
+<%#
+  Inline booking / request form — §6.7 conversion block.
+  The field set switches on service.bookingKind so every service gets the intake
+  the PRD describes (inspection slot picker, documents wizard, tracker bundle
+  picker, research product cards, consultation slot, parts VIN form).
+
+  Guest-first (§6.3): no account, no password. Posts to /api/bookings for
+  scheduled work (inspection · consultation · install) and /api/service-requests
+  for everything else. Works without JS: the markup is a real form.
+%>
+<%
+  var kind = service.bookingKind || 'request';
+  var isBooking = kind === 'inspection' || kind === 'consultation' || kind === 'install';
+  var endpoint = isBooking ? '/api/bookings' : '/api/service-requests';
+  var submitLabel = service.ctaLabel;
+%>
+<%# §13.2: the draft key is per service page, so a half-filled inspection
+      form and a consultation form never mix. %>
+<form class="card card__body service-form" data-service-form
+      data-draft="service-<%= service.slug %>"
+      data-kind="<%= kind %>" data-service-slug="<%= service.slug %>"
+      data-endpoint="<%= endpoint %>" method="post" action="<%= endpoint %>" novalidate>
+  <p class="form-hint">
+    <% if (kind === 'inspection') { %>
+      Tell us the car and where it is. We confirm the slot on WhatsApp and send the inspector.
+    <% } else if (kind === 'consultation') { %>
+      Pick a day and a window. You get a call link on WhatsApp once the slot is held.
+    <% } else if (kind === 'documents') { %>
+      Choose what needs to happen. We list exactly what to send before you pay anything.
+    <% } else if (kind === 'tracking') { %>
+      Choose a bundle. Installation is booked after we confirm the slot with you.
+    <% } else if (kind === 'research') { %>
+      Choose the report. You get a written PDF in your account inside 48–72 hours.
+    <% } else if (kind === 'parts') { %>
+      VIN first — parts are matched by chassis, not by “same model”.
+    <% } else if (kind === 'sell_swap') { %>
+      Sell or swap — the full intake is on the next page.
+    <% } else { %>
+      One brief, two fields. The concierge answers with verified options in 48–72 hours.
+    <% } %>
+  </p>
+
+  <% if (kind === 'inspection') { %>
+    <div class="form-grid">
+      <div class="field">
+        <label class="field__label" for="sf-make">Make</label>
+        <input class="input" id="sf-make" name="make" type="text" placeholder="Toyota" required>
+      </div>
+      <div class="field">
+        <label class="field__label" for="sf-model">Model</label>
+        <input class="input" id="sf-model" name="model" type="text" placeholder="Camry" required>
+      </div>
+      <div class="field">
+        <label class="field__label" for="sf-year">Year</label>
+        <input class="input" id="sf-year" name="year" type="number" inputmode="numeric" min="1980" max="2030" placeholder="2015">
+      </div>
+      <div class="field">
+        <label class="field__label" for="sf-location">Where is the car?</label>
+        <input class="input" id="sf-location" name="location" type="text" placeholder="GRA Phase 2, Port Harcourt" required>
+      </div>
+      <div class="field">
+        <label class="field__label" for="sf-date">Preferred day</label>
+        <input class="input" id="sf-date" name="slot_date" type="date" required>
+      </div>
+      <div class="field">
+        <label class="field__label" for="sf-slot">Time window</label>
+        <select class="select" id="sf-slot" name="slot_window">
+          <option value="morning">Morning (8am–12pm)</option>
+          <option value="afternoon">Afternoon (12pm–4pm)</option>
+          <option value="evening">Late afternoon (4pm–6pm)</option>
+        </select>
+      </div>
+    </div>
+  <% } else if (kind === 'consultation') { %>
+    <div class="form-grid">
+      <div class="field">
+        <label class="field__label" for="sf-date">Preferred day</label>
+        <input class="input" id="sf-date" name="slot_date" type="date" required>
+      </div>
+      <div class="field">
+        <label class="field__label" for="sf-slot">Time window</label>
+        <select class="select" id="sf-slot" name="slot_window">
+          <option value="morning">Morning (8am–12pm)</option>
+          <option value="afternoon">Afternoon (12pm–4pm)</option>
+          <option value="evening">Late afternoon (4pm–6pm)</option>
+        </select>
+      </div>
+      <div class="field full-width">
+        <label class="field__label" for="sf-topic">What should we look at?</label>
+        <textarea class="textarea" id="sf-topic" name="notes" rows="3"
+                  placeholder="The three cars on my shortlist, my ₦12m budget, and whether the mileage on one of them adds up."></textarea>
+      </div>
+    </div>
+  <% } else if (kind === 'documents') { %>
+    <div class="form-grid">
+      <div class="field full-width">
+        <label class="field__label" for="sf-doc-type">What do you need?</label>
+        <select class="select" id="sf-doc-type" name="doc_type">
+          <option value="customs_verification">Customs verification</option>
+          <option value="registration">Registration &amp; plate number</option>
+          <option value="licence_renewal">Licence renewal</option>
+          <option value="tinted_permit">Tinted-glass permit</option>
+          <option value="insurance">Insurance</option>
+          <option value="change_of_ownership">Change of ownership</option>
+        </select>
+      </div>
+      <div class="field">
+        <label class="field__label" for="sf-reg">Vehicle registration or VIN</label>
+        <input class="input" id="sf-reg" name="vehicle_ref" type="text" placeholder="ABC-123-PH or VIN">
+      </div>
+      <div class="field">
+        <label class="field__label" for="sf-doc-notes">Anything we should know</label>
+        <input class="input" id="sf-doc-notes" name="notes" type="text" placeholder="Papers are with the dealer, not me">
+      </div>
+    </div>
+  <% } else if (kind === 'tracking') { %>
+    <fieldset class="field">
+      <legend class="field__label">Choose a bundle</legend>
+      <div class="radio-cards">
+        <% (service.pricing || []).forEach(function (tier, index) { %>
+          <label class="radio-card">
+            <input type="radio" name="bundle" value="<%= tier.tier %>" <%= index === 0 ? 'checked' : '' %>>
+            <span>
+              <strong><%= tier.tier %></strong>
+              <span class="radio-card__price"><%= tier.price %></span>
+            </span>
+          </label>
+        <% }); %>
+      </div>
+    </fieldset>
+    <div class="form-grid">
+      <div class="field">
+        <label class="field__label" for="sf-vehicle">Vehicle</label>
+        <input class="input" id="sf-vehicle" name="vehicle" type="text" placeholder="2019 Toyota Corolla" required>
+      </div>
+      <div class="field">
+        <label class="field__label" for="sf-install-area">Install location</label>
+        <input class="input" id="sf-install-area" name="location" type="text" placeholder="Woji, Port Harcourt" required>
+      </div>
+    </div>
+  <% } else if (kind === 'research') { %>
+    <fieldset class="field">
+      <legend class="field__label">Choose a report</legend>
+      <div class="radio-cards">
+        <% (service.pricing || []).forEach(function (tier, index) { %>
+          <label class="radio-card">
+            <input type="radio" name="report" value="<%= tier.tier %>" <%= index === 0 ? 'checked' : '' %>>
+            <span>
+              <strong><%= tier.tier %></strong>
+              <span class="radio-card__price"><%= tier.price %></span>
+            </span>
+          </label>
+        <% }); %>
+      </div>
+    </fieldset>
+    <div class="field">
+      <label class="field__label" for="sf-brief">The car or the question</label>
+      <textarea class="textarea" id="sf-brief" name="notes" rows="3"
+                placeholder="2016 Toyota Prado TX, ₦38m asking — is that a fair PH price, and what will it cost me over 5 years?"></textarea>
+    </div>
+  <% } else if (kind === 'parts') { %>
+    <div class="form-grid">
+      <div class="field">
+        <label class="field__label" for="sf-vin">VIN or chassis number</label>
+        <input class="input" id="sf-vin" name="vin" type="text" placeholder="JTMHX05J0..." required>
+      </div>
+      <div class="field">
+        <label class="field__label" for="sf-part">Part needed</label>
+        <input class="input" id="sf-part" name="part" type="text" placeholder="Front left headlamp" required>
+      </div>
+      <div class="field full-width">
+        <label class="field__label" for="sf-part-notes">Anything else</label>
+        <input class="input" id="sf-part-notes" name="notes" type="text" placeholder="Original or OEM acceptable">
+      </div>
+    </div>
+  <% } else if (kind === 'sell_swap') { %>
+    <div class="btn-row">
+      <a class="btn btn--primary" href="/sell-swap#sell">Sell my car</a>
+      <a class="btn btn--secondary" href="/sell-swap#swap">Swap / upgrade</a>
+    </div>
+  <% } else if (kind === 'dealer') { %>
+    <div class="btn-row">
+      <a class="btn btn--primary" href="/partner">See dealer packages</a>
+      <a class="btn btn--secondary" href="/dealer">Dealer portal login</a>
+    </div>
+  <% } else { %>
+    <div class="field">
+      <label class="field__label" for="sf-quick-brief">What are you looking for?</label>
+      <textarea class="textarea" id="sf-quick-brief" name="notes" rows="3"
+                placeholder="Automatic SUV under ₦15m, low mileage, AC must chill — for family use."></textarea>
+    </div>
+    <p class="field__hint">
+      Want the full 4-step brief with budget sliders and must-have chips?
+      <a href="/find-my-car">Use the concierge flow →</a>
+    </p>
+  <% } %>
+
+  <% if (kind !== 'sell_swap' && kind !== 'dealer') { %>
+    <div class="form-grid">
+      <div class="field">
+        <label class="field__label" for="sf-name">Your name</label>
+        <input class="input" id="sf-name" name="name" type="text" autocomplete="name" required>
+      </div>
+      <div class="field">
+        <label class="field__label" for="sf-phone">WhatsApp number</label>
+        <input class="input" id="sf-phone" name="phone" type="tel" inputmode="numeric"
+               autocomplete="tel" placeholder="080 0000 0000" required>
+      </div>
+    </div>
+
+    <label class="checkbox-row">
+      <input type="checkbox" name="consent" required>
+      <span>HonestCars can contact me on WhatsApp about this request. No marketing spam — that is a separate, optional list.</span>
+    </label>
+
+    <button class="btn btn--primary btn--lg btn--block" type="submit" data-submit><%= submitLabel %></button>
+    <p class="field__error hidden" data-form-error role="alert"></p>
+    <p class="field__hint mb-0">
+      Guest-first — no account needed. You will get a reference on screen and the same details on WhatsApp.
+    </p>
+  <% } %>
+</form>
+
+<div class="card card__body service-form__success hidden" data-form-success role="status" aria-live="polite"></div>

@@ -1,0 +1,396 @@
+<%#
+  /admin/settings — §5.1's settings screen, and the FR-32 area manager.
+
+  The PRD's data model says the area list is admin-managed. This is that
+  management: the markets we cover, the neighbourhoods inside each, and the
+  order the storefront offers them in. Nothing here renames a listing — a
+  rename leaves the cars filed under the old spelling where they are, and says
+  how many that was so the desk can decide.
+
+  Locals: cities (each with its areas), areas, unmanaged, areaCount, catalogue,
+          settingGroups, settingsSummary, settingsTableMissing
+%>
+
+<%# ---------------------------------------------------------------------------
+    FR-32 — opening a market.
+
+    A `service_cities` row is what makes a city a market: it owns the stock
+    series, it is what `?city=` resolves to, and it is where the area list
+    lives. Until now that row was SQL-only, so the picker could offer forty-eight
+    cities and the desk could only operate four of them.
+
+    The form promotes a city that is *already* in the national catalogue
+    (src/lib/nigeria-cities.js) rather than accepting free text. That is the
+    point: one list of Nigerian cities, so the picker and the country cannot
+    drift — and a typo cannot open a market nobody can find. A city that is
+    genuinely missing gets a line in that file, which is reviewable.
+--------------------------------------------------------------------------- %>
+<section class="panel" aria-labelledby="open-market-h">
+  <div class="panel__head">
+    <div>
+      <h2 class="panel__title" id="open-market-h">Open a new market</h2>
+      <p class="cms-hint mb-0">
+        <%= catalogue.markets %> of the <%= catalogue.total %> cities in the national list are markets we operate.
+        Opening one puts it in the city picker, gives <code>/cars?city=…</code> something real to filter by, and gives it
+        a stock series for the numbers it issues — then add its neighbourhoods below.
+      </p>
+    </div>
+  </div>
+
+  <% if (!catalogue.open.length) { %>
+    <p class="empty-line mb-0">
+      Every city in the national list is a market already. Another one needs a line in
+      <code>src/lib/nigeria-cities.js</code> first — the picker and the country list are the same list on purpose.
+    </p>
+  <% } else { %>
+    <form method="post" action="/admin/settings/markets" class="admin-inline-form">
+      <label class="visually-hidden" for="open-market-slug">City to open as a market</label>
+      <select class="select select--compact" id="open-market-slug" name="slug" required>
+        <option value="">Choose a city…</option>
+        <% catalogue.byState.forEach(function (group) { %>
+          <optgroup label="<%= group.state %>">
+            <% group.cities.forEach(function (city) { %>
+              <option value="<%= city.slug %>"><%= city.name %><% if (city.live) { %> — <%= city.live %> live<% } %></option>
+            <% }); %>
+          </optgroup>
+        <% }); %>
+      </select>
+      <label class="visually-hidden" for="open-market-prefix">Stock series</label>
+      <input class="input input--compact" id="open-market-prefix" name="stock_prefix"
+             placeholder="HC-XX — its own series, or blank for the default" maxlength="8">
+      <button class="btn btn--primary btn--sm" type="submit">Open market</button>
+    </form>
+    <p class="cms-hint mt-2 mb-0">
+      A stock number identifies the market that issued it, so two markets cannot share a series.
+      A city we have no cars in is fine — it opens with an empty shelf and the site says so rather than
+      pretending the filter matched something.
+    </p>
+  <% } %>
+
+  <% if (catalogue.uncatalogued.length) { %>
+    <p class="cms-hint mt-2 mb-0">
+      Market<%= catalogue.uncatalogued.length === 1 ? '' : 's' %> not in the national list:
+      <%= catalogue.uncatalogued.map(function (city) { return city.name; }).join(', ') %>.
+      Real, and missing from the picker's country list — add
+      <%= catalogue.uncatalogued.length === 1 ? 'it' : 'them' %> to <code>src/lib/nigeria-cities.js</code>.
+    </p>
+  <% } %>
+</section>
+
+<section class="panel" aria-labelledby="markets-h">
+  <div class="panel__head">
+    <div>
+      <h2 class="panel__title" id="markets-h">Markets &amp; service areas</h2>
+      <p class="cms-hint">
+        <%= cities.length %> market<%= cities.length === 1 ? '' : 's' %> ·
+        <%= areaCount %> area<%= areaCount === 1 ? '' : 's' %>.
+        A buyer filters by these; an area that is not on this list cannot be filtered for,
+        and a retired one stops being offered without losing the cars already filed under it.
+      </p>
+    </div>
+  </div>
+
+  <div class="admin-grid admin-grid--2">
+    <% cities.forEach(function (city) { %>
+      <section class="panel<%= city.active ? '' : ' panel--muted' %>" aria-labelledby="city-<%= city.id %>">
+        <div class="panel__head">
+          <div>
+            <h3 class="panel__title" id="city-<%= city.id %>">
+              <%= city.name %> <span class="muted"><%= city.stateLabel %></span>
+              <% if (!city.active) { %><span class="tag tag--muted">closed</span><% } %>
+            </h3>
+            <p class="cms-hint">
+              <span class="tabular"><%= city.live %></span> live ·
+              <span class="tabular"><%= city.cars %></span> in the 7-day sold window ·
+              series <code><%= city.stockPrefix %></code>
+            </p>
+          </div>
+
+          <%# Two forms, not one: a series is a detail and closing a market is a
+              decision. One submit for both makes it possible to close a city
+              while correcting a typo. %>
+          <div class="market-controls">
+            <form method="post" action="/admin/settings/markets/<%= city.id %>" class="inline-form">
+              <label class="visually-hidden" for="series-<%= city.id %>">Stock series for <%= city.name %></label>
+              <input class="input input--compact input--series" id="series-<%= city.id %>" name="stock_prefix"
+                     value="<%= city.stockPrefix %>" maxlength="8">
+              <button class="btn btn--secondary btn--sm" type="submit">Save series</button>
+            </form>
+            <form method="post" action="/admin/settings/markets/<%= city.id %>" class="inline-form">
+              <input type="hidden" name="active" value="<%= city.active ? '' : '1' %>">
+              <button class="btn btn--ghost btn--sm" type="submit">
+                <%= city.active ? 'Close market' : 'Re-open market' %>
+              </button>
+            </form>
+          </div>
+        </div>
+
+        <% if (!city.areas.length) { %>
+          <p class="empty-line">No neighbourhoods listed for this market yet. Add the first one below — until then buyers can only filter the whole city.</p>
+        <% } else { %>
+          <div class="table-wrap">
+            <table class="table">
+              <thead>
+                <tr>
+                  <th scope="col">Area</th>
+                  <th scope="col" class="tabular">Live</th>
+                  <th scope="col" class="tabular">All stock</th>
+                  <th scope="col">Order</th>
+                  <th scope="col">Rename / retire</th>
+                </tr>
+              </thead>
+              <tbody>
+                <% city.areas.forEach(function (area, index) { %>
+                  <tr<%= area.active ? '' : ' class="is-muted"' %>>
+                    <td>
+                      <strong><%= area.name %></strong>
+                      <% if (!area.active) { %><span class="tag tag--muted">retired</span><% } %>
+                    </td>
+                    <td class="tabular"><%= area.cars %></td>
+                    <td class="tabular"><%= area.stock %></td>
+                    <td>
+                      <form method="post" action="/admin/settings/areas/<%= area.id %>/move" class="inline-form">
+                        <input type="hidden" name="direction" value="up">
+                        <button class="btn btn--ghost btn--sm" type="submit"
+                                <%= index === 0 ? 'disabled' : '' %>
+                                aria-label="Move <%= area.name %> up">↑</button>
+                      </form>
+                      <form method="post" action="/admin/settings/areas/<%= area.id %>/move" class="inline-form">
+                        <input type="hidden" name="direction" value="down">
+                        <button class="btn btn--ghost btn--sm" type="submit"
+                                <%= index === city.areas.length - 1 ? 'disabled' : '' %>
+                                aria-label="Move <%= area.name %> down">↓</button>
+                      </form>
+                    </td>
+                    <td>
+                      <form method="post" action="/admin/settings/areas/<%= area.id %>" class="inline-form">
+                        <label class="visually-hidden" for="area-name-<%= area.id %>">Area name</label>
+                        <input class="input input--compact" id="area-name-<%= area.id %>" name="name"
+                               value="<%= area.name %>" maxlength="80">
+                        <button class="btn btn--secondary btn--sm" type="submit">Save</button>
+                      </form>
+                      <form method="post" action="/admin/settings/areas/<%= area.id %>" class="inline-form">
+                        <input type="hidden" name="active" value="<%= area.active ? '' : '1' %>">
+                        <button class="btn btn--ghost btn--sm" type="submit">
+                          <%= area.active ? 'Retire' : 'Restore' %>
+                        </button>
+                      </form>
+                    </td>
+                  </tr>
+                <% }); %>
+              </tbody>
+            </table>
+          </div>
+        <% } %>
+
+        <form method="post" action="/admin/settings/areas" class="admin-inline-form mt-2">
+          <input type="hidden" name="city_id" value="<%= city.id %>">
+          <label class="visually-hidden" for="new-area-<%= city.id %>">New area in <%= city.name %></label>
+          <input class="input input--compact" id="new-area-<%= city.id %>" name="name"
+                 placeholder="e.g. <%= city.areas.length ? 'another neighbourhood' : 'New Owerri' %>" maxlength="80" required>
+          <button class="btn btn--primary btn--sm" type="submit">Add area</button>
+        </form>
+      </section>
+    <% }); %>
+  </div>
+</section>
+
+<% if (unmanaged.length) { %>
+  <section class="panel mt-2" aria-labelledby="unmanaged-h">
+    <h2 class="panel__title" id="unmanaged-h">Filed under areas we do not list</h2>
+    <p class="cms-hint">
+      Cars carrying a neighbourhood that is not on the market's list — a dealer typed
+      something we have never offered, or an import arrived before it was added. They are
+      live and sellable; a buyer simply cannot filter for them. Add the ones worth keeping.
+    </p>
+    <div class="table-wrap mt-2">
+      <table class="table">
+        <thead>
+          <tr>
+            <th scope="col">Market</th>
+            <th scope="col">Area as filed</th>
+            <th scope="col" class="tabular">Live</th>
+            <th scope="col" class="tabular">All stock</th>
+            <th scope="col">Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% unmanaged.forEach(function (row) { %>
+            <tr>
+              <td><%= row.city %></td>
+              <td><strong><%= row.area %></strong></td>
+              <td class="tabular"><%= row.live %></td>
+              <td class="tabular"><%= row.cars %></td>
+              <td>
+                <% var city = cities.find(function (c) { return c.name === row.city; }); %>
+                <% if (city) { %>
+                  <form method="post" action="/admin/settings/areas" class="inline-form">
+                    <input type="hidden" name="city_id" value="<%= city.id %>">
+                    <input type="hidden" name="name" value="<%= row.area %>">
+                    <button class="btn btn--secondary btn--sm" type="submit">Add to <%= city.name %></button>
+                  </form>
+                <% } else { %>
+                  <span class="muted">No market named “<%= row.city %>” — the lot's own city is off the list too.</span>
+                <% } %>
+              </td>
+            </tr>
+          <% }); %>
+        </tbody>
+      </table>
+    </div>
+  </section>
+<% } %>
+
+<%# ---------------------------------------------------------------------------
+    §5.1 — the rest of the settings screen.
+
+    Every group here is built from the registry in src/lib/settings-schema.js, so
+    this form cannot offer a setting the code does not read: a row with no
+    consumer is a button that does nothing, and an ops team that changes a number
+    nobody reads has been lied to. Each row shows whether it is running on the
+    default or on a value somebody here saved.
+--------------------------------------------------------------------------- %>
+
+<% if (settingsTableMissing) { %>
+  <section class="panel mt-2">
+    <h2 class="panel__title">Settings cannot be saved yet</h2>
+    <p class="cms-hint mb-0">
+      The <code>settings</code> table is missing on this database — run <code>npm run db:setup</code>
+      (migration 027). Everything below is showing its built-in default, which is what the site is
+      already using.
+    </p>
+  </section>
+<% } %>
+
+<% settingGroups.forEach(function (group) { %>
+  <section class="panel mt-2" id="group-<%= group.key %>" aria-labelledby="group-<%= group.key %>-h">
+    <div class="panel__head">
+      <div>
+        <h2 class="panel__title" id="group-<%= group.key %>-h"><%= group.title %></h2>
+        <p class="cms-hint"><%= group.hint %></p>
+      </div>
+      <div class="muted">
+        <% if (group.changed) { %>
+          <span class="badge badge--ok"><%= group.changed %> changed</span>
+        <% } else { %>
+          <span class="badge badge--draft">all defaults</span>
+        <% } %>
+        <form method="post" action="/admin/settings/group/<%= group.key %>/reset" class="inline-form">
+          <button class="btn btn--ghost btn--sm" type="submit"
+                  <%= group.changed ? '' : 'disabled' %>>Reset to defaults</button>
+        </form>
+      </div>
+    </div>
+
+    <form method="post" action="/admin/settings/group/<%= group.key %>">
+      <% if (group.key === 'channels') { %>
+        <%# One row per message template. The channel a message takes is not a
+            detail: with no provider configured it is recorded skipped, and ops
+            sends it by hand — so an operator needs to see, per message, where it
+            is meant to go. %>
+        <div class="table-wrap mt-1">
+          <table class="table">
+            <thead>
+              <tr>
+                <th scope="col">Message</th>
+                <th scope="col">Where it goes</th>
+                <th scope="col">State</th>
+              </tr>
+            </thead>
+            <tbody>
+              <% group.fields.forEach(function (field) { %>
+                <tr>
+                  <td>
+                    <strong><%= field.label %></strong>
+                    <br><span class="cms-hint"><%= field.hint %></span>
+                  </td>
+                  <td>
+                    <label class="visually-hidden" for="<%= field.key.replace(/\./g, '-') %>"><%= field.label %></label>
+                    <select class="select" id="<%= field.key.replace(/\./g, '-') %>" name="<%= field.key %>">
+                      <option value="" <%= field.changed ? '' : 'selected' %>>Default — <%= field.defaultDisplay %></option>
+                      <% field.options.forEach(function (option) { %>
+                        <option value="<%= option.value %>" <%= field.changed && field.value === option.value ? 'selected' : '' %>><%= option.label %></option>
+                      <% }); %>
+                    </select>
+                  </td>
+                  <td>
+                    <% if (field.changed) { %>
+                      <span class="badge badge--in_review">changed</span>
+                    <% } else { %>
+                      <span class="muted">default</span>
+                    <% } %>
+                  </td>
+                </tr>
+              <% }); %>
+            </tbody>
+          </table>
+        </div>
+      <% } else { %>
+        <div class="admin-grid admin-grid--2 mt-1">
+          <% group.fields.forEach(function (field) { %>
+            <div class="field">
+              <label class="field__label" for="<%= field.key.replace(/\./g, '-') %>">
+                <%= field.label %><% if (field.type === 'money') { %>
+                  <span class="muted">(₦)</span><% } else if (field.unit) { %>
+                  <span class="muted">(<%= field.unit %>)</span><% } %>
+              </label>
+              <% if (field.type === 'textarea') { %>
+                <textarea class="input" id="<%= field.key.replace(/\./g, '-') %>" name="<%= field.key %>"
+                          rows="2" maxlength="<%= field.max || 200 %>"><%= field.display %></textarea>
+              <% } else if (field.type === 'money') { %>
+                <input class="input" id="<%= field.key.replace(/\./g, '-') %>" name="<%= field.key %>"
+                       value="<%= field.display %>" inputmode="decimal" autocomplete="off">
+              <% } else if (field.type === 'enum') { %>
+                <select class="select" id="<%= field.key.replace(/\./g, '-') %>" name="<%= field.key %>">
+                  <option value="" <%= field.changed ? '' : 'selected' %>>Default — <%= field.defaultDisplay %></option>
+                  <% field.options.forEach(function (option) { %>
+                    <option value="<%= option.value %>" <%= field.changed && field.value === option.value ? 'selected' : '' %>><%= option.label %></option>
+                  <% }); %>
+                </select>
+              <% } else { %>
+                <input class="input" id="<%= field.key.replace(/\./g, '-') %>" name="<%= field.key %>"
+                       value="<%= field.display %>" placeholder="<%= field.placeholder || '' %>"
+                       inputmode="<%= field.type === 'int' || field.type === 'money' ? 'numeric' : (field.type === 'phone' || field.type === 'digits' ? 'tel' : 'text') %>"
+                       autocomplete="off">
+              <% } %>
+              <p class="cms-hint"><%= field.hint %></p>
+              <p class="cms-hint mb-0">
+                <% if (field.changed) { %>
+                  <span class="badge badge--in_review">changed</span>
+                <% } else { %>
+                  <span class="muted">default</span>
+                <% } %>
+                <span class="muted">· built-in default: <%= field.defaultDisplay %></span>
+              </p>
+            </div>
+          <% }); %>
+        </div>
+      <% } %>
+
+      <div class="admin-inline-form mt-2">
+        <button class="btn btn--primary btn--sm" type="submit">Save <%= group.title.toLowerCase() %></button>
+        <span class="cms-hint">Leave a field as it is to keep it; “Reset to defaults” above puts a value back.</span>
+      </div>
+    </form>
+  </section>
+<% }); %>
+
+<section class="panel mt-2" aria-labelledby="settings-keys-h">
+  <h2 class="panel__title" id="settings-keys-h">What is deliberately not on this screen</h2>
+  <p class="cms-hint">
+    Every setting on this screen is read by the code that uses it. There are no decorative controls here: a field
+    nothing read would be a box that appears to change something and does not, and it is not on the list.
+  </p>
+  <p class="cms-hint">
+    Provider credentials — the payment keys, the SMS and email keys, the GA4 and Meta pixel IDs — live in
+    <code>.env</code> and stay there. They are deployment secrets, and a console page that can read them is a page
+    where they leak. Same for the database connection and the session pepper: those are the deployment, not the
+    business.
+  </p>
+  <p class="cms-hint mb-0">
+    <%= settingsSummary.total %> settings can be changed here; <%= settingsSummary.changed %> currently differ from
+    their defaults. A value that is changed is stored in the <code>settings</code> table with who changed it and
+    when; “Reset to defaults” deletes the row rather than writing the default in, so there is exactly one place a
+    default is written down.
+  </p>
+</section>

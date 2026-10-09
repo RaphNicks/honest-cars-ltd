@@ -1,0 +1,115 @@
+<%#
+  Content block renderer — §6.9 body components, shared by blog posts and CMS
+  pages (§6.10). Keeps one definition of what a “callout” or a “checklist” is.
+
+  Block types: paragraph · heading · callout · checklist · table · quote ·
+  youtube · video · listings · listing · stats
+  Locals: blocks, mentioned (listings, optional), embeds (slug → listing, optional),
+  helpers
+%>
+<div class="post-body">
+  <% blocks.forEach(function (block, index) { %>
+    <% if (block.type === 'paragraph') { %>
+      <p><%- helpers.inlineText(block.text) %></p>
+
+    <% } else if (block.type === 'heading') { %>
+      <%
+        var headingId = 's-' + String(block.text).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 60);
+      %>
+      <h2 id="<%= headingId %>"><%= block.text %></h2>
+
+    <% } else if (block.type === 'callout') { %>
+      <aside class="callout<%= block.tone === 'amber' ? ' callout--warn' : '' %>">
+        <% if (block.title) { %><h3><%= block.title %></h3><% } %>
+        <p><%- helpers.inlineText(block.text) %></p>
+      </aside>
+
+    <% } else if (block.type === 'checklist') { %>
+      <ul class="checklist">
+        <% block.items.forEach(function (item) { %>
+          <li><%- helpers.icon('check', { size: 16 }) %> <span><%- helpers.inlineText(item) %></span></li>
+        <% }); %>
+      </ul>
+
+    <% } else if (block.type === 'table') { %>
+      <div class="table-wrap">
+        <table class="table">
+          <% if (block.caption) { %><caption><%= block.caption %></caption><% } %>
+          <thead>
+            <tr>
+              <% block.head.forEach(function (cell) { %><th scope="col"><%= cell %></th><% }); %>
+            </tr>
+          </thead>
+          <tbody>
+            <% block.rows.forEach(function (row) { %>
+              <tr><% row.forEach(function (cell) { %><td><%- helpers.inlineText(cell) %></td><% }); %></tr>
+            <% }); %>
+          </tbody>
+        </table>
+      </div>
+
+    <% } else if (block.type === 'quote') { %>
+      <blockquote>
+        <p class="mb-1">“<%- helpers.inlineText(block.text) %>”</p>
+        <% if (block.attribution) { %><footer class="testimonial__meta"><%= block.attribution %></footer><% } %>
+      </blockquote>
+
+    <% } else if (block.type === 'video') { %>
+      <% var clipInfo = helpers.videoFor(block.src); %>
+      <% if (clipInfo) { %>
+        <%- include('video-facade', {
+              clip: { src: block.src, poster: clipInfo.poster, seconds: clipInfo.seconds, bytes: clipInfo.bytes },
+              title: block.title, caption: block.caption, helpers: helpers, alt: block.caption || block.title
+            }) %>
+      <% } else { %>
+        <%# A clip named in the post but not in the manifest: say so rather than
+            render a play button that leads nowhere. %>
+        <p class="field__hint">Video “<%= block.src %>” is not in this build — run <code>npm run videos</code>.</p>
+      <% } %>
+
+    <% } else if (block.type === 'youtube') { %>
+      <%# Tap-to-load facade (§13.2): the iframe only exists after a click. %>
+      <div class="youtube-facade" data-youtube-facade data-video-id="<%= block.videoId %>">
+        <img src="<%= block.poster || '/img/seed/hero-lot.svg' %>" alt="<%= helpers.esc(block.title || 'Video') %>"
+             width="1200" height="675" loading="lazy" decoding="async">
+        <button class="youtube-facade__play" type="button" data-youtube-play>
+          <%- helpers.icon('video', { size: 28 }) %>
+          <span><%= block.title || 'Play video' %><%= block.duration ? ` · ${block.duration}` : '' %></span>
+        </button>
+      </div>
+
+    <% } else if (block.type === 'listing') { %>
+      <%# FR-35 — one specific car. A sold or pulled car renders nothing. %>
+      <% var embed = embeds ? embeds.get(block.slug) : null; %>
+      <% if (embed) { %>
+        <div class="grid grid--3" style="margin: var(--space-3) 0">
+          <%- include('car-card', { listing: embed, helpers: helpers }) %>
+        </div>
+      <% } %>
+
+    <% } else if (block.type === 'listings') { %>
+      <% if (mentioned && mentioned.length) { %>
+        <div class="hscroll">
+          <% mentioned.forEach(function (listing) { %>
+            <%- include('car-card', { listing: listing, helpers: helpers }) %>
+          <% }); %>
+        </div>
+      <% } else { %>
+        <p class="field__hint">
+          <a href="/cars">Browse live listings</a> that match this article.
+        </p>
+      <% } %>
+
+    <% } else if (block.type === 'stats') { %>
+      <div class="stat-band">
+        <% block.items.forEach(function (item) { %>
+          <div class="stat">
+            <span class="stat__value"><%= item.value %></span>
+            <span class="stat__label"><%= item.label %></span>
+          </div>
+        <% }); %>
+      </div>
+
+    <% } %>
+  <% }); %>
+</div>

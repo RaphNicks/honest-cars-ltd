@@ -1,0 +1,300 @@
+<%#
+  /admin/financing — FR-34. The desk's side of the handoff.
+
+  The whole screen answers two questions and refuses to imply a third:
+
+    • Which enquiry is sitting here that nobody has picked up?  → `status = new`
+    • Which one is with a lender, and since when?               → `status = shared`
+    • (never) "will it be approved?" — that is the lender's answer, and it is
+      recorded here only after it exists.
+
+  Locals: queue, counts, partners, activePartners, waiting, awaitingOutcome,
+          status, canManage, employments, timelines, statuses
+%>
+<% var naira = helpers.formatNaira; %>
+<% var dateLabel = function (value) {
+  return value ? new Date(value).toLocaleDateString('en-NG', { day: 'numeric', month: 'short', year: 'numeric' }) : '—';
+}; %>
+<% var badgeFor = function (status) {
+  // The badge classes the console already uses: green for done, amber for
+  // moving, grey for new. A financing status is never displayed as success
+  // until the lender has actually said yes.
+  return status === 'approved' ? 'badge--ok'
+    : status === 'declined' ? 'badge--fail'
+    : status === 'shared' || status === 'contacted' ? 'badge--in_review'
+    : 'badge--new';
+}; %>
+
+<div class="admin-grid admin-grid--5">
+  <div class="kpi kpi--sm">
+    <span class="kpi__label">Waiting on us</span>
+    <strong class="kpi__value tabular"><%= counts.new %></strong>
+    <span class="kpi__foot">nobody has routed these yet</span>
+  </div>
+  <div class="kpi kpi--sm">
+    <span class="kpi__label">With a lender</span>
+    <strong class="kpi__value tabular"><%= counts.shared + counts.contacted %></strong>
+    <span class="kpi__foot">routed, outcome not recorded</span>
+  </div>
+  <div class="kpi kpi--sm">
+    <span class="kpi__label">Approved</span>
+    <strong class="kpi__value tabular"><%= counts.approved %></strong>
+    <span class="kpi__foot">the lender said yes</span>
+  </div>
+  <div class="kpi kpi--sm">
+    <span class="kpi__label">Declined</span>
+    <strong class="kpi__value tabular"><%= counts.declined %></strong>
+    <span class="kpi__foot">try another lender if the customer wants</span>
+  </div>
+  <div class="kpi kpi--sm">
+    <span class="kpi__label">Partners on the desk</span>
+    <strong class="kpi__value tabular"><%= activePartners.length %></strong>
+    <span class="kpi__foot">
+      <%= activePartners.length ? activePartners.map(function (p) { return p.name; }).join(', ') : 'none — routing has nowhere to go yet' %>
+    </span>
+  </div>
+</div>
+
+<% if (!activePartners.length) { %>
+  <div class="alert-band mt-3">
+    <div>
+      <h2>No lender on the list yet</h2>
+      <p class="mb-0">
+        Every enquiry below can still be worked — a human answers it, and the arithmetic already went back to the
+        customer — but nothing can be <em>routed</em> until you add a partner. That is deliberate: the console will
+        not claim an enquiry was shared with a lender when there is no lender to share it with.
+      </p>
+    </div>
+  </div>
+<% } %>
+
+<section class="panel mt-3">
+  <div class="panel__head">
+    <div>
+      <h2 class="panel__title">Enquiries</h2>
+      <p class="cms-hint">
+        Routing records the partner and the date, and sends the details through the notification log. If no
+        channel is configured the message is recorded <code>skipped</code> with its text intact — send it by
+        hand from the row, and the record matches what actually happened.
+      </p>
+    </div>
+    <form method="get" action="/admin/financing" class="admin-filters">
+      <div class="field">
+        <label class="field__label" for="fin-status">Status</label>
+        <select class="select" id="fin-status" name="status">
+          <option value="">Every status</option>
+          <% statuses.forEach(function (option) { %>
+            <option value="<%= option %>" <%= status === option ? 'selected' : '' %>><%= option %></option>
+          <% }); %>
+        </select>
+      </div>
+      <button class="btn btn--secondary btn--sm" type="submit">Filter</button>
+    </form>
+  </div>
+
+  <% if (!queue.length) { %>
+    <p class="cms-hint">
+      Nothing here yet. Enquiries arrive from <a href="/financing" target="_blank" rel="noopener">/financing</a>
+      and from the concierge brief's “do you need financing?” question.
+    </p>
+  <% } else { %>
+    <div class="table-scroll">
+      <table class="table table--stack">
+        <caption class="visually-hidden">Financing enquiries and their handoff</caption>
+        <thead>
+          <tr>
+            <th scope="col">Enquiry</th>
+            <th scope="col">The numbers</th>
+            <th scope="col">Lender</th>
+            <th scope="col">Status</th>
+            <% if (canManage) { %><th scope="col">Action</th><% } %>
+          </tr>
+        </thead>
+        <tbody>
+          <% queue.forEach(function (lead) { %>
+            <tr>
+              <td>
+                <strong class="tabular"><%= lead.reference %></strong>
+                <br><span class="muted"><%= lead.name %> · <span class="tabular"><%= lead.phone %></span></span>
+                <% if (lead.listingTitle) { %>
+                  <br><span class="muted"><%= lead.listingTitle %></span>
+                <% } %>
+                <% if (lead.trackingId) { %>
+                  <br><a class="muted" href="/admin/concierge?open=<%= lead.requestId %>">from concierge <%= lead.trackingId %></a>
+                <% } %>
+                <% if (lead.leadId) { %>
+                  <br><span class="badge badge--new">inbox: <%= lead.leadStatus %><%= lead.assignedName ? ` — ${lead.assignedName}` : '' %></span>
+                <% } %>
+                <br><span class="muted"><%= dateLabel(lead.createdAt) %></span>
+              </td>
+              <td class="tabular">
+                <%= naira(lead.amountKobo) %>
+                <br><span class="muted">down <%= naira(lead.downKobo) %></span>
+                <br><span class="muted"><%= naira(lead.monthlyKobo) %>/mo · <%= lead.tenorMonths %> months</span>
+                <% if (lead.employment) { %><br><span class="muted"><%= lead.employment.replace(/_/g, ' ') %></span><% } %>
+                <% if (lead.timeline) { %><br><span class="muted">wants it: <%= lead.timeline.replace(/_/g, ' ') %></span><% } %>
+                <% if (lead.plan && lead.plan.headline) { %>
+                  <details class="mt-1">
+                    <summary class="muted">what the customer was told</summary>
+                    <p class="cms-hint mb-0"><%= lead.plan.headline %></p>
+                    <p class="cms-hint mb-0"><%= lead.plan.detail %></p>
+                  </details>
+                <% } %>
+              </td>
+              <td>
+                <% if (lead.partnerName) { %>
+                  <strong><%= lead.partnerName %></strong>
+                  <br><span class="muted">routed <%= dateLabel(lead.sharedAt) %></span>
+                <% } else { %>
+                  <span class="muted">not routed yet</span>
+                <% } %>
+              </td>
+              <td>
+                <span class="badge <%= badgeFor(lead.status) %>"><%= lead.status %></span>
+                <% if (lead.outcomeNote) { %><br><span class="muted"><%= lead.outcomeNote %></span><% } %>
+                <% if (lead.updatedAt) { %><br><span class="muted">updated <%= dateLabel(lead.updatedAt) %></span><% } %>
+              </td>
+              <% if (canManage) { %>
+                <td>
+                  <% if (lead.status === 'new' || lead.status === 'withdrawn') { %>
+                    <form method="post" action="/admin/financing/<%= lead.id %>/route" class="stack">
+                      <div class="field">
+                        <label class="field__label" for="partner-<%= lead.id %>">Route to</label>
+                        <select class="select" id="partner-<%= lead.id %>" name="partner_id" required>
+                          <option value="">Pick a lender…</option>
+                          <% activePartners.forEach(function (partner) { %>
+                            <option value="<%= partner.id %>"><%= partner.name %></option>
+                          <% }); %>
+                        </select>
+                      </div>
+                      <button class="btn btn--primary btn--sm" type="submit">Route it</button>
+                    </form>
+                  <% } else { %>
+                    <form method="post" action="/admin/financing/<%= lead.id %>/outcome" class="stack">
+                      <div class="field">
+                        <label class="field__label" for="outcome-<%= lead.id %>">What came back</label>
+                        <select class="select" id="outcome-<%= lead.id %>" name="status" required>
+                          <option value="contacted">They have been in touch</option>
+                          <option value="approved">Approved</option>
+                          <option value="declined">Declined</option>
+                          <option value="withdrawn">Customer withdrew</option>
+                        </select>
+                      </div>
+                      <div class="field">
+                        <label class="field__label" for="note-<%= lead.id %>">Note (optional)</label>
+                        <input class="input" id="note-<%= lead.id %>" name="note" maxlength="240"
+                               placeholder="e.g. needs a guarantor">
+                      </div>
+                      <button class="btn btn--secondary btn--sm" type="submit">Record it</button>
+                    </form>
+                  <% } %>
+                </td>
+              <% } %>
+            </tr>
+          <% }); %>
+        </tbody>
+      </table>
+    </div>
+  <% } %>
+</section>
+
+<% if (canManage) { %>
+  <div class="admin-grid admin-grid--2 mt-3">
+    <section class="panel">
+      <div class="panel__head">
+        <div>
+          <h2 class="panel__title">Lenders on the desk</h2>
+          <p class="cms-hint">
+            This is the desk's own book, not a setting: who you actually work with, on which channel, and what
+            they will consider. A partner is a fact entered by a human, and switching one off stops routing to
+            them without touching the enquiries already with them.
+          </p>
+        </div>
+      </div>
+      <% if (!partners.length) { %>
+        <p class="cms-hint">No lenders yet. Add the first one below.</p>
+      <% } else { %>
+        <div class="table-scroll">
+          <table class="table table--stack">
+            <caption class="visually-hidden">Finance partners</caption>
+            <thead>
+              <tr>
+                <th scope="col">Lender</th>
+                <th scope="col">Channel</th>
+                <th scope="col">Enquiries</th>
+                <th scope="col">State</th>
+              </tr>
+            </thead>
+            <tbody>
+              <% partners.forEach(function (partner) { %>
+                <tr>
+                  <td>
+                    <strong><%= partner.name %></strong>
+                    <br><span class="muted"><%= partner.kindLabel %><%= partner.note ? ` · ${partner.note}` : '' %></span>
+                  </td>
+                  <td>
+                    <%= partner.channel %>
+                    <% if (partner.contact) { %><br><span class="muted tabular"><%= partner.contact %></span><% } %>
+                  </td>
+                  <td class="tabular"><%= partner.leads || 0 %></td>
+                  <td>
+                    <span class="badge <%= partner.active ? 'badge--ok' : 'badge--draft' %>"><%= partner.active ? 'active' : 'off' %></span>
+                    <form method="post" action="/admin/financing/partners/<%= partner.id %>/active" class="inline-form mt-1">
+                      <input type="hidden" name="active" value="<%= partner.active ? '0' : '1' %>">
+                      <button class="btn btn--ghost btn--sm" type="submit"><%= partner.active ? 'Switch off' : 'Reactivate' %></button>
+                    </form>
+                  </td>
+                </tr>
+              <% }); %>
+            </tbody>
+          </table>
+        </div>
+      <% } %>
+    </section>
+
+    <section class="panel">
+      <div class="panel__head">
+        <div>
+          <h2 class="panel__title">Add a lender</h2>
+          <p class="cms-hint">
+            The channel decides what “routing” can actually do: <strong>manual</strong> records the handoff and
+            gives you the message to send yourself, and email/WhatsApp only deliver once a provider is configured.
+          </p>
+        </div>
+      </div>
+      <form method="post" action="/admin/financing/partners" class="stack">
+        <div class="field">
+          <label class="field__label" for="partner-name">Name</label>
+          <input class="input" id="partner-name" name="name" required maxlength="120" placeholder="e.g. Example MFB">
+        </div>
+        <div class="field">
+          <label class="field__label" for="partner-kind">Kind</label>
+          <select class="select" id="partner-kind" name="kind">
+            <% ['bank', 'mfb', 'fintech', 'cooperative', 'other'].forEach(function (kind) { %>
+              <option value="<%= kind %>"><%= kind %></option>
+            <% }); %>
+          </select>
+        </div>
+        <div class="field">
+          <label class="field__label" for="partner-channel">Channel</label>
+          <select class="select" id="partner-channel" name="channel">
+            <% ['manual', 'whatsapp', 'email', 'phone'].forEach(function (channel) { %>
+              <option value="<%= channel %>"><%= channel %></option>
+            <% }); %>
+          </select>
+        </div>
+        <div class="field">
+          <label class="field__label" for="partner-contact">Contact</label>
+          <input class="input" id="partner-contact" name="contact" maxlength="160"
+                 placeholder="phone or email — leave blank for manual">
+        </div>
+        <div class="field">
+          <label class="field__label" for="partner-note">What they fund (optional)</label>
+          <input class="input" id="partner-note" name="note" maxlength="240"
+                 placeholder="e.g. salaried only, 6-month statements, up to ₦15m">
+        </div>
+        <button class="btn btn--primary" type="submit">Add the lender</button>
+      </form>
+    </section>
+  </div>
+<% } %>

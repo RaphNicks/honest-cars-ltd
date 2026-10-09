@@ -1,0 +1,17 @@
+<%#
+  Trust Component System — verification badge (§3.5).
+  Three grades on every car card and VDP; tooltip explains each grade in one line.
+  Locals: listing (or grade string), helpers, [size]
+%>
+<% var grade = typeof listing === 'string' ? listing : listing.grade;
+   var gradeLabel = helpers.GRADE_LABELS[grade] || 'Network-Listed';
+   var tooltip = helpers.GRADE_TOOLTIPS[grade]; %>
+<span class="info-tip">
+  <span class="badge badge--<%= grade %>">
+    <span class="badge__dot" aria-hidden="true"></span><%= gradeLabel %>
+  </span>
+  <button class="info-tip__button" type="button" aria-expanded="false"
+          aria-label="What does <%= gradeLabel %> mean?"
+          data-tip-toggle><%- 'i' %></button>
+  <span class="info-tip__panel" hidden data-tip-panel><%= tooltip %></span>
+</span>

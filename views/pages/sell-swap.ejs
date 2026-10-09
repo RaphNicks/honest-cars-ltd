@@ -1,0 +1,350 @@
+<%#
+  Sell / Swap — §6.6.
+  Tab 1 — Sell my car: 3-step intake (car basics + photos upload guide →
+  condition & documents → contact). Promise: free valuation within 24h from live
+  network data. Optional paid inspection for a certified listing.
+  Tab 2 — Swap/upgrade: sell intake + “what you want instead” (reuses concierge
+  step-1 components) → one swap engagement.
+%>
+
+<section class="page-hero">
+  <div class="container">
+    <%- include('../partials/breadcrumbs', { crumbs: trail }) %>
+    <p class="eyebrow">Sell or swap</p>
+    <h1>Free valuation within 24 hours — from real PH data, not a guess</h1>
+    <p class="lead">
+      We price it from what cars like yours are actually selling for in Port Harcourt, then either
+      find you a cash buyer or net it off against a verified car you want instead.
+    </p>
+    <div class="hero__chips">
+      <span class="trust-chip"><%- helpers.icon('clock', { size: 16 }) %><strong>24 hours</strong> valuation promise</span>
+      <span class="trust-chip"><%- helpers.icon('checkCircle', { size: 16 }) %><strong>No listing fee</strong> up front</span>
+      <span class="trust-chip"><%- helpers.icon('repeat', { size: 16 }) %><strong>Swap</strong> and we net off the difference</span>
+    </div>
+  </div>
+</section>
+
+<section class="section">
+  <div class="container">
+    <div class="tabs" role="tablist" aria-label="Sell or swap">
+      <button class="tab" type="button" role="tab" id="tab-sell" aria-selected="true" aria-controls="panel-sell"
+              data-feed-tab="sell">Sell my car</button>
+      <button class="tab" type="button" role="tab" id="tab-swap" aria-selected="false" aria-controls="panel-swap"
+              data-feed-tab="swap">Swap / upgrade</button>
+    </div>
+
+    <%# ------------------------------------------------------------ Tab 1: sell %>
+    <div id="panel-sell" role="tabpanel" aria-labelledby="tab-sell" data-feed-panel="sell">
+      <%#
+        FR-29 — the instant estimate (§6.6). It reads the same price-intel table
+        the price badge on a listing reads, and it says what it does not know:
+        no band, an old band, and no mileage curve are all stated rather than
+        smoothed over. The human valuation below is still the promise.
+      %>
+      <section class="valuation" data-valuation aria-labelledby="valuation-h">
+        <div class="valuation__intro">
+          <p class="eyebrow">Instant estimate</p>
+          <h2 id="valuation-h">What is it likely worth?</h2>
+          <p class="valuation__lead">
+            A rough band from the same price data that labels every car on the site, in seconds. It is
+            not an offer and not a promise: the free human valuation below confirms it inside 24 hours,
+            with the comparables written down.
+          </p>
+        </div>
+
+        <form class="valuation__form form-grid" data-valuation-form novalidate>
+          <div class="field">
+            <label class="field__label" for="val-make">Make</label>
+            <input class="input" id="val-make" name="make" type="text" placeholder="Toyota" required autocomplete="off">
+          </div>
+          <div class="field">
+            <label class="field__label" for="val-model">Model</label>
+            <input class="input" id="val-model" name="model" type="text" placeholder="Camry" required autocomplete="off">
+          </div>
+          <div class="field">
+            <label class="field__label" for="val-year">Year</label>
+            <input class="input" id="val-year" name="year" type="number" inputmode="numeric" min="1980" max="2030" placeholder="2015" required>
+          </div>
+          <div class="field">
+            <label class="field__label" for="val-condition">Condition</label>
+            <select class="select" id="val-condition" name="condition">
+              <option value="any">Let us assume</option>
+              <option value="nigerian_used">Nigerian-used</option>
+              <option value="tokunbo">Tokunbo (imported used)</option>
+              <option value="new">New</option>
+            </select>
+          </div>
+          <div class="field">
+            <label class="field__label" for="val-mileage">Mileage (km, optional)</label>
+            <input class="input" id="val-mileage" name="mileage_km" type="number" inputmode="numeric" min="0" step="1000" placeholder="120000">
+          </div>
+          <div class="field field--action full-width">
+            <button class="btn btn--primary" type="submit">Show me the band</button>
+          </div>
+        </form>
+
+        <p class="valuation__status" data-valuation-status role="status" aria-live="polite"></p>
+        <div class="valuation__result" data-valuation-result hidden></div>
+      </section>
+
+      <div class="flow" id="sell-intake" data-flow="sell" data-endpoint="/api/service-requests" data-storage-key="hc-sell-intake">
+        <div class="flow__progress">
+          <div class="flow__bar" aria-hidden="true">
+            <span data-state="current"></span><span></span><span></span>
+          </div>
+          <div class="flow__steps">
+            <span data-state="current">1 · Car basics</span>
+            <span>2 · Condition &amp; documents</span>
+            <span>3 · Contact</span>
+          </div>
+          <p class="flow__saved" data-flow-saved role="status" aria-live="polite"></p>
+        </div>
+
+        <form data-flow-form novalidate>
+          <div class="flow__panel" data-step="1">
+            <h2>What are you selling?</h2>
+            <div class="form-grid">
+              <div class="field">
+                <label class="field__label" for="ss-make">Make</label>
+                <input class="input" id="ss-make" name="make" type="text" placeholder="Toyota" required>
+              </div>
+              <div class="field">
+                <label class="field__label" for="ss-model">Model</label>
+                <input class="input" id="ss-model" name="model" type="text" placeholder="Corolla" required>
+              </div>
+              <div class="field">
+                <label class="field__label" for="ss-year">Year</label>
+                <input class="input" id="ss-year" name="year" type="number" inputmode="numeric" min="1980" max="2030" required>
+              </div>
+              <div class="field">
+                <label class="field__label" for="ss-mileage">Mileage (km)</label>
+                <input class="input" id="ss-mileage" name="mileage_km" type="number" inputmode="numeric" min="0" step="1000" placeholder="120000">
+              </div>
+              <div class="field">
+                <label class="field__label" for="ss-trim">Trim / variant</label>
+                <input class="input" id="ss-trim" name="trim" type="text" placeholder="LE, Sport, TX…">
+              </div>
+              <div class="field">
+                <label class="field__label" for="ss-area">Where is the car?</label>
+                <input class="input" id="ss-area" name="area" type="text" placeholder="Woji, Port Harcourt" required>
+              </div>
+            </div>
+
+            <div class="callout mt-2">
+              <h3>Photos that sell a car honestly</h3>
+              <p>
+                Front three-quarter · both sides · rear · interior front and back · dashboard with the
+                odometer · engine bay · every scratch or dent you know about. Bright daylight, no filters.
+                You can send them on WhatsApp after you submit — the guide stays on this page.
+              </p>
+            </div>
+
+            <div class="flow__nav">
+              <span></span>
+              <button class="btn btn--primary" type="button" data-flow-next>Next: condition</button>
+            </div>
+          </div>
+
+          <div class="flow__panel" data-step="2" hidden>
+            <h2>Condition &amp; documents</h2>
+            <fieldset class="field">
+              <legend class="field__label">Condition</legend>
+              <div class="radio-cards">
+                <label class="radio-card">
+                  <input type="radio" name="condition" value="nigerian_used" checked>
+                  <span><strong>Nigerian-used</strong><span class="radio-card__price">Driven here, registered here.</span></span>
+                </label>
+                <label class="radio-card">
+                  <input type="radio" name="condition" value="tokunbo">
+                  <span><strong>Tokunbo (foreign-used import)</strong><span class="radio-card__price">Recently cleared or clearing now.</span></span>
+                </label>
+              </div>
+            </fieldset>
+
+            <fieldset class="field">
+              <legend class="field__label">Documents you have</legend>
+              <div class="radio-cards">
+                <label class="radio-card"><input type="checkbox" name="documents" value="customs"><span><strong>Customs papers</strong></span></label>
+                <label class="radio-card"><input type="checkbox" name="documents" value="registration"><span><strong>Registration / plate number</strong></span></label>
+                <label class="radio-card"><input type="checkbox" name="documents" value="insurance"><span><strong>Valid insurance</strong></span></label>
+                <label class="radio-card"><input type="checkbox" name="documents" value="service_history"><span><strong>Service history</strong></span></label>
+              </div>
+            </fieldset>
+
+            <div class="field">
+              <label class="field__label" for="ss-condition-notes">Anything a buyer will find anyway</label>
+              <textarea class="textarea" id="ss-condition-notes" name="notes" rows="3"
+                        placeholder="Rear bumper was resprayed in 2024. AC compressor changed last year. Everything else original."></textarea>
+              <p class="field__hint">Honesty here is what gets the certified grade — and a better price.</p>
+            </div>
+
+            <label class="checkbox-row">
+              <input type="checkbox" name="want_inspection" value="yes">
+              <span>Book the paid inspection (₦25,000) so the car can be listed as HonestCars-Certified — higher price positioning.</span>
+            </label>
+
+            <div class="flow__nav">
+              <button class="btn btn--secondary" type="button" data-flow-back>Back</button>
+              <button class="btn btn--primary" type="button" data-flow-next>Next: contact</button>
+            </div>
+          </div>
+
+          <div class="flow__panel" data-step="3" hidden>
+            <h2>Where do we send the valuation?</h2>
+            <div class="form-grid">
+              <div class="field">
+                <label class="field__label" for="ss-name">Your name</label>
+                <input class="input" id="ss-name" name="name" type="text" autocomplete="name" required>
+              </div>
+              <div class="field">
+                <label class="field__label" for="ss-phone">WhatsApp number</label>
+                <input class="input" id="ss-phone" name="phone" type="tel" inputmode="numeric" autocomplete="tel"
+                       placeholder="080 0000 0000" required>
+              </div>
+            </div>
+            <label class="checkbox-row">
+              <input type="checkbox" name="consent" required>
+              <span>HonestCars can contact me on WhatsApp about this valuation. No marketing spam.</span>
+            </label>
+            <div class="flow__nav">
+              <button class="btn btn--secondary" type="button" data-flow-back>Back</button>
+              <button class="btn btn--primary btn--lg" type="submit" data-submit>Send me the valuation</button>
+            </div>
+            <p class="field__error hidden" data-form-error role="alert"></p>
+          </div>
+        </form>
+
+        <div class="card card__body service-form__success hidden" data-flow-success role="status" aria-live="polite"></div>
+      </div>
+    </div>
+
+    <%# ------------------------------------------------------------ Tab 2: swap %>
+    <div id="panel-swap" role="tabpanel" aria-labelledby="tab-swap" data-feed-panel="swap" hidden>
+      <div class="grid grid--2" style="align-items:start">
+        <form class="card card__body service-form" data-service-form data-kind="swap" data-service-slug="sell-swap"
+              data-endpoint="/api/service-requests" method="post" action="/api/service-requests" novalidate>
+          <h2 class="mb-1">Swap: your car + what you want instead</h2>
+          <p class="form-hint">
+            One brief. We value yours, then reuse the concierge search to bring verified options and net
+            off the difference, so you see one number to settle.
+          </p>
+
+          <div class="form-grid">
+            <div class="field">
+              <label class="field__label" for="sw-make">Your car — make</label>
+              <input class="input" id="sw-make" name="make" type="text" placeholder="Honda" required>
+            </div>
+            <div class="field">
+              <label class="field__label" for="sw-model">Model</label>
+              <input class="input" id="sw-model" name="model" type="text" placeholder="Accord" required>
+            </div>
+            <div class="field">
+              <label class="field__label" for="sw-year">Year</label>
+              <input class="input" id="sw-year" name="year" type="number" inputmode="numeric" min="1980" max="2030">
+            </div>
+            <div class="field">
+              <label class="field__label" for="sw-mileage">Mileage (km)</label>
+              <input class="input" id="sw-mileage" name="mileage_km" type="number" inputmode="numeric" min="0" step="1000">
+            </div>
+          </div>
+
+          <fieldset class="field">
+            <legend class="field__label">What are you swapping into?</legend>
+            <div class="chip-set chip-set--selectable" data-chip-group="wanted_body" role="group" aria-label="Wanted body type">
+              <button class="chip" type="button" data-chip="suv" aria-pressed="false">SUV</button>
+              <button class="chip" type="button" data-chip="sedan" aria-pressed="false">Sedan</button>
+              <button class="chip" type="button" data-chip="pickup" aria-pressed="false">Pickup</button>
+              <button class="chip" type="button" data-chip="hatchback" aria-pressed="false">Hatchback</button>
+            </div>
+          </fieldset>
+
+          <div class="form-grid">
+            <div class="field">
+              <label class="field__label" for="sw-max">Budget on top (₦)</label>
+              <input class="input" id="sw-max" name="budget_max" type="number" inputmode="numeric" step="100000" placeholder="5000000">
+            </div>
+            <div class="field">
+              <label class="field__label" for="sw-timeline">Timeline</label>
+              <select class="select" id="sw-timeline" name="timeline">
+                <option value="asap">ASAP</option>
+                <option value="two_weeks" selected>Within 2 weeks</option>
+                <option value="month">This month</option>
+                <option value="researching">Just researching</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="field">
+            <label class="field__label" for="sw-notes">Anything else</label>
+            <textarea class="textarea" id="sw-notes" name="notes" rows="2"
+                      placeholder="Must be automatic, family size, and I would like to settle the difference in one payment."></textarea>
+          </div>
+
+          <div class="form-grid">
+            <div class="field">
+              <label class="field__label" for="sw-name">Your name</label>
+              <input class="input" id="sw-name" name="name" type="text" autocomplete="name" required>
+            </div>
+            <div class="field">
+              <label class="field__label" for="sw-phone">WhatsApp number</label>
+              <input class="input" id="sw-phone" name="phone" type="tel" inputmode="numeric" autocomplete="tel" required>
+            </div>
+          </div>
+
+          <label class="checkbox-row">
+            <input type="checkbox" name="consent" required>
+            <span>HonestCars can contact me on WhatsApp about this swap. No marketing spam.</span>
+          </label>
+
+          <button class="btn btn--primary btn--lg btn--block" type="submit" data-submit>Start the swap</button>
+          <p class="field__error hidden" data-form-error role="alert"></p>
+        </form>
+
+        <aside class="stack">
+          <div class="note-block">
+            <h2>How a swap settles</h2>
+            <ol class="steps steps--compact">
+              <li class="step"><span class="step__num">1</span><div><strong>We value yours</strong><p class="mb-0">Inside 24 hours, from live network data — with the comparables written down.</p></div></li>
+              <li class="step"><span class="step__num">2</span><div><strong>We bring your options</strong><p class="mb-0">Up to three inspected cars that fit the brief you gave.</p></div></li>
+              <li class="step"><span class="step__num">3</span><div><strong>One number to settle</strong><p class="mb-0">Your valuation is netted off the price, through protected channels.</p></div></li>
+            </ol>
+          </div>
+          <div class="note-block">
+            <h2>Not sure of the value?</h2>
+            <p class="mb-2">Send photos on WhatsApp and ask for the rough band — the free human valuation confirms it.</p>
+            <a class="btn btn--secondary btn--block" href="<%= site.nav.whatsapp.general %>" target="_blank" rel="noopener"
+               data-event="whatsapp_click" data-source="sell_swap">Ask for a rough number</a>
+          </div>
+        </aside>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="section section--surface" aria-labelledby="ss-proof">
+  <div class="container">
+    <div class="section-head">
+      <h2 id="ss-proof">What sellers say</h2>
+    </div>
+    <div class="grid grid--2">
+      <% testimonials.forEach(function (testimonial) { %>
+        <figure class="testimonial">
+          <span class="testimonial__stars" aria-label="<%= testimonial.rating %> out of 5">★★★★★</span>
+          <blockquote class="testimonial__quote">“<%= testimonial.quote %>”</blockquote>
+          <figcaption class="testimonial__meta"><%= testimonial.name %> · <%= testimonial.area %></figcaption>
+        </figure>
+      <% }); %>
+    </div>
+  </div>
+</section>
+
+<% if (faqs.length) { %>
+<section class="section" aria-labelledby="ss-faq">
+  <div class="container container--narrow">
+    <div class="section-head">
+      <h2 id="ss-faq">Selling and swapping — questions</h2>
+    </div>
+    <%- include('../partials/accordion', { faqs: faqs, idPrefix: 'ss-faq' }) %>
+  </div>
+</section>
+<% } %>

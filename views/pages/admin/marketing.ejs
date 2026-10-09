@@ -1,0 +1,271 @@
+<%#
+  /admin/marketing — §15.2 dashes: channel → lead → paid, and CAC guardrails.
+
+  One row per channel. Traffic comes from the events the browser sent, enquiries
+  from leads.utm, money from payments credited by first touch, cost from the
+  invoices a person entered. Four sources, four different keys — which is why the
+  rows are merged here rather than in one clever SQL statement, and why the rules
+  are printed under the table instead of implied.
+
+  Locals: summary, rows, totals, guardrailKobo, from, to, today, naira, canEnterSpend
+%>
+<%
+  var pct = function (part, whole) {
+    if (!whole || !part) return '—';
+    return ((part / whole) * 100).toFixed(1) + '%';
+  };
+  var cacState = function (row) {
+    if (!row.spendKobo) return 'none';                 // no invoice: cost unknown
+    if (!row.acquisitions) return 'idle';              // money out, nothing back yet
+    return row.cac > guardrailKobo ? 'over' : 'within';
+  };
+  var stateLabel = { none: 'no spend recorded', idle: 'no paid conversions yet', over: 'above guardrail', within: 'within guardrail' };
+%>
+
+<div class="kpi-grid">
+  <div class="kpi">
+    <span class="kpi__label">Sessions</span>
+    <strong class="kpi__value tabular"><%= totals.sessions.toLocaleString('en-NG') %></strong>
+    <span class="kpi__foot">first-touch, deduplicated by visit</span>
+  </div>
+  <div class="kpi">
+    <span class="kpi__label">Leads</span>
+    <strong class="kpi__value tabular"><%= totals.leads %></strong>
+    <span class="kpi__foot">enquiries carrying a channel</span>
+  </div>
+  <div class="kpi">
+    <span class="kpi__label">Paid</span>
+    <strong class="kpi__value tabular"><%= naira(totals.paidKobo) %></strong>
+    <span class="kpi__foot"><%= totals.acquisitions %> paid transaction<%= totals.acquisitions === 1 ? '' : 's' %></span>
+  </div>
+  <div class="kpi">
+    <span class="kpi__label">Ad spend</span>
+    <strong class="kpi__value tabular"><%= naira(totals.spendKobo) %></strong>
+    <span class="kpi__foot">
+      <% if (!summary.spendPeriods.length) { %>
+        nothing recorded for this window
+      <% } else { %>
+        invoice<%= summary.spendPeriods.length === 1 ? '' : 's' %>
+        <span class="tabular"><%= summary.spendPeriods[0].period_start.toISOString().slice(0, 10) %></span>
+        → <span class="tabular"><%= summary.spendPeriods[summary.spendPeriods.length - 1].period_end.toISOString().slice(0, 10) %></span>
+      <% } %>
+    </span>
+  </div>
+  <div class="kpi">
+    <span class="kpi__label">Cost per acquisition</span>
+    <strong class="kpi__value tabular"><%= totals.cac ? naira(totals.cac) : '—' %></strong>
+    <span class="kpi__foot">guardrail <%= naira(guardrailKobo) %></span>
+  </div>
+  <div class="kpi">
+    <span class="kpi__label">Return on ad spend</span>
+    <strong class="kpi__value tabular"><%= totals.roas ? totals.roas.toFixed(2) + '×' : '—' %></strong>
+    <span class="kpi__foot">₦ in for every ₦1 out</span>
+  </div>
+</div>
+
+<div class="admin-grid admin-grid--2">
+  <section class="panel" aria-labelledby="funnel-h">
+    <h2 class="panel__title" id="funnel-h">The funnel this window</h2>
+    <ul class="mini-list">
+      <li>
+        <span class="muted">Sessions</span>
+        <strong class="tabular"><%= totals.sessions.toLocaleString('en-NG') %></strong>
+      </li>
+      <li>
+        <span class="muted">Opened a listing</span>
+        <strong class="tabular"><%= rows.reduce(function (n, r) { return n + r.listingViews; }, 0).toLocaleString('en-NG') %></strong>
+        <span class="muted tabular"><%= pct(rows.reduce(function (n, r) { return n + r.listingViews; }, 0), totals.sessions) %> of sessions</span>
+      </li>
+      <li>
+        <span class="muted">Enquired (lead)</span>
+        <strong class="tabular"><%= totals.leads %></strong>
+        <span class="muted tabular"><%= pct(totals.leads, rows.reduce(function (n, r) { return n + r.listingViews; }, 0)) %> of viewers</span>
+      </li>
+      <li>
+        <span class="muted">Reached a funnel end</span>
+        <strong class="tabular"><%= rows.reduce(function (n, r) { return n + r.funnelCompletions; }, 0).toLocaleString('en-NG') %></strong>
+        <span class="muted">retainer, order or booking event</span>
+      </li>
+      <li>
+        <span class="muted">Paid</span>
+        <strong class="tabular"><%= totals.acquisitions %></strong>
+        <span class="muted tabular"><%= pct(totals.acquisitions, totals.leads) %> of leads</span>
+      </li>
+    </ul>
+    <% if (summary.pending.payments) { %>
+      <p class="cms-hint mt-2">
+        <%= naira(summary.pending.kobo) %> across <%= summary.pending.payments %> payment<%= summary.pending.payments === 1 ? '' : 's' %>
+        is pending in this window and is <strong>not</strong> counted above — money is counted when it lands,
+        so pending lines sit on <a href="/admin/payments">Money</a>.
+      </p>
+    <% } %>
+  </section>
+
+  <section class="panel" aria-labelledby="guard-h">
+    <h2 class="panel__title" id="guard-h">CAC guardrail</h2>
+    <p class="cms-hint">
+      Cost per acquisition is ad spend ÷ paid transactions. The guardrail is
+      <strong class="tabular"><%= naira(guardrailKobo) %></strong>; a channel above it is marked, not hidden.
+      Set it with <code>MARKETING_CAC_GUARDRAIL_KOBO</code>.
+    </p>
+    <% var flagged = rows.filter(function (r) { return cacState(r) === 'over' || cacState(r) === 'idle'; }); %>
+    <% if (!flagged.length) { %>
+      <p class="empty-line">Every channel with spend is either inside the guardrail or has no invoice yet. Nothing to chase.</p>
+    <% } else { %>
+      <ul class="mini-list">
+        <% flagged.forEach(function (r) { %>
+          <li>
+            <strong><%= r.channel %></strong>
+            <span class="muted">
+              <% if (cacState(r) === 'over') { %>
+                <span class="tabular"><%= naira(r.cac) %></span> per paid transaction against
+                <span class="tabular"><%= naira(guardrailKobo) %></span> — <%= naira(r.paidKobo) %> back on <%= naira(r.spendKobo) %> spent.
+              <% } else { %>
+                <span class="tabular"><%= naira(r.spendKobo) %></span> spent, no paid transaction yet.
+                <%= r.leads %> lead<%= r.leads === 1 ? '' : 's' %> so far.
+              <% } %>
+            </span>
+          </li>
+        <% }); %>
+      </ul>
+      <p class="cms-hint mt-2">A channel with spend and no conversions is the one to look at first — it is the most expensive way to learn nothing.</p>
+    <% } %>
+  </section>
+</div>
+
+<section class="panel mt-2" aria-labelledby="channels-h">
+  <div class="panel__head">
+    <div>
+      <h2 class="panel__title" id="channels-h">Channel → lead → paid</h2>
+      <p class="cms-hint">Every channel a session, a lead or a naira arrived on, plus the ones where nothing happened.</p>
+    </div>
+    <form class="admin-filters" method="get" action="/admin/marketing">
+      <label class="visually-hidden" for="marketing-from">From</label>
+      <input class="input input--compact" type="date" id="marketing-from" name="from" value="<%= from %>" max="<%= today %>">
+      <span class="muted" aria-hidden="true">to</span>
+      <label class="visually-hidden" for="marketing-to">To</label>
+      <input class="input input--compact" type="date" id="marketing-to" name="to" value="<%= to %>" max="<%= today %>">
+      <button class="btn btn--secondary btn--sm" type="submit">Apply window</button>
+    </form>
+  </div>
+
+  <p class="cms-hint">
+    <span class="tabular"><%= from %></span> to <span class="tabular"><%= to %></span> ·
+    <%= rows.length %> channel<%= rows.length === 1 ? '' : 's' %>
+  </p>
+
+  <% if (!rows.length) { %>
+    <p class="empty-line">No traffic, leads or spend in this window. Widen the dates — or check that the site has been visited since the last reset.</p>
+  <% } else { %>
+    <div class="table-wrap mt-2">
+      <table class="table table--stack">
+        <thead>
+          <tr>
+            <th scope="col">Channel</th>
+            <th scope="col" class="tabular">Sessions</th>
+            <th scope="col" class="tabular">Listing views</th>
+            <th scope="col" class="tabular">WhatsApp</th>
+            <th scope="col" class="tabular">Funnel starts</th>
+            <th scope="col" class="tabular">Funnel ends</th>
+            <th scope="col" class="tabular">Leads</th>
+            <th scope="col" class="tabular">Paid</th>
+            <th scope="col" class="tabular">Spend</th>
+            <th scope="col" class="tabular">CAC</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% rows.forEach(function (row) { %>
+            <tr>
+              <th scope="row" data-label="Channel"><%= row.channel %></th>
+              <td data-label="Sessions" class="tabular"><%= row.sessions.toLocaleString('en-NG') %></td>
+              <td data-label="Listing views" class="tabular"><%= row.listingViews.toLocaleString('en-NG') %></td>
+              <td data-label="WhatsApp" class="tabular"><%= row.whatsappClicks %></td>
+              <td data-label="Funnel starts" class="tabular"><%= row.funnelStarts %></td>
+              <td data-label="Funnel ends" class="tabular"><%= row.funnelCompletions %></td>
+              <td data-label="Leads" class="tabular">
+                <%= row.leads %><%
+                  /* Won/lost only where it means something: the lead statuses ops actually set. */
+                  if (row.won || row.lost) { %> <span class="muted">(<%= row.won %> won, <%= row.lost %> lost)</span><% }
+                %>
+              </td>
+              <td data-label="Paid" class="tabular">
+                <% if (row.paidKobo) { %><%= naira(row.paidKobo) %> <span class="muted">×<%= row.payments %></span><% } else { %><span class="muted">—</span><% } %>
+              </td>
+              <td data-label="Spend" class="tabular"><%= row.spendKobo ? naira(row.spendKobo) : '—' %></td>
+              <td data-label="CAC" class="tabular">
+                <% if (row.cac) { %>
+                  <span class="badge badge--<%= cacState(row) === 'over' ? 'attention' : 'ok' %>"><%= naira(row.cac) %></span>
+                <% } else { %>
+                  <span class="muted" title="<%= stateLabel[cacState(row)] %>">—</span>
+                <% } %>
+              </td>
+            </tr>
+          <% }); %>
+        </tbody>
+        <tfoot>
+          <tr>
+            <th scope="row" data-label="Total">All channels</th>
+            <td data-label="Sessions" class="tabular"><%= totals.sessions.toLocaleString('en-NG') %></td>
+            <td data-label="Listing views" class="tabular"><%= rows.reduce(function (n, r) { return n + r.listingViews; }, 0).toLocaleString('en-NG') %></td>
+            <td data-label="WhatsApp" class="tabular"><%= rows.reduce(function (n, r) { return n + r.whatsappClicks; }, 0) %></td>
+            <td data-label="Funnel starts" class="tabular"><%= rows.reduce(function (n, r) { return n + r.funnelStarts; }, 0) %></td>
+            <td data-label="Funnel ends" class="tabular"><%= rows.reduce(function (n, r) { return n + r.funnelCompletions; }, 0) %></td>
+            <td data-label="Leads" class="tabular"><%= totals.leads %></td>
+            <td data-label="Paid" class="tabular"><%= naira(totals.paidKobo) %></td>
+            <td data-label="Spend" class="tabular"><%= totals.spendKobo ? naira(totals.spendKobo) : '—' %></td>
+            <td data-label="CAC" class="tabular"><%= totals.cac ? naira(totals.cac) : '—' %></td>
+          </tr>
+        </tfoot>
+      </table>
+    </div>
+  <% } %>
+
+  <p class="cms-hint mt-2">
+    <strong>How these numbers are made.</strong>
+    Sessions and page activity come from the events the browser sends (§15.1), counted once per visit.
+    Enquiries come from the lead's stored campaign. Money is credited to the channel of the
+    <em>first</em> enquiry from that phone number — a customer who found you on Instagram and paid a
+    week later is an Instagram customer. A payment with no enquiry behind it reads
+    <strong>(unattributed)</strong> rather than being folded into direct traffic. Spend is what someone
+    entered for a period that sits inside this window; a period that only partly overlaps is left out
+    rather than guessed at.
+  </p>
+</section>
+
+<% if (canEnterSpend) { %>
+  <section class="panel mt-2" aria-labelledby="spend-h">
+    <h2 class="panel__title" id="spend-h">Record what a channel cost</h2>
+    <p class="cms-hint">
+      Meta and Google tell you what you spent after the fact; this is where that invoice goes.
+      Saving the same channel and period again corrects it rather than adding to it.
+    </p>
+    <form class="admin-filters admin-inline-form" method="post" action="/admin/marketing/spend">
+      <label class="field">
+        <span class="field__label">Channel</span>
+        <input class="input input--compact" type="text" name="channel" list="marketing-channels" placeholder="instagram" required maxlength="80">
+      </label>
+      <datalist id="marketing-channels">
+        <% rows.forEach(function (row) { %>
+          <% if (row.channel.charAt(0) !== '(') { %><option value="<%= row.channel %>"></option><% } %>
+        <% }); %>
+      </datalist>
+      <label class="field">
+        <span class="field__label">Period start</span>
+        <input class="input input--compact" type="date" name="period_start" value="<%= from %>" max="<%= today %>" required>
+      </label>
+      <label class="field">
+        <span class="field__label">Period end</span>
+        <input class="input input--compact" type="date" name="period_end" value="<%= to %>" max="<%= today %>" required>
+      </label>
+      <label class="field">
+        <span class="field__label">Amount</span>
+        <input class="input input--compact" type="text" name="amount" inputmode="decimal" placeholder="₦74,000" required>
+      </label>
+      <label class="field">
+        <span class="field__label">Note</span>
+        <input class="input input--compact" type="text" name="note" maxlength="200" placeholder="Search — inspection terms">
+      </label>
+      <button class="btn btn--secondary btn--sm" type="submit">Record spend</button>
+    </form>
+  </section>
+<% } %>

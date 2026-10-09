@@ -1,0 +1,17 @@
+<%# Visible breadcrumbs; matching BreadcrumbList JSON-LD is emitted by the route.
+    Locals: crumbs = [{label, href?}] %>
+<nav class="breadcrumbs" aria-label="Breadcrumb">
+  <ol>
+    <li><a href="/">Home</a></li>
+    <% crumbs.forEach(function (crumb, index) { %>
+      <li aria-hidden="true" class="sep">/</li>
+      <li>
+        <% if (crumb.href && index < crumbs.length - 1) { %>
+          <a href="<%= crumb.href %>"><%= crumb.label %></a>
+        <% } else { %>
+          <span aria-current="page"><%= crumb.label %></span>
+        <% } %>
+      </li>
+    <% }); %>
+  </ol>
+</nav>

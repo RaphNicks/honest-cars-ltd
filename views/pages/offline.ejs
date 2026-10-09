@@ -1,0 +1,53 @@
+<%#
+  /offline — FR-30's fallback page, precached by the service worker at install.
+
+  It is deliberately plain: the visitor may be on a 3G bar with no data left,
+  and everything else they need is already in their cache. The rule for the
+  copy is the project's usual one — say what is true rather than what sounds
+  reassuring. "You are offline" is true; "please check your connection" blames
+  the visitor for our inability to fetch.
+%>
+<section class="section offline">
+  <div class="container offline__inner">
+    <p class="eyebrow">Offline</p>
+    <h1>You are offline, and this page is on your device</h1>
+    <p class="lead">
+      HonestCars keeps working without a connection for the pages you have already opened here —
+      the listings you looked at, anything you saved, and the apps shell around them.
+    </p>
+
+    <div class="offline__grid">
+      <div class="offline__card">
+        <h2>Already saved on this device</h2>
+        <ul>
+          <li>Pages you have opened, including car pages you read</li>
+          <li>Anything you saved to your shortlist</li>
+          <li>Enquiries you typed: they wait on the device and send themselves the moment you are back online</li>
+        </ul>
+      </div>
+      <div class="offline__card">
+        <h2>Needs a connection</h2>
+        <ul>
+          <li>Pages you have never opened on this device</li>
+          <li>Fresh prices, new stock and inspection reports</li>
+          <li>Sending an enquiry, paying, or signing in</li>
+        </ul>
+      </div>
+    </div>
+
+    <p class="offline__note">
+      Nothing you typed has been lost. An enquiry that could not be sent is held on this device and
+      sent as soon as the phone is back on a network.
+    </p>
+
+    <div class="offline__actions">
+      <button class="btn btn--primary" type="button" data-offline-retry>Try again</button>
+      <a class="btn btn--ghost" href="/cars">Back to cars</a>
+    </div>
+
+    <p class="offline__small">
+      If the button does nothing, the phone is still off the network — the pages that are already
+      saved here keep working either way.
+    </p>
+  </div>
+</section>

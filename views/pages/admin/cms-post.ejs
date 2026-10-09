@@ -1,0 +1,335 @@
+<%#
+  /admin/cms/posts/:id — the post editor (§6.9 + §7.3).
+  Left: the copy and its meta. Right: the house rules as they stand, the
+  workflow buttons, and the revision history with restore.
+  Locals: post (null when new), check, found, revisions, categories,
+          markupReference, workflow, statusLabels, limits
+%>
+<%
+  var isNew = !post;
+  var action = isNew ? '/admin/cms/posts' : '/admin/cms/posts/' + post.id;
+  var previewBlocks = preview || [];
+  var canPublish = check ? check.ok : false;
+  var nextStates = isNew ? [] : workflow.filter(function (state) { return state !== post.status; });
+%>
+
+<div class="admin-head">
+  <h1><%= isNew ? 'New post' : post.title %></h1>
+  <p class="admin-head__lead">
+    <% if (isNew) { %>
+      The body field is block markup — the reference is below the editor. Saved as a draft; nobody sees it until you publish.
+    <% } else { %>
+      <span class="badge badge--<%= post.status === 'published' ? 'active' : 'pending' %>"><%= post.statusLabel %></span>
+      <span class="muted">
+        <%= post.words %> words · <%= post.links %> listing/service link<%= post.links === 1 ? '' : 's' %> ·
+        <%= revisions.length %> revision<%= revisions.length === 1 ? '' : 's' %>
+        <% if (post.publishedByName) { %> · published by <%= post.publishedByName %><% } %>
+      </span>
+      <% if (post.url && post.status === 'published') { %>
+        · <a href="<%= post.url %>" target="_blank" rel="noopener">View live →</a>
+      <% } %>
+    <% } %>
+  </p>
+</div>
+
+<div class="cms-layout">
+  <div>
+    <form method="post" action="<%= action %>" class="panel">
+      <h2 class="panel__title">Copy</h2>
+
+      <div class="field">
+        <label class="field__label" for="f-title">Title</label>
+        <input class="input" id="f-title" name="title" type="text" required maxlength="240"
+               value="<%= post ? post.title : '' %>">
+      </div>
+
+      <div class="admin-grid admin-grid--2">
+        <div class="field">
+          <label class="field__label" for="f-slug">Slug</label>
+          <input class="input" id="f-slug" name="slug" type="text" maxlength="120"
+                 value="<%= post ? post.slug : '' %>"
+                 placeholder="filled from the title if you leave it blank">
+          <span class="cms-hint">Public URL: /blog/&lt;slug&gt;. Changing it changes the URL — old ones are not redirected automatically.</span>
+        </div>
+        <div class="field">
+          <label class="field__label" for="f-category">Category</label>
+          <select class="select" id="f-category" name="category">
+            <% categories.forEach(function ([value, label]) { %>
+              <option value="<%= value %>" <%= post && post.category === value ? 'selected' : '' %>><%= label %></option>
+            <% }); %>
+          </select>
+          <span class="cms-hint">Fixed by §6.9 — categories are not free text.</span>
+        </div>
+      </div>
+
+      <div class="field">
+        <label class="field__label" for="f-excerpt">Excerpt</label>
+        <textarea class="input" id="f-excerpt" name="excerpt" rows="2" maxlength="400"><%= post ? post.excerpt : '' %></textarea>
+      </div>
+
+      <div class="field">
+        <label class="field__label" for="f-body">Body — block markup</label>
+        <textarea class="input cms-body" id="f-body" name="body_markup" rows="26"><%= post ? post.markup : '' %></textarea>
+
+      </div>
+
+      <details class="panel" open>
+        <summary>Markup reference</summary>
+        <table class="table">
+          <thead><tr><th scope="col">Write</th><th scope="col">You get</th></tr></thead>
+          <tbody>
+            <% markupReference.forEach(function ([syntax, meaning]) { %>
+              <tr><td><code><%= syntax %></code></td><td class="muted"><%= meaning %></td></tr>
+            <% }); %>
+          </tbody>
+        </table>
+      </details>
+
+      <h2 class="panel__title mt-3">Search &amp; cards (§14.3)</h2>
+      <div class="admin-grid admin-grid--2">
+        <div class="field">
+          <label class="field__label" for="f-meta-title">Meta title</label>
+          <input class="input" id="f-meta-title" name="meta_title" type="text" maxlength="200"
+                 value="<%= post ? post.metaTitle : '' %>">
+          <span class="cms-hint">≤ <%= titleLimit %> characters. Blank falls back to the title.</span>
+        </div>
+        <div class="field">
+          <label class="field__label" for="f-meta-desc">Meta description</label>
+          <input class="input" id="f-meta-desc" name="meta_description" type="text" maxlength="320"
+                 value="<%= post ? post.metaDescription : '' %>">
+          <span class="cms-hint">≤ <%= descriptionLimit %> characters. Blank falls back to the excerpt.</span>
+        </div>
+      </div>
+
+      <div class="admin-grid admin-grid--2 mt-2">
+        <div class="field">
+          <label class="field__label" for="f-hero">Hero image path</label>
+          <input class="input" id="f-hero" name="hero_image" type="text" maxlength="400"
+                 value="<%= post ? post.heroImage : '/img/seed/hero-lot.svg' %>">
+        </div>
+        <div class="field">
+          <label class="field__label" for="f-hero-alt">Hero alt text</label>
+          <input class="input" id="f-hero-alt" name="hero_alt" type="text" maxlength="300"
+                 value="<%= post ? (post.heroAlt || '') : '' %>">
+        </div>
+      </div>
+
+      <div class="admin-grid admin-grid--3 mt-2">
+        <div class="field">
+          <label class="field__label" for="f-author-entity">Author page</label>
+          <%# FR-35 — linking the byline to a person is what makes /blog/author/{slug} %>
+          <select class="select" id="f-author-entity" name="author_id">
+            <option value="">No author page</option>
+            <% authors.forEach(function (person) { %>
+              <option value="<%= person.id %>" <%= post && post.authorId === person.id ? 'selected' : '' %>><%= person.name %> — <%= person.role %></option>
+            <% }); %>
+          </select>
+          <span class="cms-hint">Pick a person and the byline links to their page. Manage bios from the seed for now.</span>
+        </div>
+        <div class="field">
+          <label class="field__label" for="f-author">Byline name</label>
+          <input class="input" id="f-author" name="author_name" type="text" maxlength="120"
+                 value="<%= post ? post.authorName : 'Honest Cars editorial' %>">
+        </div>
+        <div class="field">
+          <label class="field__label" for="f-role">Author role</label>
+          <input class="input" id="f-role" name="author_role" type="text" maxlength="120"
+                 value="<%= post ? post.authorRole : 'Editorial' %>">
+        </div>
+        <div class="field">
+          <label class="field__label" for="f-read">Read time (min)</label>
+          <input class="input" id="f-read" name="read_minutes" type="number" min="1" max="60"
+                 value="<%= post ? post.readMinutes : 6 %>">
+        </div>
+      </div>
+
+      <fieldset class="field">
+        <legend class="field__label">Tags (governed list)</legend>
+        <%# FR-35 — the fixed taxonomy. A tag with no posts still shows so the next
+            writer knows it exists and does not invent a synonym for it. %>
+        <div class="cms-checks">
+          <% allTags.forEach(function (tag) { %>
+            <label class="cms-check">
+              <input type="checkbox" name="tags" value="<%= tag.slug %>"
+                     <%= post && post.tagSlugs && post.tagSlugs.indexOf(tag.slug) !== -1 ? 'checked' : '' %>>
+              <%= tag.label %>
+              <span class="cms-hint"><%= tag.kind %><%= tag.count ? ' · ' + tag.count + ' post' + (tag.count === 1 ? '' : 's') : ' · unused' %></span>
+            </label>
+          <% }); %>
+        </div>
+      </fieldset>
+
+      <div class="field">
+        <label class="field__label" for="f-bio">Author bio (E-E-A-T card)</label>
+        <input class="input" id="f-bio" name="author_bio" type="text" maxlength="300"
+               value="<%= post ? post.authorBio : '' %>">
+      </div>
+
+      <div class="admin-grid admin-grid--2 mt-2">
+        <div class="field">
+          <label class="field__label" for="f-tags">Make tags</label>
+          <input class="input" id="f-tags" name="make_tags" type="text"
+                 value="<%= post ? post.makeTags.join(', ') : '' %>">
+          <span class="cms-hint">Comma separated. These drive the live listings under the article.</span>
+        </div>
+        <div class="field">
+          <label class="field__label" for="f-cta">Service CTA</label>
+          <select class="select" id="f-cta" name="service_cta">
+            <option value="">None</option>
+            <% ['inspection','concierge','documents','research','consultation','sell-swap','tracking','parts'].forEach(function (slug) { %>
+              <option value="<%= slug %>" <%= post && post.serviceCta === slug ? 'selected' : '' %>><%= slug %></option>
+            <% }); %>
+          </select>
+        </div>
+      </div>
+
+      <div class="field">
+        <label class="cms-check"><input type="checkbox" name="is_featured" value="1" <%= post && post.isFeatured ? 'checked' : '' %>> Feature this post on the blog index</label>
+      </div>
+
+      <div class="field">
+        <label class="field__label" for="f-note">Revision note (optional)</label>
+        <input class="input" id="f-note" name="note" type="text" maxlength="240"
+               placeholder="what changed in this save — it goes in the history">
+      </div>
+
+      <div class="cms-strip mt-2">
+        <button class="btn btn--primary" type="submit">Save draft</button>
+        <a class="btn btn--ghost" href="/admin/cms">Back to hub</a>
+      </div>
+    </form>
+
+    <% if (!isNew && previewBlocks.length) { %>
+      <section class="panel mt-3">
+        <h2 class="panel__title">Preview</h2>
+        <p class="cms-hint">Rendered from the block list that was saved — the same renderer the live page uses.</p>
+        <div class="cms-preview">
+          <%- include('../../partials/content-blocks', { blocks: previewBlocks, mentioned: [], embeds: embedPreview, helpers: helpers }) %>
+        </div>
+      </section>
+    <% } %>
+  </div>
+
+  <aside>
+    <section class="panel">
+      <h2 class="panel__title">House rules (§6.9)</h2>
+      <% if (isNew) { %>
+        <p class="empty-line">Save the draft first — the rules are checked against the saved copy.</p>
+      <% } else { %>
+        <ul class="cms-rules">
+          <li class="cms-check <%= check.ok ? 'cms-check--ok' : 'cms-check--bad' %>">
+            <span><%= check.ok ? '✓' : '✗' %></span>
+            <span>
+              <strong>Publishable</strong><br>
+              <% if (check.ok) { %>
+                Meta and links are within the §14.3 limits.
+              <% } else { %>
+                <span class="cms-flag"><%= check.issues.join(' ') %></span>
+              <% } %>
+            </span>
+          </li>
+          <li>
+            <strong>Meta title</strong> <span class="tabular"><%= check.titleLength %>/<%= titleLimit %></span>
+          </li>
+          <li>
+            <strong>Meta description</strong> <span class="tabular"><%= check.descriptionLength %>/<%= descriptionLimit %></span>
+          </li>
+          <li>
+            <strong>Listing / service links</strong> <span class="tabular"><%= check.links %>/<%= minLinks %></span>
+            <% if (found.length) { %>
+              <ul class="cms-list">
+                <% found.forEach(function (link) { %>
+                  <li><a href="<%= link.href %>" target="_blank" rel="noopener"><%= link.label %></a></li>
+                <% }); %>
+              </ul>
+            <% } %>
+          </li>
+          <li><strong>Category</strong> <span class="muted"><%= post.category.replace(/_/g, ' ') %></span> <span class="cms-hint">fixed list</span></li>
+          <li><strong>Words</strong> <span class="tabular"><%= post.words %></span></li>
+        </ul>
+      <% } %>
+    </section>
+
+    <% if (!isNew) { %>
+      <section class="panel mt-3">
+        <h2 class="panel__title">Workflow</h2>
+        <p class="muted">
+          Current state: <strong><%= post.statusLabel %></strong>
+          <% if (post.reviewNote) { %><br><span class="cms-flag">Reviewer note: <%= post.reviewNote %></span><% } %>
+        </p>
+
+        <% if (post.status === 'draft') { %>
+          <form method="post" action="/admin/cms/posts/<%= post.id %>/status" class="admin-inline-form">
+            <input type="hidden" name="status" value="in_review">
+            <label class="field__label" for="w-review-note">Note for the reviewer</label>
+            <input class="input" id="w-review-note" name="note" type="text" maxlength="300">
+            <button class="btn btn--primary btn--sm" type="submit">Send for review</button>
+          </form>
+        <% } %>
+
+        <% if (post.status === 'in_review') { %>
+          <form method="post" action="/admin/cms/posts/<%= post.id %>/status" class="admin-inline-form">
+            <input type="hidden" name="status" value="published">
+            <button class="btn btn--primary btn--sm" type="submit" <%= canPublish ? '' : 'disabled' %>>Publish now</button>
+            <% if (!canPublish) { %><p class="cms-hint">Fix the house rules above first.</p><% } %>
+          </form>
+          <form method="post" action="/admin/cms/posts/<%= post.id %>/status" class="admin-inline-form">
+            <input type="hidden" name="status" value="draft">
+            <input class="input" name="note" type="text" maxlength="300" placeholder="what needs changing">
+            <button class="btn btn--secondary btn--sm" type="submit">Back to draft</button>
+          </form>
+        <% } %>
+
+        <% if (post.status === 'scheduled' || post.status === 'published') { %>
+          <form method="post" action="/admin/cms/posts/<%= post.id %>/status" class="admin-inline-form">
+            <input type="hidden" name="status" value="draft">
+            <input class="input" name="note" type="text" maxlength="300" placeholder="why it is coming down">
+            <button class="btn btn--secondary btn--sm" type="submit">Unpublish to draft</button>
+          </form>
+        <% } %>
+
+        <% if (post.status === 'draft' || post.status === 'in_review') { %>
+          <form method="post" action="/admin/cms/posts/<%= post.id %>/status" class="admin-inline-form">
+            <input type="hidden" name="status" value="scheduled">
+            <label class="field__label" for="w-publish-at">Schedule for</label>
+            <input class="input" id="w-publish-at" name="publish_at" type="datetime-local" required>
+            <button class="btn btn--secondary btn--sm" type="submit" <%= canPublish ? '' : 'disabled' %>>Schedule</button>
+          </form>
+        <% } %>
+
+        <% if (post.status === 'draft') { %>
+          <form method="post" action="/admin/cms/posts/<%= post.id %>/delete" class="admin-inline-form"
+                onsubmit="return confirm('Delete this draft? The revision history keeps what it looked like.')">
+            <button class="btn btn--ghost btn--sm" type="submit"><%- helpers.icon('trash', { size: 16 }) %> Delete draft</button>
+          </form>
+        <% } %>
+      </section>
+
+      <section class="panel mt-3">
+        <h2 class="panel__title">History</h2>
+        <% if (!revisions.length) { %>
+          <p class="empty-line">No revisions yet.</p>
+        <% } else { %>
+          <ul class="cms-list">
+            <% revisions.forEach(function (revision) { %>
+              <li>
+                <strong><%= statusLabels[revision.status] || revision.status %></strong>
+                <span class="muted">
+                  · <%= new Date(revision.createdAt).toLocaleString('en-NG', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) %>
+                  · <%= revision.actorName %>
+                </span>
+                <% if (revision.note) { %><br><span class="muted"><%= revision.note %></span><% } %>
+                <% if (revision.status !== 'deleted') { %>
+                  <form method="post" action="/admin/cms/posts/<%= post.id %>/restore" class="inline-form">
+                    <input type="hidden" name="revision_id" value="<%= revision.id %>">
+                    <button class="btn btn--ghost btn--sm" type="submit">Restore</button>
+                  </form>
+                <% } %>
+              </li>
+            <% }); %>
+          </ul>
+        <% } %>
+      </section>
+    <% } %>
+  </aside>
+</div>

@@ -1,0 +1,103 @@
+<%
+/**
+ * /dealer, signed out — the door to the §7.2 partner portal.
+ *
+ * This page used to be a phase-2 stub. The portal exists now, so the page
+ * explains what a partner lot gets and how to sign in. It stays noindex:
+ * nothing here belongs in search results.
+ * Locals: trail, accountRole
+ */
+%>
+<section class="page-hero">
+  <div class="container">
+    <%- include('../../partials/breadcrumbs', { crumbs: trail }) %>
+    <p class="eyebrow">Dealer portal</p>
+    <h1>Run your lot from one screen</h1>
+    <p>
+      Your stock, your enquiries and your commission — with the honesty layer that makes buyers
+      answer. Sign in with the phone number on your partner agreement.
+    </p>
+    <% if (accountRole === 'customer') { %>
+      <p class="note-inline">
+        You are signed in with a <strong>customer</strong> account. The portal is for partner lots —
+        to run a lot here, talk to the ops desk. Your own saved cars and requests are at
+        <a href="/account">your account</a>.
+      </p>
+    <% } %>
+    <div class="btn-row">
+      <% if (!accountRole) { %>
+        <a class="btn btn--primary" href="/login?next=%2Fdealer%2Fdashboard">Sign in to the portal</a>
+      <% } else if (accountRole === 'customer') { %>
+        <a class="btn btn--primary" href="/account">Go to my account</a>
+      <% } %>
+      <a class="btn btn--secondary" href="/partner">See the partner packages</a>
+    </div>
+  </div>
+</section>
+
+<section class="section">
+  <div class="container">
+    <div class="section-head">
+      <h2>What a partner lot gets</h2>
+      <p class="section-head__note mb-0">Seven screens, built around the questions a lot actually asks.</p>
+    </div>
+
+    <div class="promise-cols">
+      <div>
+        <h3>Dashboard</h3>
+        <p>Live stock, leads this week, views per car, and the two or three things that need you today — expiring listings and cars nobody has confirmed.</p>
+      </div>
+      <div>
+        <h3>My listings</h3>
+        <p>Draft, in review, live, reserved, sold, expired. Mark a car sold, change a price, add photos — and every price change reaches the buyers watching it.</p>
+      </div>
+      <div>
+        <h3>Add a car</h3>
+        <p>Photograph first with the guided shot list — front three-quarter, rear, interior, dash, odometer, engine — then the specification and the documents checklist.</p>
+      </div>
+      <div>
+        <h3>Leads inbox</h3>
+        <p>Every enquiry on your cars with the buyer’s number, the car reference and the message — moved through contacted, viewing, closed or lost.</p>
+      </div>
+      <div>
+        <h3>Performance</h3>
+        <p>Views, enquiry rate, how fast you answer, and a freshness score that names the cars buyers are scrolling past.</p>
+      </div>
+      <div>
+        <h3>Commission &amp; agreement</h3>
+        <p>An append-only statement per closed deal — commission in, payouts out, corrections named — plus the tier badge and the signed agreement on file.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="section section--surface">
+  <div class="container container--narrow">
+    <h2>The one rule that does not bend</h2>
+    <p>
+      A car you add is a <strong>draft</strong> until the HonestCars team reviews it. Ops checks the
+      listing, the photographs and the documents, and only then does it appear in search. That review
+      is the reason a buyer on this site believes the mileage on your car — it is the most valuable
+      thing the network gives your lot, so it is the last thing we would skip.
+    </p>
+    <p class="mb-0">
+      Everything else is yours to run. Your leads are yours, your prices are yours, your sold cars are
+      yours to mark.
+    </p>
+  </div>
+</section>
+
+<section class="section">
+  <div class="container container--narrow">
+    <div class="portal-stub">
+      <span class="portal-stub__icon"><%- helpers.icon('store', { size: 28 }) %></span>
+      <h2 class="mb-1">Not a partner lot yet?</h2>
+      <p>The portal is for lots that have signed the honesty terms — documents sighted, real mileage, no buyer-side games. If that is how you already work, it is a short conversation.</p>
+      <div class="btn-row">
+        <a class="btn btn--primary" href="<%= site.nav.whatsapp.general %>" target="_blank" rel="noopener"
+           data-event="whatsapp_click" data-source="dealer_landing">Talk to the ops desk</a>
+        <a class="btn btn--secondary" href="/partner">Read the packages</a>
+      </div>
+    </div>
+  </div>
+</section>

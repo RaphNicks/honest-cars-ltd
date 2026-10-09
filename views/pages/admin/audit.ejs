@@ -1,0 +1,49 @@
+<%#
+  /admin/audit — sensitive-action log (§7.3).
+  Locals: rows, entity
+%>
+<section class="panel">
+  <div class="panel__head">
+    <h2 class="panel__title">Audit log</h2>
+    <form class="admin-filters" method="get" action="/admin/audit">
+      <label class="visually-hidden" for="audit-entity">Entity</label>
+      <select class="select select--compact" id="audit-entity" name="entity" data-auto-submit>
+        <option value="">Everything</option>
+        <% ['vehicle_listings','service_requests','leads','bookings','users'].forEach(function (value) { %>
+          <option value="<%= value %>" <%= entity === value ? 'selected' : '' %>><%= value %></option>
+        <% }); %>
+      </select>
+      <noscript><button class="btn btn--secondary btn--sm" type="submit">Filter</button></noscript>
+    </form>
+  </div>
+
+  <% if (!rows.length) { %>
+    <p class="empty-line">Nothing logged yet. Publishes, grade changes, price overrides, dispatch and role changes land here.</p>
+  <% } else { %>
+    <table class="table table--stack">
+      <thead>
+        <tr>
+          <th scope="col">When</th>
+          <th scope="col">Actor</th>
+          <th scope="col">Action</th>
+          <th scope="col">Entity</th>
+          <th scope="col">Notes</th>
+        </tr>
+      </thead>
+      <tbody>
+        <% rows.forEach(function (row) { %>
+          <tr>
+            <td><%= new Date(row.createdAt).toLocaleString('en-NG', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) %></td>
+            <td>
+              <%= row.actor %>
+              <% if (row.actorRole) { %><br><span class="muted"><%= row.actorRole %></span><% } %>
+            </td>
+            <td><span class="chip"><%= row.action %></span></td>
+            <td class="tabular"><%= row.entity %> #<%= row.entityId %></td>
+            <td><%= row.detail ? (typeof row.detail === 'string' ? row.detail : JSON.stringify(row.detail)) : '—' %></td>
+          </tr>
+        <% }); %>
+      </tbody>
+    </table>
+  <% } %>
+</section>

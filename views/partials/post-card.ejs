@@ -1,0 +1,18 @@
+<%# Blog card — “From the Blog” homepage module 8 (§6.1) and /blog grid (§6.9) %>
+<%# `locals.featured === true` on purpose: includes inherit the parent's locals,
+    and several pages carry a *list* named `featured` — truthiness would mark
+    every card. The closing quote after the tag is load-bearing. %>
+<article class="post-card<%= locals.featured === true ? ' post-card--featured' : '' %>">
+  <% var postBlur = helpers.blurFor(post.heroImage); %>
+  <div class="post-card__media media-blur"<% if (postBlur) { %> style="background-image:url('<%= postBlur %>')"<% } %>>
+    <img class="post-card__img" data-blur-img src="<%= helpers.photoSrc(post.heroImage) %>"
+         alt="<%= helpers.esc(post.heroAlt) %>"
+         width="1200" height="900" loading="lazy" decoding="async">
+  </div>
+  <div class="post-card__body">
+    <span class="badge badge--ghost"><%= post.categoryLabel %></span>
+    <h3 class="post-card__title"><a href="<%= post.url %>"><%= post.title %></a></h3>
+    <p class="post-card__excerpt"><%= post.excerpt %></p>
+    <p class="post-card__meta mb-0"><%= post.readMinutes %> min read · <%= post.author.name %></p>
+  </div>
+</article>

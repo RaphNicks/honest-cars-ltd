@@ -1,0 +1,42 @@
+<%#
+  Video facade — §13.2: “video strictly tap-to-load with duration/size label”.
+
+  Nothing about the video is fetched until the button is pressed: the poster is a
+  ~40 KB JPEG and the duration/size come from src/lib/video-manifest.json, so the
+  label states the real cost of the tap (measured from the file, not estimated).
+
+  Works without JavaScript in the honest way: the facade links to the file, so a
+  visitor with no JS can still watch it — it just costs them the whole download,
+  which is why the size is on the button either way.
+
+  Locals: clip ({src, poster, seconds, bytes}), title, caption, helpers,
+          [label] (button text override), [alt]
+%>
+<% var info = helpers.videoFor(clip.src) || clip; %>
+<% var poster = clip.poster || info.poster || null; %>
+<% var duration = helpers.formatDuration(info.seconds); %>
+<% var size = helpers.formatBytes(info.bytes); %>
+<% var playLabel = (typeof label !== 'undefined' && label) ? label : 'Play'; %>
+<figure class="video-facade" data-video-facade>
+  <a class="video-facade__frame" href="<%= clip.src %>" data-video-link
+     data-video-seconds="<%= info.seconds %>" data-video-bytes="<%= info.bytes %>"
+     aria-label="<%= helpers.esc(title || info.title || 'Play video') %> — <%= duration %>, <%= size %>">
+    <% if (poster) { %>
+      <img src="<%= poster %>" alt="<%= helpers.esc(typeof alt !== 'undefined' && alt ? alt : (title || info.title || 'Video still')) %>"
+           width="640" height="360" loading="lazy" decoding="async">
+    <% } %>
+    <span class="video-facade__scrim" aria-hidden="true"></span>
+    <span class="video-facade__play">
+      <%- helpers.icon('video', { size: 26 }) %>
+      <span class="video-facade__label"><%= playLabel %></span>
+      <span class="video-facade__cost tabular"><%= duration %> · <%= size %></span>
+    </span>
+  </a>
+  <% if (typeof title !== 'undefined' && title && title !== info.title) { %>
+    <figcaption class="video-facade__caption"><%= title %></figcaption>
+  <% } else if (typeof caption !== 'undefined' && caption) { %>
+    <figcaption class="video-facade__caption"><%= caption %></figcaption>
+  <% } else if (info.caption) { %>
+    <figcaption class="video-facade__caption"><%= info.caption %></figcaption>
+  <% } %>
+</figure>

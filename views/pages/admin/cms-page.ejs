@@ -1,0 +1,107 @@
+<%#
+  /admin/cms/pages/:id — one page (§6.10).
+  Locals: record, check, revisions, markupReference, limits, maybeClearCounsel
+%>
+<div class="admin-head">
+  <h1>/<%= record.slug %></h1>
+  <p class="admin-head__lead">
+    <%= record.words || '' %>
+    <span class="badge badge--<%= record.indexable ? 'active' : 'pending' %>"><%= record.indexable ? 'Indexable' : 'Noindex' %></span>
+    <% if (record.legalReview) { %><span class="cms-flag">Awaiting counsel review</span><% } %>
+    · <a href="<%= record.url %>" target="_blank" rel="noopener">View page →</a>
+  </p>
+</div>
+
+<form method="post" action="/admin/cms/pages/<%= record.id %>" class="cms-layout">
+  <div>
+    <section class="panel">
+      <h2 class="panel__title">Page</h2>
+
+      <div class="field">
+        <label class="field__label" for="p-h1">H1</label>
+        <input class="input" id="p-h1" name="h1" type="text" maxlength="200" value="<%= record.h1 %>">
+      </div>
+
+      <div class="field">
+        <label class="field__label" for="p-hero">Hero copy</label>
+        <textarea class="input" id="p-hero" name="hero_copy" rows="3" maxlength="2000"><%= record.heroCopy %></textarea>
+      </div>
+
+      <div class="admin-grid admin-grid--2">
+        <div class="field">
+          <label class="field__label" for="p-meta-title">Meta title</label>
+          <input class="input" id="p-meta-title" name="meta_title" type="text" maxlength="200" value="<%= record.metaTitle %>">
+          <span class="cms-hint"><%= check.titleLength %>/<%= titleLimit %> characters</span>
+        </div>
+        <div class="field">
+          <label class="field__label" for="p-meta-desc">Meta description</label>
+          <input class="input" id="p-meta-desc" name="meta_description" type="text" maxlength="320" value="<%= record.metaDescription %>">
+          <span class="cms-hint"><%= check.descriptionLength %>/<%= descriptionLimit %> characters</span>
+        </div>
+      </div>
+
+      <div class="field">
+        <label class="field__label" for="p-body">Body — block markup</label>
+        <textarea class="input cms-body" id="p-body" name="body_markup" rows="22"><%= record.markup %></textarea>
+      </div>
+
+      <details class="panel">
+        <summary>Markup reference</summary>
+        <table class="table">
+          <thead><tr><th scope="col">Write</th><th scope="col">You get</th></tr></thead>
+          <tbody>
+            <% markupReference.forEach(function ([syntax, meaning]) { %>
+              <tr><td><code><%= syntax %></code></td><td class="muted"><%= meaning %></td></tr>
+            <% }); %>
+          </tbody>
+        </table>
+      </details>
+
+      <div class="cms-strip mt-2">
+        <button class="btn btn--primary" type="submit">Save page</button>
+        <a class="btn btn--ghost" href="/admin/cms/pages">Back to pages</a>
+      </div>
+    </section>
+  </div>
+
+  <aside>
+    <section class="panel">
+      <h2 class="panel__title">Search &amp; flags</h2>
+
+      <label class="cms-check">
+        <input type="checkbox" name="indexable" value="1" <%= record.indexable ? 'checked' : '' %>>
+        <span>Indexable — include this page in the sitemap and let search engines keep it</span>
+      </label>
+
+      <label class="cms-check mt-2">
+        <input type="checkbox" name="legal_review" value="1" <%= record.legalReview ? 'checked' : '' %>
+               <%= maybeClearCounsel ? '' : 'disabled' %>>
+        <span>A waiting on counsel review — shows the public “placeholder” callout</span>
+      </label>
+      <% if (!maybeClearCounsel) { %>
+        <p class="cms-hint">Only an admin can clear the counsel-review flag (§7.4) — it is an attestation, not an edit.</p>
+      <% } %>
+    </section>
+
+    <section class="panel" style="margin-top: var(--space-2);">
+      <h2 class="panel__title">History</h2>
+      <% if (!revisions.length) { %>
+        <p class="empty-line">No revisions yet.</p>
+      <% } else { %>
+        <ul class="cms-list">
+          <% revisions.forEach(function (revision) { %>
+            <li>
+              <strong><%= revision.status %></strong>
+              <span class="muted">
+                · <%= new Date(revision.createdAt).toLocaleString('en-NG', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) %>
+                · <%= revision.actorName %>
+              </span>
+              <% if (revision.note) { %><br><span class="muted"><%= revision.note %></span><% } %>
+            </li>
+          <% }); %>
+        </ul>
+        <p class="cms-hint">Page revisions are an audit trail. Restoring one is a feature for a later pass — the wording is counsel’s to change.</p>
+      <% } %>
+    </section>
+  </aside>
+</form>

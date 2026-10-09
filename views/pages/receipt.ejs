@@ -1,0 +1,88 @@
+<%#
+  /account/receipts/:reference — what a customer keeps after paying (§7.3).
+  One payment, what it was for, what came back if anything, and the event trail
+  the PSP webhook wrote. No card data exists here to leak — the PSP hosts it.
+  Locals: receipt (payment, items, events), trail
+%>
+<section class="page-hero page-hero--account">
+  <div class="container">
+    <%- include('../partials/breadcrumbs', { crumbs: trail }) %>
+    <p class="eyebrow">Receipt</p>
+    <h1>Payment <%= receipt.payment.reference %></h1>
+    <p class="lead mb-0">
+      <%= helpers.formatNaira(receipt.payment.amountKobo) %> for
+      <%= receipt.payment.purpose %><%= receipt.payment.orderNo ? ` · order ${receipt.payment.orderNo}` : receipt.payment.bookingReference ? ` · booking ${receipt.payment.bookingReference}` : receipt.payment.requestTrackingId ? ` · request ${receipt.payment.requestTrackingId}` : '' %>.
+      Status: <strong><%= receipt.payment.status.replace(/_/g, ' ') %></strong>.
+    </p>
+  </div>
+</section>
+
+<section class="section">
+  <div class="container container--narrow">
+    <div class="panel">
+      <table class="table">
+        <caption class="visually-hidden">Payment details</caption>
+        <tbody>
+          <tr><th scope="row">Paid by</th><td><%= receipt.payment.customerName %> · <span class="tabular"><%= receipt.payment.maskedPhone %></span></td></tr>
+          <tr><th scope="row">Method</th><td><%= receipt.payment.provider.replace(/_/g, ' ') %><% if (receipt.payment.providerRef) { %> · <span class="tabular"><%= receipt.payment.providerRef %></span><% } %></td></tr>
+          <tr><th scope="row">Amount</th><td class="tabular"><strong><%= helpers.formatNaira(receipt.payment.amountKobo) %></strong></td></tr>
+          <% if (receipt.payment.refundKobo) { %>
+            <tr>
+              <th scope="row">Refunded</th>
+              <td class="tabular">
+                <%= helpers.formatNaira(receipt.payment.refundKobo) %>
+                <% if (receipt.payment.refundReason) { %><br><span class="muted"><%= receipt.payment.refundReason %></span><% } %>
+              </td>
+            </tr>
+            <tr><th scope="row">Still with us</th><td class="tabular"><%= helpers.formatNaira(receipt.payment.refundableKobo) %></td></tr>
+          <% } %>
+          <% if (receipt.payment.paidAt) { %>
+            <tr><th scope="row">Paid</th><td><%= new Date(receipt.payment.paidAt).toLocaleString('en-NG', { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' }) %></td></tr>
+          <% } %>
+          <tr><th scope="row">Reference</th><td class="tabular"><%= receipt.payment.reference %></td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <% if (receipt.items.length) { %>
+      <div class="panel">
+        <h2 class="panel__title">What it covered</h2>
+        <table class="table">
+          <thead><tr><th scope="col">Item</th><th scope="col">Qty</th><th scope="col">Unit</th><th scope="col">Line</th></tr></thead>
+          <tbody>
+            <% receipt.items.forEach(function (item) { %>
+              <tr>
+                <th scope="row"><%= item.name %></th>
+                <td class="tabular"><%= item.qty %></td>
+                <td class="tabular"><%= helpers.formatNaira(item.unitPriceKobo) %></td>
+                <td class="tabular"><%= helpers.formatNaira(item.unitPriceKobo * item.qty) %></td>
+              </tr>
+            <% }); %>
+          </tbody>
+        </table>
+      </div>
+    <% } %>
+
+    <div class="panel">
+      <h2 class="panel__title">The trail</h2>
+      <ol class="receipt-trail">
+        <% receipt.events.forEach(function (event) { %>
+          <li>
+            <strong><%= event.type.replace(/\./g, ' · ') %></strong>
+            <span class="muted"> — <%= new Date(event.at).toLocaleString('en-NG', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) %></span>
+            <% if (event.signatureOk === 0) { %><br><span class="warn">Signature check failed and the payment was not applied.</span><% } %>
+          </li>
+        <% }); %>
+      </ol>
+      <p class="note-inline mb-0">
+        Every step above was written the moment it happened, by us or by the payment provider. This is the same
+        record our finance desk sees — ask us and we will walk you through it.
+      </p>
+    </div>
+
+    <div class="btn-row">
+      <button class="btn btn--secondary" type="button" data-print>Print this receipt</button>
+      <a class="btn btn--ghost" href="/account">Back to your account</a>
+    </div>
+  </div>
+</section>

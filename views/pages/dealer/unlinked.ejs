@@ -1,0 +1,31 @@
+<%
+/**
+ * A dealer account with no lot attached yet. Honest beats empty: the account
+ * exists, ops has not linked the lot, and the dealer should be told exactly
+ * what happens next rather than shown a dashboard of zeroes.
+ */
+%>
+<section class="panel">
+  <div class="panel__head">
+    <h2 class="panel__title">Your account is not linked to a lot yet</h2>
+    <span class="cms-hint">this usually takes a few minutes on the desk side</span>
+  </div>
+
+  <p>
+    You are signed in as <strong><%= user.shortName %></strong>, and this account is set up as a
+    <strong>dealer</strong>. What is missing is the link between the account and the lot record — the
+    name, address and commission rate the portal reads your stock from.
+  </p>
+
+  <p class="mb-1">Send the desk one line and they will link it:</p>
+  <div class="btn-row">
+    <a class="btn btn--primary" href="<%= helpers.whatsappLink('Please link my dealer portal account (' + user.phone + ') to our lot.', 'dealer_unlinked') %>"
+       target="_blank" rel="noopener" data-event="whatsapp_click" data-source="dealer_unlinked">Message the ops desk</a>
+    <a class="btn btn--secondary" href="/partner">Read the partner terms again</a>
+  </div>
+
+  <p class="muted mt-2 mb-0">
+    One account per lot, by design: the portal shows one lot’s stock, leads and commission, and nothing else.
+    If you run two lots, ask the desk for a second account.
+  </p>
+</section>

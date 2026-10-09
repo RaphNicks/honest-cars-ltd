@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 900" width="1200" height="900" role="img" aria-label="HonestCars inspection in Port Harcourt">
+  <defs><linearGradient id="h" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#0E2A47"/><stop offset="100%" stop-color="#12395F"/></linearGradient></defs>
+  <rect width="1200" height="900" fill="url(#h)"/>
+  <g opacity="0.22" fill="#FFFFFF">
+    <path d="M120 620 L210 620 C230 560 290 528 380 528 C474 528 530 560 552 620 L640 620 C652 620 658 628 658 640 L658 668 L100 668 L100 640 C100 628 108 620 120 620 Z"/>
+    <circle cx="200" cy="690" r="34"/><circle cx="546" cy="690" r="34"/>
+  </g>
+  <g opacity="0.35" stroke="#12A150" stroke-width="6" fill="none">
+    <circle cx="880" cy="300" r="86"/><path d="M840 302 L868 330 L926 268"/>
+  </g>
+  <text x="100" y="220" font-family="Inter, -apple-system, Segoe UI, Roboto, sans-serif" font-size="72" font-weight="700" fill="#FFFFFF">Every vehicle checked</text>
+  <text x="100" y="310" font-family="Inter, -apple-system, Segoe UI, Roboto, sans-serif" font-size="72" font-weight="700" fill="#12A150">in PH, by us.</text>
+  <text x="100" y="380" font-family="Inter, -apple-system, Segoe UI, Roboto, sans-serif" font-size="30" font-weight="400" fill="#D8E0E8">Placeholder art — swap for real lot photography.</text>
+  <text x="100" y="800" font-family="Inter, -apple-system, Segoe UI, Roboto, sans-serif" font-size="26" font-weight="500" fill="#8FA8C0">HONESTCARS · PORT HARCOURT, RIVERS STATE</text>
+</svg>

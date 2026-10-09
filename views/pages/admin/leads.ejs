@@ -1,0 +1,176 @@
+<%#
+  /admin/leads — the unified inbox (§7.3 CRM-lite).
+  Listing enquiries, concierge/service/hire/B2B requests, in one list, with
+  owner, status pipeline, lost reason and WhatsApp reply templates.
+  Locals: rows, counts, staff, filters, leadTypes, statuses, templates
+%>
+<div class="admin-grid admin-grid--5">
+  <div class="kpi kpi--sm">
+    <span class="kpi__label">New</span>
+    <strong class="kpi__value tabular"><%= counts.new_leads %></strong>
+    <span class="kpi__foot">unworked leads</span>
+  </div>
+  <div class="kpi kpi--sm">
+    <span class="kpi__label">Unassigned</span>
+    <strong class="kpi__value tabular"><%= counts.unassigned %></strong>
+    <span class="kpi__foot">nobody owns these</span>
+  </div>
+  <div class="kpi kpi--sm">
+    <span class="kpi__label">In conversation</span>
+    <strong class="kpi__value tabular"><%= counts.contacted + counts.viewing %></strong>
+    <span class="kpi__foot">contacted or viewing</span>
+  </div>
+  <div class="kpi kpi--sm">
+    <span class="kpi__label">Closed</span>
+    <strong class="kpi__value tabular"><%= counts.closed %></strong>
+    <span class="kpi__foot"><%= counts.lost %> lost</span>
+  </div>
+  <div class="kpi kpi--sm">
+    <span class="kpi__label">SLA breached</span>
+    <strong class="kpi__value tabular"><%= counts.sla_breached %></strong>
+    <span class="kpi__foot">requests past due</span>
+  </div>
+</div>
+
+<section class="panel">
+  <div class="panel__head">
+    <h2 class="panel__title">Inbox</h2>
+    <div class="btn-row">
+      <form method="post" action="/admin/leads/auto-assign">
+        <button class="btn btn--secondary btn--sm" type="submit">Round-robin assign unowned</button>
+      </form>
+    </div>
+  </div>
+
+  <form class="admin-filters" method="get" action="/admin/leads">
+    <label class="visually-hidden" for="lead-status">Status</label>
+    <select class="select select--compact" id="lead-status" name="status" data-auto-submit>
+      <option value="">Any status</option>
+      <% statuses.forEach(function (value) { %>
+        <option value="<%= value %>" <%= filters.status === value ? 'selected' : '' %>><%= value %></option>
+      <% }); %>
+    </select>
+
+    <label class="visually-hidden" for="lead-kind">Source</label>
+    <select class="select select--compact" id="lead-kind" name="kind" data-auto-submit>
+      <option value="">Everything</option>
+      <option value="lead" <%= filters.kind === 'lead' ? 'selected' : '' %>>Listing enquiries</option>
+      <option value="request" <%= filters.kind === 'request' ? 'selected' : '' %>>Service requests</option>
+    </select>
+
+    <label class="visually-hidden" for="lead-type">Type</label>
+    <select class="select select--compact" id="lead-type" name="type" data-auto-submit>
+      <option value="">Any type</option>
+      <% leadTypes.forEach(function (value) { %>
+        <option value="<%= value %>" <%= filters.type === value ? 'selected' : '' %>><%= value.replace(/_/g, ' ') %></option>
+      <% }); %>
+    </select>
+
+    <label class="visually-hidden" for="lead-owner">Owner</label>
+    <select class="select select--compact" id="lead-owner" name="owner" data-auto-submit>
+      <option value="">Anyone</option>
+      <option value="unassigned" <%= filters.owner === 'unassigned' ? 'selected' : '' %>>Unassigned</option>
+      <% staff.forEach(function (person) { %>
+        <option value="<%= person.id %>" <%= String(filters.owner) === String(person.id) ? 'selected' : '' %>><%= person.name %></option>
+      <% }); %>
+    </select>
+
+    <label class="visually-hidden" for="lead-q">Search</label>
+    <input class="input input--compact" id="lead-q" name="q" type="search" value="<%= filters.q || '' %>" placeholder="Name or phone">
+    <button class="btn btn--secondary btn--sm" type="submit">Filter</button>
+  </form>
+</section>
+
+<% if (!rows.length) { %>
+  <p class="empty-line">Nothing matches those filters.</p>
+<% } else { %>
+  <div class="stack">
+    <% rows.forEach(function (row) { %>
+      <section class="panel lead-row" aria-labelledby="lead-<%= row.kind %>-<%= row.id %>">
+        <div class="panel__head">
+          <div>
+            <h2 class="lead-row__title" id="lead-<%= row.kind %>-<%= row.id %>">
+              <%= row.name %>
+              <span class="badge badge--<%= row.status %>"><%= row.status %></span>
+              <span class="chip"><%= row.kind === 'request' ? row.trackingId : row.type.replace(/_/g, ' ') %></span>
+            </h2>
+            <p class="lead-row__meta">
+              <span class="tabular"><%= row.maskedPhone %></span> ·
+              <%= row.kind === 'request' ? row.type : row.type %> ·
+              <%= helpers.relativeDays(row.createdAt) %>
+              <% if (row.listingTitle) { %> · about <%= row.listingTitle %><% } %>
+              <% if (row.assigneeName) { %> · owner <strong><%= row.assigneeName %></strong><% } else { %> · <strong class="warn">unowned</strong><% } %>
+              <% if (row.slaDueAt) { %> · SLA <%= helpers.relativeDays(row.slaDueAt) %><% } %>
+            </p>
+            <% if (row.message) { %><p class="lead-row__message">“<%= row.message %>”</p><% } %>
+            <% if (row.lostReason) { %><p class="note-inline mb-0">Lost reason: <%= row.lostReason %></p><% } %>
+          </div>
+          <div class="lead-row__links">
+            <% if (row.kind === 'request') { %>
+              <a class="btn btn--ghost btn--sm" href="/concierge/<%= row.trackingId %>" target="_blank" rel="noopener">Status page</a>
+              <a class="btn btn--ghost btn--sm" href="/admin/concierge?open=<%= row.id %>">Pipeline</a>
+            <% } else if (row.listingSlug) { %>
+              <a class="btn btn--ghost btn--sm" href="/cars/<%= row.listingSlug %>" target="_blank" rel="noopener">Listing</a>
+            <% } %>
+            <a class="btn btn--secondary btn--sm"
+               href="https://wa.me/<%= row.phone.replace(/[^\d]/g, '') %>?text=<%= encodeURIComponent('Hello ' + row.name.split(' ')[0] + ', this is Honest Cars about ' + (row.trackingId || row.type.replace(/_/g, ' ')) + '.') %>"
+               target="_blank" rel="noopener">WhatsApp</a>
+          </div>
+        </div>
+
+        <div class="admin-actions">
+          <form class="admin-actions__group" method="post" action="/admin/leads/<%= row.id %>/status">
+            <input type="hidden" name="kind" value="<%= row.kind %>">
+            <p class="admin-actions__label">Pipeline</p>
+            <label class="visually-hidden" for="lead-status-<%= row.kind %>-<%= row.id %>">Status</label>
+            <select class="select select--compact" id="lead-status-<%= row.kind %>-<%= row.id %>" name="status">
+              <% statuses.forEach(function (value) { %>
+                <option value="<%= value %>" <%= row.status === value ? 'selected' : '' %>><%= value %></option>
+              <% }); %>
+            </select>
+            <label class="visually-hidden" for="lead-lost-<%= row.kind %>-<%= row.id %>">Lost reason</label>
+            <input class="input input--compact" id="lead-lost-<%= row.kind %>-<%= row.id %>" name="lost_reason"
+                   type="text" placeholder="Lost reason (when lost)">
+            <button class="btn btn--secondary btn--sm" type="submit">Update</button>
+          </form>
+
+          <form class="admin-actions__group" method="post" action="/admin/leads/<%= row.id %>/assign">
+            <input type="hidden" name="kind" value="<%= row.kind %>">
+            <p class="admin-actions__label">Owner</p>
+            <label class="visually-hidden" for="lead-owner-<%= row.kind %>-<%= row.id %>">Assign to</label>
+            <select class="select select--compact" id="lead-owner-<%= row.kind %>-<%= row.id %>" name="assigned_to">
+              <option value="0">Unassigned</option>
+              <% staff.forEach(function (person) { %>
+                <option value="<%= person.id %>" <%= String(row.assignedTo) === String(person.id) ? 'selected' : '' %>>
+                  <%= person.name %> · <%= person.role %>
+                </option>
+              <% }); %>
+            </select>
+            <button class="btn btn--secondary btn--sm" type="submit">Assign</button>
+          </form>
+
+          <form class="admin-actions__group admin-actions__group--wide" method="post" action="/admin/leads/<%= row.id %>/status">
+            <input type="hidden" name="kind" value="<%= row.kind %>">
+            <input type="hidden" name="status" value="contacted">
+            <p class="admin-actions__label">Reply template</p>
+            <label class="visually-hidden" for="template-<%= row.kind %>-<%= row.id %>">Template</label>
+            <select class="select select--compact" id="template-<%= row.kind %>-<%= row.id %>"
+                      data-template-select
+                      data-name="<%= row.name.split(' ')[0] %>"
+                      data-ref="<%= row.trackingId || row.type.replace(/_/g, ' ') %>">
+              <% templates.forEach(function (tpl) { %>
+                <option value="<%= tpl.key %>" data-body="<%= helpers.esc(tpl.body) %>"><%= tpl.label %></option>
+              <% }); %>
+            </select>
+            <textarea class="textarea admin-reply" rows="3" data-template-output readonly
+                      placeholder="Pick a template — it appears here, ready to paste into WhatsApp."></textarea>
+            <div class="btn-row">
+              <button class="btn btn--ghost btn--sm" type="button" data-copy-template>Copy reply</button>
+              <button class="btn btn--secondary btn--sm" type="submit">Mark contacted</button>
+            </div>
+          </form>
+        </div>
+      </section>
+    <% }); %>
+  </div>
+<% } %>

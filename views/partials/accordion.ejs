@@ -1,0 +1,24 @@
+<%# FAQ accordion. First item opens by default so the section never looks empty.
+    Locals: faqs = [{question, answer}], idPrefix %>
+<% var prefix = typeof idPrefix === 'undefined' ? 'faq' : idPrefix; %>
+<div class="accordion" data-accordion>
+  <% faqs.forEach(function (faq, index) { %>
+    <% var open = index === 0; %>
+    <div class="accordion__item">
+      <h3 class="mb-0">
+        <button class="accordion__button" type="button"
+                aria-expanded="<%= open ? 'true' : 'false' %>"
+                aria-controls="<%= prefix %>-panel-<%= index %>"
+                id="<%= prefix %>-button-<%= index %>">
+          <span><%= faq.question %></span>
+          <%- helpers.icon('chevronDown', { size: 20 }) %>
+        </button>
+      </h3>
+      <div class="accordion__panel" id="<%= prefix %>-panel-<%= index %>"
+           role="region" aria-labelledby="<%= prefix %>-button-<%= index %>"
+           <%= open ? '' : 'hidden' %>>
+        <p><%= faq.answer %></p>
+      </div>
+    </div>
+  <% }); %>
+</div>

@@ -1,0 +1,268 @@
+<%#
+  /admin/security — §12.2: the second factor on your own account.
+
+  The screen's job is to be unambiguous about one thing: an enrolment that was
+  started and never finished is NOT protection. So it never says "on" for a
+  pending secret — it says the setup is unfinished and what to do about it — and
+  it says how many recovery codes are left, because a factor with no way back in
+  is a future lockout, not a security control.
+
+  Locals: state, required, enrolled, pending, codes, coverage, setup, issuer
+%>
+<% var dayLabel = function (value) {
+  return value ? new Date(value).toLocaleDateString('en-NG', { day: 'numeric', month: 'short', year: 'numeric' }) : '—';
+}; %>
+<%#
+  `freshCodes` is a one-shot local: it is only ever set by the POST that just
+  generated them. Recovery codes are credentials, and credentials do not belong
+  in a URL — a query string ends up in browser history, in the server's access
+  log and in the Referer of the next request. So the POST answers with this page
+  instead of redirecting, and a GET never carries them.
+%>
+<% var freshCodes = (typeof freshCodes === 'undefined' || !freshCodes) ? [] : freshCodes; %>
+
+<% if (required && !enrolled) { %>
+  <div class="alert-band mt-3">
+    <div>
+      <h2>This role needs a second factor</h2>
+      <p class="mb-0">
+        Your role can move money or grant roles, so §12.2 asks for two-step sign-in — and until it is set up you
+        cannot open the rest of the console. Everything else in here still works the moment you finish; nothing
+        is lost.
+      </p>
+    </div>
+  </div>
+<% } %>
+
+<div class="admin-grid admin-grid--4">
+  <div class="kpi kpi--sm">
+    <span class="kpi__label">Second factor</span>
+    <strong class="kpi__value"><%= enrolled ? 'On' : pending ? 'Unfinished' : 'Off' %></strong>
+    <span class="kpi__foot">
+      <%= enrolled
+        ? 'on since ' + dayLabel(state.confirmedAt)
+        : pending
+          ? 'a secret was made but never proved'
+          : required ? 'this role requires one' : 'optional for your role' %>
+    </span>
+  </div>
+  <div class="kpi kpi--sm">
+    <span class="kpi__label">Recovery codes left</span>
+    <strong class="kpi__value tabular"><%= codes.remaining %></strong>
+    <span class="kpi__foot">
+      <%= codes.total ? codes.total + ' issued, ' + codes.used + ' used' : 'none yet — generate them after setup' %>
+    </span>
+  </div>
+  <div class="kpi kpi--sm">
+    <span class="kpi__label">Your role</span>
+    <strong class="kpi__value"><%= admin.roleLabel %></strong>
+    <span class="kpi__foot"><%= required ? 'second factor required' : 'you may enrol voluntarily' %></span>
+  </div>
+  <div class="kpi kpi--sm">
+    <span class="kpi__label">Method</span>
+    <strong class="kpi__value">TOTP</strong>
+    <span class="kpi__foot">Google Authenticator, Authy, 1Password, any RFC 6238 app</span>
+  </div>
+</div>
+
+<% if (freshCodes.length) { %>
+  <section class="panel mt-3">
+    <div class="panel__head">
+      <div>
+        <h2 class="panel__title">Your recovery codes — write these down now</h2>
+        <p class="cms-hint">
+          Each one works once, in place of the app. They are stored as hashes, so this is the only time they are
+          ever shown — not on a reload, and not by anyone at HonestCars. Print them or put them somewhere a
+          thief with your phone does not have.
+        </p>
+      </div>
+    </div>
+    <ul class="recovery-codes">
+      <% freshCodes.forEach(function (code) { %>
+        <li class="tabular"><%= code %></li>
+      <% }); %>
+    </ul>
+    <p class="note-inline">
+      <a href="/admin">Done — take me to the console</a> ·
+      <a href="/admin/security">Stay on this screen</a> (the codes will not be shown again)
+    </p>
+  </section>
+<% } %>
+
+<section class="panel mt-3">
+  <div class="panel__head">
+    <div>
+      <h2 class="panel__title">
+        <%= enrolled ? 'Your second factor' : pending ? 'Finish setting up' : 'Set up two-step sign-in' %>
+      </h2>
+      <p class="cms-hint">
+        A code from your phone, on top of the one we send. The number proves the phone; this proves the person
+        holding it.
+      </p>
+    </div>
+  </div>
+
+  <% if (enrolled) { %>
+    <p>
+      Two-step sign-in has been on since <strong><%= dayLabel(state.confirmedAt) %></strong>. Signing in asks for
+      a code from your authenticator app after the one we send, and every code works exactly once.
+    </p>
+
+    <div class="admin-grid admin-grid--2 mt-3">
+      <div>
+        <h3>Replace your recovery codes</h3>
+        <p class="cms-hint">
+          Do this if the sheet is lost, photographed, or down to its last couple of codes.
+          <%= codes.remaining %> of <%= codes.total || 0 %> are left<% if (codes.firstUsedAt) { %>, the first used on <%= dayLabel(codes.firstUsedAt) %><% } %>.
+          Generating a new set stops every code on the old sheet working, immediately.
+        </p>
+        <form method="post" action="/admin/security/recovery" class="admin-inline-form">
+          <div class="field">
+            <label class="field__label" for="regen-code">Confirm with a code</label>
+            <input class="input tabular" id="regen-code" name="code" inputmode="numeric" autocomplete="one-time-code"
+                   maxlength="12" required placeholder="000000">
+            <p class="field__hint">A code from the app, or one of the recovery codes you already have.</p>
+          </div>
+          <button class="btn btn--primary btn--sm" type="submit">Generate new codes</button>
+        </form>
+      </div>
+
+      <div>
+        <% if (required) { %>
+          <h3>Moving to a new phone</h3>
+          <p class="cms-hint mb-0">
+            Your role keeps a second factor, so it cannot be switched off — that is the point of it. Sign in with
+            a recovery code, then ask a colleague with <strong>Staff &amp; roles</strong> to reset the factor for
+            you: it clears the old secret and signs out your other devices. You will set up the new phone from
+            this screen.
+          </p>
+        <% } else { %>
+          <h3>Turn it off</h3>
+          <p class="cms-hint">
+            Your role does not require a second factor. Turning it off deletes the secret and every recovery code
+            with it, and it is recorded in the audit log.
+          </p>
+          <form method="post" action="/admin/security/disable" class="admin-inline-form">
+            <div class="field">
+              <label class="field__label" for="disable-code">Confirm with a code</label>
+              <input class="input tabular" id="disable-code" name="code" inputmode="numeric" autocomplete="one-time-code"
+                     maxlength="12" required placeholder="000000">
+              <p class="field__hint">A click on its own cannot remove a second factor.</p>
+            </div>
+            <button class="btn btn--secondary btn--sm" type="submit">Turn it off</button>
+          </form>
+        <% } %>
+      </div>
+    </div>
+  <% } else if (setup) { %>
+    <ol class="steps steps--compact">
+      <li>
+        <strong>Open your authenticator app</strong> and add an account by entering a setup key — not by
+        scanning a picture.
+        <p class="cms-hint mb-0">
+          There is no QR image anywhere in this product, on purpose: a QR is the secret drawn as pixels, and
+          drawing it would mean either a dependency that writes the secret into a data URL or an outside service
+          that receives it. Typing the key takes ten seconds and keeps it between your phone and this server.
+        </p>
+      </li>
+      <li>
+        <strong>Enter this key</strong> as a time-based (TOTP) account:
+        <p class="setup-secret tabular" data-setup-secret><%= setup.formatted %></p>
+        <p class="cms-hint">
+          Account name: <code><%= issuer %>:<%= admin.user.phone %></code> ·
+          <a href="<%= setup.uri %>" rel="nofollow">Open in an authenticator app on this device</a>
+        </p>
+      </li>
+      <li>
+        <strong>Prove it works</strong> by typing the six digits it shows. Nothing is switched on until that
+        happens — and the code you use here cannot be used to sign in afterwards.
+        <form method="post" action="/admin/security/confirm" class="admin-inline-form mt-1">
+          <div class="field">
+            <label class="field__label" for="confirm-code">Six-digit code</label>
+            <input class="input tabular" id="confirm-code" name="code" inputmode="numeric"
+                   autocomplete="one-time-code" maxlength="6" required placeholder="000000">
+          </div>
+          <button class="btn btn--primary btn--sm" type="submit">Turn it on</button>
+        </form>
+      </li>
+    </ol>
+    <p class="cms-hint mb-0">
+      If the code is rejected, check your phone's clock is set to update automatically — TOTP is a shared clock,
+      and a phone a minute out produces codes that are a minute wrong.
+    </p>
+  <% } else if (pending) { %>
+    <p>
+      A setup was started on this account and never confirmed, so there is a secret that has proved nothing.
+      Start again to replace it — the unfinished one is discarded.
+    </p>
+    <form method="post" action="/admin/security/begin" class="admin-inline-form mt-2">
+      <button class="btn btn--primary btn--sm" type="submit">Start again</button>
+    </form>
+  <% } else { %>
+    <p>
+      Two-step sign-in is off. Turning it on takes a minute: we show you a key to put in your authenticator app,
+      you type one code back to prove it works, and we hand you ten recovery codes for the day the phone is lost.
+    </p>
+    <form method="post" action="/admin/security/begin" class="admin-inline-form mt-2">
+      <button class="btn btn--primary btn--sm" type="submit">Set up two-step sign-in</button>
+    </form>
+    <% if (!required) { %>
+      <p class="cms-hint mb-0">
+        Your role does not require this, and nobody can turn it on for you — it is your own account.
+      </p>
+    <% } %>
+  <% } %>
+</section>
+
+<% if (coverage) { %>
+  <section class="panel mt-3">
+    <div class="panel__head">
+      <div>
+        <h2 class="panel__title">Who is protected</h2>
+        <p class="cms-hint">
+          §12.2 asks for a second factor on the roles that can move money or grant roles.
+          <%= coverage.complete
+            ? 'Every account that requires one has one.'
+            : coverage.missing + ' account' + (coverage.missing === 1 ? '' : 's') + ' that require one still do not have it.' %>
+        </p>
+      </div>
+    </div>
+    <div class="table-scroll">
+      <table class="table">
+        <caption class="visually-hidden">Second-factor coverage by role</caption>
+        <thead>
+          <tr>
+            <th scope="col">Role</th>
+            <th scope="col">Accounts</th>
+            <th scope="col">Protected</th>
+            <th scope="col">Half-finished</th>
+            <th scope="col">Required</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% Object.keys(coverage.byRole).forEach(function (role) { var row = coverage.byRole[role]; %>
+            <tr>
+              <td><strong><%= roleLabels[role] || role %><%= role === admin.user.role ? ' (you)' : '' %></strong></td>
+              <td class="tabular"><%= row.staff %></td>
+              <td class="tabular">
+                <%= row.enrolled %>
+                <% if (row.enrolled < row.staff) { %>
+                  <span class="badge badge--pending"><%= row.staff - row.enrolled %> without</span>
+                <% } %>
+              </td>
+              <td class="tabular"><%= row.pending %></td>
+              <td>
+                <span class="badge <%= row.required ? 'badge--ok' : 'badge--new' %>"><%= row.required ? 'yes' : 'optional' %></span>
+              </td>
+            </tr>
+          <% }); %>
+        </tbody>
+      </table>
+    </div>
+    <p class="cms-hint mb-0">
+      A half-finished enrolment is counted as <em>without</em> — a secret nobody has proved is not protection.
+      Resetting someone else's factor (a lost phone) is on <a href="/admin/staff">Staff &amp; roles</a>, and it
+      is audited.
+    </p>
+  </section>
+<% } %>
