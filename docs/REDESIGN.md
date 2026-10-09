@@ -215,4 +215,18 @@ confirm the only remaining boxes are functional forms and data panels.
 
 Verification: 556/556 tests · lint 0 · 147 pages audited, 0 findings.
 
-**Next: Batch E, on your approval.**
+## 8. Batch E — completed (`c945ddb`)
+
+- `/account`: compact ten-anchor in-page nav; the ten boxed dashboard
+  sections opened into hairline sections over the same two-column grid.
+  Record lists inside were already hairline rows; the top count chips stay
+  (a summary line, not cards).
+- Auth audited against §9: login + MFA already present one calm narrow
+  container with labelled fields, hints, visible errors and status banners.
+  Sign-in is phone + OTP by design — that is also the recovery path; a
+  functional contract, not a design gap.
+
+Verification: 556/556 tests (account suite renders `/account` with a session)
+· lint 0.
+
+**Next: Batch F, on your approval.**
