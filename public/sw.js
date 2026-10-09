@@ -36,7 +36,7 @@
 
 /* eslint-env serviceworker */
 
-const VERSION = 'hc-v7'; // v6: pwa.js now asks a waiting worker to take over, so a new shell is never left waiting on 'close every tab'
+const VERSION = 'hc-v8'; // v6: pwa.js now asks a waiting worker to take over, so a new shell is never left waiting on 'close every tab'
 const SHELL = `${VERSION}-shell`;
 const PAGES = `${VERSION}-pages`;
 const RUNTIME = `${VERSION}-runtime`; // shell assets discovered later (other font weights)
@@ -56,11 +56,12 @@ const SHELL_URLS = [
   '/css/sections.css',
   '/css/pages.css',
   '/css/account.css',
-  // Only the two weights the layout preloads are worth ~50 KB of someone's
-  // data up front (§13.2); 500/600 land in the runtime asset cache the first
-  // time a page that uses them is opened, and are then available offline too.
-  '/fonts/inter-latin-400-normal.woff2',
-  '/fonts/inter-latin-700-normal.woff2',
+  // Only the two files the layout preloads are worth ~50 KB of someone's
+  // data up front (§13.2); the other weights land in the runtime asset cache
+  // the first time a page that uses them is opened, and are then available
+  // offline too.
+  '/fonts/ibm-plex-sans-latin-400-normal.woff2',
+  '/fonts/barlow-condensed-latin-700-normal.woff2',
   // `/js/admin.js` and `/js/dealer.js` are deliberately absent: /admin and
   // /dealer are bypassed by this worker, so precaching them would only cost
   // every other visitor bytes — their pages fill the runtime cache when used.

@@ -8,7 +8,7 @@
  *   1. declares a font-size that is not a ladder step,
  *   2. declares a clamp() whose endpoints are not ladder steps,
  *   3. sets 12px on a prose element (p, li, td, dd, blockquote),
- *   4. introduces a second font family,
+ *   4. introduces a third font family,
  *   5. uses a font weight outside 400/500/600/700.
  *
  * Run: npm run lint:type
@@ -18,7 +18,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 
 const CSS_DIR = path.join(__dirname, '..', 'public', 'css');
-const LADDER = [12, 14, 16, 20, 24, 32];
+const LADDER = [12, 14, 16, 20, 24, 32, 40];
 const PROSE_SELECTORS = /(^|[\s,>])(p|li|td|dd|dt|blockquote|figcaption)([\s,.:[{>]|$)/;
 const ALLOWED_WEIGHTS = [400, 500, 600, 700];
 
@@ -40,7 +40,7 @@ function audit(file) {
     const value = match[1].trim();
     const line = css.slice(0, match.index).split('\n').length;
 
-    if (/^var\(--text-(12|14|16|20|24|32)\)$/.test(value)) continue;
+    if (/^var\(--text-(12|14|16|20|24|32|40)\)$/.test(value)) continue;
 
     const clampMatch = value.match(/^clamp\(\s*(\d+(?:\.\d+)?)px\s*,[^,]+,\s*(\d+(?:\.\d+)?)px\s*\)$/);
     if (clampMatch) {
@@ -55,7 +55,7 @@ function audit(file) {
     }
 
     if (/^(inherit|initial|unset)$/.test(value)) continue;
-    errors.push(`${name}:${line} font-size "${value}" is outside the six-step ladder (${LADDER.join('/')}px)`);
+    errors.push(`${name}:${line} font-size "${value}" is outside the type ladder (${LADDER.join('/')}px)`);
   }
 
   // --- prose never below 14px --------------------------------------------
@@ -75,9 +75,11 @@ function audit(file) {
   while ((match = familyRe.exec(css))) {
     const value = match[1].trim();
     if (/^var\(--font-sans\)$/.test(value)) continue;
-    if (/^['"]Inter['"]$/.test(value)) continue; // the @font-face declarations
+    if (/^var\(--font-display\)$/.test(value)) continue;
+    // the @font-face declarations themselves
+    if (/^['"](IBM Plex Sans|Barlow Condensed)['"]$/.test(value)) continue;
     if (value.startsWith('inherit')) continue;
-    errors.push(`${name} font-family "${value}" — Inter is the only family (§3.3)`);
+    errors.push(`${name} font-family "${value}" — IBM Plex Sans + Barlow Condensed are the only families (§3.3)`);
   }
 
   const weightRe = /font-weight\s*:\s*([0-9]{3}|var\(--weight-[a-z]+\))/g;
@@ -102,7 +104,7 @@ function main() {
     process.exit(1);
   }
 
-  console.log(`✓ type-scale audit passed — ${files.length} stylesheets, ladder ${LADDER.join('/')}px, one family, weights ${ALLOWED_WEIGHTS.join('/')}`);
+  console.log(`✓ type-scale audit passed — ${files.length} stylesheets, ladder ${LADDER.join('/')}px, two families, weights ${ALLOWED_WEIGHTS.join('/')}`);
 }
 
 main();

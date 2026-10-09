@@ -332,8 +332,10 @@
 .car-card__title a:hover { text-decoration: underline; }
 
 .car-card__price {
-  font-size: var(--text-20);
+  font-family: var(--font-display);
+  font-size: var(--text-24);
   font-weight: var(--weight-bold);
+  letter-spacing: 0.01em;
   color: var(--honest-navy);
   font-variant-numeric: tabular-nums;
   line-height: 1.2;
@@ -1441,7 +1443,7 @@ img.header__logo-mark {
   .vdp-rail { position: sticky; top: calc(var(--header-height) + var(--space-2)); }
 }
 
-.vdp-price { font-size: var(--text-32); font-weight: var(--weight-bold); color: var(--honest-navy); line-height: 1; letter-spacing: -0.01em; }
+.vdp-price { font-family: var(--font-display); font-size: var(--text-40); font-weight: var(--weight-bold); color: var(--honest-navy); line-height: 1.05; letter-spacing: 0.01em; }
 
 .key-facts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-1); }
 .key-fact { padding: var(--space-1); background: var(--surface); border-radius: var(--radius-sm); }

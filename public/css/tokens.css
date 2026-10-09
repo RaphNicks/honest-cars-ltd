@@ -53,8 +53,11 @@
   --color-focus: var(--honest-green);
 
   /* --- §3.3 Typography --------------------------------------------------- */
-  /* One family only: Inter (self-hosted), weights 400/500/600/700. */
-  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  /* Two self-hosted families: IBM Plex Sans for the interface (400/500/600/700)
+     and Barlow Condensed for display work (600/700) — headlines, prices,
+     high-impact figures. Fallbacks approximate each face's width. */
+  --font-sans: 'IBM Plex Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  --font-display: 'Barlow Condensed', 'Arial Narrow', 'Helvetica Neue', Arial, sans-serif;
 
   --weight-regular: 400;
   --weight-medium: 500;
@@ -70,7 +73,8 @@
   --text-16: 16px;                                   /* body copy (mobile base) */
   --text-20: 20px;                                   /* h3 / lead paragraph */
   --text-24: clamp(20px, 0.9vw + 17.6px, 24px);      /* h2 — steps 4 → 5 */
-  --text-32: clamp(24px, 1.5vw + 20.8px, 32px);      /* h1 — steps 5 → 6 */
+  --text-32: clamp(24px, 1.5vw + 20.8px, 32px);      /* h2 — steps 5 → 6 */
+  --text-40: clamp(32px, 2.2vw + 23.2px, 40px);      /* h1 — display step */
 
   /* Line heights paired to the ladder */
   --leading-tight: 1.15;

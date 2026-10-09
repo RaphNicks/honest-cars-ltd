@@ -145,10 +145,10 @@ test('the precache list covers the whole shell and every entry ships', () => {
     );
   }
 
-  // The two weights the layout preloads, and no others: the other two arrive
+  // The two files the layout preloads, and no others: the rest arrive
   // through the runtime cache rather than costing every install ~50 kB.
-  assert.ok(unique.has('/fonts/inter-latin-400-normal.woff2'));
-  assert.ok(unique.has('/fonts/inter-latin-700-normal.woff2'));
+  assert.ok(unique.has('/fonts/ibm-plex-sans-latin-400-normal.woff2'));
+  assert.ok(unique.has('/fonts/barlow-condensed-latin-700-normal.woff2'));
   assert.equal(urls.filter((url) => url.startsWith('/fonts/')).length, 2);
 });
 

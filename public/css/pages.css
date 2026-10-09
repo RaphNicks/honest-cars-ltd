@@ -22,7 +22,13 @@
   .hero__grid { grid-template-columns: 1.05fr 1fr; align-items: center; gap: var(--space-6); }
 }
 
-.hero__title { font-size: var(--text-32); margin-bottom: var(--space-2); }
+/* The hero headline is the one place uppercase condensed earns its keep. */
+.hero__title {
+  font-size: var(--text-40);
+  margin-bottom: var(--space-2);
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
 .hero__sub { font-size: var(--text-20); color: var(--color-text-muted); line-height: var(--leading-snug); margin-bottom: var(--space-3); max-width: 46ch; }
 
 .hero__media {
@@ -461,7 +467,6 @@ body[data-page="/"] img.header__logo-mark { background: var(--honest-navy); outl
 .hero--cinematic .hero__title {
   color: var(--white);
   max-width: 27ch;
-  letter-spacing: -0.02em;
   text-wrap: balance;
 }
 

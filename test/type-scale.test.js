@@ -1,9 +1,10 @@
 'use strict';
 
 /**
- * The six-step type scale is a hard requirement of PRD §3.3. This suite proves
- * the audit runs, passes on the shipped stylesheets, and actually fails when a
- * seventh size is introduced.
+ * The seven-step type scale (12–40, display step added with the Barlow
+ * Condensed system) is a hard requirement of PRD §3.3 as amended. This suite
+ * proves the audit runs, passes on the shipped stylesheets, and actually
+ * fails when an off-ladder size is introduced.
  */
 
 const test = require('node:test');
@@ -13,7 +14,7 @@ const path = require('node:path');
 
 const { ROOT, runScript } = require('./helpers');
 
-const LADDER = [12, 14, 16, 20, 24, 32];
+const LADDER = [12, 14, 16, 20, 24, 32, 40];
 
 test('type-scale audit passes on the shipped stylesheets', () => {
   const output = runScript('scripts/lint-type-scale.js');
@@ -27,7 +28,7 @@ test('every ladder step is declared as a token', () => {
   }
 });
 
-test('there is no seventh text size token', () => {
+test('the declared text tokens match the ladder exactly', () => {
   const tokens = fs.readFileSync(path.join(ROOT, 'public', 'css', 'tokens.css'), 'utf8');
   const declared = [...tokens.matchAll(/--text-(\d+):/g)].map((m) => Number(m[1]));
   assert.deepEqual([...new Set(declared)].sort((a, b) => a - b), LADDER);
@@ -37,7 +38,7 @@ test('the audit rejects a size outside the ladder', () => {
   const probe = path.join(ROOT, 'public', 'css', '_probe.css');
   fs.writeFileSync(probe, '.probe { font-size: 13px; }\n');
   try {
-    assert.throws(() => runScript('scripts/lint-type-scale.js'), /outside the six-step ladder/);
+    assert.throws(() => runScript('scripts/lint-type-scale.js'), /outside the type ladder/);
   } finally {
     fs.unlinkSync(probe);
   }
