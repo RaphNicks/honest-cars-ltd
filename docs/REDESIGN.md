@@ -177,4 +177,21 @@ Verification: lint exit 0 (type-scale caught and fixed a 12px attribution) ·
 556/556 tests · 147 pages audited, 0 findings · live page carries all new
 strips.
 
-**Next: Batch C, on your approval.**
+## 6. Batch C — completed (`aaec82a`)
+
+- `/services` hub: eight identical cards → two-column numbered editorial
+  index; the promise trio → hairline columns.
+- Service pages: `.deliverable` boxes → open checklist rows.
+- `/hire` and `/shop` fine-print trios → hairline columns; the shop's
+  delivery-fee panel stays boxed (functional data the checkout uses).
+- `/sell-swap` aside → two open editorial notes; forms stay single calm
+  containers.
+- Audited, unchanged: pricing/`table--split` tables, hire fleet and shop
+  product cards (legitimate scannable records), financing's form + arithmetic
+  panel.
+
+Verification: 556/556 tests · lint 0 · 147 pages audited, 0 findings · live
+spot-checks on `/services`, `/hire`, `/shop`, `/sell-swap` and a service page
+confirm the only remaining boxes are functional forms and data panels.
+
+**Next: Batch D, on your approval.**
