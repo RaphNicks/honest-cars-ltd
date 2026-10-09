@@ -244,4 +244,17 @@ Verification: 556/556 tests (account suite renders `/account` with a session)
 
 Verification: 556/556 tests · lint 0.
 
-**Next: Batch G, on your approval.**
+## 10. Batch G — completed (`f16ca7c`)
+
+- `admin.css`: every raw hex duplicating a live house token (border, muted,
+  navy, text, green, danger, sunken surface, white) now references the
+  token — same rendered colours, one vocabulary with the storefront.
+- The remaining tints are the console's deliberate status palette (each tag
+  pair AA-tuned on its own surface), now documented where they are defined.
+- Console templates audited against §7: tables for tabular records, compact
+  kpi summaries, hairline record lists; the few boxed blocks are functional
+  form panels and stay boxed.
+
+Verification: 556/556 tests · lint 0.
+
+**Next: Batch H, on your approval.**
