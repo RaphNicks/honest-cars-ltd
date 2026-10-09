@@ -257,4 +257,18 @@ Verification: 556/556 tests · lint 0.
 
 Verification: 556/556 tests · lint 0.
 
-**Next: Batch H, on your approval.**
+## 11. Batch H — completed (`7f10014`)
+
+- `/cars/compare`: best-value highlights trio (missed in Batch A's
+  discovery audit) → hairline columns.
+- `/about`: the lone boxed Company details panel opened — last box standing
+  after Batch D.
+- VDP polish queued from Batch A: gallery thumbs gain a hover affordance
+  (150ms, within budget); price line tightened with -0.01em tracking.
+- Sweep confirmed the remaining boxed containers on public pages are
+  functional: cart/checkout forms, concierge records, the sticky VDP rail.
+
+Verification: 556/556 tests · lint 0 · static build 74 pages · 147 pages
+audited, 0 findings · live checks on compare, about and a real VDP.
+
+**The redesign programme (Batches A–H) is complete. PR #1 awaits sign-off.**
