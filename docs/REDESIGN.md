@@ -229,4 +229,19 @@ Verification: 556/556 tests · lint 0 · 147 pages audited, 0 findings.
 Verification: 556/556 tests (account suite renders `/account` with a session)
 · lint 0.
 
-**Next: Batch F, on your approval.**
+## 9. Batch F — completed (`9cca730`)
+
+- `/dealer` landing: six portal-pitch boxes → hairline columns.
+- The authenticated portal audited against §7 and left as-is: it already is
+  an operational tool — real tables (addons, billing, statements), compact
+  `kpi--sm` summaries, hairline record lists, guided listing forms.
+- `admin.css` retoken pass: the console stylesheet spoke the pre-token
+  dialect (undefined `--colour-*` names with hex fallbacks); every reference
+  now reads from the live house tokens — identical rendered colours, one
+  vocabulary. Spark bars' gradient → solid green (no-gradient rule).
+- Deliberately deferred to Batch G: the status-tint badge palette (real
+  colours, not fallbacks) into named semantic tokens.
+
+Verification: 556/556 tests · lint 0.
+
+**Next: Batch G, on your approval.**
