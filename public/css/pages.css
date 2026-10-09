@@ -838,3 +838,38 @@ body[data-page="/"] img.header__logo-mark { background: var(--honest-navy); outl
 
 /* --- Category tiles: the photograph is the tile; the border was noise -------- */
 .cat-card { border: 0; }
+
+/* ==========================================================================
+   Batch C — the card diet reaches the service, hire, shop and sell-swap pages
+   ========================================================================== */
+
+/* The services hub runs the index in two columns on desktop. */
+@media (min-width: 1025px) {
+  .service-index--two {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    column-gap: var(--space-5);
+  }
+}
+
+/* Three promises as hairline columns instead of three boxes. */
+.promise-cols { display: grid; gap: var(--space-3); margin-top: var(--space-3); }
+
+@media (min-width: 769px) {
+  .promise-cols { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+
+.promise-cols > * { margin: 0; padding-top: var(--space-2); border-top: var(--border); }
+
+.promise-cols h3 { margin: 0 0 var(--space-05); font-size: var(--text-16); font-weight: var(--weight-semibold); color: var(--honest-navy); }
+
+.promise-cols p { margin: 0; font-size: var(--text-14); line-height: var(--leading-relaxed); color: var(--color-text-muted); }
+
+.promise-cols a { color: var(--honest-navy); }
+
+/* Open editorial notes beside forms (sell-swap aside). */
+.note-block { padding-top: var(--space-2); border-top: var(--border); }
+
+.note-block + .note-block { margin-top: var(--space-3); }
+
+.note-block h2 { margin: 0 0 var(--space-1); font-size: var(--text-20); }

@@ -42,7 +42,8 @@
 .tick-list__no svg { color: var(--danger); flex: none; margin-top: 2px; }
 .tick-list a { color: var(--honest-navy); }
 
-.deliverable { display: flex; gap: var(--space-2); padding: var(--space-3); border: var(--border); border-radius: var(--radius); background: var(--white); }
+/* Batch C: deliverables read as a checklist, not a card wall (§2.1). */
+.deliverable { display: flex; gap: var(--space-2); padding: 0 0 var(--space-2); border: 0; border-radius: 0; background: transparent; }
 .deliverable__icon { color: var(--honest-green); flex: none; }
 .deliverable__title { font-size: var(--text-16); margin: 0 0 var(--space-05); }
 .deliverable p { color: var(--color-text-muted); font-size: var(--text-14); }

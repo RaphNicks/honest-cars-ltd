@@ -22,9 +22,19 @@
 
 <section class="section">
   <div class="container">
-    <div class="grid grid--3">
-      <% services.forEach(function (service) { %>
-        <%- include('../partials/service-card', { service: service, helpers: helpers }) %>
+    <div class="service-index service-index--two">
+      <% services.forEach(function (service, index) { %>
+        <a class="service-index__row" href="/services/<%= service.slug %>">
+          <span class="service-index__num" aria-hidden="true"><%= String(index + 1).padStart(2, '0') %></span>
+          <span class="service-index__body">
+            <strong><%= service.name %></strong>
+            <span><%= service.promise %></span>
+          </span>
+          <% if (service.fromPriceKobo) { %>
+            <span class="service-index__price">from <%= helpers.formatNaira(service.fromPriceKobo) %></span>
+          <% } %>
+          <span class="service-index__arrow" aria-hidden="true">→</span>
+        </a>
       <% }); %>
     </div>
   </div>
@@ -35,18 +45,18 @@
     <div class="section-head">
       <h2 id="suite-promise">One suite, one standard</h2>
     </div>
-    <div class="grid grid--3">
-      <div class="card card__body">
+    <div class="promise-cols">
+      <div>
         <h3>Priced before we start</h3>
-        <p class="mb-0">Every service page shows its tiers and what is in them. No “call for price”, no surprise line items after the work is done.</p>
+        <p>Every service page shows its tiers and what is in them. No “call for price”, no surprise line items after the work is done.</p>
       </div>
-      <div class="card card__body">
+      <div>
         <h3>Done by people who are here</h3>
-        <p class="mb-0">Inspectors, document runners and installers work across Port Harcourt every day. Timelines on this site are the ones we actually hit.</p>
+        <p>Inspectors, document runners and installers work across Port Harcourt every day. Timelines on this site are the ones we actually hit.</p>
       </div>
-      <div class="card card__body">
+      <div>
         <h3>Honest when it fails</h3>
-        <p class="mb-0">If an inspection kills the deal, or a part cannot be matched, you get that answer in writing — not a silence and a refund delay.</p>
+        <p>If an inspection kills the deal, or a part cannot be matched, you get that answer in writing — not a silence and a refund delay.</p>
       </div>
     </div>
   </div>
