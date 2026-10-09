@@ -70,9 +70,10 @@ test.after(async () => {
 maybe('homepage renders the hero, the trust chips and the live feed', async () => {
   const { response, html } = await getHtml(ctx.baseUrl, '/');
   assert.equal(response.status, 200);
-  // The redesign wraps the closing sentence in a green <em>; the copy is the
-  // same three sentences, verbatim, so the assertion tolerates one tag.
-  assert.match(html, /Every vehicle verified\. Every price compared\. (?:<[^>]+>)?Every deal honest\./);
+  // The hero now carries the reference's three-beat headline; the <br> and the
+  // green <em> are presentation, so the assertion tolerates tags between beats.
+  assert.match(html, /Quality Cars\.[\s\S]{0,12}Real People\.[\s\S]{0,40}Honest Deals\./);
+  assert.match(html, /Hassle-Free/, 'the reference trust pill is in force');
   assert.match(html, /hero--cinematic/, 'the cinematic hero is in force');
   assert.match(html, /Find your perfect ride/, 'category cards render');
   assert.match(html, /cars live now/);

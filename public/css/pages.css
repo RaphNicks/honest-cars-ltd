@@ -353,15 +353,28 @@
   color: var(--honest-green);
 }
 
-/* --- The home header goes deep navy, like the reference ------------------ */
+/* --- The home header floats transparent over the hero, like the reference;
+       solid deep navy once scrolled, or when an announcement strip sits above
+       the hero and there is no photograph behind the bar. ------------------ */
 body[data-page="/"] .header {
+  background: transparent;
+  border-bottom-color: transparent;
+  box-shadow: none;
+}
+
+body[data-page="/"] .header[data-scrolled='true'] {
   background: var(--navy-deep);
   border-bottom-color: var(--white-glass-line);
 }
 
-body[data-page="/"] .header[data-scrolled='true'] {
-  border-bottom-color: var(--white-glass-line);
+body[data-page="/"]:has(.banner-strip) .header { background: var(--navy-deep); }
+
+/* The hero tucks under the transparent bar; not when a banner occupies it. */
+body[data-page="/"] .hero--cinematic {
+  margin-top: calc(-1 * var(--header-height));
 }
+
+body[data-page="/"] .banner-strip + .hero--cinematic { margin-top: 0; }
 
 body[data-page="/"] .header__logo,
 body[data-page="/"] .header__nav-link,
@@ -447,7 +460,7 @@ body[data-page="/"] img.header__logo-mark { background: var(--honest-navy); outl
 
 .hero--cinematic .hero__title {
   color: var(--white);
-  max-width: 21ch;
+  max-width: 27ch;
   letter-spacing: -0.02em;
   text-wrap: balance;
 }
@@ -463,14 +476,73 @@ body[data-page="/"] img.header__logo-mark { background: var(--honest-navy); outl
   box-shadow: 0 24px 48px rgba(7, 28, 42, 0.45);
 }
 
-/* Trust chips become dark glass over the photo. */
+/* Trust chips: dark plaques with a green icon disc and two lines, like the
+   reference. The figures stay live; only the presentation changed. */
 .hero--cinematic .trust-chip {
-  background: var(--white-glass);
-  border-color: var(--white-glass-line);
+  align-items: center;
+  gap: var(--space-1);
+  padding: var(--space-1);
+  padding-right: var(--space-2);
+  border: 0;
+  border-radius: var(--radius);
+  background: var(--chip-glass);
   color: var(--white);
 }
 
-.hero--cinematic .trust-chip strong { color: var(--green-bright); }
+.trust-chip__icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: var(--honest-green);
+  color: var(--white);
+  flex: 0 0 auto;
+}
+
+.trust-chip__icon svg { width: 18px; height: 18px; color: var(--white); }
+
+.trust-chip__text { display: flex; flex-direction: column; gap: 2px; text-align: left; }
+
+.hero--cinematic .trust-chip__text strong {
+  color: var(--white);
+  font-size: var(--text-14);
+  font-weight: var(--weight-semibold);
+}
+
+.trust-chip__text span { font-size: var(--text-12); color: var(--navy-08); }
+
+/* Handwritten accent over the photograph — decorative, desktop only. */
+.hero__script {
+  position: absolute;
+  top: 16%;
+  left: 56%;
+  margin: 0;
+  transform: rotate(-6deg);
+  /* Inter-only house rule (§3.3): the annotation reads as a designer's note
+     through weight, oblique and the swoosh, not through a second family. */
+  font-family: var(--font-sans);
+  font-style: italic;
+  font-weight: var(--weight-semibold);
+  font-size: var(--text-20);
+  line-height: 1.3;
+  color: var(--white);
+  text-shadow: 0 2px 12px var(--chip-glass);
+  display: none;
+}
+
+@media (min-width: 1025px) {
+  .hero__script { display: block; }
+}
+
+.hero__script-swoosh {
+  display: block;
+  width: 120px;
+  height: 14px;
+  margin-top: 2px;
+  color: var(--green-bright);
+}
 
 /* --- Category cards: live body types, one real photo each ----------------- */
 .cat-grid {
@@ -503,11 +575,11 @@ body[data-page="/"] img.header__logo-mark { background: var(--honest-navy); outl
   width: 100%;
   height: 100%;
   object-fit: cover;
-  transition: transform 0.45s var(--ease);
+  transition: transform var(--motion) var(--ease);
 }
 
 .cat-card:hover .cat-card__img,
-.cat-card:focus-visible .cat-card__img { transform: scale(1.05); }
+.cat-card:focus-visible .cat-card__img { transform: scale(1.03); }
 
 .cat-card__label {
   position: absolute;
@@ -639,15 +711,15 @@ body[data-page="/"] img.header__logo-mark { background: var(--honest-navy); outl
 .section--cinema .grid--2 { align-items: center; }
 
 /* --- Vehicle cards: a gentler premium hover -------------------------------- */
-.car-card__img { transition: transform 0.45s var(--ease); }
+.car-card__img { transition: transform var(--motion) var(--ease); }
 
-.car-card:hover .car-card__img { transform: scale(1.04); }
+.car-card:hover .car-card__img { transform: scale(1.02); }
 
 /* --- Enter-view motion, fast and restrained (§7 of the redesign brief) ----- */
 .reveal {
   opacity: 0;
-  transform: translateY(14px);
-  transition: opacity 0.55s var(--ease), transform 0.55s var(--ease);
+  transform: translateY(8px);
+  transition: opacity var(--motion) var(--ease), transform var(--motion) var(--ease);
 }
 
 .reveal--in { opacity: 1; transform: none; }

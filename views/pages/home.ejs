@@ -38,11 +38,11 @@
   <div class="hero__scrim" aria-hidden="true"></div>
   <div class="container hero__grid">
     <div class="hero__copy">
-      <p class="hero__eyebrow"><%- helpers.icon('checkCircle', { size: 14 }) %> Trusted cars. Better journeys.</p>
+      <p class="hero__eyebrow"><%- helpers.icon('checkCircle', { size: 14 }) %> Trusted • Verified • Hassle-Free</p>
       <% if (modules.hero && modules.hero.headline) { %>
         <h1 class="hero__title"><%= modules.hero.headline %></h1>
       <% } else { %>
-        <h1 class="hero__title">Every vehicle verified. Every price compared. <em class="hero__accent">Every deal honest.</em></h1>
+        <h1 class="hero__title">Quality Cars.<br>Real People. <em class="hero__accent">Honest Deals.</em></h1>
       <% } %>
       <p class="hero__sub">
         <%= (modules.hero && modules.hero.subhead) || 'Verified cars from 37+ trusted Port Harcourt lots — with inspections, documents and negotiation handled for you.' %>
@@ -80,12 +80,31 @@
 
       <%# Three trust chips: cars live · partner dealers in PH · verified-only badge system %>\
       <div class="hero__chips">
-        <span class="trust-chip"><%- helpers.icon('car', { size: 16 }) %><strong><%= site.counters.carsLive %></strong> cars live now</span>
-        <span class="trust-chip"><%- helpers.icon('store', { size: 16 }) %><strong><%= site.counters.partnerDealers %></strong> partner dealers in <%= (site.cities || []).length || 1 %> <%= (site.cities || []).length === 1 ? 'city' : 'cities' %></span>
-        <span class="trust-chip"><%- helpers.icon('checkCircle', { size: 16 }) %><strong><%= site.counters.certified %></strong> certified listings</span>
+        <span class="trust-chip">
+          <span class="trust-chip__icon"><%- helpers.icon('car', { size: 18 }) %></span>
+          <span class="trust-chip__text">
+            <strong><%= site.counters.carsLive %> cars live now</strong>
+            <span>Fresh listings, daily</span>
+          </span>
+        </span>
+        <span class="trust-chip">
+          <span class="trust-chip__icon"><%- helpers.icon('store', { size: 18 }) %></span>
+          <span class="trust-chip__text">
+            <strong><%= site.counters.partnerDealers %> partner dealers</strong>
+            <span>In <%= (site.cities || []).length || 1 %> <%= (site.cities || []).length === 1 ? 'city' : 'cities' %></span>
+          </span>
+        </span>
+        <span class="trust-chip">
+          <span class="trust-chip__icon"><%- helpers.icon('checkCircle', { size: 18 }) %></span>
+          <span class="trust-chip__text">
+            <strong><%= site.counters.certified %> certified listings</strong>
+            <span>Inspected &amp; verified</span>
+          </span>
+        </span>
       </div>
     </div>
   </div>
+  <%# Decorative handwritten accent, like the reference — hidden on phones. %>  <p class="hero__script" aria-hidden="true">Drive with<br>Confidence<svg class="hero__script-swoosh" viewBox="0 0 120 14" focusable="false"><path d="M2 10 C 30 3, 62 2, 118 7" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"></path></svg></p>
 </section>
 
 <%# ------------------------------------------- 3. Category cards (live counts) %>\

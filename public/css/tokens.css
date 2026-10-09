@@ -30,6 +30,7 @@
   --scrim-hero-floor: linear-gradient(0deg, rgba(7, 28, 42, 0.55) 0%, rgba(7, 28, 42, 0) 42%);
   --scrim-band: linear-gradient(90deg, rgba(7, 28, 42, 0.93) 0%, rgba(7, 28, 42, 0.74) 55%, rgba(7, 28, 42, 0.45) 100%);
   --scrim-up: linear-gradient(180deg, rgba(7, 28, 42, 0) 20%, rgba(7, 28, 42, 0.9) 82%);
+  --chip-glass: rgba(7, 28, 42, 0.72);
 
   /* Derived neutrals — tints of the tokens above only, no new hues */
   --navy-70: #3f5670;
