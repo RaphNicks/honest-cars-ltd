@@ -78,11 +78,22 @@
     </div>
 
     <% if (feed.posts.length) { %>
+      <% if (feed.page === 1 && !q && !category) { %>
+      <div class="blog-index mt-3">
+        <%- include('../partials/post-card', { post: feed.posts[0], helpers: helpers, featured: true }) %>
+        <div class="blog-index__more" data-post-grid>
+          <% feed.posts.slice(1).forEach(function (post) { %>
+            <%- include('../partials/post-card', { post: post, helpers: helpers }) %>
+          <% }); %>
+        </div>
+      </div>
+      <% } else { %>
       <div class="grid grid--3 mt-3" data-post-grid>
         <% feed.posts.forEach(function (post) { %>
           <%- include('../partials/post-card', { post: post, helpers: helpers }) %>
         <% }); %>
       </div>
+      <% } %>
 
       <div class="btn-row mt-3" style="justify-content:center">
         <% if (feed.page < feed.pages) { %>

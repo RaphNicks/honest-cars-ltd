@@ -36,12 +36,12 @@
       <h2>Who you are dealing with</h2>
       <p class="section-head__note mb-0">Small team, one city, no anonymous call centre.</p>
     </div>
-    <div class="grid grid--3">
+    <div class="people-cols">
       <% team.forEach(function (member) { %>
-        <div class="card card__body">
-          <h3 class="mb-1"><%= member.name %></h3>
-          <p class="text-green mb-1"><strong><%= member.role %></strong></p>
-          <p class="mb-0"><%= member.bio %></p>
+        <div>
+          <h3><%= member.name %></h3>
+          <p class="people-cols__role"><%= member.role %></p>
+          <p><%= member.bio %></p>
         </div>
       <% }); %>
     </div>
@@ -76,15 +76,27 @@
 <section class="section">
   <div class="container">
     <div class="section-head"><h2>What buyers and sellers say</h2></div>
-    <div class="grid grid--3">
-      <% testimonials.forEach(function (testimonial) { %>
-        <figure class="testimonial">
-          <span class="testimonial__stars" aria-label="<%= testimonial.rating %> out of 5">★★★★★</span>
-          <blockquote class="testimonial__quote">“<%= testimonial.quote %>”</blockquote>
-          <figcaption class="testimonial__meta"><%= testimonial.name %> · <%= testimonial.area %></figcaption>
+    <% if (testimonials.length) { %>
+    <figure class="quote-lead quote-lead--light">
+      <blockquote class="quote-lead__text">“<%= testimonials[0].quote %>”</blockquote>
+      <figcaption class="quote-lead__meta">
+        <%= testimonials[0].name %> · <%= testimonials[0].area %>
+        <span class="quote-lead__stars" aria-label="<%= testimonials[0].rating %> out of 5">★★★★★</span>
+      </figcaption>
+    </figure>
+    <% } %>
+    <% if (testimonials.length > 1) { %>
+    <div class="quote-more quote-more--light">
+      <% testimonials.slice(1).forEach(function (testimonial) { %>
+        <figure class="quote-more__item">
+          <blockquote>“<%= testimonial.quote %>”</blockquote>
+          <figcaption><%= testimonial.name %> · <%= testimonial.area %>
+            <span class="quote-lead__stars" aria-label="<%= testimonial.rating %> out of 5">★★★★★</span>
+          </figcaption>
         </figure>
       <% }); %>
     </div>
+    <% } %>
   </div>
 </section>
 <% } %>

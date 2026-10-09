@@ -873,3 +873,71 @@ body[data-page="/"] img.header__logo-mark { background: var(--honest-navy); outl
 .note-block + .note-block { margin-top: var(--space-3); }
 
 .note-block h2 { margin: 0 0 var(--space-1); font-size: var(--text-20); }
+
+/* ==========================================================================
+   Batch D — content & trust pages: editorial index, columns, open channels
+   ========================================================================== */
+
+/* Blog index: one featured story, the rest in a calmer two-column shelf. */
+.blog-index { display: grid; gap: var(--space-3); }
+
+@media (min-width: 1025px) {
+  .blog-index { grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); gap: var(--space-4); align-items: start; }
+}
+
+.blog-index__more { display: grid; gap: var(--space-2); grid-template-columns: 1fr; }
+
+@media (min-width: 769px) {
+  .blog-index__more { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+/* Team as columns with a green role line. */
+.people-cols { display: grid; gap: var(--space-3); }
+
+@media (min-width: 769px) {
+  .people-cols { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+
+.people-cols > * { margin: 0; padding-top: var(--space-2); border-top: var(--border); }
+
+.people-cols h3 { margin: 0 0 var(--space-05); font-size: var(--text-16); font-weight: var(--weight-semibold); color: var(--honest-navy); }
+
+.people-cols__role { margin: 0 0 var(--space-05); font-size: var(--text-14); font-weight: var(--weight-semibold); color: var(--honest-green); }
+
+.people-cols p { margin: 0; font-size: var(--text-14); line-height: var(--leading-relaxed); color: var(--color-text-muted); }
+
+/* The navy-band quotation pattern, retuned for light sections. */
+.quote-lead--light .quote-lead__text { color: var(--honest-navy); }
+
+.quote-lead--light .quote-lead__meta { color: var(--color-text-muted); }
+
+.quote-more--light .quote-more__item { border-top-color: var(--color-border); }
+
+.quote-more--light .quote-more__item blockquote { color: var(--color-text); }
+
+.quote-more--light .quote-more__item figcaption { color: var(--color-text-muted); }
+
+/* Contact channels: an open list, not a stack of boxes. */
+.channels { border-top: var(--border); }
+
+.channels__row {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  padding: var(--space-2) 0;
+  border-bottom: var(--border);
+}
+
+a.channels__row:hover { text-decoration: none; }
+
+a.channels__row:hover .channels__body strong { color: var(--honest-green); }
+
+.channels__icon { color: var(--honest-green); flex: 0 0 auto; margin-top: 2px; }
+
+.channels__body { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+
+.channels__body strong { font-size: var(--text-16); font-weight: var(--weight-semibold); color: var(--honest-navy); }
+
+.channels__body span { font-size: var(--text-14); line-height: var(--leading-relaxed); color: var(--color-text-muted); }
+
+.channels__body a { color: var(--honest-navy); }

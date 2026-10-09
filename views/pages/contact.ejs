@@ -18,36 +18,47 @@
 <section class="section">
   <div class="container">
     <div class="grid grid--2" style="align-items:start">
-      <div class="stack">
-        <a class="card card__body card--hoverable" href="<%= site.nav.whatsapp.general %>" target="_blank" rel="noopener"
+      <div class="channels">
+        <a class="channels__row" href="<%= site.nav.whatsapp.general %>" target="_blank" rel="noopener"
            data-event="whatsapp_click" data-source="contact_card">
-          <h2 class="mb-1"><%- helpers.icon('whatsapp', { size: 22 }) %> WhatsApp — fastest</h2>
-          <p class="mb-0">Send the car link or the question. Working hours: minutes. After 6pm: first thing next morning.</p>
+          <span class="channels__icon"><%- helpers.icon('whatsapp', { size: 20 }) %></span>
+          <span class="channels__body">
+            <strong>WhatsApp — fastest</strong>
+            <span>Send the car link or the question. Working hours: minutes. After 6pm: first thing next morning.</span>
+          </span>
         </a>
 
-        <div class="card card__body">
-          <h2 class="mb-1"><%- helpers.icon('phone', { size: 22 }) %> Phone</h2>
-          <p class="mb-0"><a href="tel:<%= site.business.phone %>"><%= helpers.phonePretty(site.business.phone) %></a></p>
+        <div class="channels__row">
+          <span class="channels__icon"><%- helpers.icon('phone', { size: 20 }) %></span>
+          <span class="channels__body">
+            <strong>Phone</strong>
+            <span><a href="tel:<%= site.business.phone %>"><%= helpers.phonePretty(site.business.phone) %></a></span>
+          </span>
         </div>
 
-        <div class="card card__body">
-          <h2 class="mb-1"><%- helpers.icon('chat', { size: 22 }) %> Email</h2>
-          <p class="mb-0"><a href="mailto:<%= site.business.email %>"><%= site.business.email %></a></p>
+        <div class="channels__row">
+          <span class="channels__icon"><%- helpers.icon('chat', { size: 20 }) %></span>
+          <span class="channels__body">
+            <strong>Email</strong>
+            <span><a href="mailto:<%= site.business.email %>"><%= site.business.email %></a></span>
+          </span>
         </div>
 
-        <div class="card card__body">
-          <h2 class="mb-1"><%- helpers.icon('mapPin', { size: 22 }) %> Where we are</h2>
-          <p class="mb-1"><strong>We operate virtually in Port Harcourt — inspections come to you.</strong></p>
-          <p class="mb-0">
-            There is no walk-in showroom, because we do not hold stock: the cars belong to partner lots across
-            the city, and our inspectors travel to them. Meetings happen where the car is, or at a meet-point
-            we agree on WhatsApp.
-          </p>
+        <div class="channels__row">
+          <span class="channels__icon"><%- helpers.icon('mapPin', { size: 20 }) %></span>
+          <span class="channels__body">
+            <strong>Where we are</strong>
+            <span>We operate virtually in Port Harcourt — inspections come to you. There is no walk-in showroom,
+            because we do not hold stock: the cars belong to partner lots across the city, and our inspectors
+            travel to them. Meetings happen where the car is, or at a meet-point we agree on WhatsApp.</span>
+          </span>
         </div>
 
-        <div class="card card__body">
-          <h2 class="mb-1">Company details</h2>
-          <p class="mb-0"><%= site.business.cacLine %></p>
+        <div class="channels__row">
+          <span class="channels__body">
+            <strong>Company details</strong>
+            <span><%= site.business.cacLine %></span>
+          </span>
         </div>
       </div>
 
@@ -117,9 +128,16 @@
 <section class="section">
   <div class="container">
     <div class="section-head"><h2>Or go straight to the thing you need</h2></div>
-    <div class="grid grid--3">
-      <% services.slice(0, 6).forEach(function (service) { %>
-        <%- include('../partials/service-card', { service: service, helpers: helpers }) %>
+    <div class="service-index service-index--two">
+      <% services.slice(0, 6).forEach(function (service, index) { %>
+        <a class="service-index__row" href="/services/<%= service.slug %>">
+          <span class="service-index__num" aria-hidden="true"><%= String(index + 1).padStart(2, '0') %></span>
+          <span class="service-index__body">
+            <strong><%= service.name %></strong>
+            <span><%= service.promise %></span>
+          </span>
+          <span class="service-index__arrow" aria-hidden="true">→</span>
+        </a>
       <% }); %>
     </div>
   </div>
