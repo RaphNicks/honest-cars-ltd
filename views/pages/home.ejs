@@ -295,9 +295,19 @@
       </div>
       <a class="section-head__link" href="/services">All services →</a>
     </div>
-    <div class="grid grid--3" data-reveal>
-      <% services.forEach(function (service) { %>
-        <%- include('../partials/service-card', { service: service, helpers: helpers }) %>
+    <div class="service-index" data-reveal>
+      <% services.forEach(function (service, index) { %>
+        <a class="service-index__row" href="/services/<%= service.slug %>">
+          <span class="service-index__num" aria-hidden="true"><%= String(index + 1).padStart(2, '0') %></span>
+          <span class="service-index__body">
+            <strong><%= service.name %></strong>
+            <span><%= service.promise %></span>
+          </span>
+          <% if (service.fromPriceKobo) { %>
+            <span class="service-index__price">from <%= helpers.formatNaira(service.fromPriceKobo) %></span>
+          <% } %>
+          <span class="service-index__arrow" aria-hidden="true">→</span>
+        </a>
       <% }); %>
     </div>
   </div>
@@ -332,15 +342,27 @@
       </div>
     </div>
 
-    <div class="grid grid--3 mt-3" data-reveal>
-      <% testimonials.forEach(function (testimonial) { %>
-        <figure class="testimonial">
-          <span class="testimonial__stars" aria-label="<%= testimonial.rating %> out of 5">★★★★★</span>
-          <blockquote class="testimonial__quote">“<%= testimonial.quote %>”</blockquote>
-          <figcaption class="testimonial__meta"><%= testimonial.name %> · <%= testimonial.area %></figcaption>
+    <% if (testimonials.length) { %>
+    <figure class="quote-lead" data-reveal>
+      <blockquote class="quote-lead__text">“<%= testimonials[0].quote %>”</blockquote>
+      <figcaption class="quote-lead__meta">
+        <%= testimonials[0].name %> · <%= testimonials[0].area %>
+        <span class="quote-lead__stars" aria-label="<%= testimonials[0].rating %> out of 5">★★★★★</span>
+      </figcaption>
+    </figure>
+    <% } %>
+    <% if (testimonials.length > 1) { %>
+    <div class="quote-more" data-reveal>
+      <% testimonials.slice(1).forEach(function (testimonial) { %>
+        <figure class="quote-more__item">
+          <blockquote>“<%= testimonial.quote %>”</blockquote>
+          <figcaption><%= testimonial.name %> · <%= testimonial.area %>
+            <span class="quote-lead__stars" aria-label="<%= testimonial.rating %> out of 5">★★★★★</span>
+          </figcaption>
         </figure>
       <% }); %>
     </div>
+    <% } %>
   </div>
 </section>
 
@@ -354,10 +376,13 @@
       </div>
       <a class="section-head__link" href="/blog">All posts →</a>
     </div>
-    <div class="grid grid--3" data-reveal>
-      <% posts.forEach(function (post) { %>
-        <%- include('../partials/post-card', { post: post, helpers: helpers }) %>
-      <% }); %>
+    <div class="blog-strip" data-reveal>
+      <%- include('../partials/post-card', { post: posts[0], helpers: helpers, featured: true }) %>
+      <div class="blog-strip__more">
+        <% posts.slice(1).forEach(function (post) { %>
+          <%- include('../partials/post-card', { post: post, helpers: helpers }) %>
+        <% }); %>
+      </div>
     </div>
   </div>
 </section>

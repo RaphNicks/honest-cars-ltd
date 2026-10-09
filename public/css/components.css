@@ -1131,14 +1131,16 @@ img.header__logo-mark {
   .grade-strip { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 }
 
+/* Batch B: the three grades read as annotated columns, not boxes — the colour
+   rule on the left carries the meaning (§2.1 card diet). */
 .grade-card {
   display: flex;
   gap: var(--space-2);
-  padding: var(--space-2);
-  background: var(--white);
-  border: var(--border);
-  border-left: 4px solid var(--line);
-  border-radius: var(--radius);
+  padding: 0 0 0 var(--space-2);
+  background: transparent;
+  border: 0;
+  border-left: 3px solid var(--line);
+  border-radius: 0;
 }
 
 .grade-card--field_checked { border-left-color: var(--honest-amber); }

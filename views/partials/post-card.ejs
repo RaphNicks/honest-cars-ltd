@@ -1,5 +1,5 @@
 <%# Blog card — “From the Blog” homepage module 8 (§6.1) and /blog grid (§6.9) %>
-<article class="post-card">
+<article class="post-card<%= typeof featured !== 'undefined' && featured ? ' post-card--featured' : '' %>>
   <% var postBlur = helpers.blurFor(post.heroImage); %>
   <div class="post-card__media media-blur"<% if (postBlur) { %> style="background-image:url('<%= postBlur %>')"<% } %>>
     <img class="post-card__img" data-blur-img src="<%= helpers.photoSrc(post.heroImage) %>"

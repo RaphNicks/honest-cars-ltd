@@ -728,3 +728,113 @@ body[data-page="/"] img.header__logo-mark { background: var(--honest-navy); outl
   .reveal { opacity: 1; transform: none; transition: none; }
   .cat-card__img, .car-card__img { transition: none; }
 }
+
+/* ==========================================================================
+   Batch B — editorial homepage: typography and hairlines over boxes
+   ========================================================================== */
+
+/* --- Services as a numbered index, not a card wall ------------------------ */
+.service-index { border-top: var(--border); }
+
+.service-index__row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-05) var(--space-2);
+  padding: var(--space-2) 0;
+  border-bottom: var(--border);
+}
+
+.service-index__num {
+  font-size: var(--text-12);
+  font-weight: var(--weight-medium);
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.service-index__body {
+  flex: 1 1 260px;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.service-index__body strong { font-size: var(--text-16); font-weight: var(--weight-semibold); color: var(--honest-navy); }
+
+.service-index__body span { font-size: var(--text-14); color: var(--color-text-muted); }
+
+.service-index__price {
+  margin-left: auto;
+  font-size: var(--text-14);
+  font-weight: var(--weight-semibold);
+  color: var(--honest-green);
+  white-space: nowrap;
+}
+
+.service-index__arrow { color: var(--muted); transition: color var(--motion) var(--ease), transform var(--motion) var(--ease); }
+
+.service-index__row:hover { text-decoration: none; }
+
+.service-index__row:hover .service-index__arrow { color: var(--honest-green); transform: translateX(2px); }
+
+/* --- Testimonials as quotations on the navy band --------------------------- */
+.quote-lead { margin: var(--space-4) 0 0; max-width: 820px; }
+
+.quote-lead__text {
+  margin: 0 0 var(--space-2);
+  font-size: var(--text-24);
+  line-height: var(--leading-snug);
+  font-weight: var(--weight-medium);
+  color: var(--white);
+}
+
+.quote-lead__meta {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  font-size: var(--text-14);
+  color: var(--navy-08);
+}
+
+.quote-lead__stars { color: var(--honest-amber); letter-spacing: 2px; font-size: var(--text-12); }
+
+.quote-more { display: grid; gap: var(--space-3); margin-top: var(--space-4); }
+
+@media (min-width: 769px) {
+  .quote-more { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+
+.quote-more__item { margin: 0; padding-top: var(--space-2); border-top: 1px solid var(--white-glass-line); }
+
+.quote-more__item blockquote {
+  margin: 0 0 var(--space-1);
+  font-size: var(--text-14);
+  line-height: var(--leading-relaxed);
+  color: var(--navy-08);
+}
+
+.quote-more__item figcaption {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  font-size: var(--text-14);
+  color: var(--navy-08);
+}
+
+/* --- Blog strip: one featured story, compact follow-ups --------------------- */
+.blog-strip { display: grid; gap: var(--space-3); }
+
+@media (min-width: 1025px) {
+  .blog-strip { grid-template-columns: 1.4fr 1fr; align-items: stretch; }
+}
+
+.blog-strip__more { display: grid; gap: var(--space-2); align-content: start; }
+
+@media (min-width: 769px) {
+  .post-card--featured { display: grid; grid-template-columns: 1.1fr 1fr; }
+  .post-card--featured .post-card__media { aspect-ratio: auto; height: 100%; min-height: 260px; }
+}
+
+/* --- Category tiles: the photograph is the tile; the border was noise -------- */
+.cat-card { border: 0; }
