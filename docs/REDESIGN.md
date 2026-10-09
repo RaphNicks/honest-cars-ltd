@@ -271,4 +271,18 @@ Verification: 556/556 tests · lint 0.
 Verification: 556/556 tests · lint 0 · static build 74 pages · 147 pages
 audited, 0 findings · live checks on compare, about and a real VDP.
 
-**The redesign programme (Batches A–H) is complete. PR #1 awaits sign-off.**
+## 12. Typography system — Barlow Condensed + IBM Plex Sans (`6ce6ca3`)
+
+Owner direction (2026-10-09) replaced the Inter-only rule with an
+automotive pairing: Barlow Condensed 600/700 for display work, IBM Plex
+Sans 400–700 for the interface. Both self-hosted woff2, latin subsets,
+font-display swap. Display carries h1–h3, the hero headline (only
+uppercase treatment), eyebrows, prices and kpi figures; a --text-40 step
+joins the ladder so condensed headings hold optical weight. Lint, the
+type-scale suite and the pwa suite enforce the new system; the service
+worker precaches plex-400 + barlow-700 (hc-v8). Generated documents
+(invoices, reports, statements, OG images) keep Inter — fixed-width PDF
+layouts and the fontconfig pipeline are protected backend artifacts.
+
+**The redesign programme (Batches A–H) plus the typography system are
+complete. PR #1 awaits sign-off.**
