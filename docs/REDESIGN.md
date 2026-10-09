@@ -194,4 +194,25 @@ Verification: 556/556 tests · lint 0 · 147 pages audited, 0 findings · live
 spot-checks on `/services`, `/hire`, `/shop`, `/sell-swap` and a service page
 confirm the only remaining boxes are functional forms and data panels.
 
-**Next: Batch D, on your approval.**
+## 7. Batch D — completed (`0a3d701`)
+
+- `/blog`: page one leads with a featured story (side-by-side media), the
+  rest in a two-column shelf; filtered/paginated views keep the plain grid so
+  load-more keeps appending unchanged.
+- `/how-it-works`: boxed trio → hairline columns.
+- `/about`: team cards → columns with a green role line; testimonial cards →
+  one large light quotation + hairline follow-ups.
+- `/contact`: five-box stack → open channel list; service card wall → numbered
+  index; the form stays one calm container.
+- `/blog/{slug}`: boxed aside widgets → open notes; author block kept (E-E-A-T).
+- `/faq`, `/guide`, `/verification`, legal pages: audited, already editorial
+  (accordions, narrow prose column, integrity band) — unchanged.
+- Bug caught by the live audit and fixed: the post-card featured test used
+  truthiness while EJS includes inherit parent locals (a *list* named
+  `featured` on several pages) — every card turned "featured" and a closing
+  quote was lost. Now `locals.featured === true`; verified one featured card
+  per page on `/blog` and `/`.
+
+Verification: 556/556 tests · lint 0 · 147 pages audited, 0 findings.
+
+**Next: Batch E, on your approval.**
