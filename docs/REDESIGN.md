@@ -151,4 +151,30 @@ file did not survive a sandbox reset; dropping it over
 `public/img/site/hero-cinema.jpg` and running `npm run images` swaps it in
 with zero code changes.
 
-**Next: Batch B, on your approval.**
+## 5. Batch B — completed (`6169f8d`)
+
+Homepage card diet, per §2.1:
+
+- Grades: three boxes → three annotated columns (left colour rule carries the
+  meaning; no background, no border).
+- Services grid → numbered editorial index (hairline rows: name, promise,
+  from-price, hover arrow). Same links and data.
+- Testimonials on navy: one large editorial quotation + hairline columns for
+  the rest; attributions and ratings untouched.
+- Blog strip: featured story in a side-by-side composition + two compact
+  cards, replacing the uniform trio.
+- Category tiles: outer border removed; the photograph is the tile.
+
+Discovery surfaces audited against §5.2–5.5 and left structurally as-is
+because they already comply: `/cars` uses a plain filter panel (dialog on
+mobile) with result bar and removable pills; the VDP presents specs as a
+hairline `dl` with no boxing; comparison is a real aligned table with
+best-value highlighting; `/find-my-car` is a stepped flow with a progress
+bar. Their remaining polish (rail typography, gallery rhythm) is queued for
+Batch H's consistency pass rather than risking churn now.
+
+Verification: lint exit 0 (type-scale caught and fixed a 12px attribution) ·
+556/556 tests · 147 pages audited, 0 findings · live page carries all new
+strips.
+
+**Next: Batch C, on your approval.**
