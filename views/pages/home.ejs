@@ -1,39 +1,54 @@
 <%#
-  Homepage — §6.1, section by section:
-    2. Hero + instant search (Make · Model · Max budget ₦ · Search) + 3 trust chips
-    3. Live inventory — “Fresh on the market”, 8 cards, tabs
-    4. How it works — 3 steps
-    5. Verification grades strip
-    6. Services suite (all live services from the DB)
-    7. Social proof — testimonials + counters
-    8. From the Blog — 3 latest
-    9. Dealer CTA band
-   10. Deal-alert opt-in
+  Homepage — §6.1, section by section (2026 cinematic refresh):
+    1.  Announcement strip (CMS, off by default)
+    2.  Cinematic hero — full-bleed golden-hour photograph, headline with a
+        green accent, the instant search (Make · Body · Max budget ₦ · Search)
+        and the three live trust chips
+    3.  Category cards — live body-type counts, one real listing photo each
+    4.  Live inventory — “Fresh on the market”, 8 cards, tabs
+    5.  Featured rail (ops-picked)
+    6.  Brand row — live make counts
+    7.  How it works — 3 steps beside the inspector photograph
+    8.  Verification grades strip
+    9.  Services suite (all live services from the DB)
+   10.  Social proof — counters + testimonials on deep navy
+   11.  From the Blog — 3 latest
+   12.  Dealer CTA band on the dusk-road photograph
+   13.  Deal-alert opt-in
 %>
 
 <% if (modules.announcement && modules.announcement.text) { %>
-<%# §7.3 homepage module — marketing banner, off until marketing turns it on %>
+<%# §7.3 homepage module — marketing banner, off until marketing turns it on %>\
 <section class="banner-strip" role="region" aria-label="Announcement">
   <div class="container banner-strip__inner">
     <span class="banner-strip__text"><%= modules.announcement.text %></span>
     <% if (modules.announcement.href) { %>
       <%# No data-event here on purpose: §15.1 has no banner event, and the
-          event plan is used verbatim — we do not invent names. %>
+          event plan is used verbatim — we do not invent names. %>\
       <a class="banner-strip__link" href="<%= modules.announcement.href %>"><%= modules.announcement.label || 'Find out more' %> →</a>
     <% } %>
   </div>
 </section>
 <% } %>
 
-<section class="hero">
+<section class="hero hero--cinematic">
+  <img class="hero__bg" src="<%= helpers.photoSrc('/img/site/hero-cinema.jpg') %>"
+       <% if (helpers.srcsetFor('/img/site/hero-cinema.jpg')) { %>srcset="<%= helpers.srcsetFor('/img/site/hero-cinema.jpg') %>" sizes="100vw"<% } %>
+       alt="" aria-hidden="true" width="1200" height="900" fetchpriority="high" decoding="async">
+  <div class="hero__scrim" aria-hidden="true"></div>
   <div class="container hero__grid">
-    <div>
-      <h1 class="hero__title"><%= (modules.hero && modules.hero.headline) || 'Every vehicle verified. Every price compared. Every deal honest.' %></h1>
+    <div class="hero__copy">
+      <p class="hero__eyebrow"><%- helpers.icon('checkCircle', { size: 14 }) %> Trusted cars. Better journeys.</p>
+      <% if (modules.hero && modules.hero.headline) { %>
+        <h1 class="hero__title"><%= modules.hero.headline %></h1>
+      <% } else { %>
+        <h1 class="hero__title">Every vehicle verified. Every price compared. <em class="hero__accent">Every deal honest.</em></h1>
+      <% } %>
       <p class="hero__sub">
         <%= (modules.hero && modules.hero.subhead) || 'Verified cars from 37+ trusted Port Harcourt lots — with inspections, documents and negotiation handled for you.' %>
       </p>
 
-      <%# §6.1 module 2 — instant search → /cars with filters applied %>
+      <%# §6.1 module 2 — instant search → /cars with filters applied %>\
       <form class="search-bar" action="/cars" method="get" role="search" aria-label="Search cars">
         <div class="field">
           <label class="field__label" for="hero-make">Make</label>
@@ -63,29 +78,53 @@
         </button>
       </form>
 
-      <%# Three trust chips: cars live · partner dealers in PH · verified-only badge system %>
+      <%# Three trust chips: cars live · partner dealers in PH · verified-only badge system %>\
       <div class="hero__chips">
         <span class="trust-chip"><%- helpers.icon('car', { size: 16 }) %><strong><%= site.counters.carsLive %></strong> cars live now</span>
         <span class="trust-chip"><%- helpers.icon('store', { size: 16 }) %><strong><%= site.counters.partnerDealers %></strong> partner dealers in <%= (site.cities || []).length || 1 %> <%= (site.cities || []).length === 1 ? 'city' : 'cities' %></span>
         <span class="trust-chip"><%- helpers.icon('checkCircle', { size: 16 }) %><strong><%= site.counters.certified %></strong> certified listings</span>
       </div>
     </div>
-
-    <% var heroBlur = helpers.blurFor('/img/site/home-hero.jpg'); %>
-    <div class="hero__media media-blur"<% if (heroBlur) { %> style="background-image:url('<%= heroBlur %>')"<% } %>>
-      <img src="<%= helpers.photoSrc('/img/site/home-hero.jpg') %>"
-           <% if (helpers.srcsetFor('/img/site/home-hero.jpg')) { %>srcset="<%= helpers.srcsetFor('/img/site/home-hero.jpg') %>" sizes="(min-width: 1025px) 560px, 92vw"<% } %>
-           alt="A HonestCars inspector running the checklist on a silver sedan in Port Harcourt"
-           width="1200" height="900" fetchpriority="high" data-blur-img decoding="async">
-    </div>
   </div>
 </section>
 
-<%# ------------------------------------------------ 3. Live inventory (tabs) %>
-<section class="section section--surface" aria-labelledby="fresh-heading">
+<%# ------------------------------------------- 3. Category cards (live counts) %>\
+<% if (categoryCards.length) { %>
+<section class="section section--surface" aria-labelledby="cats-heading">
   <div class="container">
-    <div class="section-head">
-      <h2 id="fresh-heading">Fresh on the market</h2>
+    <div class="section-head" data-reveal>
+      <div>
+        <p class="eyebrow">Popular categories</p>
+        <h2 id="cats-heading">Find your perfect ride</h2>
+      </div>
+      <a class="section-head__link" href="/cars">View all cars →</a>
+    </div>
+    <div class="cat-grid" data-reveal>
+      <% categoryCards.forEach(function (card) { %>
+        <a class="cat-card" href="/cars?body=<%= encodeURIComponent(card.value) %>">
+          <img class="cat-card__img" src="<%= helpers.photoSrc(card.image) %>"
+               <% if (helpers.smallSrc && helpers.smallSrc(card.image)) { %>srcset="<%= helpers.smallSrc(card.image) %> 600w, <%= card.image %> 1200w" sizes="(min-width: 1025px) 216px, (min-width: 769px) 30vw, 44vw"<% } %>
+               alt="<%= helpers.BODY_TYPE_LABELS[card.value] || card.value %> for sale on HonestCars"
+               width="600" height="450" loading="lazy" decoding="async">
+          <span class="cat-card__label">
+            <strong><%= helpers.BODY_TYPE_LABELS[card.value] || card.value %></strong>
+            <span class="cat-card__count"><%= card.count %> cars</span>
+          </span>
+        </a>
+      <% }); %>
+    </div>
+  </div>
+</section>
+<% } %>
+
+<%# ------------------------------------------------ 4. Live inventory (tabs) %>\
+<section class="section" aria-labelledby="fresh-heading">
+  <div class="container">
+    <div class="section-head" data-reveal>
+      <div>
+        <p class="eyebrow">Live inventory</p>
+        <h2 id="fresh-heading">Fresh on the market</h2>
+      </div>
       <a class="section-head__link" href="/cars">View all <%= site.counters.carsLive %> cars →</a>
     </div>
 
@@ -111,17 +150,20 @@
 </section>
 
 <% if (featured.length) { %>
-<%# §7.3 homepage module — featured rail, hand-picked by the ops desk %>
-<section class="section" aria-labelledby="featured-heading">
+<%# §7.3 homepage module — featured rail, hand-picked by the ops desk %>\
+<section class="section section--surface" aria-labelledby="featured-heading">
   <div class="container">
-    <div class="section-head">
-      <h2 id="featured-heading"><%= (featuredModule && featuredModule.heading) || 'Featured this week' %></h2>
+    <div class="section-head" data-reveal>
+      <div>
+        <p class="eyebrow">Featured listings</p>
+        <h2 id="featured-heading"><%= (featuredModule && featuredModule.heading) || 'Featured this week' %></h2>
+      </div>
       <a class="section-head__link" href="/cars">All cars →</a>
     </div>
     <% if (featuredModule && featuredModule.subheading) { %>
       <p class="section-head__sub"><%= featuredModule.subheading %></p>
     <% } %>
-    <div class="grid grid--3">
+    <div class="grid grid--3" data-reveal>
       <% featured.slice(0, 3).forEach(function (listing) { %>
         <%- include('../partials/car-card', { listing: listing, helpers: helpers, eager: false }) %>
       <% }); %>
@@ -130,47 +172,78 @@
 </section>
 <% } %>
 
-<%# ------------------------------------------------------- 4. How it works %>
+<%# ------------------------------------------------- 6. Brand row (live makes) %>\
+<% if (brandRow.length) { %>
+<section class="section section--brands" aria-label="Popular brands on HonestCars">
+  <div class="container">
+    <p class="eyebrow" data-reveal>Trusted brands</p>
+    <div class="brand-row" data-reveal>
+      <% brandRow.forEach(function (brand) { %>
+        <a class="brand-chip" href="/cars?make=<%= encodeURIComponent(brand.value) %>"
+           aria-label="<%= brand.value %> — <%= brand.count %> cars on HonestCars"><%= brand.value %></a>
+      <% }); %>
+    </div>
+  </div>
+</section>
+<% } %>
+
+<%# --------------------------------------- 7. How it works, beside the photo %>\
 <section class="section" aria-labelledby="how-heading">
   <div class="container">
-    <div class="section-head">
-      <h2 id="how-heading">How it works</h2>
+    <div class="section-head" data-reveal>
+      <div>
+        <p class="eyebrow">Why choose HonestCars</p>
+        <h2 id="how-heading">How it works</h2>
+      </div>
       <a class="section-head__link" href="/how-it-works">The full checklist →</a>
     </div>
-    <div class="steps">
-      <div class="step">
-        <span class="step__num">1</span>
-        <div>
-          <strong>Pick a car, or tell us what you want</strong>
-          <p>Browse verified stock, or hand us the brief and let the concierge find it in 48–72 hours.</p>
-        </div>
+    <div class="how__grid">
+      <% var howBlur = helpers.blurFor('/img/site/home-hero.jpg'); %>
+      <div class="how__media media-blur"<% if (howBlur) { %> style="background-image:url('<%= howBlur %>')"<% } %> data-reveal>
+        <img src="<%= helpers.photoSrc('/img/site/home-hero.jpg') %>"
+             <% if (helpers.srcsetFor('/img/site/home-hero.jpg')) { %>srcset="<%= helpers.srcsetFor('/img/site/home-hero.jpg') %>" sizes="(min-width: 1025px) 520px, 92vw"<% } %>
+             alt="A HonestCars inspector running the checklist on a silver sedan in Port Harcourt"
+             width="1200" height="900" loading="lazy" data-blur-img decoding="async">
+        <p class="how__chip"><%- helpers.icon('checkCircle', { size: 16 }) %> Every car is inspected, documented and verified.</p>
       </div>
-      <div class="step">
-        <span class="step__num">2</span>
-        <div>
-          <strong>We verify &amp; compare the price</strong>
-          <p>An inspector visits, scans the OBD2, sights the documents and writes down what is actually wrong.</p>
+      <div class="steps" data-reveal>
+        <div class="step">
+          <span class="step__num">1</span>
+          <div>
+            <strong>Pick a car, or tell us what you want</strong>
+            <p>Browse verified stock, or hand us the brief and let the concierge find it in 48–72 hours.</p>
+          </div>
         </div>
-      </div>
-      <div class="step">
-        <span class="step__num">3</span>
-        <div>
-          <strong>You buy protected, or we walk away</strong>
-          <p>Payment moves through HonestCars-protected channels, never to a seller directly. Handover with papers in hand.</p>
+        <div class="step">
+          <span class="step__num">2</span>
+          <div>
+            <strong>We verify &amp; compare the price</strong>
+            <p>An inspector visits, scans the OBD2, sights the documents and writes down what is actually wrong.</p>
+          </div>
+        </div>
+        <div class="step">
+          <span class="step__num">3</span>
+          <div>
+            <strong>You buy protected, or we walk away</strong>
+            <p>Payment moves through HonestCars-protected channels, never to a seller directly. Handover with papers in hand.</p>
+          </div>
         </div>
       </div>
     </div>
   </div>
 </section>
 
-<%# --------------------------------------- 5. Verification grades strip (§3.5) %>
+<%# --------------------------------------- 8. Verification grades strip (§3.5) %>\
 <section class="section section--surface" aria-labelledby="grades-heading">
   <div class="container">
-    <div class="section-head">
-      <h2 id="grades-heading">Three grades. No grey areas.</h2>
+    <div class="section-head" data-reveal>
+      <div>
+        <p class="eyebrow">The verification system</p>
+        <h2 id="grades-heading">Three grades. No grey areas.</h2>
+      </div>
       <a class="section-head__link" href="/verification">What each grade means →</a>
     </div>
-    <div class="grade-strip">
+    <div class="grade-strip" data-reveal>
       <div class="grade-card">
         <div>
           <strong>● Network-Listed</strong>
@@ -193,14 +266,17 @@
   </div>
 </section>
 
-<%# ---------------------------------------------------- 6. Services suite %>
+<%# ---------------------------------------------------- 9. Services suite %>\
 <section class="section" aria-labelledby="services-heading">
   <div class="container">
-    <div class="section-head">
-      <h2 id="services-heading">Everything around the car, handled</h2>
+    <div class="section-head" data-reveal>
+      <div>
+        <p class="eyebrow">Beyond the purchase</p>
+        <h2 id="services-heading">Everything around the car, handled</h2>
+      </div>
       <a class="section-head__link" href="/services">All services →</a>
     </div>
-    <div class="grid grid--3">
+    <div class="grid grid--3" data-reveal>
       <% services.forEach(function (service) { %>
         <%- include('../partials/service-card', { service: service, helpers: helpers }) %>
       <% }); %>
@@ -208,14 +284,17 @@
   </div>
 </section>
 
-<%# ------------------------------------------------ 7. Social proof + counters %>
-<section class="section section--surface" aria-labelledby="proof-heading">
+<%# ----------------------------------- 10. Social proof + counters, deep navy %>\
+<section class="section section--proof" aria-labelledby="proof-heading">
   <div class="container">
-    <div class="section-head">
-      <h2 id="proof-heading">What Port Harcourt says</h2>
+    <div class="section-head" data-reveal>
+      <div>
+        <p class="eyebrow">What our customers say</p>
+        <h2 id="proof-heading">What Port Harcourt says</h2>
+      </div>
     </div>
 
-    <div class="counter-row">
+    <div class="counter-row" data-reveal>
       <div class="counter">
         <span class="counter__value"><%= site.counters.carsLive %></span>
         <span class="counter__label"><%= counterLabels.carsLive || 'cars live in the network' %></span>
@@ -234,7 +313,7 @@
       </div>
     </div>
 
-    <div class="grid grid--3 mt-3">
+    <div class="grid grid--3 mt-3" data-reveal>
       <% testimonials.forEach(function (testimonial) { %>
         <figure class="testimonial">
           <span class="testimonial__stars" aria-label="<%= testimonial.rating %> out of 5">★★★★★</span>
@@ -246,14 +325,17 @@
   </div>
 </section>
 
-<%# ------------------------------------------------------- 8. From the Blog %>
+<%# ------------------------------------------------------- 11. From the Blog %>\
 <section class="section" aria-labelledby="blog-heading">
   <div class="container">
-    <div class="section-head">
-      <h2 id="blog-heading">From the Honest Buyer’s Guide</h2>
+    <div class="section-head" data-reveal>
+      <div>
+        <p class="eyebrow">The Honest Buyer’s Guide</p>
+        <h2 id="blog-heading">From the Honest Buyer’s Guide</h2>
+      </div>
       <a class="section-head__link" href="/blog">All posts →</a>
     </div>
-    <div class="grid grid--3">
+    <div class="grid grid--3" data-reveal>
       <% posts.forEach(function (post) { %>
         <%- include('../partials/post-card', { post: post, helpers: helpers }) %>
       <% }); %>
@@ -261,11 +343,16 @@
   </div>
 </section>
 
-<%# ------------------------------------------------------- 9. Dealer CTA band %>
-<section class="section section--navy" aria-labelledby="dealer-heading">
+<%# ------------------------------------- 12. Dealer CTA band, dusk road photo %>\
+<section class="section section--cinema" aria-labelledby="dealer-heading">
+  <img class="section__bg" src="<%= helpers.photoSrc('/img/site/road-dusk.jpg') %>"
+       <% if (helpers.srcsetFor('/img/site/road-dusk.jpg')) { %>srcset="<%= helpers.srcsetFor('/img/site/road-dusk.jpg') %>" sizes="100vw"<% } %>
+       alt="" aria-hidden="true" width="1200" height="900" loading="lazy" decoding="async">
+  <div class="section__scrim" aria-hidden="true"></div>
   <div class="container">
-    <div class="grid grid--2" style="align-items:center">
+    <div class="grid grid--2">
       <div>
+        <p class="eyebrow">Ready to drive?</p>
         <h2 id="dealer-heading">Own a car lot in PH? We bring you buyers.</h2>
         <p>List on HonestCars and get photographed, verified stock in front of buyers who are ready to pay — plus leads routed straight to your phone.</p>
       </div>
@@ -278,10 +365,10 @@
   </div>
 </section>
 
-<%# ----------------------------------------------------- 10. Deal-alert opt-in %>
+<%# ----------------------------------------------------- 13. Deal-alert opt-in %>\
 <section class="section" aria-labelledby="alert-heading">
   <div class="container">
-    <div class="alert-band">
+    <div class="alert-band" data-reveal>
       <div>
         <h2 id="alert-heading">Get hot verified deals on WhatsApp</h2>
         <p class="mb-0">One message when a car matches your budget and grade. No spamming, unsubscribe anytime — we ask once and remember.</p>

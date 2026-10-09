@@ -25,6 +25,7 @@ import { initServiceForms } from './service-forms.js';
 import { initFlows } from './flow.js';
 import { initValuation } from './valuation.js';
 import { initPWA } from './pwa.js';
+import { initReveal } from './reveal.js';
 import { initFinancing } from './financing.js';
 import { initAddToCart, initCartPage, initCheckoutPage, initComparePage } from './cart.js';
 import { initLoadMore, initVideoFacades, initTableOfContents, initHelpful } from './blog.js';
@@ -41,6 +42,7 @@ function boot() {
   initFormDrafts();
   initOutbox();
   initHeader();
+  initReveal();
   initAreaSwitcher();
   initTabs();
   initAccordions();

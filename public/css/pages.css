@@ -335,3 +335,324 @@
   margin-top: var(--space-1);
 }
 .financing-summary .checklist { margin-top: var(--space-1); }
+
+/* ==========================================================================
+   2026 cinematic storefront refresh — homepage first (§6.1)
+   The brand stays white-and-navy; the homepage borrows a deeper cut of the
+   navy and lets photography carry the first screen. Every colour here is a
+   token; every size is on the six-step ladder.
+   ========================================================================== */
+
+/* --- Editorial eyebrow above section headings --------------------------- */
+.eyebrow {
+  margin: 0 0 var(--space-05);
+  font-size: var(--text-12);
+  font-weight: var(--weight-semibold);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--honest-green);
+}
+
+/* --- The home header goes deep navy, like the reference ------------------ */
+body[data-page="/"] .header {
+  background: var(--navy-deep);
+  border-bottom-color: var(--white-glass-line);
+}
+
+body[data-page="/"] .header[data-scrolled='true'] {
+  border-bottom-color: var(--white-glass-line);
+}
+
+body[data-page="/"] .header__logo,
+body[data-page="/"] .header__nav-link,
+body[data-page="/"] .header__search-toggle,
+body[data-page="/"] .header__menu-toggle,
+body[data-page="/"] .header__signin,
+body[data-page="/"] .area-switcher--header .area-switcher__toggle {
+  color: var(--white);
+}
+
+body[data-page="/"] .header__nav-link[aria-current='page'] { color: var(--green-bright); }
+
+body[data-page="/"] .header__search-toggle:hover,
+body[data-page="/"] .header__menu-toggle:hover,
+body[data-page="/"] .area-switcher--header .area-switcher__toggle:hover {
+  background: var(--white-glass);
+}
+
+/* The gold mark sits on a navy chip; on the navy header the chip recedes,
+   so lift it one step instead of introducing a new colour. */
+body[data-page="/"] img.header__logo-mark { background: var(--honest-navy); outline: 1px solid var(--white-glass-line); }
+
+/* --- Cinematic hero ------------------------------------------------------- */
+.hero--cinematic {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  background: var(--navy-deep);
+  color: var(--white);
+  padding-block: var(--space-6) var(--space-6);
+}
+
+@media (min-width: 769px) {
+  .hero--cinematic { padding-block: var(--space-10) var(--space-8); }
+}
+
+@media (min-width: 1025px) {
+  .hero--cinematic { padding-block: var(--space-12) var(--space-10); }
+}
+
+.hero__bg {
+  position: absolute;
+  inset: 0;
+  z-index: -2;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: 78% 50%;
+}
+
+@media (min-width: 769px) {
+  .hero__bg { object-position: 70% 50%; }
+}
+
+.hero__scrim {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: var(--scrim-hero), var(--scrim-hero-floor);
+}
+
+.hero--cinematic .hero__grid { grid-template-columns: 1fr; }
+
+.hero__copy { max-width: 620px; }
+
+.hero__eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-05);
+  margin: 0 0 var(--space-2);
+  padding: var(--space-05) var(--space-2);
+  border: 1px solid var(--green-glass-line);
+  border-radius: var(--radius-pill);
+  background: var(--green-glass);
+  color: var(--green-bright);
+  font-size: var(--text-12);
+  font-weight: var(--weight-semibold);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.hero__eyebrow svg { width: 14px; height: 14px; }
+
+.hero--cinematic .hero__title {
+  color: var(--white);
+  max-width: 21ch;
+  letter-spacing: -0.02em;
+  text-wrap: balance;
+}
+
+.hero__accent { font-style: normal; color: var(--green-bright); }
+
+.hero--cinematic .hero__sub { color: var(--navy-08); }
+
+/* The search panel is the one bright object on the photograph — let it read
+   as a deliberate piece of the composition. */
+.hero--cinematic .search-bar {
+  border-color: var(--white-glass-line);
+  box-shadow: 0 24px 48px rgba(7, 28, 42, 0.45);
+}
+
+/* Trust chips become dark glass over the photo. */
+.hero--cinematic .trust-chip {
+  background: var(--white-glass);
+  border-color: var(--white-glass-line);
+  color: var(--white);
+}
+
+.hero--cinematic .trust-chip strong { color: var(--green-bright); }
+
+/* --- Category cards: live body types, one real photo each ----------------- */
+.cat-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-2);
+}
+
+@media (min-width: 769px) {
+  .cat-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+
+@media (min-width: 1025px) {
+  .cat-grid { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+}
+
+.cat-card {
+  position: relative;
+  display: block;
+  aspect-ratio: 4 / 3;
+  border-radius: var(--radius);
+  border: var(--border);
+  overflow: hidden;
+  background: var(--navy-deep);
+}
+
+.cat-card:hover { text-decoration: none; }
+
+.cat-card__img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 0.45s var(--ease);
+}
+
+.cat-card:hover .cat-card__img,
+.cat-card:focus-visible .cat-card__img { transform: scale(1.05); }
+
+.cat-card__label {
+  position: absolute;
+  inset-inline: 0;
+  bottom: 0;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-1);
+  padding: var(--space-3) var(--space-2) var(--space-1);
+  background: var(--scrim-up);
+  color: var(--white);
+}
+
+.cat-card__label strong { font-size: var(--text-16); font-weight: var(--weight-semibold); }
+
+.cat-card__count {
+  font-size: var(--text-12);
+  font-weight: var(--weight-medium);
+  color: var(--green-bright);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* --- Brand row: the makes the network actually stocks --------------------- */
+.section--brands { padding-block: var(--space-4); border-block: var(--border); }
+
+.brand-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2) var(--space-4);
+}
+
+.brand-chip {
+  font-size: var(--text-16);
+  font-weight: var(--weight-semibold);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--muted);
+  transition: color var(--motion) var(--ease);
+}
+
+.brand-chip:hover { color: var(--honest-navy); text-decoration: none; }
+
+/* --- How it works, beside the inspector photograph ------------------------ */
+.how__grid { display: grid; gap: var(--space-4); }
+
+@media (min-width: 1025px) {
+  .how__grid { grid-template-columns: 1fr 1.1fr; align-items: center; gap: var(--space-6); }
+}
+
+.how__media {
+  position: relative;
+  aspect-ratio: 4 / 3;
+  border-radius: var(--radius);
+  border: var(--border);
+  overflow: hidden;
+  background: var(--surface);
+}
+
+.how__media img { width: 100%; height: 100%; object-fit: cover; }
+
+.how__chip {
+  position: absolute;
+  left: var(--space-2);
+  bottom: var(--space-2);
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  max-width: calc(100% - var(--space-4));
+  margin: 0;
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius);
+  background: var(--white);
+  box-shadow: var(--shadow-hover);
+  font-size: var(--text-14);
+  font-weight: var(--weight-semibold);
+  color: var(--ink);
+}
+
+.how__chip svg { width: 16px; height: 16px; color: var(--honest-green); flex: 0 0 auto; }
+
+/* --- Social proof on deep navy -------------------------------------------- */
+.section--proof { background: var(--navy-deep); color: var(--white); }
+
+.section--proof .eyebrow { color: var(--green-bright); }
+
+.section--proof .section-head h2 { color: var(--white); }
+
+.section--proof .counter__value { color: var(--green-bright); }
+
+.section--proof .counter__label { color: var(--navy-08); }
+
+.section--proof .testimonial {
+  border-color: transparent;
+  border-radius: var(--radius);
+  box-shadow: 0 20px 40px rgba(7, 28, 42, 0.45);
+}
+
+/* --- Dealer band on the dusk-road photograph ------------------------------- */
+.section--cinema {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  background: var(--navy-deep);
+  color: var(--white);
+}
+
+.section__bg {
+  position: absolute;
+  inset: 0;
+  z-index: -2;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: 70% 50%;
+}
+
+.section__scrim { position: absolute; inset: 0; z-index: -1; background: var(--scrim-band); }
+
+.section--cinema .eyebrow { color: var(--green-bright); }
+
+.section--cinema h2 { color: var(--white); }
+
+.section--cinema p { color: var(--navy-08); }
+
+.section--cinema .grid--2 { align-items: center; }
+
+/* --- Vehicle cards: a gentler premium hover -------------------------------- */
+.car-card__img { transition: transform 0.45s var(--ease); }
+
+.car-card:hover .car-card__img { transform: scale(1.04); }
+
+/* --- Enter-view motion, fast and restrained (§7 of the redesign brief) ----- */
+.reveal {
+  opacity: 0;
+  transform: translateY(14px);
+  transition: opacity 0.55s var(--ease), transform 0.55s var(--ease);
+}
+
+.reveal--in { opacity: 1; transform: none; }
+
+@media (prefers-reduced-motion: reduce) {
+  .reveal { opacity: 1; transform: none; transition: none; }
+  .cat-card__img, .car-card__img { transition: none; }
+}

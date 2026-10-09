@@ -70,7 +70,11 @@ test.after(async () => {
 maybe('homepage renders the hero, the trust chips and the live feed', async () => {
   const { response, html } = await getHtml(ctx.baseUrl, '/');
   assert.equal(response.status, 200);
-  assert.match(html, /Every vehicle verified\. Every price compared\. Every deal honest\./);
+  // The redesign wraps the closing sentence in a green <em>; the copy is the
+  // same three sentences, verbatim, so the assertion tolerates one tag.
+  assert.match(html, /Every vehicle verified\. Every price compared\. (?:<[^>]+>)?Every deal honest\./);
+  assert.match(html, /hero--cinematic/, 'the cinematic hero is in force');
+  assert.match(html, /Find your perfect ride/, 'category cards render');
   assert.match(html, /cars live now/);
   assert.match(html, /Fresh on the market/);
   assert.match(html, /How it works/);

@@ -29,14 +29,24 @@ const router = express.Router();
 // Homepage — §6.1 (static-capable: it renders identically for everyone)
 // ---------------------------------------------------------------------------
 async function buildHomeLocals() {
-  const [feed, testimonials, posts, services, facets, counters] = await Promise.all([
+  const [feed, testimonials, posts, services, facets, counters, showcase] = await Promise.all([
     db.listings.homeFeed(config.listings.homeFeedLimit),
     db.content.publishedTestimonials(4),
     db.content.latestPosts(3),
     db.content.serviceSuite(),
     db.listings.filterFacets(),
     db.listings.networkCounters(),
+    db.listings.categoryShowcase(),
   ]);
+
+  // §6.1 redesign — the category cards and the brand row are both drawn from
+  // live facets: real counts, real listing photos, real /cars destinations.
+  const imageByBody = new Map(showcase.map((row) => [row.body, row.image_url]));
+  const categoryCards = facets.bodyTypes
+    .filter((row) => imageByBody.has(row.value))
+    .slice(0, 5)
+    .map((row) => ({ value: row.value, count: Number(row.count), image: imageByBody.get(row.value) }));
+  const brandRow = facets.makes.slice(0, 8).map((row) => ({ value: row.value, count: Number(row.count) }));
 
   const faqs = await db.content.faqsForScope('global');
 
@@ -73,6 +83,8 @@ async function buildHomeLocals() {
       counters,
       faqs,
       modules,
+      categoryCards,
+      brandRow,
       counterLabels,
       featured: featured.filter(Boolean),
       featuredModule: modules.featured || null,

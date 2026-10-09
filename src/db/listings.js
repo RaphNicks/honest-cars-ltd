@@ -337,6 +337,25 @@ async function attachMedia(listings) {
   return listings;
 }
 
+/**
+ * One live photo per body type, deepest stock first — the homepage category
+ * cards (§6.1 redesign). Counts come from the same live rule the facet rail
+ * uses, and the photo is the primary image of a real live listing, so a card
+ * can never show a car the marketplace does not have.
+ */
+async function categoryShowcase() {
+  return query(
+    `SELECT l.body_type AS body, COUNT(*) AS count,
+            SUBSTRING_INDEX(GROUP_CONCAT(m.url ORDER BY m.position ASC), ',', 1) AS image_url
+       FROM vehicle_listings l
+       JOIN listing_media m ON m.listing_id = l.id AND m.type = 'image'
+      WHERE l.status IN ('live','reserved')
+        AND (l.expires_at IS NULL OR l.expires_at > UTC_TIMESTAMP())
+      GROUP BY l.body_type
+      ORDER BY count DESC`,
+  );
+}
+
 /** Homepage "fresh on the market" feed with the tab counts (§6.1 module 3). */
 async function homeFeed(limit = 8) {
   const [feed, certified, under10m, suvs] = await Promise.all([
@@ -891,6 +910,7 @@ module.exports = {
   findSimilar,
   countNearMatches,
   filterFacets,
+  categoryShowcase,
   comparablesFor,
   modelCounts,
   networkCounters,

@@ -17,6 +17,20 @@
   --line: #d8e0e8;          /* dividers & borders */
   --white: #ffffff;         /* dominant canvas — the site should feel mostly white */
 
+  /* Cinematic surfaces — the 2026 storefront refresh keeps the brand navy for
+     chrome and borrows a deeper cut of the same hue for photographic bands.
+     Greens beyond --honest-green only ever sit on dark surfaces. */
+  --navy-deep: #071c2a;
+  --green-bright: #35d58a;
+  --white-glass: rgba(255, 255, 255, 0.08);
+  --white-glass-line: rgba(255, 255, 255, 0.16);
+  --green-glass: rgba(53, 213, 138, 0.14);
+  --green-glass-line: rgba(53, 213, 138, 0.38);
+  --scrim-hero: linear-gradient(97deg, rgba(7, 28, 42, 0.95) 10%, rgba(7, 28, 42, 0.82) 44%, rgba(7, 28, 42, 0.38) 72%, rgba(7, 28, 42, 0.18) 100%);
+  --scrim-hero-floor: linear-gradient(0deg, rgba(7, 28, 42, 0.55) 0%, rgba(7, 28, 42, 0) 42%);
+  --scrim-band: linear-gradient(90deg, rgba(7, 28, 42, 0.93) 0%, rgba(7, 28, 42, 0.74) 55%, rgba(7, 28, 42, 0.45) 100%);
+  --scrim-up: linear-gradient(180deg, rgba(7, 28, 42, 0) 20%, rgba(7, 28, 42, 0.9) 82%);
+
   /* Derived neutrals — tints of the tokens above only, no new hues */
   --navy-70: #3f5670;
   --navy-08: #eef2f7;

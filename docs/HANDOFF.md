@@ -48,7 +48,8 @@ Every **§9 MUST is built.** The commit trail, most recent first:
 
 | Commit | What it delivered |
 |---|---|
-| *this commit* | **a pull is not a deploy** — a half-updated page, and the three things that now stop it |
+| *this commit* | **the cinematic storefront** — same site, same data, a premium first screen |
+| `c6836a8` | **a pull is not a deploy** — a half-updated page, and the three things that now stop it |
 | `f53876d` | **opening a market from the console** — the switch the picker was built around |
 | `f00907d` | **the city picker + the Services chevron** — 48 cities, searchable, deepest stock first |
 | `79e0dd2` | **the Services menu + the hidden attribute** — hover no longer drops the panel; `[hidden]` is a real rule; the badge corner wraps |
@@ -111,6 +112,43 @@ resilience ask:
 `size_bytes`, `poster_url` on `listing_media`), a `video` content block with a
 `[clip:…]` directive, clips on two listings' galleries, and 8 blog posts with 3
 embedded videos. All four clips total 726 KB.
+
+---
+
+## 3r. Just shipped: the cinematic storefront
+
+A reference mockup arrived with one instruction: elevate the visuals, keep
+every route, every sentence of copy, every live counter and every working
+control exactly as they are. So the redesign is one template plus CSS, driven
+by the same locals the page already had — nothing was re-platformed.
+
+- **The hero is now a full-bleed golden-hour photograph** (new asset, run
+  through the existing `prepare-images` pipeline like every other photo) with a
+  tuned left scrim, the same three-sentence headline with its closing line in
+  brand green, the same instant-search form, and the same three live chips
+  restyled as dark glass. On the homepage only, the header sits above it in
+  deep navy.
+- **Two new strips, drawn only from live data.** Category cards take each body
+  type's facet count and one real listing photo (`categoryShowcase()` in the
+  one data module) and link to `/cars?body=…`; the brand row takes the top
+  makes and links to `/cars?make=…`. No invented counts, no downloaded logos —
+  a body type with no live photo simply gets no card.
+- **Existing sections, restyled, not removed.** "How it works" now stands
+  beside the inspector photograph with a floating "inspected, documented and
+  verified" chip; social proof moved onto deep navy with the live counters in
+  green; the dealer band sits over a new dusk-road photograph. Every heading,
+  link, tab, grade card, testimonial and form is the one that was already
+  there.
+- **Motion is one small module** (`reveal.js`): sections fade and rise once as
+  they enter view, and stop entirely under `prefers-reduced-motion` — and with
+  the module absent the page is fully visible, because the class is only added
+  by script. The service worker precaches it (`hc-v7`); the PWA suite caught
+  the first draft that forgot.
+
+Tokens grew a cinematic family — `--navy-deep`, `--green-bright`, glass tints
+and scrim gradients — while the six-step type ladder and the 8px grid stayed
+untouched, which the type-scale lint confirms. 556 tests pass, 147 pages
+audited with 0 findings.
 
 ---
 
