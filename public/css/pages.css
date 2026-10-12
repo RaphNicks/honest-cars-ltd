@@ -379,6 +379,25 @@ body[data-page="/"] .header[data-scrolled='true'] {
 
 body[data-page="/"]:has(.banner-strip) .header { background: var(--navy-deep); }
 
+/* Opening the header search on the landing page pushes the hero down and
+   leaves the transparent bar floating over plain white, which hid the white
+   nav text (owner screenshot 2026-10-12). While the panel is open, the home
+   header takes the same chrome as every other page: white bar, dark text. */
+body[data-page="/"]:has(#header-search:not(.hidden)) .header { background: var(--white); }
+
+body[data-page="/"]:has(#header-search:not(.hidden)) .header__logo,
+body[data-page="/"]:has(#header-search:not(.hidden)) .header__nav-link,
+body[data-page="/"]:has(#header-search:not(.hidden)) .header__search-toggle,
+body[data-page="/"]:has(#header-search:not(.hidden)) .header__menu-toggle,
+body[data-page="/"]:has(#header-search:not(.hidden)) .header__signin,
+body[data-page="/"]:has(#header-search:not(.hidden)) .area-switcher--header .area-switcher__toggle {
+  color: var(--honest-navy);
+}
+
+body[data-page="/"]:has(#header-search:not(.hidden)) .header__nav-link[aria-current='page'] {
+  color: var(--color-accent-strong, #0f8a44);
+}
+
 /* The hero tucks under the transparent bar; not when a banner occupies it. */
 body[data-page="/"] .hero--cinematic {
   margin-top: calc(-1 * var(--header-height));
