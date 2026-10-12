@@ -1197,3 +1197,7 @@ a.hire-cal__ref:hover { text-decoration: underline; }
   .admin-bar__nav { flex-direction: row; flex-wrap: wrap; flex: 1 1 auto; }
   .admin-bar__me { margin-top: 0; flex-direction: row; align-items: center; }
 }
+
+/* Premium rounding pass (owner 2026-10-12): the console stays sharp and
+   serious; only its small chips and keys get a touch of softness. */
+.edcal__chip, .addon, .hire-key, .key-reveal { border-radius: 10px; }

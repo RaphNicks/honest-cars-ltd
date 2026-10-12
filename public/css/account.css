@@ -304,3 +304,6 @@
 
   .account-nav a { display: block; padding: var(--space-1) 0; }
 }
+
+/* Premium rounding pass (owner 2026-10-12). */
+.dash-card { border-radius: var(--radius); }

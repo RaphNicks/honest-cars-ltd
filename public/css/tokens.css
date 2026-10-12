@@ -100,10 +100,10 @@
   --bottom-nav-height: 60px;
 
   /* --- Radius, borders, shadows ----------------------------------------- */
-  --radius-sm: 0;
-  --radius: 0;         /* owner 2026-10-12: sharp corners everywhere */
-  --radius-lg: 0;
-  --radius-pill: 0;
+  --radius-sm: 10px;   /* inputs and small controls */
+  --radius: 16px;      /* the premium house radius — cards, panels, media */
+  --radius-lg: 24px;   /* big surfaces: hero search panel, modals */
+  --radius-pill: 999px;/* CTAs, chips, badges */
 
   --border-width: 1px;
   --border: var(--border-width) solid var(--color-border);

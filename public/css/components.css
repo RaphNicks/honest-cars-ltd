@@ -1914,3 +1914,26 @@ body[data-scroll-locked='true'] { overflow: hidden; }
   margin: var(--space-1) 0;
   word-spacing: 0.3em;
 }
+
+/* ==========================================================================
+   Premium rounding pass (owner 2026-10-12, revisited): soft, deliberate
+   radii on the touchable surfaces; structure — header, footer, rails,
+   tables — stays sharp. Late in the cascade on purpose.
+   ========================================================================== */
+.btn { border-radius: var(--radius-pill); }
+.input, .select, .textarea { border-radius: var(--radius-sm); }
+.badge { border-radius: var(--radius-pill); }
+.badge__dot { border-radius: 50%; }
+.info-tip__button { border-radius: 50%; }
+.car-card { border-radius: var(--radius); }
+.trust-chip { border-radius: 14px; }
+.trust-chip__icon { border-radius: 50%; }
+.price-position__dot { border-radius: 50%; }
+.modal__panel { border-radius: var(--radius-lg); }
+.surface-panel { border-radius: var(--radius); }
+.key-fact { border-radius: 12px; }
+.post-card__media { border-radius: var(--radius); overflow: hidden; }
+.search-bar { border-radius: var(--radius-lg); }
+.cat-card { border-radius: var(--radius); }
+.gallery__main { border-radius: var(--radius); overflow: hidden; }
+.gallery__thumbs img { border-radius: 10px; }

@@ -935,3 +935,6 @@ a.channels__row:hover .channels__body strong { color: var(--honest-green); }
 .channels__body span { font-size: var(--text-14); line-height: var(--leading-relaxed); color: var(--color-text-muted); }
 
 .channels__body a { color: var(--honest-navy); }
+
+/* Premium rounding pass (owner 2026-10-12). */
+.inspection-strip img { border-radius: var(--radius); }
