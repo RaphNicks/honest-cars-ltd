@@ -465,6 +465,12 @@ maybe('a lead can be assigned, moved and closed with a lost reason', async () =>
   assert.equal(after.status, 'assigned');
   assert.ok(after.assigned_at);
 
+  const ownerInbox = await accounts.ops.client.request(
+    `/admin/leads?kind=lead&type=viewing&owner=${accounts.ops.id}`,
+  );
+  assert.equal(ownerInbox.status, 200);
+  assert.match(ownerInbox.text, /Console lead/);
+
   const lost = await accounts.admin.client.post(`/admin/leads/${row.id}/status`, {
     kind: 'lead',
     status: 'lost',
@@ -498,6 +504,42 @@ maybe('a request moved through the inbox carries its own audit trail', async () 
   const after = await db.queryOne('SELECT * FROM service_requests WHERE id = ?', [row.id]);
   assert.equal(after.status, 'searching');
   assert.ok(after.last_contacted_at, 'moving a request forward stamps contact');
+
+  await db.query('DELETE FROM service_requests WHERE id = ?', [row.id]);
+});
+
+maybe('a concierge request can be assigned to an accessible owner without changing its stage', async () => {
+  const phone = nextPhone();
+  createdPhones.add(phone);
+  const trackingId = `HC-AS-${(run + 617) % 9000 + 1000}`;
+  await db.query(
+    "INSERT INTO service_requests (tracking_id, type, status, name, phone, source_path) VALUES (?, 'concierge', 'new', 'Assignment probe', ?, '/find-my-car')",
+    [trackingId, phone],
+  );
+  const row = await db.queryOne('SELECT id FROM service_requests WHERE tracking_id = ?', [trackingId]);
+
+  const assigned = await accounts.admin.client.post(`/admin/leads/${row.id}/assign`, {
+    kind: 'request',
+    assigned_to: String(accounts.ops.id),
+  });
+  assert.equal(assigned.status, 303);
+  const saved = await db.queryOne('SELECT status, assigned_to FROM service_requests WHERE id = ?', [row.id]);
+  assert.equal(saved.status, 'new', 'ownership is separate from the concierge stage');
+  assert.equal(Number(saved.assigned_to), accounts.ops.id);
+
+  const owners = await require('../src/db/admin').staffOptions();
+  assert.ok(owners.some((person) => Number(person.id) === accounts.ops.id));
+  assert.ok(owners.every((person) => ['admin', 'ops'].includes(person.role)));
+  assert.equal(owners.some((person) => Number(person.id) === accounts.inspector.id), false);
+
+  const pipeline = await accounts.ops.client.request(`/admin/concierge?open=${row.id}`);
+  assert.equal(pipeline.status, 200);
+  assert.match(pipeline.text, /Owner: Console ops/);
+  const inbox = await accounts.ops.client.request(
+    `/admin/leads?kind=request&type=concierge&owner=${accounts.ops.id}`,
+  );
+  assert.equal(inbox.status, 200);
+  assert.match(inbox.text, new RegExp(trackingId));
 
   await db.query('DELETE FROM service_requests WHERE id = ?', [row.id]);
 });

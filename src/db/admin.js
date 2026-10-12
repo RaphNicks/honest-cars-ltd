@@ -602,17 +602,26 @@ async function setLeadStatus(id, status, { actorId, lostReason = null, kind = 'l
 }
 
 async function assignLead(id, { actorId, assignedTo, kind = 'lead' }) {
-  const table = kind === 'request' ? 'service_requests' : 'leads';
-  await query(
-    `UPDATE ${table} SET assigned_to = ?, assigned_at = UTC_TIMESTAMP(), status = CASE WHEN status = 'new' THEN 'assigned' ELSE status END WHERE id = ?`,
-    [assignedTo || null, id],
-  );
+  const ownerId = assignedTo || null;
+  if (kind === 'request') {
+    // Concierge requests keep their own pipeline stages; unlike a lead, they
+    // have no "assigned" status. Ownership is stored separately.
+    await query(
+      'UPDATE service_requests SET assigned_to = ?, assigned_at = UTC_TIMESTAMP() WHERE id = ?',
+      [ownerId, id],
+    );
+  } else {
+    await query(
+      "UPDATE leads SET assigned_to = ?, assigned_at = UTC_TIMESTAMP(), status = CASE WHEN status = 'new' THEN 'assigned' ELSE status END WHERE id = ?",
+      [ownerId, id],
+    );
+  }
   await recordAudit({
     actorId,
     action: kind === 'request' ? 'request.assign' : 'lead.assign',
     entity: kind === 'request' ? 'request' : 'lead',
     entityId: id,
-    detail: { assignedTo },
+    detail: { assignedTo: ownerId },
   });
   return { ok: true };
 }
@@ -641,8 +650,10 @@ async function autoAssign({ actorId, limit = 50 } = {}) {
 }
 
 async function staffOptions() {
+  // These users can open both the Leads inbox and Concierge pipeline. Do not
+  // assign queue items to roles that cannot see them in the console.
   const rows = await query(
-    "SELECT id, name, phone, role FROM `users` WHERE role IN ('ops','admin','inspector','finance','marketing') AND status = 'active' ORDER BY FIELD(role,'admin','ops','inspector','finance','marketing'), name",
+    "SELECT id, name, phone, role FROM `users` WHERE role IN ('admin','ops') AND status = 'active' ORDER BY FIELD(role,'admin','ops'), name",
   );
   return rows.map((row) => ({
     id: row.id,

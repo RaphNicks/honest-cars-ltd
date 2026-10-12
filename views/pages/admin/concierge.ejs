@@ -39,6 +39,7 @@
               <p class="board-card__title"><%= row.name %></p>
               <p class="board-card__meta">
                 <span class="chip"><%= row.type %></span>
+                <span class="chip"><% if (row.assigneeName) { %>Owner: <%= row.assigneeName %><% } else { %>Unassigned<% } %></span>
                 <% if (row.candidateCount) { %><span class="chip"><%= row.candidateCount %> car<%= row.candidateCount === 1 ? '' : 's' %></span><% } %>
                 <%# §6.5: the retainer decides whether the search is funded — show it on the card. %>
                 <% if (row.retainer) { %>
