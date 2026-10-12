@@ -32,13 +32,12 @@
 <% } %>
 
 <section class="hero hero--cinematic">
-  <%# Owner direction (2026-10-12): the video is the hero, always — no still
-      to flash in front of it or linger behind it. Reduced-motion visitors
-      hide it in CSS instead. %>
-  <video class="hero__bg" data-hero-video autoplay muted loop playsinline preload="auto"
-         aria-hidden="true" tabindex="-1">
-    <source src="/video/Car_driving_on_highway.mp4" type="video/mp4">
-  </video>
+  <%# Owner direction (2026-10-12, revised): the video is the hero on bigger
+      screens and loads directly; on phones the hero is the plain navy field
+      and no video bytes are fetched at all. initHeroVideo() in ui.js decides
+      by viewport; reduced-motion visitors get the calm field too. %>
+  <video class="hero__bg" data-hero-video data-src="/video/Car_driving_on_highway.mp4"
+         muted loop playsinline aria-hidden="true" tabindex="-1"></video>
   <div class="hero__scrim" aria-hidden="true"></div>
   <div class="container hero__grid">
     <div class="hero__copy">

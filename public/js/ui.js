@@ -320,6 +320,31 @@ export function initCompareHydrate() {
   window.location.replace(url.toString());
 }
 
+/* ------------------------------------ hero video: big screens only */
+export function initHeroVideo() {
+  const video = document.querySelector('[data-hero-video]');
+  if (!video || !video.dataset.src) return;
+  const wide = window.matchMedia('(min-width: 900px)');
+  const calm = window.matchMedia('(prefers-reduced-motion: reduce)');
+  const sync = () => {
+    if (wide.matches && !calm.matches) {
+      // Bigger screen: the video loads directly and plays on its own.
+      if (!video.getAttribute('src')) {
+        video.setAttribute('src', video.dataset.src);
+        video.play().catch(() => { /* a refused autoplay leaves the calm field */ });
+      }
+    } else if (video.getAttribute('src')) {
+      // Crossed back to a phone (or asked for less motion): drop the video.
+      video.pause();
+      video.removeAttribute('src');
+      video.load();
+    }
+  };
+  sync();
+  wide.addEventListener?.('change', sync);
+  calm.addEventListener?.('change', sync);
+}
+
 /* ------------------------------------ recently viewed (VDP, no PII) */
 export function rememberViewed(listing) {
   if (!listing || !listing.id) return;

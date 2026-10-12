@@ -152,6 +152,15 @@
             <p class="note-inline">Confirm with the dealer that it is still current.</p>
             <button class="btn btn--ghost btn--sm" type="submit">Mark refreshed</button>
           </form>
+
+          <%# Owner (2026-10-12): test cars and mistakes need an eraser — the
+              purge keeps house-lot cars on purpose, so only this removes one. %>
+          <form class="admin-actions__group" method="post" action="/admin/listings/<%= row.id %>/delete">
+            <p class="admin-actions__label">Remove for good</p>
+            <p class="note-inline">Off the site, out of search, gone. Written to the audit log.</p>
+            <button class="btn btn--danger btn--sm" type="submit"
+                    data-confirm="Delete <%= row.stockNo %> for good? It leaves the site and cannot be brought back.">Delete listing</button>
+          </form>
         </div>
       </section>
     <% }); %>

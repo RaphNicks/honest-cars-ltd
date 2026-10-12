@@ -325,6 +325,26 @@ router.post('/listings/new', auth.requireStaff('listings.moderate'), auth.sameOr
   } catch (error) { return next(error); }
 });
 
+// Owner (2026-10-12): a test car published from the console must be removable
+// — the purge keeps house-lot cars on purpose, so the console needs its own
+// eraser. Every FK into a listing cascades or nulls, so one delete is safe.
+router.post('/listings/:id/delete', auth.requireStaff('listings.moderate'), auth.sameOriginOnly, async (req, res, next) => {
+  try {
+    const id = validate.integer(req.params.id, { min: 1, fallback: 0 });
+    const [row] = await db.query('SELECT id, stock_no, status, make, model, year FROM vehicle_listings WHERE id = ?', [id]);
+    if (!row) return done(res, `${PATHS.listings}?status=all`, 'That listing is already gone.', { error: true });
+    await db.query('DELETE FROM vehicle_listings WHERE id = ?', [id]);
+    await admin.recordAudit({
+      actorId: req.user.id,
+      action: 'listing.delete',
+      entity: 'listing',
+      entityId: id,
+      detail: `${row.stock_no} (${row.year} ${row.make} ${row.model}, ${row.status}) deleted from the console`,
+    });
+    return done(res, `${PATHS.listings}?status=all`, `${row.stock_no} deleted for good — it is off the site and out of search.`);
+  } catch (error) { return next(error); }
+});
+
 router.post('/listings/:id/photos', auth.requireStaff('listings.moderate'), auth.sameOriginOnly, async (req, res, next) => {
   try {
     const listingId = validate.integer(req.params.id, { min: 1, fallback: 0 });

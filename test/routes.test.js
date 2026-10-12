@@ -78,9 +78,12 @@ maybe('homepage renders the hero, the trust chips and the live feed', async () =
   assert.doesNotMatch(html, /Hassle-Free/, 'the trust pill was removed on owner direction');
   assert.doesNotMatch(html, /Drive with/, 'the handwritten accent was removed on owner direction');
   assert.match(html, /hero--cinematic/, 'the cinematic hero is in force');
-  assert.match(html, /data-hero-video[^>]*autoplay/, 'the landing hero autoplays the owner video');
+  // Owner direction (2026-10-12, revised): the video loads directly on big
+  // screens via initHeroVideo(); phones get the plain navy field and never
+  // fetch the file — so the markup carries the source as data-src only.
+  assert.match(html, /data-hero-video[^>]*data-src="\/video\/Car_driving_on_highway\.mp4"/, 'the hero video is wired for direct load on wide screens');
+  assert.doesNotMatch(html, /data-hero-video[^>]* src="/, 'no eager src: a phone must not download the video');
   assert.doesNotMatch(html, /hero-lot/, 'no still image stands in for the video any more');
-  assert.match(html, /Car_driving_on_highway\.mp4/, 'the hero video source is the uploaded file');
   assert.match(html, /Find your perfect ride/, 'category cards render');
   assert.match(html, /cars live now/);
   assert.match(html, /Fresh on the market/);

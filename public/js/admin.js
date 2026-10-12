@@ -70,7 +70,17 @@ function wirePrint() {
   });
 }
 
+/** Destructive buttons (delete a listing) ask once, in the browser's words. */
+function wireConfirm() {
+  document.addEventListener('submit', (event) => {
+    const button = event.submitter;
+    if (!button || !button.hasAttribute('data-confirm')) return;
+    if (!window.confirm(button.getAttribute('data-confirm'))) event.preventDefault();
+  });
+}
+
 wireAutoSubmit();
 wireTemplates();
 wireSummary();
 wirePrint();
+wireConfirm();

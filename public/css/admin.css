@@ -645,6 +645,11 @@ body.admin {
 /* Buttons already exist in components.css; the console only adds a compact
    variant so dense rows do not grow. */
 .btn--sm { padding: 8px 12px; font-size: var(--text-14); min-height: 36px; }
+
+/* The delete-listing eraser (account.css has one too, but the console does
+   not load that sheet). */
+.btn--danger { background: var(--danger, #B3261E); border-color: var(--danger, #B3261E); color: var(--white, #fff); }
+.btn--danger:hover { filter: brightness(0.94); }
 .select--compact, .input--compact { padding: 8px 10px; font-size: var(--text-14); min-height: 36px; }
 .btn--block { width: 100%; justify-content: center; }
 

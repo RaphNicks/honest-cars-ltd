@@ -435,8 +435,13 @@ body[data-page="/"] .area-switcher--header .area-switcher__toggle:hover {
 }
 
 /* --- Cinematic hero ------------------------------------------------------- */
-/* The hero video is motion; visitors who asked for less motion get the
-   calm navy field instead — no still image, per owner direction. */
+/* The hero video is motion for bigger screens; phones get the calm navy
+   field (owner direction 2026-10-12), as do visitors who asked for less
+   motion — no still image, and no video bytes fetched on a phone. */
+@media (max-width: 899px) {
+  .hero--cinematic .hero__bg { display: none; }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .hero--cinematic .hero__bg { display: none; }
 }
