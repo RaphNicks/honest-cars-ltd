@@ -805,7 +805,7 @@ body[data-page="/"] .area-switcher--header .area-switcher__toggle:hover {
 }
 
 /* --- Blog strip: one featured story, compact follow-ups --------------------- */
-.blog-strip { display: grid; gap: var(--space-6); }
+.blog-strip { display: grid; gap: var(--space-4); }
 
 /* Owner direction (2026-10-12): one column, posts under each other — the
    featured story is simply the first row, not a side-by-side composition. */
@@ -813,12 +813,7 @@ body[data-page="/"] .area-switcher--header .area-switcher__toggle:hover {
   .blog-strip { grid-template-columns: 1fr; }
 }
 
-.blog-strip__more { display: grid; gap: var(--space-6); align-content: start; }
-
-@media (min-width: 769px) {
-  .post-card--featured { display: block; height: auto; }
-  .post-card--featured .post-card__media { aspect-ratio: 16 / 9; height: auto; max-height: none; }
-}
+.blog-strip__more { display: grid; gap: var(--space-4); align-content: start; }
 
 /* --- Category tiles: the photograph is the tile; the border was noise -------- */
 .cat-card { border: 0; }
@@ -863,13 +858,13 @@ body[data-page="/"] .area-switcher--header .area-switcher__toggle:hover {
    ========================================================================== */
 
 /* Blog index: every post in one column, under each other (owner 2026-10-12). */
-.blog-index { display: grid; gap: var(--space-6); grid-template-columns: 1fr; }
+.blog-index { display: grid; gap: var(--space-4); grid-template-columns: 1fr; }
 
-.blog-index__more { display: grid; gap: var(--space-6); grid-template-columns: 1fr; }
+.blog-index__more { display: grid; gap: var(--space-4); grid-template-columns: 1fr; }
 
 /* The filtered/searched view uses the generic three-up grid in markup; on the
    blog we override it back to the single column the owner asked for. */
-.grid--3[data-post-grid] { grid-template-columns: 1fr; gap: var(--space-6); }
+.grid--3[data-post-grid] { grid-template-columns: 1fr; gap: var(--space-4); }
 
 /* Team as columns with a green role line. */
 .people-cols { display: grid; gap: var(--space-3); }
