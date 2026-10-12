@@ -94,7 +94,9 @@
           <span class="trust-chip__icon"><%- helpers.icon('store', { size: 18 }) %></span>
           <span class="trust-chip__text">
             <strong><%= site.counters.partnerDealers %> partner dealers</strong>
-            <span>In <%= (site.cities || []).length || 1 %> <%= (site.cities || []).length === 1 ? 'city' : 'cities' %></span>
+            <%# Owner direction (2026-10-12): no coverage counts in copy — the
+                base is stated in the footer and buyers everywhere are welcome. %>
+            <span>Verified businesses</span>
           </span>
         </span>
         <span class="trust-chip">

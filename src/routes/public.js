@@ -176,15 +176,18 @@ router.get('/cars', async (req, res, next) => {
     const locationLabel = city ? `${city.name}, ${city.stateLabel}` : 'All markets';
     // §6.2's hero copy follows the market: a buyer who filtered to Owerri should
     // not read a Port Harcourt introduction.
-    const heading = city ? `Cars for sale in ${city.name}` : 'Cars for sale in Port Harcourt, Owerri, Aba & Benin City';
+    // Owner direction (2026-10-12): the base is stated, buyers everywhere are
+    // welcome, and generic copy never lists coverage — so the network view
+    // names Port Harcourt only.
+    const heading = city ? `Cars for sale in ${city.name}` : 'Cars for sale in Port Harcourt';
     // A market with stock gets the market intro. A city we list but have no lots
     // in says so, and offers the thing that can actually help; the network view
-    // keeps the four-market line.
+    // keeps no coverage list at all (owner direction 2026-10-12).
     const intro = city && city.live > 0
       ? `Live stock from partner lots in ${city.name}, ${city.stateLabel} — with the mileage, documents status and verification grade shown before you travel. Prices are what the dealer is asking; we tell you where each one sits against the current market band.`
       : city
         ? `We do not have partner lots in ${city.name} yet. Tell us what you are looking for and a human will find it, verify it and bring you the paperwork — usually inside 72 hours. Every car we do have is one click away.`
-        : 'Live stock from partner lots across four markets — Port Harcourt, Owerri, Aba and Benin City — with the mileage, documents status and verification grade shown before you travel. Prices are what the dealer is asking; we tell you where each one sits against the current market band.';
+        : 'Live stock from partner lots — with the mileage, documents status and verification grade shown before you travel. Prices are what the dealer is asking; we tell you where each one sits against the current market band.';
 
     const data = {
       ...built,
@@ -213,17 +216,17 @@ router.get('/cars', async (req, res, next) => {
         // but have no lots in must not promise "verified stock" in a title or a
         // meta description — it says what is true and points at the concierge.
         title: !city
-          ? 'Cars for sale in Port Harcourt & South-East Nigeria'
+          ? 'Cars for sale in Port Harcourt'
           : city.live > 0
             ? `Cars for sale in ${city.name} — verified stock`
             : `Cars for sale in ${city.name} — we are not there yet`,
         metaTitle: !city
-          ? 'Cars for sale in Port Harcourt & South-East Nigeria'
+          ? 'Cars for sale in Port Harcourt'
           : city.live > 0
             ? `Cars for sale in ${city.name}, ${city.stateLabel} — verified stock`
             : `Cars for sale in ${city.name}, ${city.stateLabel} — find one for me`,
         description: !city
-          ? 'Filter live verified stock across Port Harcourt, Owerri, Aba and Benin City by budget, make, body type, mileage and verification grade. Prices shown against the current market band.'
+          ? 'Filter live verified stock by budget, make, body type, mileage and verification grade. Prices shown against the current market band.'
           : city.live > 0
             ? `Filter live verified stock in ${city.name}, ${city.stateLabel} by budget, make, body type, mileage and verification grade. Prices shown against the current market band.`
             : `No partner lots in ${city.name} yet. Send us the car you want and a human will find it, verify it and bring you the paperwork — usually inside 72 hours.`,
@@ -234,7 +237,7 @@ router.get('/cars', async (req, res, next) => {
         // "Cars for sale in Lagos" and mean it.
         robots: onlyCity && cityFacet ? 'index,follow' : raw || fromPreference || (city && !cityFacet) ? 'noindex,follow' : 'index,follow',
         jsonLd: [seo.itemListSchema(built.result.listings, {
-          name: city ? `Cars for sale in ${city.name}` : 'Cars for sale in Port Harcourt, Owerri, Aba and Benin City',
+          name: city ? `Cars for sale in ${city.name}` : 'Cars for sale in Port Harcourt',
         })],
         bodyClass: 'page-cars',
       },
