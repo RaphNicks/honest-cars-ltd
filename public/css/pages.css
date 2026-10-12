@@ -386,6 +386,18 @@ body[data-page="/"] .hero--cinematic {
 
 body[data-page="/"] .banner-strip + .hero--cinematic { margin-top: 0; }
 
+/* Owner direction (2026-10-12): the landing hero fills the first screen,
+   top to bottom. The tuck above already puts its top edge at the very top
+   of the viewport, so a viewport-tall box makes the film the whole first
+   screen. dvh where supported so mobile chrome doesn't clip it. */
+body[data-page="/"] .hero--cinematic {
+  min-height: 100vh;
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
 body[data-page="/"] .header__logo,
 body[data-page="/"] .header__nav-link,
 body[data-page="/"] .header__search-toggle,
