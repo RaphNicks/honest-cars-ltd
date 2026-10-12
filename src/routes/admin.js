@@ -307,7 +307,7 @@ router.post('/listings/new', auth.requireStaff('listings.moderate'), auth.sameOr
     const created = await dealers.createListing(dealerId, input);
     const links = SHOT_LIST
       .map((shot) => ({ shot, url: validate.text(req.body[`photo_${shot[0]}`], 400) }))
-      .filter((row) => /^(https?:\/\/|\/img\/)/i.test(row.url));
+      .filter((row) => /^(https?:\/\/|\/img\/|\/uploads\/photos\/)/i.test(row.url));
     for (const row of links) {
       await dealers.addPhoto(dealerId, created.id, {
         url: row.url,

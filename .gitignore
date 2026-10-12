@@ -3,6 +3,7 @@ node_modules/
 dist/
 .test-static/
 public/og/
+public/uploads/
 *.log
 .DS_Store
 mysql-runtime/

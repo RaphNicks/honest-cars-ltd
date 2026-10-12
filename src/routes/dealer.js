@@ -367,7 +367,7 @@ router.post('/listings', requireDealer, auth.sameOriginOnly, async (req, res, ne
     // three photos cannot be submitted, and the wizard says so on its page.
     const links = SHOT_LIST
       .map((shot) => ({ shot, url: validate.text(req.body[`photo_${shot[0]}`], 400) }))
-      .filter((row) => /^(https?:\/\/|\/img\/)/i.test(row.url));
+      .filter((row) => /^(https?:\/\/|\/img\/|\/uploads\/photos\/)/i.test(row.url));
     for (const row of links) {
       await dealers.addPhoto(req.lot.id, created.id, {
         url: row.url,

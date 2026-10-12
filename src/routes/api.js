@@ -38,8 +38,27 @@ const dealerApi = require('../services/dealer-api');
 const render = require('../lib/render');
 const { sendJson, sendFragment, personalise, wantsLessData } = require('../lib/respond');
 const { helpers } = require('../lib/locals');
+const auth = require('../services/auth');
+const upload = require('../lib/upload');
 
 const router = express.Router();
+
+// ---------------------------------------------------------------------------
+// Direct photo upload — the wizard and the listing photo manager post image
+// bytes; the file is stored and its served URL is what the form keeps.
+// ---------------------------------------------------------------------------
+router.post('/media/upload', auth.requireUser, auth.sameOriginOnly, async (req, res) => {
+  try {
+    if (!Buffer.isBuffer(req.body)) {
+      return res.status(415).json({ ok: false, error: 'Send a JPEG, PNG or WebP photo as the upload body.' });
+    }
+    const result = await upload.storePhoto(req.body, req.user.id);
+    if (!result.ok) return res.status(400).json(result);
+    return res.json(result);
+  } catch (error) {
+    return res.status(500).json({ ok: false, error: 'The photo could not be stored — try again.' });
+  }
+});
 
 // ---------------------------------------------------------------------------
 // §15.1 analytics — the browser posts batches, we validate against the same

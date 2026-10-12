@@ -78,6 +78,9 @@ function createApp() {
   // PSP webhooks verify an HMAC over the exact bytes they sent, so those two
   // paths get the raw body before any JSON parsing happens (§12.2).
   app.use(['/api/payments/webhook/paystack', '/api/payments/webhook/flutterwave'], express.raw({ type: '*/*', limit: '256kb' }));
+  // Photo upload posts the image bytes as the body; parsed raw, before the
+  // JSON/urlencoded parsers see it.
+  app.use('/api/media/upload', express.raw({ type: ['image/jpeg', 'image/png', 'image/webp'], limit: '8mb' }));
   app.use(express.urlencoded({ extended: false, limit: '64kb' }));
   app.use(express.json({ limit: '128kb' }));
 

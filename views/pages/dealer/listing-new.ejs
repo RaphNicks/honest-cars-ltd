@@ -50,19 +50,26 @@ var shots = shots || [];
             </div>
           </div>
           <label class="field">
-            <span class="field__label">Photo link for this shot (optional here)</span>
+            <span class="field__label">Photo for this shot (optional here)</span>
             <input class="input" type="url" inputmode="url" name="photo_<%= shot[0] %>"
                    value="<%= value('photo_' + shot[0]) %>"
-                   placeholder="https://… or send it to the ops desk on WhatsApp">
+                   placeholder="Upload from this device, or paste an https:// link">
           </label>
+          <div class="shot-upload">
+            <label class="btn btn--secondary shot-upload__btn">
+              Upload from this device
+              <input type="file" accept="image/jpeg,image/png,image/webp" data-shot-upload="<%= shot[0] %>" hidden>
+            </label>
+            <img class="shot-upload__thumb" alt="Uploaded photo preview" hidden>
+            <span class="shot-upload__status" role="status"></span>
+          </div>
         </li>
       <% }); %>
     </ol>
 
     <p class="note-inline">
-      This build stores photos by link. Take the six shots on your phone, send them to the
-      <a href="<%= site.nav.whatsapp.general %>" target="_blank" rel="noopener">ops desk on WhatsApp</a>
-      with the stock number, or paste links you already host. Photos are reviewed before the car goes live.
+      Take the six shots on your phone and upload them here, or paste links you already host.
+      Photos are reviewed before the car goes live.
     </p>
 
     <div class="wizard-nav">

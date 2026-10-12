@@ -389,8 +389,8 @@ async function addPhoto(dealerId, listingId, { url, alt = null, shot = null }) {
   const listing = await listingForDealer(dealerId, listingId);
   if (!listing) return { ok: false, error: 'That listing is not one of yours.' };
   const clean = String(url || '').trim().slice(0, 400);
-  if (!/^(https?:\/\/|\/img\/)/i.test(clean)) {
-    return { ok: false, error: 'A photo needs a URL on this site (/img/…) or an https link.' };
+  if (!/^(https?:\/\/|\/img\/|\/uploads\/photos\/)/i.test(clean)) {
+    return { ok: false, error: 'A photo needs a URL on this site (/img/…, an upload) or an https link.' };
   }
   const position = (listing.media || []).length;
   await query(

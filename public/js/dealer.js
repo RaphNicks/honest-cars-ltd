@@ -53,8 +53,56 @@ function wireWizard() {
     button.addEventListener('click', () => show(Number(button.getAttribute('data-wizard-prev'))));
   });
 
+  wireShotUploads(form);
+
   const start = Number(new URLSearchParams(window.location.search).get('step') || 1);
   show(start >= 1 && start <= panels.length ? start : 1, { scroll: false });
+}
+
+/**
+ * Per-shot photo upload. The file is posted as-is to /api/media/upload; the
+ * served URL it returns is written into the shot's link field, so the rest of
+ * the wizard (drafting, validation, the photo review queue) never changes.
+ */
+function wireShotUploads(form) {
+  form.querySelectorAll('[data-shot-upload]').forEach((fileInput) => {
+    const key = fileInput.getAttribute('data-shot-upload');
+    const card = fileInput.closest('.shot-list__item') || fileInput.closest('li');
+    const thumb = card && card.querySelector('.shot-upload__thumb');
+    const status = card && card.querySelector('.shot-upload__status');
+    const link = form.querySelector(`input[name="photo_${key}"]`);
+
+    // A photo already on the form (draft reload, validation bounce) shows its preview.
+    if (thumb && link && link.value.trim()) {
+      thumb.src = link.value.trim();
+      thumb.hidden = false;
+    }
+
+    fileInput.addEventListener('change', async () => {
+      const file = fileInput.files && fileInput.files[0];
+      if (!file) return;
+      if (status) status.textContent = 'Uploading…';
+      try {
+        const res = await fetch('/api/media/upload', {
+          method: 'POST',
+          headers: { 'Content-Type': file.type },
+          body: file,
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok || !data.ok) throw new Error(data.error || 'Upload failed — paste a link instead.');
+        if (link) link.value = data.url;
+        if (thumb) {
+          thumb.src = data.url;
+          thumb.hidden = false;
+        }
+        if (status) status.textContent = 'Uploaded — attached to this shot.';
+      } catch (err) {
+        if (status) status.textContent = err && err.message ? err.message : 'Upload failed — paste a link instead.';
+      } finally {
+        fileInput.value = '';
+      }
+    });
+  });
 }
 
 /** Native validation on one panel. Says which field, in the browser's words. */
