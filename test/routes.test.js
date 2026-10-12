@@ -73,9 +73,13 @@ maybe('homepage renders the hero, the trust chips and the live feed', async () =
   // The hero now carries the reference's three-beat headline; the <br> and the
   // green <em> are presentation, so the assertion tolerates tags between beats.
   assert.match(html, /Quality Cars\.[\s\S]{0,12}Real People\.[\s\S]{0,40}Honest Deals\./);
-  assert.match(html, /Hassle-Free/, 'the reference trust pill is in force');
+  // Owner direction (2026-10-12): the trust pill and the handwritten accent
+  // are gone from the hero.
+  assert.doesNotMatch(html, /Hassle-Free/, 'the trust pill was removed on owner direction');
+  assert.doesNotMatch(html, /Drive with/, 'the handwritten accent was removed on owner direction');
   assert.match(html, /hero--cinematic/, 'the cinematic hero is in force');
-  assert.match(html, /data-hero-video/, 'the landing hero runs the owner video with the lot photo as poster');
+  assert.match(html, /data-hero-video[^>]*autoplay/, 'the landing hero autoplays the owner video');
+  assert.doesNotMatch(html, /hero-lot/, 'no still image stands in for the video any more');
   assert.match(html, /Car_driving_on_highway\.mp4/, 'the hero video source is the uploaded file');
   assert.match(html, /Find your perfect ride/, 'category cards render');
   assert.match(html, /cars live now/);

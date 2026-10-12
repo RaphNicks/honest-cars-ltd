@@ -138,21 +138,6 @@ export function initWhatsappFloat() {
   );
 }
 
-/* ------------------------------------------------------- hero video */
-export function initHeroVideo(root = document) {
-  const video = root.querySelector('[data-hero-video]');
-  if (!video) return;
-  // The poster is the fallback and the default: reduced motion and
-  // save-data visitors keep the still photo, and preload stays "none"
-  // until we know the video will actually play (§13.2).
-  if (prefersReducedMotion) return;
-  if (navigator.connection && navigator.connection.saveData) return;
-  video.preload = 'auto';
-  const start = () => video.play().catch(() => {});
-  if (video.readyState >= 2) start();
-  else video.addEventListener('loadeddata', start, { once: true });
-}
-
 /* ------------------------------------------------------------- gallery */
 export function initGallery(root = document) {
   const gallery = root.querySelector('[data-gallery]');

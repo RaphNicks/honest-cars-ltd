@@ -404,6 +404,12 @@ body[data-page="/"] .area-switcher--header .area-switcher__toggle:hover {
 }
 
 /* --- Cinematic hero ------------------------------------------------------- */
+/* The hero video is motion; visitors who asked for less motion get the
+   calm navy field instead — no still image, per owner direction. */
+@media (prefers-reduced-motion: reduce) {
+  .hero--cinematic .hero__bg { display: none; }
+}
+
 .hero--cinematic {
   position: relative;
   isolation: isolate;
@@ -446,23 +452,6 @@ body[data-page="/"] .area-switcher--header .area-switcher__toggle:hover {
 
 .hero__copy { max-width: 620px; }
 
-.hero__eyebrow {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-05);
-  margin: 0 0 var(--space-2);
-  padding: var(--space-05) var(--space-2);
-  border: 1px solid var(--green-glass-line);
-  border-radius: var(--radius-pill);
-  background: var(--green-glass);
-  color: var(--green-bright);
-  font-size: var(--text-12);
-  font-weight: var(--weight-semibold);
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-}
-
-.hero__eyebrow svg { width: 14px; height: 14px; }
 
 .hero--cinematic .hero__title {
   color: var(--white);
@@ -519,35 +508,11 @@ body[data-page="/"] .area-switcher--header .area-switcher__toggle:hover {
 .trust-chip__text span { font-size: var(--text-12); color: var(--navy-08); }
 
 /* Handwritten accent over the photograph — decorative, desktop only. */
-.hero__script {
-  position: absolute;
-  top: 16%;
-  left: 56%;
-  margin: 0;
-  transform: rotate(-6deg);
-  /* Inter-only house rule (§3.3): the annotation reads as a designer's note
-     through weight, oblique and the swoosh, not through a second family. */
-  font-family: var(--font-sans);
-  font-style: italic;
-  font-weight: var(--weight-semibold);
-  font-size: var(--text-20);
-  line-height: 1.3;
-  color: var(--white);
-  text-shadow: 0 2px 12px var(--chip-glass);
-  display: none;
-}
 
 @media (min-width: 1025px) {
   .hero__script { display: block; }
 }
 
-.hero__script-swoosh {
-  display: block;
-  width: 120px;
-  height: 14px;
-  margin-top: 2px;
-  color: var(--green-bright);
-}
 
 /* --- Category cards: live body types, one real photo each ----------------- */
 .cat-grid {

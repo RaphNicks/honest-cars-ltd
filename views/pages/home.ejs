@@ -18,13 +18,13 @@
 %>
 
 <% if (modules.announcement && modules.announcement.text) { %>
-<%# §7.3 homepage module — marketing banner, off until marketing turns it on %>\
+<%# §7.3 homepage module — marketing banner, off until marketing turns it on %>
 <section class="banner-strip" role="region" aria-label="Announcement">
   <div class="container banner-strip__inner">
     <span class="banner-strip__text"><%= modules.announcement.text %></span>
     <% if (modules.announcement.href) { %>
       <%# No data-event here on purpose: §15.1 has no banner event, and the
-          event plan is used verbatim — we do not invent names. %>\
+          event plan is used verbatim — we do not invent names. %>
       <a class="banner-strip__link" href="<%= modules.announcement.href %>"><%= modules.announcement.label || 'Find out more' %> →</a>
     <% } %>
   </div>
@@ -32,17 +32,16 @@
 <% } %>
 
 <section class="hero hero--cinematic">
-  <%# The lot photo is the poster: it paints first, stays for no-JS and for
-      visitors who asked for less motion or less data. The video only starts
-      when js/hero says both are fine (owner upload dff0114). %>
-  <video class="hero__bg" data-hero-video poster="<%= helpers.photoSrc('/img/site/hero-lot.jpg') %>"
-         muted loop playsinline preload="none" aria-hidden="true" tabindex="-1">
+  <%# Owner direction (2026-10-12): the video is the hero, always — no still
+      to flash in front of it or linger behind it. Reduced-motion visitors
+      hide it in CSS instead. %>
+  <video class="hero__bg" data-hero-video autoplay muted loop playsinline preload="auto"
+         aria-hidden="true" tabindex="-1">
     <source src="/video/Car_driving_on_highway.mp4" type="video/mp4">
   </video>
   <div class="hero__scrim" aria-hidden="true"></div>
   <div class="container hero__grid">
     <div class="hero__copy">
-      <p class="hero__eyebrow"><%- helpers.icon('checkCircle', { size: 14 }) %> Trusted • Verified • Hassle-Free</p>
       <% if (modules.hero && modules.hero.headline) { %>
         <h1 class="hero__title"><%= modules.hero.headline %></h1>
       <% } else { %>
@@ -52,7 +51,7 @@
         <%= (modules.hero && modules.hero.subhead) || 'Verified cars from 37+ trusted Port Harcourt lots — with inspections, documents and negotiation handled for you.' %>
       </p>
 
-      <%# §6.1 module 2 — instant search → /cars with filters applied %>\
+      <%# §6.1 module 2 — instant search → /cars with filters applied %>
       <form class="search-bar" action="/cars" method="get" role="search" aria-label="Search cars">
         <div class="field">
           <label class="field__label" for="hero-make">Make</label>
@@ -82,7 +81,7 @@
         </button>
       </form>
 
-      <%# Three trust chips: cars live · partner dealers in PH · verified-only badge system %>\
+      <%# Three trust chips: cars live · partner dealers in PH · verified-only badge system %>
       <div class="hero__chips">
         <span class="trust-chip">
           <span class="trust-chip__icon"><%- helpers.icon('car', { size: 18 }) %></span>
@@ -108,10 +107,9 @@
       </div>
     </div>
   </div>
-  <%# Decorative handwritten accent, like the reference — hidden on phones. %>  <p class="hero__script" aria-hidden="true">Drive with<br>Confidence<svg class="hero__script-swoosh" viewBox="0 0 120 14" focusable="false"><path d="M2 10 C 30 3, 62 2, 118 7" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"></path></svg></p>
 </section>
 
-<%# ------------------------------------------- 3. Category cards (live counts) %>\
+<%# ------------------------------------------- 3. Category cards (live counts) %>
 <% if (categoryCards.length) { %>
 <section class="section section--surface" aria-labelledby="cats-heading">
   <div class="container">
@@ -140,7 +138,7 @@
 </section>
 <% } %>
 
-<%# ------------------------------------------------ 4. Live inventory (tabs) %>\
+<%# ------------------------------------------------ 4. Live inventory (tabs) %>
 <section class="section" aria-labelledby="fresh-heading">
   <div class="container">
     <div class="section-head" data-reveal>
@@ -173,7 +171,7 @@
 </section>
 
 <% if (featured.length) { %>
-<%# §7.3 homepage module — featured rail, hand-picked by the ops desk %>\
+<%# §7.3 homepage module — featured rail, hand-picked by the ops desk %>
 <section class="section section--surface" aria-labelledby="featured-heading">
   <div class="container">
     <div class="section-head" data-reveal>
@@ -195,7 +193,7 @@
 </section>
 <% } %>
 
-<%# ------------------------------------------------- 6. Brand row (live makes) %>\
+<%# ------------------------------------------------- 6. Brand row (live makes) %>
 <% if (brandRow.length) { %>
 <section class="section section--brands" aria-label="Popular brands on HonestCars">
   <div class="container">
@@ -210,7 +208,7 @@
 </section>
 <% } %>
 
-<%# --------------------------------------- 7. How it works, beside the photo %>\
+<%# --------------------------------------- 7. How it works, beside the photo %>
 <section class="section" aria-labelledby="how-heading">
   <div class="container">
     <div class="section-head" data-reveal>
@@ -256,7 +254,7 @@
   </div>
 </section>
 
-<%# --------------------------------------- 8. Verification grades strip (§3.5) %>\
+<%# --------------------------------------- 8. Verification grades strip (§3.5) %>
 <section class="section section--surface" aria-labelledby="grades-heading">
   <div class="container">
     <div class="section-head" data-reveal>
@@ -289,7 +287,7 @@
   </div>
 </section>
 
-<%# ---------------------------------------------------- 9. Services suite %>\
+<%# ---------------------------------------------------- 9. Services suite %>
 <section class="section" aria-labelledby="services-heading">
   <div class="container">
     <div class="section-head" data-reveal>
@@ -317,7 +315,7 @@
   </div>
 </section>
 
-<%# ----------------------------------- 10. Social proof + counters, deep navy %>\
+<%# ----------------------------------- 10. Social proof + counters, deep navy %>
 <section class="section section--proof" aria-labelledby="proof-heading">
   <div class="container">
     <div class="section-head" data-reveal>
@@ -370,7 +368,7 @@
   </div>
 </section>
 
-<%# ------------------------------------------------------- 11. From the Blog %>\
+<%# ------------------------------------------------------- 11. From the Blog %>
 <section class="section" aria-labelledby="blog-heading">
   <div class="container">
     <div class="section-head" data-reveal>
@@ -391,7 +389,7 @@
   </div>
 </section>
 
-<%# ------------------------------------- 12. Dealer CTA band, dusk road photo %>\
+<%# ------------------------------------- 12. Dealer CTA band, dusk road photo %>
 <section class="section section--cinema" aria-labelledby="dealer-heading">
   <img class="section__bg" src="<%= helpers.photoSrc('/img/site/road-dusk.jpg') %>"
        <% if (helpers.srcsetFor('/img/site/road-dusk.jpg')) { %>srcset="<%= helpers.srcsetFor('/img/site/road-dusk.jpg') %>" sizes="100vw"<% } %>
@@ -413,7 +411,7 @@
   </div>
 </section>
 
-<%# ----------------------------------------------------- 13. Deal-alert opt-in %>\
+<%# ----------------------------------------------------- 13. Deal-alert opt-in %>
 <section class="section" aria-labelledby="alert-heading">
   <div class="container">
     <div class="alert-band" data-reveal>
