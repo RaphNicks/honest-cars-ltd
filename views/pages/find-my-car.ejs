@@ -314,16 +314,15 @@
 <%# Tracking entry — the status page is where tracking IDs land. %>
 <section class="section section--surface" aria-labelledby="track-request">
   <div class="container container--narrow">
-    <h2 id="track-request">Already have a tracking ID?</h2>
-    <p>It looks like <strong>HC-2481</strong> and it is in the WhatsApp message we sent when your brief was confirmed.</p>
+    <h2 id="track-request">Track an existing request</h2>
+    <p>Enter the tracking ID from your WhatsApp confirmation to see the latest status.</p>
     <form class="faq-search" method="get" action="/concierge/lookup" data-tracking-lookup>
       <div class="field">
         <label class="field__label" for="tracking-id">Tracking ID</label>
-        <input class="input" id="tracking-id" name="id" type="text" placeholder="HC-2481" required>
+        <input class="input" id="tracking-id" name="id" type="text" placeholder="Enter your tracking ID" required>
       </div>
       <button class="btn btn--primary" type="submit">Open my status page</button>
     </form>
-    <p class="field__hint mb-0">Demo record for review: <a href="/concierge/HC-2481">/concierge/HC-2481</a></p>
   </div>
 </section>
 

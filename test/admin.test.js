@@ -583,7 +583,14 @@ maybe('stage moves are audited, and a lost request keeps its reason', async () =
     "INSERT INTO service_requests (tracking_id, type, status, name, phone, source_path) VALUES (?, 'concierge', 'searching', 'Pipeline probe', ?, '/find-my-car')",
     [`HC-CT-${(run + 47) % 9000 + 1000}`, phone],
   );
-  const row = await db.queryOne('SELECT id FROM service_requests WHERE phone = ?', [phone]);
+  const row = await db.queryOne('SELECT id, tracking_id FROM service_requests WHERE phone = ?', [phone]);
+
+  const returnedToNew = await accounts.admin.client.post(`/admin/concierge/${row.id}/stage`, { status: 'new' });
+  assert.equal(returnedToNew.status, 303);
+  const reopened = await accounts.admin.client.request(returnedToNew.headers.get('location'));
+  assert.equal(reopened.status, 200, 'the stage redirect must reopen the focused request without an error page');
+  assert.match(reopened.text, new RegExp(row.tracking_id));
+  assert.match(reopened.text, /Stage moved to new\./);
 
   const moved = await accounts.admin.client.post(`/admin/concierge/${row.id}/stage`, { status: 'options_ready' });
   assert.equal(moved.status, 303);
@@ -597,7 +604,7 @@ maybe('stage moves are audited, and a lost request keeps its reason', async () =
   assert.equal(after.status, 'lost');
   assert.equal(after.lost_reason, 'Found one on his own');
   const entries = await auditFor('request', row.id);
-  assert.equal(entries.filter((entry) => entry.action === 'request.stage').length, 2);
+  assert.equal(entries.filter((entry) => entry.action === 'request.stage').length, 3);
 
   await db.query('DELETE FROM service_requests WHERE id = ?', [row.id]);
 });

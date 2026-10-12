@@ -57,3 +57,36 @@ test('the landing-page navy is used by all site navigation bars', () => {
   assert.match(rule(components, '.bottom-nav'), /background:\s*var\(--navy-deep\)/);
   assert.match(rule(admin, '.admin-bar'), /background:\s*var\(--navy-deep\)/);
 });
+
+test('find-my-car explains tracking without publishing a demo ID, and lookup accepts real IDs', () => {
+  const template = fs.readFileSync(path.join(ROOT, 'views/pages/find-my-car.ejs'), 'utf8');
+  assert.match(template, /Track an existing request/);
+  assert.match(template, /tracking ID from your WhatsApp confirmation/);
+  assert.doesNotMatch(template, /HC-2481|Demo record for review/);
+
+  const flow = fs.readFileSync(path.join(ROOT, 'public/js/flow.js'), 'utf8');
+  const literal = flow.match(/if \(!\/([^/]+)\/\.test\(id\)\)/);
+  assert.ok(literal, 'the client-side tracking ID validation is present');
+  const trackingIdPattern = new RegExp(literal[1]);
+  assert.equal(trackingIdPattern.test('HC-2481'), true);
+  assert.equal(trackingIdPattern.test('HC-12'), false);
+  assert.equal(trackingIdPattern.test('HC-1234567'), false);
+});
+
+test('concierge form success does not scroll to the tracking section after collapsing the form', () => {
+  const flow = fs.readFileSync(path.join(ROOT, 'public/js/flow.js'), 'utf8');
+  assert.match(
+    flow,
+    /form\.classList\.add\('hidden'\);\s*const progress = flow\.querySelector\('\.flow__progress'\);\s*if \(progress\) progress\.classList\.add\('hidden'\);[\s\S]*?renderSuccess\(success, \{ kind, serviceSlug: kind, result \}, \{ scroll: false \}\);/,
+  );
+
+  const forms = fs.readFileSync(path.join(ROOT, 'public/js/service-forms.js'), 'utf8');
+  assert.match(forms, /export function renderSuccess\(container, \{ kind, serviceSlug, result \}, \{ scroll = true \} = \{\}\)/);
+  assert.equal((forms.match(/if \(scroll\) container\.scrollIntoView/g) || []).length, 2);
+});
+
+test('flow field spacing does not offset the second control inside a two-column grid', () => {
+  const css = fs.readFileSync(path.join(ROOT, 'public/css/sections.css'), 'utf8');
+  assert.match(css, /\.flow__panel > \.field \+ \.field \{ margin-top: var\(--space-2\); \}/);
+  assert.doesNotMatch(css, /\.flow__panel \.field \+ \.field/);
+});

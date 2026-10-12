@@ -212,7 +212,7 @@ export async function post(endpoint, payload) {
   return sendOrQueue(endpoint, { ...payload, sourcePath: location.pathname, utm: utm() || null });
 }
 
-export function renderSuccess(container, { kind, serviceSlug, result }) {
+export function renderSuccess(container, { kind, serviceSlug, result }, { scroll = true } = {}) {
   if (!container) return;
   const wa = result.whatsappUrl || null;
   const reference = result.trackingId || result.reference || null;
@@ -268,7 +268,7 @@ export function renderSuccess(container, { kind, serviceSlug, result }) {
       </div>
     `;
     container.classList.remove('hidden');
-    container.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    if (scroll) container.scrollIntoView({ block: 'center', behavior: 'smooth' });
     window.dispatchEvent(new CustomEvent('hc:request-created', { detail: { kind, ...result } }));
     return;
   }
@@ -297,7 +297,7 @@ export function renderSuccess(container, { kind, serviceSlug, result }) {
     <p class="field__hint mb-0">Filed from <code>/services/${serviceSlug}</code>. Keep the reference — it is how we find you without asking for your name again.</p>
   `;
   container.classList.remove('hidden');
-  container.scrollIntoView({ block: 'center', behavior: 'smooth' });
+  if (scroll) container.scrollIntoView({ block: 'center', behavior: 'smooth' });
 
   // Tell the rest of the page (toast, analytics) that something real happened.
   window.dispatchEvent(new CustomEvent('hc:request-created', { detail: { kind, ...result } }));

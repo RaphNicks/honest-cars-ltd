@@ -256,10 +256,12 @@ export function initFlows(root = document) {
       if (!result.ok) return fail(result.error || 'That did not send — please try again.');
 
       try { if (storageKey) localStorage.removeItem(storageKey); } catch { /* ignore */ }
-      renderSuccess(success, { kind, serviceSlug: kind, result });
       form.classList.add('hidden');
       const progress = flow.querySelector('.flow__progress');
       if (progress) progress.classList.add('hidden');
+      // Keep the visitor at the form. Scrolling before the multi-step form
+      // collapses can leave the page clamped at the tracking section below.
+      renderSuccess(success, { kind, serviceSlug: kind, result }, { scroll: false });
     });
 
     function fail(message) {
@@ -277,13 +279,13 @@ export function initFlows(root = document) {
     if (saved && loadDraft()) saved.textContent = 'We restored your saved brief from this device.';
   });
 
-  // /concierge/lookup — a plain GET form would need a route per id, so redirect.
+  // Validate here for quick feedback; /concierge/lookup also handles plain GETs.
   root.querySelectorAll('[data-tracking-lookup]').forEach((form) => {
     form.addEventListener('submit', (event) => {
       event.preventDefault();
       const input = form.querySelector('input[name="id"]');
       const id = String(input && input.value ? input.value : '').trim().toUpperCase();
-      if (!/^HC-\\d{3,6}$/.test(id)) {
+      if (!/^HC-\d{3,6}$/.test(id)) {
         input.setAttribute('aria-invalid', 'true');
         input.focus();
         return;
