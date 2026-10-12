@@ -18,7 +18,10 @@
 <body class="admin<%= page.bodyClass ? ' ' + page.bodyClass : '' %>" data-admin>
   <a class="skip-link" href="#console">Skip to the console</a>
 
-  <header class="admin-bar">
+  <%# Owner direction (2026-10-12): console navigation lives in a left sidebar,
+      not a top bar — same links, same people block, new home. %>
+  <div class="admin-shell">
+  <aside class="admin-bar">
     <div class="admin-bar__inner">
       <a class="admin-bar__brand" href="<%= admin.brandHref || '/admin' %>">
         <span class="admin-bar__mark<%= helpers.brandMark ? ' admin-bar__mark--logo' : '' %>"><%
@@ -47,8 +50,9 @@
         </form>
       </div>
     </div>
-  </header>
+  </aside>
 
+  <div class="admin-content">
   <main class="admin-main" id="console">
     <div class="admin-main__inner">
       <div class="admin-head">
@@ -86,6 +90,8 @@
       <% } %>
     </div>
   </footer>
+  </div>
+  </div>
 
   <script type="module" src="/js/admin.js"></script>
   <% if ((page.bodyClass || '').includes('page-dealer')) { %>

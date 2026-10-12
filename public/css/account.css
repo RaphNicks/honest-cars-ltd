@@ -276,3 +276,31 @@
 .escrow-list { margin-top: var(--space-2); border-top: var(--border); padding-top: var(--space-2); }
 .escrow-item + .escrow-item { margin-top: var(--space-2); border-top: 1px dashed var(--color-border); padding-top: var(--space-2); }
 .escrow-item h4, .escrow-item h3 { font-size: var(--text-16); }
+
+/* ==========================================================================
+   Account sidebar — owner direction (2026-10-12): section links sit in a
+   left rail beside the dashboard instead of a row above it. Phones keep
+   the wrapped row from the base rule above.
+   ========================================================================== */
+@media (min-width: 769px) {
+  .account-wrap {
+    display: grid;
+    grid-template-columns: 200px minmax(0, 1fr);
+    gap: var(--space-4);
+    align-items: start;
+  }
+
+  .account-nav {
+    display: flex;
+    flex-direction: column;
+    flex-wrap: nowrap;
+    gap: var(--space-1);
+    margin: 0;
+    padding: 0;
+    border-bottom: 0;
+    position: sticky;
+    top: calc(var(--header-height) + var(--space-3));
+  }
+
+  .account-nav a { display: block; padding: var(--space-1) 0; }
+}
