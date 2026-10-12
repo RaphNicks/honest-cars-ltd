@@ -110,7 +110,11 @@
   position: fixed;
   left: 0;
   right: 0;
-  bottom: calc(var(--bottom-nav-height) + env(safe-area-inset-bottom, 0px));
+  /* Sits at the screen edge; when the bottom nav is on screen it pushes the
+     bar up, and retreats with the nav on scroll-down (owner feedback
+     2026-10-12). */
+  bottom: env(safe-area-inset-bottom, 0px);
+  transition: bottom 180ms ease;
   display: flex;
   gap: var(--space-1);
   padding: var(--space-1) var(--space-2);
@@ -119,6 +123,14 @@
   z-index: 30;
 }
 .sticky-cta .btn { flex: 1; }
+body[data-bottom-nav='true'] .sticky-cta {
+  bottom: calc(var(--bottom-nav-height) + env(safe-area-inset-bottom, 0px));
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sticky-cta { transition: none; }
+}
+
 @media (min-width: 769px) { .sticky-cta { display: none; } }
 body:has(.sticky-cta) main { padding-bottom: var(--space-8); }
 
@@ -331,8 +343,11 @@ body:has(.sticky-cta) main { padding-bottom: var(--space-8); }
 .page-body p, .page-body li { font-size: var(--text-16); line-height: var(--leading-relaxed); }
 .legal-note { padding: var(--space-2) var(--space-3); background: var(--amber-08); border-left: 4px solid var(--honest-amber); border-radius: 0 var(--radius) var(--radius) 0; font-size: var(--text-14); }
 
-.faq-group { display: grid; gap: var(--space-2); }
+.faq-group { display: grid; gap: var(--space-1); }
+.faq-group + .faq-group { margin-top: var(--space-6); }
 .faq-search { display: flex; gap: var(--space-1); flex-wrap: wrap; align-items: flex-end; }
+/* The field's own bottom margin belongs to stacked forms, not to this row. */
+.faq-search .field { margin-bottom: 0; flex: 1 1 240px; max-width: 420px; }
 .faq-empty { color: var(--color-text-muted); font-size: var(--text-14); }
 
 /* --------------------------------------------------------------------------
