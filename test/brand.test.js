@@ -71,8 +71,8 @@ test('the install icons are opaque, the in-page mark keeps its transparency', as
   // Where the mark lands decides whether it needs a field of its own. The
   // install icons and the favicon sit on whatever the launcher or the tab strip
   // is — white as often as not — so they are opaque navy squares. The header
-  // mark, the console mark and the share card all draw the gold directly, and
-  // the header supplies its own navy chip in CSS.
+  // mark, the console mark and the share card all draw the gold directly —
+  // owner direction (2026-10-12): the emblem stands alone, no chip behind it.
   for (const file of ['icons/icon-192.png', 'icons/icon-512.png', 'icons/maskable-192.png', 'icons/maskable-512.png', 'icons/apple-touch-icon.png', 'favicon.png']) {
     const meta = await sharp(path.join(ROOT, 'public', file)).metadata();
     assert.equal(meta.hasAlpha, false, `public/${file} must be an opaque square`);
@@ -80,12 +80,12 @@ test('the install icons are opaque, the in-page mark keeps its transparency', as
   const mark = await sharp(path.join(ROOT, 'public', 'img', 'logo.png')).metadata();
   assert.equal(mark.hasAlpha, true, 'public/img/logo.png must keep the artwork’s transparency');
 
-  // …and the header must actually give it that chip, and actually size it.
+  // …and the header must show the emblem bare: no background, no chip.
   const css = read('public/css/components.css');
   const rule = css.match(/img\.header__logo-mark \{([^}]*)\}/);
   assert.ok(rule, 'img.header__logo-mark needs a rule of its own');
-  assert.match(rule[1], /background:\s*var\(--honest-navy\)/, 'the header chip must be the brand navy');
-  assert.match(rule[1], /border-radius/, 'the chip must take the house radius');
+  assert.doesNotMatch(rule[1], /background/, 'the emblem stands alone — no chip behind it');
+  assert.match(rule[1], /width:\s*36px/, 'the lone emblem is sized to keep its detail');
 });
 
 test('the brand block asks for the mark only while the file is there', () => {

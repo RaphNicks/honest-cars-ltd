@@ -444,16 +444,12 @@
 
 .header__logo:hover { text-decoration: none; }
 .header__logo-mark { width: 28px; height: 28px; flex: 0 0 auto; }
-/* The company's mark is gold on transparency, and gold on the white header
-   loses its detail at 32px — so it sits on a navy chip, the same navy the
-   footer and the console bar use. The mark is the one file; the chip is here,
-   because only the header is light. */
+/* Owner direction (2026-10-12): the mark shows as the emblem alone — the
+   transparent PNG, no chip behind it. A touch larger than the old chipped
+   size so the gold line-work keeps its detail on the light header. */
 img.header__logo-mark {
-  width: 32px;
-  height: 32px;
-  padding: 3px;
-  background: var(--honest-navy);
-  border-radius: var(--radius-sm);
+  width: 36px;
+  height: 36px;
 }
 .header__logo em { font-style: normal; color: var(--honest-green); }
 
