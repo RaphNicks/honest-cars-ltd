@@ -13,7 +13,7 @@ var value = function (name, fallback) { return form && form[name] !== undefined 
 var shots = shots || [];
 %>
 
-<form class="dealer-wizard" method="post" action="<%= locals.formAction || '/dealer/listings' %>" data-dealer-wizard>
+<form class="dealer-wizard" method="post" action="<%= locals.formAction || '/dealer/listings' %>" data-dealer-wizard<% if (locals.draftKey) { %> data-draft-key="<%= draftKey %>"<% } %>>
   <input type="hidden" name="step" value="<%= step %>">
 
   <%# Console mode: staff pick the lot the car sits with; dealers always post

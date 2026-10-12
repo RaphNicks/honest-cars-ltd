@@ -75,6 +75,9 @@ function wireDraftAutosave() {
   const form = document.querySelector('[data-dealer-wizard]');
   if (!form) return;
   const note = document.querySelector('[data-autosave-note]');
+  // The console wizard shares this script but keeps its own draft, so a
+  // dealer's half-typed car never resurfaces in the console (and vice versa).
+  const draftKey = form.getAttribute('data-draft-key') || DRAFT_KEY;
 
   const save = () => {
     try {
@@ -84,7 +87,7 @@ function wireDraftAutosave() {
         if (Object.prototype.hasOwnProperty.call(data, key)) return; // first checkbox wins
         data[key] = value;
       });
-      window.localStorage.setItem(DRAFT_KEY, JSON.stringify({ at: Date.now(), data }));
+      window.localStorage.setItem(draftKey, JSON.stringify({ at: Date.now(), data }));
       if (note) note.textContent = 'Draft saved on this device. Nothing reaches HonestCars until you press “Save the draft”.';
     } catch {
       /* private mode, or storage full — the form still works */
@@ -94,7 +97,7 @@ function wireDraftAutosave() {
   // Restore only if the server sent an empty form: a re-render after an error
   // must never be overwritten by a stale local copy.
   try {
-    const raw = window.localStorage.getItem(DRAFT_KEY);
+    const raw = window.localStorage.getItem(draftKey);
     const hasValues = Array.from(form.elements).some((el) => el.name && el.value && el.name !== 'step');
     if (raw && !hasValues) {
       const draft = JSON.parse(raw);
@@ -120,7 +123,7 @@ function wireDraftAutosave() {
     timer = window.setTimeout(save, 600);
   });
   form.addEventListener('submit', () => {
-    try { window.localStorage.removeItem(DRAFT_KEY); } catch { /* nothing to clear */ }
+    try { window.localStorage.removeItem(draftKey); } catch { /* nothing to clear */ }
   });
 }
 

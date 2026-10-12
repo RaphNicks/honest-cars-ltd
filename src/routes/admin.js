@@ -288,6 +288,9 @@ router.get('/listings/new', auth.requireStaff('listings.moderate'), async (req, 
         areaOptions: [],
         dealers: lots,
         formAction: PATHS.newListing,
+        // The console wizard shares the dealer portal's script but keeps a
+        // separate on-device draft, so the two roles never swap half-typed cars.
+        draftKey: 'honestcars.console.listing-draft.v1',
       },
     });
   } catch (error) { return next(error); }
