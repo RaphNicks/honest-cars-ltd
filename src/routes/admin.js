@@ -299,13 +299,16 @@ router.get('/listings/new', auth.requireStaff('listings.moderate'), async (req, 
 router.post('/listings/new', auth.requireStaff('listings.moderate'), auth.sameOriginOnly, async (req, res, next) => {
   try {
     const dealerId = validate.integer(req.body.dealer_id, { min: 1, fallback: 0 });
-    if (!dealerId) return done(res, PATHS.newListing, 'Pick the lot this car belongs to.', { error: true });
+    // A failed submit lands back on the step it was posted from, not on step 1;
+    // the on-device draft restores what was typed.
+    const backTo = `${PATHS.newListing}?step=${validate.integer(req.body.step, { min: 1, max: 3, fallback: 1 })}`;
+    if (!dealerId) return done(res, backTo, 'Pick the lot this car belongs to.', { error: true });
     const input = listingInput(req.body);
     if (!input.make || !input.model || !input.year) {
-      return done(res, PATHS.newListing, 'A car needs a make, a model and a year.', { error: true });
+      return done(res, backTo, 'A car needs a make, a model and a year.', { error: true });
     }
     if (!input.priceKobo) {
-      return done(res, PATHS.newListing, 'A car needs an asking price — buyers filter on it.', { error: true });
+      return done(res, backTo, 'A car needs an asking price — buyers filter on it.', { error: true });
     }
     const created = await dealers.createListing(dealerId, input);
     const links = SHOT_LIST

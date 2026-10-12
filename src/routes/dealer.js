@@ -355,11 +355,14 @@ function listingInput(body) {
 router.post('/listings', requireDealer, auth.sameOriginOnly, async (req, res, next) => {
   try {
     const input = listingInput(req.body);
+    // A failed submit lands the dealer back on the step they posted from, not
+    // on step 1; the on-device draft restores what they typed.
+    const backTo = `${PATHS.newListing}?step=${validate.integer(req.body.step, { min: 1, max: 3, fallback: 1 })}`;
     if (!input.make || !input.model || !input.year) {
-      return done(res, PATHS.newListing, 'A car needs a make, a model and a year.', { error: true });
+      return done(res, backTo, 'A car needs a make, a model and a year.', { error: true });
     }
     if (!input.priceKobo) {
-      return done(res, PATHS.newListing, 'A car needs an asking price — buyers filter on it.', { error: true });
+      return done(res, backTo, 'A car needs an asking price — buyers filter on it.', { error: true });
     }
     const created = await dealers.createListing(req.lot.id, input);
 
