@@ -187,7 +187,9 @@ router.get('/cars', async (req, res, next) => {
       ? `Live stock from partner lots in ${city.name}, ${city.stateLabel} — with the mileage, documents status and verification grade shown before you travel. Prices are what the dealer is asking; we tell you where each one sits against the current market band.`
       : city
         ? `We do not have partner lots in ${city.name} yet. Tell us what you are looking for and a human will find it, verify it and bring you the paperwork — usually inside 72 hours. Every car we do have is one click away.`
-        : 'Live stock from partner lots — with the mileage, documents status and verification grade shown before you travel. Prices are what the dealer is asking; we tell you where each one sits against the current market band.';
+        : built.result.total
+          ? 'Live stock from partner lots — with the mileage, documents status and verification grade shown before you travel. Prices are what the dealer is asking; we tell you where each one sits against the current market band.'
+          : 'Our first verified cars are being inspected and listed now. Until then, hand us the brief — a human finds it, verifies it and brings you the paperwork, usually inside 72 hours.';
 
     const data = {
       ...built,
@@ -226,7 +228,9 @@ router.get('/cars', async (req, res, next) => {
             ? `Cars for sale in ${city.name}, ${city.stateLabel} — verified stock`
             : `Cars for sale in ${city.name}, ${city.stateLabel} — find one for me`,
         description: !city
-          ? 'Filter live verified stock by budget, make, body type, mileage and verification grade. Prices shown against the current market band.'
+          ? built.result.total
+            ? 'Filter live verified stock by budget, make, body type, mileage and verification grade. Prices shown against the current market band.'
+            : 'Honest Cars Ltd — inspected, documented cars handled for you in Port Harcourt. Hand us the brief and a human finds, verifies and delivers your car.'
           : city.live > 0
             ? `Filter live verified stock in ${city.name}, ${city.stateLabel} by budget, make, body type, mileage and verification grade. Prices shown against the current market band.`
             : `No partner lots in ${city.name} yet. Send us the car you want and a human will find it, verify it and bring you the paperwork — usually inside 72 hours.`,

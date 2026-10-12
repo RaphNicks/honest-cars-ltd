@@ -48,7 +48,7 @@
         <h1 class="hero__title">Quality Cars.<br>Real People. <em class="hero__accent">Honest Deals.</em></h1>
       <% } %>
       <p class="hero__sub">
-        <%= (modules.hero && modules.hero.subhead) || 'Verified cars from 37+ trusted Port Harcourt lots — with inspections, documents and negotiation handled for you.' %>
+        <%= (modules.hero && modules.hero.subhead) || 'Every car we list is inspected, documented and negotiated for you — from first search to final papers.' %>
       </p>
 
       <%# §6.1 module 2 — instant search → /cars with filters applied %>
@@ -81,8 +81,11 @@
         </button>
       </form>
 
-      <%# Three trust chips: cars live · partner dealers in PH · verified-only badge system %>
+      <%# Three trust chips — each only renders once its number is real; a
+          brand-new lot makes no volume claims (owner 2026-10-12). %>
+      <% if (site.counters.carsLive > 0 || site.counters.partnerDealers > 0 || site.counters.certified > 0) { %>
       <div class="hero__chips">
+        <% if (site.counters.carsLive > 0) { %>
         <span class="trust-chip">
           <span class="trust-chip__icon"><%- helpers.icon('car', { size: 18 }) %></span>
           <span class="trust-chip__text">
@@ -90,6 +93,8 @@
             <span>Fresh listings, daily</span>
           </span>
         </span>
+        <% } %>
+        <% if (site.counters.partnerDealers > 0) { %>
         <span class="trust-chip">
           <span class="trust-chip__icon"><%- helpers.icon('store', { size: 18 }) %></span>
           <span class="trust-chip__text">
@@ -99,6 +104,8 @@
             <span>Verified businesses</span>
           </span>
         </span>
+        <% } %>
+        <% if (site.counters.certified > 0) { %>
         <span class="trust-chip">
           <span class="trust-chip__icon"><%- helpers.icon('checkCircle', { size: 18 }) %></span>
           <span class="trust-chip__text">
@@ -106,7 +113,9 @@
             <span>Inspected &amp; verified</span>
           </span>
         </span>
+        <% } %>
       </div>
+      <% } %>
     </div>
   </div>
 </section>
@@ -371,6 +380,9 @@
 </section>
 
 <%# ------------------------------------------------------- 11. From the Blog %>
+<%# A brand-new lot has no posts yet — the whole module stays out of the
+    page until the first article is published (owner 2026-10-12). %>
+<% if (posts.length) { %>
 <section class="section" aria-labelledby="blog-heading">
   <div class="container">
     <div class="section-head" data-reveal>
@@ -390,6 +402,7 @@
     </div>
   </div>
 </section>
+<% } %>
 
 <%# ------------------------------------- 12. Dealer CTA band, dusk road photo %>
 <section class="section section--cinema" aria-labelledby="dealer-heading">

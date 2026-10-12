@@ -14,7 +14,9 @@ const BASE = (process.argv[2] || 'http://127.0.0.1:3000').replace(/\/$/, '');
 const TITLE_MAX = 64; // §14.3 SERP budget
 const DESC_MAX = 158;
 
-const paths = new Set(['/', '/cars', '/cars/toyota', '/cars/suv-under-15m', '/cars/compare', '/login?next=%2Faccount', '/cart', '/checkout']);
+// Facet and vehicle URLs are data-dependent: the sitemap below contributes
+// exactly the ones that exist, so an empty (live) lot audits clean too.
+const paths = new Set(['/', '/cars', '/cars/compare', '/login?next=%2Faccount', '/cart', '/checkout']);
 const sitemap = await (await fetch(`${BASE}/sitemap.xml`)).text();
 for (const match of sitemap.matchAll(/<loc>([^<]+)<\/loc>/g)) {
   paths.add(new URL(match[1]).pathname.replace(/\/$/, '') || '/');

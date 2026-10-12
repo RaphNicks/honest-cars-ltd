@@ -315,3 +315,31 @@ Nothing in this guide is production. Before this is public it needs: a real
 MySQL with a dedicated (non-root) user, `AUTH_PEPPER` set to a random value,
 `NODE_ENV=production`, HTTPS, a payment provider's keys, and the rest of the
 gaps list in `docs/GAPS.md`.
+
+## Going live: removing the demo data
+
+The seed ships ~60 synthetic cars, blog posts, dealers, enquiries and an
+audit trail so the whole product can be exercised without real stock. When
+you are ready to test with real data, you do **not** need to touch the
+database by hand:
+
+```
+npm run db:purge-demo
+```
+
+That deletes every demo row — listings and their media, price bands, saved
+cars and searches, leads, bookings, hires, orders, blog posts,
+testimonials, notifications, the audit trail, and dealer lots that no
+account owns — while keeping the things you start from: every user account
+(the seeded logins and new sign-ups), settings, the service catalogue and
+pricing, FAQs, CMS pages, the city directory, hire classes, and dealer
+profiles that an account signs in as. It is safe to run twice.
+
+Two things to know:
+
+- The site makes no volume claims when empty: the home trust chips hide
+  until their numbers are real, and `/cars` says the first cars are being
+  inspected and points at the concierge.
+- `npm run db:seed` (or a first setup into an empty database) puts the demo
+  data back — the automated test suite needs it. Demo and live are one
+  command apart in each direction.
