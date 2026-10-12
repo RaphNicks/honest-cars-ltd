@@ -62,7 +62,7 @@ body.admin {
   place-items: center;
   width: 32px;
   height: 32px;
-  border-radius: var(--radius-sm, 8px);
+  border-radius: 0;
   background: var(--honest-green);
   font-size: var(--text-14);
   letter-spacing: 0.02em;
@@ -88,7 +88,7 @@ body.admin {
   gap: 6px;
   padding: 8px 10px;
   min-height: 40px;
-  border-radius: var(--radius-sm, 8px);
+  border-radius: 0;
   color: rgba(255, 255, 255, 0.78);
   text-decoration: none;
   font-size: var(--text-14);
@@ -116,7 +116,7 @@ body.admin {
   display: inline-block;
   margin-right: 6px;
   padding: 2px 8px;
-  border-radius: 999px;
+  border-radius: 0;
   background: rgba(255, 255, 255, 0.16);
   font-size: var(--text-12);
   text-transform: capitalize;
@@ -145,7 +145,7 @@ body.admin {
   gap: 8px;
   margin: 0 0 var(--space-2);
   padding: 12px 14px;
-  border-radius: var(--radius, 12px);
+  border-radius: 0;
   border-left: 4px solid var(--honest-green);
   background: var(--white);
   box-shadow: 0 1px 2px rgba(14, 42, 71, 0.08);
@@ -171,7 +171,7 @@ body.admin {
 /* Batch F: the compact KPI reads from the house tokens, not pre-token hex. */
 .kpi {
   background: var(--white);
-  border-radius: var(--radius);
+  border-radius: 0;
   padding: var(--space-2);
   box-shadow: var(--shadow-header);
   border: var(--border);
@@ -213,7 +213,7 @@ body.admin {
 .panel {
   background: var(--white);
   border: 1px solid var(--color-border);
-  border-radius: var(--radius, 12px);
+  border-radius: 0;
   padding: var(--space-2);
   margin-bottom: var(--space-2);
 }
@@ -239,7 +239,7 @@ body.admin {
   margin: 0;
   padding: var(--space-2);
   border: 1px dashed var(--color-border);
-  border-radius: var(--radius, 12px);
+  border-radius: 0;
   color: var(--color-text-muted);
   font-size: var(--text-14);
   background: var(--white);
@@ -269,7 +269,7 @@ body.admin {
 .spark__bar {
   width: 100%;
   min-height: 3px;
-  border-radius: 4px 4px 0 0;
+  border-radius: 0;
   background: var(--honest-green);
 }
 
@@ -294,14 +294,14 @@ body.admin {
 .funnel__track {
   height: 12px;
   background: var(--color-bg-subtle);
-  border-radius: 999px;
+  border-radius: 0;
   overflow: hidden;
 }
 
 .funnel__fill {
   display: block;
   height: 100%;
-  border-radius: 999px;
+  border-radius: 0;
   background: var(--honest-navy);
 }
 
@@ -381,7 +381,7 @@ body.admin {
 .chip {
   display: inline-block;
   padding: 2px 8px;
-  border-radius: 999px;
+  border-radius: 0;
   background: var(--color-bg-subtle);
   border: 1px solid var(--color-border);
   font-size: var(--text-12);
@@ -391,7 +391,7 @@ body.admin {
 .badge {
   display: inline-block;
   padding: 2px 8px;
-  border-radius: 4px;
+  border-radius: 0;
   font-size: var(--text-12);
   font-weight: 600;
   text-transform: capitalize;
@@ -452,7 +452,7 @@ body.admin {
   justify-content: space-between;
   padding: var(--space-2);
   border: 1px solid var(--color-border);
-  border-radius: var(--radius, 12px);
+  border-radius: 0;
   background: var(--color-bg-subtle);
 }
 
@@ -528,7 +528,7 @@ body.admin {
 .board__col {
   background: var(--color-bg-subtle);
   border: 1px solid var(--color-border);
-  border-radius: var(--radius, 12px);
+  border-radius: 0;
   padding: var(--space-1);
   min-width: 240px;
 }
@@ -548,7 +548,7 @@ body.admin {
 .board__count {
   background: var(--white);
   border: 1px solid var(--color-border);
-  border-radius: 999px;
+  border-radius: 0;
   padding: 0 8px;
   font-size: var(--text-12);
   color: var(--colour-ink, var(--color-text));
@@ -557,7 +557,7 @@ body.admin {
 .board-card {
   background: var(--white);
   border: 1px solid var(--color-border);
-  border-radius: var(--radius, 12px);
+  border-radius: 0;
   padding: var(--space-1);
   margin-bottom: var(--space-1);
 }
@@ -618,7 +618,7 @@ body.admin {
   place-items: center;
   width: 44px;
   height: 44px;
-  border-radius: 12px;
+  border-radius: 0;
   border: 1px solid var(--color-border);
   background: var(--color-bg-subtle);
   cursor: pointer;
@@ -700,7 +700,7 @@ body.admin {
 .cms-column {
   background: var(--surface, var(--color-bg-subtle));
   border: 1px solid var(--line, var(--color-border));
-  border-radius: var(--radius, 12px);
+  border-radius: 0;
   padding: var(--space-2, 16px);
 }
 .cms-column__title {
@@ -717,7 +717,7 @@ body.admin {
 .cms-card {
   background: var(--white);
   border: 1px solid var(--line, var(--color-border));
-  border-radius: var(--radius, 12px);
+  border-radius: 0;
   padding: var(--space-2, 16px);
   margin-bottom: var(--space-1, 8px);
 }
@@ -741,7 +741,7 @@ body.admin {
 .cms-check--bad { color: #B42318; }
 .cms-preview {
   border: 1px solid var(--line, var(--color-border));
-  border-radius: var(--radius, 12px);
+  border-radius: 0;
   padding: var(--space-2, 16px);
   background: var(--white);
 }
@@ -774,7 +774,7 @@ body.admin {
   width: 8px;
   height: 8px;
   margin-top: 6px;
-  border-radius: 50%;
+  border-radius: 0;
   background: var(--honest-amber, #E8A13D);
 }
 
@@ -816,14 +816,14 @@ body.admin {
   width: 112px;
   height: 84px;
   object-fit: cover;
-  border-radius: 8px;
+  border-radius: 0;
   display: block;
 }
 
 .dealer-listing__blank {
   width: 112px;
   height: 84px;
-  border-radius: 8px;
+  border-radius: 0;
   border: 1px dashed var(--line, var(--color-border));
   display: grid;
   place-items: center;
@@ -855,7 +855,7 @@ body.admin {
 .dealer-photos__item {
   position: relative;
   border: 1px solid var(--line, var(--color-border));
-  border-radius: 12px;
+  border-radius: 0;
   overflow: hidden;
   background: var(--white, #fff);
 }
@@ -900,7 +900,7 @@ body.admin {
   gap: var(--space-05, 4px);
   padding: var(--space-05, 4px) var(--space-1, 8px);
   border: 1px solid var(--line, var(--color-border));
-  border-radius: 999px;
+  border-radius: 0;
   font-size: var(--text-14);
   color: var(--muted, var(--color-text-muted));
   background: var(--white, #fff);
@@ -917,7 +917,7 @@ body.admin {
   place-items: center;
   width: 20px;
   height: 20px;
-  border-radius: 50%;
+  border-radius: 0;
   background: var(--navy-08, #EEF2F7);
   font-size: var(--text-12);
   font-weight: var(--weight-semibold, 600);
@@ -950,7 +950,7 @@ body.admin {
 .shot-list__item {
   padding: var(--space-2);
   border: 1px solid var(--line, var(--color-border));
-  border-radius: 12px;
+  border-radius: 0;
   background: var(--white, #fff);
 }
 
@@ -967,7 +967,7 @@ body.admin {
   flex: none;
   width: 24px;
   height: 24px;
-  border-radius: 50%;
+  border-radius: 0;
   background: var(--honest-navy, var(--honest-navy));
   color: var(--white, #fff);
   font-size: var(--text-12);
@@ -1007,7 +1007,7 @@ body.admin {
 .lead-row {
   padding: var(--space-2);
   border: 1px solid var(--line, var(--color-border));
-  border-radius: 12px;
+  border-radius: 0;
   background: var(--white, #fff);
 }
 
@@ -1076,7 +1076,7 @@ body.admin {
 .hire-cal__ref { font-size: var(--text-12); color: var(--colour-navy, #10233D); text-decoration: none; }
 a.hire-cal__ref:hover { text-decoration: underline; }
 .hire-cal__mark { color: var(--color-text-muted); }
-.hire-key { display: inline-block; padding: 1px 8px; border-radius: 999px; margin-right: 4px; font-size: var(--text-12); }
+.hire-key { display: inline-block; padding: 1px 8px; border-radius: 0; margin-right: 4px; font-size: var(--text-12); }
 .hire-key--free { background: #F4FBF6; border: 1px solid #CFE9DA; }
 .hire-key--out { background: #DCEAFB; border: 1px solid #B9D3F2; }
 .hire-key--held { background: #FFF6E5; border: 1px solid #F0D9A8; }
@@ -1102,7 +1102,7 @@ a.hire-cal__ref:hover { text-decoration: underline; }
 .edcal__day { font-size: var(--text-12); color: var(--color-text-muted); }
 .edcal__post { display: block; margin-top: 3px; font-size: var(--text-12); line-height: 1.35; text-decoration: none; color: var(--colour-navy, #10233D); }
 .edcal__post:hover { text-decoration: underline; }
-.edcal__chip { display: inline-block; border-radius: 999px; padding: 0 6px; font-size: var(--text-12); margin-top: 3px; }
+.edcal__chip { display: inline-block; border-radius: 0; padding: 0 6px; font-size: var(--text-12); margin-top: 3px; }
 .edcal__chip--published { background: #E9F7EF; color: #14683C; border: 1px solid #BFE4CE; }
 .edcal__chip--scheduled { background: #FFF6E5; color: #8A5B00; border: 1px solid #F0D9A8; }
 .edcal__chip--in_review { background: #EAF1FB; color: #1B4E8B; border: 1px solid #C3D8F2; }
@@ -1116,7 +1116,7 @@ a.hire-cal__ref:hover { text-decoration: underline; }
    A catalogue card per add-on: what it is, what it does, what it costs, and
    the one car it applies to when it applies to a car.
    ========================================================================== */
-.addon { border: 1px solid var(--color-border); border-radius: var(--radius, 12px); padding: var(--space-2); margin-bottom: var(--space-2); }
+.addon { border: 1px solid var(--color-border); border-radius: 0; padding: var(--space-2); margin-bottom: var(--space-2); }
 .addon:last-child { margin-bottom: 0; }
 .addon__head { display: flex; flex-wrap: wrap; gap: 8px; align-items: baseline; justify-content: space-between; }
 .addon__tagline { color: var(--color-text-muted); margin: 2px 0 6px; }
@@ -1130,8 +1130,8 @@ a.hire-cal__ref:hover { text-decoration: underline; }
    a code block gets its shape from spacing and a surface, not a second family.
    ========================================================================== */
 .input--mono { min-height: 180px; line-height: 1.5; resize: vertical; white-space: pre; overflow-wrap: normal; overflow-x: auto; }
-.key-reveal { margin: 0; padding: var(--space-2); background: var(--surface, #F5F7FA); border: 1px solid var(--color-border, var(--color-border)); border-radius: var(--radius, 12px); overflow-x: auto; letter-spacing: 0.02em; }
-.code-block { margin: 0 0 var(--space-2); padding: var(--space-2); background: var(--surface, #F5F7FA); border: 1px solid var(--color-border, var(--color-border)); border-radius: var(--radius, 12px); font-size: var(--text-14); line-height: 1.6; white-space: pre; overflow-x: auto; }
+.key-reveal { margin: 0; padding: var(--space-2); background: var(--surface, #F5F7FA); border: 1px solid var(--color-border, var(--color-border)); border-radius: 0; overflow-x: auto; letter-spacing: 0.02em; }
+.code-block { margin: 0 0 var(--space-2); padding: var(--space-2); background: var(--surface, #F5F7FA); border: 1px solid var(--color-border, var(--color-border)); border-radius: 0; font-size: var(--text-14); line-height: 1.6; white-space: pre; overflow-x: auto; }
 .note-inline--error { color: var(--danger, #B3261E); }
 
 /* ------------------------------------------------------------- markets (FR-32) */

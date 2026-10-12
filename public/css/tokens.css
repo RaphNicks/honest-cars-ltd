@@ -100,10 +100,10 @@
   --bottom-nav-height: 60px;
 
   /* --- Radius, borders, shadows ----------------------------------------- */
-  --radius-sm: 8px;
-  --radius: 12px;      /* the house radius — cards, inputs, buttons */
-  --radius-lg: 16px;
-  --radius-pill: 999px;
+  --radius-sm: 0;
+  --radius: 0;         /* owner 2026-10-12: sharp corners everywhere */
+  --radius-lg: 0;
+  --radius-pill: 0;
 
   --border-width: 1px;
   --border: var(--border-width) solid var(--color-border);

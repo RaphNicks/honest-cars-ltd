@@ -33,7 +33,7 @@
 
 .hero__media {
   aspect-ratio: 4 / 3;
-  border-radius: var(--radius);
+  border-radius: 0;
   border: var(--border);
   overflow: hidden;
   background: var(--surface);
@@ -52,7 +52,7 @@
   padding: var(--space-2);
   background: var(--white);
   border: var(--border);
-  border-radius: var(--radius);
+  border-radius: 0;
   box-shadow: var(--shadow-hover);
 }
 
@@ -76,7 +76,7 @@
   gap: var(--space-05);
   padding: var(--space-05) var(--space-1);
   border: var(--border);
-  border-radius: var(--radius-pill);
+  border-radius: 0;
   background: var(--white);
   font-size: var(--text-14);
   color: var(--ink);
@@ -118,7 +118,7 @@
   min-height: 32px;
   padding: 0 var(--space-1);
   border: var(--border);
-  border-radius: var(--radius-pill);
+  border-radius: 0;
   background: var(--surface);
   font-size: var(--text-14);
   color: var(--ink);
@@ -178,7 +178,7 @@
   .inspection-strip { grid-template-columns: repeat(6, minmax(0, 1fr)); }
 }
 
-.inspection-strip img { border-radius: var(--radius-sm); border: var(--border); aspect-ratio: 4 / 3; object-fit: cover; }
+.inspection-strip img { border-radius: 0; border: var(--border); aspect-ratio: 4 / 3; object-fit: cover; }
 
 /* --------------------------------------------------------------------------
    Facet landing pages (§14.1) — same grid, curated intro on top
@@ -205,7 +205,7 @@
   background: var(--surface);
   border: var(--border);
   border-left: 4px solid var(--honest-navy);
-  border-radius: var(--radius);
+  border-radius: 0;
   margin-top: var(--space-2);
 }
 
@@ -254,7 +254,7 @@
   padding: var(--space-2);
   border: var(--border);
   border-left: 6px solid var(--color-text-muted);
-  border-radius: var(--radius);
+  border-radius: 0;
   background: var(--color-surface-sunken, #F7FAFC);
   margin-bottom: var(--space-2);
 }
@@ -313,7 +313,7 @@
 .offline__card {
   background: var(--surface);
   border: var(--border);
-  border-radius: var(--radius);
+  border-radius: 0;
   padding: var(--space-2);
 }
 .offline__card h2 { font-size: var(--text-16); margin-bottom: var(--space-1); }
@@ -322,7 +322,7 @@
   padding: var(--space-2);
   border-left: 3px solid var(--honest-green);
   background: var(--green-08);
-  border-radius: var(--radius-sm);
+  border-radius: 0;
   font-size: var(--text-14);
   margin-bottom: var(--space-3);
 }
@@ -490,7 +490,7 @@ body[data-page="/"] .area-switcher--header .area-switcher__toggle:hover {
   padding: var(--space-1);
   padding-right: var(--space-2);
   border: 0;
-  border-radius: var(--radius);
+  border-radius: 0;
   background: var(--chip-glass);
   color: var(--white);
 }
@@ -501,7 +501,7 @@ body[data-page="/"] .area-switcher--header .area-switcher__toggle:hover {
   justify-content: center;
   width: 36px;
   height: 36px;
-  border-radius: 50%;
+  border-radius: 0;
   background: var(--honest-green);
   color: var(--white);
   flex: 0 0 auto;
@@ -545,7 +545,7 @@ body[data-page="/"] .area-switcher--header .area-switcher__toggle:hover {
   position: relative;
   display: block;
   aspect-ratio: 4 / 3;
-  border-radius: var(--radius);
+  border-radius: 0;
   border: var(--border);
   overflow: hidden;
   background: var(--navy-deep);
@@ -618,7 +618,7 @@ body[data-page="/"] .area-switcher--header .area-switcher__toggle:hover {
 .how__media {
   position: relative;
   aspect-ratio: 4 / 3;
-  border-radius: var(--radius);
+  border-radius: 0;
   border: var(--border);
   overflow: hidden;
   background: var(--surface);
@@ -636,7 +636,7 @@ body[data-page="/"] .area-switcher--header .area-switcher__toggle:hover {
   max-width: calc(100% - var(--space-4));
   margin: 0;
   padding: var(--space-1) var(--space-2);
-  border-radius: var(--radius);
+  border-radius: 0;
   background: var(--white);
   box-shadow: var(--shadow-hover);
   font-size: var(--text-14);
@@ -659,7 +659,7 @@ body[data-page="/"] .area-switcher--header .area-switcher__toggle:hover {
 
 .section--proof .testimonial {
   border-color: transparent;
-  border-radius: var(--radius);
+  border-radius: 0;
   box-shadow: 0 20px 40px rgba(7, 28, 42, 0.45);
 }
 
