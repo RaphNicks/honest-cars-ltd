@@ -304,6 +304,22 @@ export function initCompare(root = document) {
   });
 }
 
+/**
+ * The compare page renders server-side from ?ids= so links can be shared;
+ * the visitor's own picks live in localStorage. This bridges the two:
+ * land on /cars/compare with picks on this device and no ids in the URL,
+ * and the page reloads with your picks in it.
+ */
+export function initCompareHydrate() {
+  if (window.location.pathname !== '/cars/compare') return;
+  const url = new URL(window.location.href);
+  if (url.searchParams.has('ids')) return;
+  const ids = getCompareIds();
+  if (!ids.length) return;
+  url.searchParams.set('ids', ids.join(','));
+  window.location.replace(url.toString());
+}
+
 /* ------------------------------------ recently viewed (VDP, no PII) */
 export function rememberViewed(listing) {
   if (!listing || !listing.id) return;
