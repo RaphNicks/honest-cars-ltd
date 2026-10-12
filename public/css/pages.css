@@ -805,19 +805,19 @@ body[data-page="/"] .area-switcher--header .area-switcher__toggle:hover {
 }
 
 /* --- Blog strip: one featured story, compact follow-ups --------------------- */
-.blog-strip { display: grid; gap: var(--space-3); }
+.blog-strip { display: grid; gap: var(--space-6); }
 
+/* Owner direction (2026-10-12): one column, posts under each other — the
+   featured story is simply the first row, not a side-by-side composition. */
 @media (min-width: 1025px) {
-  .blog-strip { grid-template-columns: 1.4fr 1fr; align-items: start; }
+  .blog-strip { grid-template-columns: 1fr; }
 }
 
-.blog-strip__more { display: grid; gap: var(--space-2); align-content: start; }
+.blog-strip__more { display: grid; gap: var(--space-6); align-content: start; }
 
 @media (min-width: 769px) {
-  .post-card--featured { display: grid; grid-template-columns: 1.1fr 1fr; align-items: center; height: auto; }
-  /* Aspect-locked so the photo can never stretch into a tall slab and strand
-     the text column (owner feedback 2026-10-12). */
-  .post-card--featured .post-card__media { aspect-ratio: 4 / 3; height: auto; max-height: 480px; }
+  .post-card--featured { display: block; height: auto; }
+  .post-card--featured .post-card__media { aspect-ratio: 16 / 9; height: auto; max-height: none; }
 }
 
 /* --- Category tiles: the photograph is the tile; the border was noise -------- */
@@ -862,18 +862,14 @@ body[data-page="/"] .area-switcher--header .area-switcher__toggle:hover {
    Batch D — content & trust pages: editorial index, columns, open channels
    ========================================================================== */
 
-/* Blog index: one featured story, the rest in a calmer two-column shelf. */
-.blog-index { display: grid; gap: var(--space-3); }
+/* Blog index: every post in one column, under each other (owner 2026-10-12). */
+.blog-index { display: grid; gap: var(--space-6); grid-template-columns: 1fr; }
 
-@media (min-width: 1025px) {
-  .blog-index { grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); gap: var(--space-4); align-items: start; }
-}
+.blog-index__more { display: grid; gap: var(--space-6); grid-template-columns: 1fr; }
 
-.blog-index__more { display: grid; gap: var(--space-2); grid-template-columns: 1fr; }
-
-@media (min-width: 769px) {
-  .blog-index__more { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-}
+/* The filtered/searched view uses the generic three-up grid in markup; on the
+   blog we override it back to the single column the owner asked for. */
+.grid--3[data-post-grid] { grid-template-columns: 1fr; gap: var(--space-6); }
 
 /* Team as columns with a green role line. */
 .people-cols { display: grid; gap: var(--space-3); }
