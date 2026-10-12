@@ -346,17 +346,36 @@ export function initRecentlyViewed(currentId) {
   }
   if (!items.length) return;
 
-  list.innerHTML = items
-    .slice(0, 3)
-    .map(
-      (item) => `
-      <a class="card card--hoverable" href="${item.url}">
+  // The localStorage snapshot is only a reminder of what this device looked
+  // at. A purged demo car, a delisted or long-sold car must not keep haunting
+  // the page from the device — the server decides what is still viewable, and
+  // its copy of the title and price is the one that renders.
+  const esc = (value) => String(value ?? '').replace(/[&<>"']/g, (ch) => `&#${ch.charCodeAt(0)};`);
+  const ids = items.slice(0, 3).map((item) => item.id).join(',');
+  fetch(`/api/listings/compare?ids=${ids}`, { headers: { Accept: 'application/json' } })
+    .then((res) => (res.ok ? res.json() : null))
+    .then((data) => {
+      if (!data || !Array.isArray(data.listings) || !data.listings.length) return;
+      const live = new Map(data.listings.map((listing) => [Number(listing.id), listing]));
+      const rows = items
+        .filter((item) => live.has(Number(item.id)))
+        .slice(0, 3)
+        .map((item) => {
+          const fresh = live.get(Number(item.id));
+          return `
+      <a class="card card--hoverable" href="${esc(fresh.url)}">
         <div class="card__body">
-          <span class="car-card__title">${item.title}</span>
-          <span class="car-card__price">${item.priceFormatted}</span>
+          <span class="car-card__title">${esc(fresh.title)}</span>
+          <span class="car-card__price">${esc(fresh.priceFormatted)}</span>
         </div>
-      </a>`,
-    )
-    .join('');
-  container.hidden = false;
+      </a>`;
+        })
+        .join('');
+      if (!rows) return;
+      list.innerHTML = rows;
+      container.hidden = false;
+    })
+    .catch(() => {
+      /* offline or blocked — the section simply stays hidden */
+    });
 }
