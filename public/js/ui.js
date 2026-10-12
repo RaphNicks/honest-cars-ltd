@@ -5,7 +5,7 @@
  * this file just makes them feel fast.
  */
 
-import { track } from './events.js';
+import { track, smallSrc } from './events.js';
 
 const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
@@ -158,6 +158,15 @@ export function initGallery(root = document) {
 
   const show = (thumb) => {
     main.src = thumb.dataset.src;
+    // The browser picks from srcset before it ever looks at src: leaving the
+    // first photo's srcset in place is why a picked thumb never showed
+    // (reported 2026-10-09). Rebuild it from the picked photo's 600 sibling.
+    const small = smallSrc(thumb.dataset.src);
+    if (small === thumb.dataset.src) {
+      main.removeAttribute('srcset');
+    } else {
+      main.setAttribute('srcset', `${small} 600w, ${thumb.dataset.src} 1200w`);
+    }
     main.alt = thumb.dataset.alt || main.alt;
     main.parentElement.classList.remove('hc-blur');
     main.style.removeProperty('display');

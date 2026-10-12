@@ -70,6 +70,23 @@ class Element {
     this.parent = null;
   }
 
+  /** A real element's parent, under the browser's name. */
+  get parentElement() {
+    return this.parent;
+  }
+
+  /** The minimum style object: modules only set or clear properties on it. */
+  get style() {
+    if (!this._style) {
+      const props = new Map();
+      this._style = {
+        setProperty: (name, value) => props.set(name, value),
+        removeProperty: (name) => props.delete(name),
+      };
+    }
+    return this._style;
+  }
+
   /** A real fragment has this, and `cityItem()` uses it to hand back the item. */
   get firstElementChild() {
     return this.children[0] || null;
