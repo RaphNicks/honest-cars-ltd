@@ -40,7 +40,7 @@
             </td>
             <td><span class="chip"><%= row.action %></span></td>
             <td class="tabular"><%= row.entity %> #<%= row.entityId %></td>
-            <td><%= row.detail ? (typeof row.detail === 'string' ? row.detail : JSON.stringify(row.detail)) : '—' %></td>
+            <td><%= helpers.detailText(row.detail) %></td>
           </tr>
         <% }); %>
       </tbody>

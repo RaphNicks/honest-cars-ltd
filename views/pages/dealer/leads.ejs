@@ -65,7 +65,7 @@ var STAGE_ORDER = ['new', 'contacted', 'viewing', 'closed', 'lost'];
             </div>
           </div>
 
-          <p class="lead-row__message"><%= row.message %></p>
+          <p class="lead-row__message"><%= helpers.messageText(row.message) %></p>
 
           <% if (row.lostReason) { %>
             <p class="note-inline">Lost: <%= row.lostReason %></p>

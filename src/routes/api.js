@@ -36,6 +36,7 @@ const financing = require('../services/financing');
 const privacy = require('../services/privacy');
 const dealerApi = require('../services/dealer-api');
 const render = require('../lib/render');
+const humanize = require('../lib/humanize');
 const { sendJson, sendFragment, personalise, wantsLessData } = require('../lib/respond');
 const { helpers } = require('../lib/locals');
 const auth = require('../services/auth');
@@ -296,8 +297,9 @@ router.post('/service-requests', rateLimit({ windowMs: 60_000, max: 10 }), async
       })
       .catch(() => {});
 
+    // The ops desk reads this on a phone — sentences, never JSON.
     const opsText = encodeURIComponent(
-      `New ${rule.type} request ${request.trackingId}\nName: ${name}\nPhone: ${phone}\nBrief: ${JSON.stringify(brief).slice(0, 400)}`,
+      `New ${rule.type} request ${request.trackingId}\nName: ${name}\nPhone: ${phone}\nBrief: ${humanize.briefText(brief)}`,
     );
 
     return sendJson(res, {

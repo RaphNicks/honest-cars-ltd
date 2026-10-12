@@ -114,8 +114,8 @@
     <% } else { %>
       <dl class="brief">
         <% briefKeys.forEach(function (key) { %>
-          <dt><%= key.replace(/_/g, ' ') %></dt>
-          <dd><%= typeof focus.brief[key] === 'object' ? JSON.stringify(focus.brief[key]) : focus.brief[key] %></dd>
+          <dt><%= helpers.humanWord(key) %></dt>
+          <dd><%= helpers.humanBriefValue(key, focus.brief[key]) %></dd>
         <% }); %>
       </dl>
     <% } %>

@@ -20,6 +20,7 @@ const shape = require('../db/shape');
 const blocks = require('../services/blocks');
 const { icon, SERVICE_ICONS } = require('../services/icons');
 const phone = require('./phone');
+const humanize = require('./humanize');
 const { buildNav, megaMenuItems, whatsappLink } = require('../services/nav');
 const cityDirectory = require('../services/city-directory');
 const seo = require('../services/seo');
@@ -182,6 +183,14 @@ function helpers({ saveData = false } = {}) {
     vdpPath: seo.vdpPath,
     vdpMeta: seo.vdpMeta,
     serviceMeta: seo.serviceMeta,
+    // Human-readable renderings of machine payloads (audit detail, lead
+    // messages, concierge briefs) — nothing reaches a person as JSON.
+    detailText: humanize.detailText,
+    messageText: humanize.messageText,
+    briefText: humanize.briefText,
+    humanWord: humanize.word,
+    humanList: humanize.list,
+    humanBriefValue: humanize.briefValue,
   };
 }
 

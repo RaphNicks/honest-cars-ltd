@@ -102,7 +102,7 @@
               <% if (row.assigneeName) { %> · owner <strong><%= row.assigneeName %></strong><% } else { %> · <strong class="warn">unowned</strong><% } %>
               <% if (row.slaDueAt) { %> · SLA <%= helpers.relativeDays(row.slaDueAt) %><% } %>
             </p>
-            <% if (row.message) { %><p class="lead-row__message">“<%= row.message %>”</p><% } %>
+            <% if (row.message) { %><p class="lead-row__message"><%= helpers.messageText(row.message) %></p><% } %>
             <% if (row.lostReason) { %><p class="note-inline mb-0">Lost reason: <%= row.lostReason %></p><% } %>
           </div>
           <div class="lead-row__links">
