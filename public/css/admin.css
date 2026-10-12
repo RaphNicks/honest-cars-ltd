@@ -30,7 +30,7 @@ body.admin {
 
 /* --------------------------------------------------------------- top bar */
 .admin-bar {
-  background: var(--honest-navy);
+  background: var(--navy-deep);
   color: var(--white);
   position: sticky;
   top: 0;

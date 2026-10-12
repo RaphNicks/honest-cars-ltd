@@ -408,28 +408,27 @@
 .icon-btn svg { width: 20px; height: 20px; }
 
 /* --------------------------------------------------------------------------
-   Header (§5.2: sticky, white, slim ≤64px, soft shadow after scroll)
+   Header (§5.2: sticky, deep navy on every page, slim ≤64px)
    -------------------------------------------------------------------------- */
 .header {
   position: sticky;
   top: 0;
   z-index: var(--z-header);
-  background: var(--white);
+  background: var(--navy-deep);
   border-bottom: var(--border-width) solid transparent;
   transition: box-shadow var(--motion) var(--ease), border-color var(--motion) var(--ease);
 }
 
 .header[data-scrolled='true'] {
   box-shadow: var(--shadow-header);
-  border-bottom-color: var(--line);
+  border-bottom-color: var(--white-glass-line);
 }
 
 .header__inner {
   display: flex;
   align-items: center;
   gap: var(--space-2);
-  /* Exactly the token: the home hero tucks under the transparent bar by
-     this height, so a taller bar would leave a white band above the film. */
+  /* Shared height: the full-screen landing hero tucks beneath this bar. */
   height: var(--header-height);
 }
 
@@ -445,10 +444,11 @@
 }
 
 .header__logo:hover { text-decoration: none; }
+.header .header__logo { color: var(--white); }
 .header__logo-mark { width: 28px; height: 28px; flex: 0 0 auto; }
 /* Owner direction (2026-10-12): the mark shows as the emblem alone — the
    transparent PNG, no chip behind it. A touch larger than the old chipped
-   size so the gold line-work keeps its detail on the light header. */
+   size so the gold line-work keeps its detail against the dark header. */
 img.header__logo-mark {
   width: 36px;
   height: 36px;
@@ -478,12 +478,12 @@ img.header__logo-mark {
   gap: var(--space-05);
   font-size: var(--text-14);
   font-weight: var(--weight-medium);
-  color: var(--honest-navy);
+  color: var(--white);
   padding-block: var(--space-2);
   white-space: nowrap;
 }
 
-.header__nav-link[aria-current='page'] { color: var(--honest-green); font-weight: var(--weight-semibold); }
+.header__nav-link[aria-current='page'] { color: var(--green-bright); font-weight: var(--weight-semibold); }
 
 .header__actions {
   display: flex;
@@ -500,11 +500,11 @@ img.header__logo-mark {
   width: 44px;
   height: 44px;
   border-radius: 0;
-  color: var(--honest-navy);
+  color: var(--white);
 }
 
 .header__search-toggle:hover,
-.header__menu-toggle:hover { background: var(--surface); }
+.header__menu-toggle:hover { background: var(--white-glass); }
 
 @media (min-width: 1025px) {
   .header__menu-toggle { display: none; }
@@ -542,6 +542,8 @@ img.header__logo-mark {
 }
 
 .area-switcher__toggle:hover { background: var(--surface); }
+.header .area-switcher__toggle { color: var(--white); }
+.header .area-switcher__toggle:hover { background: var(--white-glass); }
 .area-switcher__label { white-space: nowrap; }
 
 .area-switcher__panel {
@@ -777,8 +779,8 @@ img.header__logo-mark {
   z-index: var(--z-bottom-nav);
   display: grid;
   grid-template-columns: repeat(5, 1fr);
-  background: var(--white);
-  border-top: var(--border);
+  background: var(--navy-deep);
+  border-top: var(--border-width) solid var(--white-glass-line);
   padding-bottom: env(safe-area-inset-bottom);
   transform: translateY(100%);
   transition: transform var(--motion) var(--ease);
@@ -799,13 +801,13 @@ img.header__logo-mark {
   min-height: var(--bottom-nav-height);
   font-size: var(--text-12);
   font-weight: var(--weight-medium);
-  color: var(--color-text-muted);
+  color: rgba(255, 255, 255, 0.78);
   text-transform: none;
   letter-spacing: normal;
 }
 
-.bottom-nav__item:hover { text-decoration: none; }
-.bottom-nav__item[aria-current='page'] { color: var(--honest-green); }
+.bottom-nav__item:hover { text-decoration: none; background: var(--white-glass); }
+.bottom-nav__item[aria-current='page'] { color: var(--green-bright); }
 .bottom-nav__item svg { width: 22px; height: 22px; }
 
 /* Floating WhatsApp — every public page, sits above the bottom nav (§5.2) */

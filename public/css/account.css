@@ -36,14 +36,14 @@
 .header__signin {
   font-size: var(--text-14);
   font-weight: 500;
-  color: var(--honest-navy);
+  color: var(--white);
   text-decoration: none;
   padding: 0 var(--space-1);
   white-space: nowrap;
 }
 
 .header__signin:hover { text-decoration: underline; }
-.header__search-toggle--on { color: var(--color-accent-strong, #0f8a44); }
+.header__search-toggle--on { color: var(--green-bright); }
 
 /* --- Sign-in page -------------------------------------------------------- */
 .auth-card {

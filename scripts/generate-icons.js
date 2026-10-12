@@ -52,6 +52,7 @@ const BRAND_DIR = path.join(ROOT, 'assets', 'brand');
 
 // §3.2 tokens. Duplicated here on purpose: a build script must not parse CSS.
 const NAVY = '#0e2a47';
+const THEME_NAVY = '#071c2a';
 const GREEN = '#12a150';
 const WHITE = '#ffffff';
 
@@ -266,7 +267,7 @@ function manifestJson() {
       display: 'standalone',
       orientation: 'portrait',
       background_color: WHITE,
-      theme_color: NAVY,
+      theme_color: THEME_NAVY,
       lang: 'en-NG',
       dir: 'ltr',
       categories: ['shopping', 'business'],

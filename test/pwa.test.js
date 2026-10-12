@@ -94,7 +94,9 @@ test('every icon the manifest names exists at the size it claims', () => {
 test('the head carries the manifest, the icons and the theme colour', () => {
   const layout = read('views/layouts/base.ejs');
   assert.match(layout, /include\('\.\.\/partials\/pwa'\)/);
-  assert.match(layout, /name="theme-color" content="#0E2A47"/);
+  assert.match(layout, /name="theme-color" content="#071C2A"/);
+  assert.match(read('views/layouts/admin.ejs'), /name="theme-color" content="#071C2A"/);
+  assert.equal(manifest.theme_color, '#071c2a');
 
   const head = read('views/partials/pwa.ejs');
   assert.match(head, /rel="manifest" href="\/manifest\.webmanifest"/);
