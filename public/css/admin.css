@@ -1016,6 +1016,32 @@ body.admin {
   .check-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 
+/* A bare .check-tap is a 44px square (inspection checklist radios). The same
+   class on the wizard's and the listing's document rows carries visible words
+   inside, so there it becomes a full row — checkbox left, title and hint
+   right — instead of four labels crushed into one overlapping pile. */
+.check-grid .check-tap {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  gap: var(--space-2);
+  width: auto;
+  height: auto;
+  min-height: 44px;
+  padding: var(--space-2);
+  text-align: left;
+}
+
+.check-grid .check-tap > span {
+  display: grid;
+  gap: 2px;
+}
+
+.check-grid .check-tap .muted {
+  font-size: var(--text-12);
+  color: var(--muted, var(--color-text-muted));
+}
+
 /* --- Leads inbox --------------------------------------------------------- */
 .lead-list {
   list-style: none;
