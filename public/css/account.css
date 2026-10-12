@@ -6,6 +6,9 @@
    ========================================================================== */
 
 /* --- Save toggle (cards + VDP) ------------------------------------------- */
+/* Owner direction (2026-10-12): the heart is not in a button — the heart IS
+   the button. No box, no border, no fill; the 40px hit-area stays invisible
+   so it remains tappable. */
 .save-toggle {
   display: inline-flex;
   align-items: center;
@@ -13,10 +16,10 @@
   gap: var(--space-1);
   min-width: 40px;
   min-height: 40px;
-  padding: 0 var(--space-1);
-  border: var(--border);
+  padding: 0;
+  border: 0;
   border-radius: 0;
-  background: var(--white);
+  background: none;
   color: var(--color-text-muted);
   font-size: var(--text-14);
   line-height: 1;
@@ -24,9 +27,9 @@
   text-decoration: none;
 }
 
-.save-toggle:hover { color: var(--honest-navy); border-color: var(--honest-navy); }
-.save-toggle.is-saved { color: var(--color-accent-strong, #0f8a44); border-color: currentColor; background: var(--color-success-bg, #f1fbf5); }
-.save-toggle--wide { padding-inline: var(--space-2); }
+.save-toggle:hover { color: var(--honest-navy); }
+.save-toggle.is-saved { color: var(--color-accent-strong, #0f8a44); background: none; }
+.save-toggle--wide { padding-inline: 0; }
 .save-toggle[aria-busy="true"] { opacity: 0.6; pointer-events: none; }
 
 /* --- Header / drawer sign-in chrome -------------------------------------- */
