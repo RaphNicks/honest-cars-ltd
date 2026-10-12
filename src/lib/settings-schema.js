@@ -160,7 +160,7 @@ const GROUPS = [
         type: 'text',
         max: 200,
         hint: 'The CAC/RC line printed in the footer, on /contact and on /about.',
-        default: () => 'Honest Cars LTD — RC 0000000 · Port Harcourt, Rivers State, Nigeria',
+        default: () => 'Honest Cars LTD — RC 9570134 · Port Harcourt, Rivers State, Nigeria',
       },
       {
         key: 'business.bank_name',
