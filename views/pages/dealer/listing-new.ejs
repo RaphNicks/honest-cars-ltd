@@ -13,8 +13,19 @@ var value = function (name, fallback) { return form && form[name] !== undefined 
 var shots = shots || [];
 %>
 
-<form class="dealer-wizard" method="post" action="/dealer/listings" data-dealer-wizard>
+<form class="dealer-wizard" method="post" action="<%= locals.formAction || '/dealer/listings' %>" data-dealer-wizard>
   <input type="hidden" name="step" value="<%= step %>">
+
+  <%# Console mode: staff pick the lot the car sits with; dealers always post
+      to their own lot, so they never see this field. %>
+  <% if (locals.dealers && locals.dealers.length) { %>
+  <label class="field">
+    <span class="field__label">Lot this car belongs to</span>
+    <select class="select" name="dealer_id" required>
+      <% locals.dealers.forEach(function (lot) { %><option value="<%= lot.id %>"><%= lot.name %></option><% }); %>
+    </select>
+  </label>
+  <% } %>
 
   <ol class="wizard-steps" data-wizard-steps>
     <li class="wizard-steps__step" data-step="1" aria-current="true"><span class="wizard-steps__num">1</span> Photographs</li>

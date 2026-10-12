@@ -57,10 +57,14 @@ const { sendPage, CACHE } = require('../lib/respond');
 const router = express.Router();
 const admin = db.admin;
 const dealers = db.dealers;
+// The console's Add-a-car reuses the dealer wizard's validation and shot list
+// so a listing is shaped identically whichever side of the desk creates it.
+const { listingInput, SHOT_LIST } = require('./dealer');
 
 const HOME = '/admin';
 const PATHS = {
   listings: `${HOME}/listings`,
+  newListing: `${HOME}/listings/new`,
   leads: `${HOME}/leads`,
   concierge: `${HOME}/concierge`,
   bookings: `${HOME}/bookings`,
@@ -88,6 +92,7 @@ const PATHS = {
 const NAV = [
   { href: HOME, label: 'Today', icon: 'chart', capability: 'reports.view' },
   { href: PATHS.listings, label: 'Listings', icon: 'car', capability: 'listings.moderate' },
+  { href: PATHS.newListing, label: 'Add a car', icon: 'plus', capability: 'listings.moderate' },
   { href: PATHS.leads, label: 'Leads', icon: 'inbox', capability: 'leads.manage' },
   { href: PATHS.concierge, label: 'Concierge', icon: 'search', capability: 'concierge.manage' },
   { href: PATHS.bookings, label: 'Dispatch', icon: 'calendar', capability: 'bookings.dispatch' },
@@ -260,6 +265,76 @@ router.get('/listings', auth.requireStaff('listings.moderate'), async (req, res,
   } catch (error) {
     return next(error);
   }
+});
+
+// --- Console listing creation (owner 2026-10-12): staff list cars too. ----
+// Same wizard and the same validation as the dealer portal; the lot is
+// chosen on the form (the house lot included), and the draft still enters
+// this queue — publishing stays a moderation decision.
+router.get('/listings/new', auth.requireStaff('listings.moderate'), async (req, res, next) => {
+  try {
+    const lots = await db.query('SELECT id, name FROM dealers ORDER BY name');
+    return await page(req, res, {
+      view: 'dealer/listing-new',
+      active: PATHS.newListing,
+      title: 'Add a car',
+      description: 'Same wizard as the dealer portal — pick the lot the car sits with; it lands in this queue as a draft.',
+      data: {
+        shots: SHOT_LIST,
+        draft: null,
+        form: {},
+        step: validate.integer(req.query.step, { min: 1, max: 3, fallback: 1 }),
+        market: [],
+        areaOptions: [],
+        dealers: lots,
+        formAction: PATHS.newListing,
+      },
+    });
+  } catch (error) { return next(error); }
+});
+
+router.post('/listings/new', auth.requireStaff('listings.moderate'), auth.sameOriginOnly, async (req, res, next) => {
+  try {
+    const dealerId = validate.integer(req.body.dealer_id, { min: 1, fallback: 0 });
+    if (!dealerId) return done(res, PATHS.newListing, 'Pick the lot this car belongs to.', { error: true });
+    const input = listingInput(req.body);
+    if (!input.make || !input.model || !input.year) {
+      return done(res, PATHS.newListing, 'A car needs a make, a model and a year.', { error: true });
+    }
+    if (!input.priceKobo) {
+      return done(res, PATHS.newListing, 'A car needs an asking price — buyers filter on it.', { error: true });
+    }
+    const created = await dealers.createListing(dealerId, input);
+    const links = SHOT_LIST
+      .map((shot) => ({ shot, url: validate.text(req.body[`photo_${shot[0]}`], 400) }))
+      .filter((row) => /^(https?:\/\/|\/img\/)/i.test(row.url));
+    for (const row of links) {
+      await dealers.addPhoto(dealerId, created.id, {
+        url: row.url,
+        alt: `${input.year} ${input.make} ${input.model} — ${row.shot[1]}`,
+        shot: row.shot[1],
+      });
+    }
+    return done(res, PATHS.listings, `Draft created for ${input.year} ${input.make} ${input.model} — grade it and publish when ready.`);
+  } catch (error) { return next(error); }
+});
+
+router.post('/listings/:id/photos', auth.requireStaff('listings.moderate'), auth.sameOriginOnly, async (req, res, next) => {
+  try {
+    const listingId = validate.integer(req.params.id, { min: 1, fallback: 0 });
+    const [listing] = await db.query('SELECT dealer_id FROM vehicle_listings WHERE id = ?', [listingId]);
+    if (!listing) return done(res, PATHS.listings, 'Listing not found.', { error: true });
+    const action = validate.oneOf(req.body.action, ['add', 'remove'], 'add');
+    const result = action === 'remove'
+      ? await dealers.removePhoto(listing.dealer_id, listingId, validate.integer(req.body.media_id, { min: 1, fallback: 0 }))
+      : await dealers.addPhoto(listing.dealer_id, listingId, {
+        url: validate.text(req.body.url, 400),
+        alt: validate.text(req.body.alt, 200) || null,
+        shot: validate.text(req.body.shot, 40) || null,
+      });
+    if (!result.ok) return done(res, PATHS.listings, result.error, { error: true });
+    return done(res, PATHS.listings, action === 'remove' ? 'Photo removed.' : 'Photo added.');
+  } catch (error) { return next(error); }
 });
 
 router.post('/listings/stale-sweep', auth.requireStaff('listings.moderate'), auth.sameOriginOnly, async (req, res, next) => {

@@ -784,4 +784,4 @@ router.post('/imports/keys/:id/revoke', requireDealer, auth.sameOriginOnly, asyn
   }
 });
 
-module.exports = { router };
+module.exports = { router, listingInput, SHOT_LIST };

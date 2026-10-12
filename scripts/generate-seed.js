@@ -1131,6 +1131,14 @@ INSERT INTO \`users\` (phone, name, role, referral_code, status) VALUES
   ('+2348000000007', 'Aba Road Autos',      'dealer',    'HCABAR', 'active')
 ON DUPLICATE KEY UPDATE role = VALUES(role), name = VALUES(name), status = 'active';
 
+-- The console's own lot (owner 2026-10-12): staff list house stock through
+-- /admin/listings/new. Owned by the admin account so the demo purge, which
+-- keeps account-owned lots, never deletes it.
+INSERT INTO dealers (name, slug, lot_area, city, tier, verified, user_id)
+SELECT 'Honest Cars Ltd — house stock', 'honest-cars-house', 'Head office', 'Port Harcourt', 'premium', 1, u.id
+  FROM \`users\` u WHERE u.phone = '+2348000000001'
+ON DUPLICATE KEY UPDATE name = VALUES(name);
+
 -- §12.2 — the second factor for the two roles that must have one. The secrets
 -- are written down here because this is a *demo* database that has to be
 -- sign-in-able by a script and a person; a real install has none of this and
@@ -1487,7 +1495,7 @@ INSERT INTO referral_rewards (referrer_id, referred_user_id, status, basis, amou
 -- the placeholder in .env. Everything else on that screen is on its default.
 INSERT INTO settings (setting_key, setting_value, updated_by) VALUES
   ('business.address_note',
-   'We work out of Port Harcourt and cover Owerri, Aba and Benin — the inspection comes to the car, wherever it is.',
+   'We work out of Port Harcourt — the inspection comes to the car, wherever it is.',
    (SELECT id FROM \`users\` WHERE phone = '+2348000000001' LIMIT 1)),
   ('marketing.cac_guardrail', '4000000',
    (SELECT id FROM \`users\` WHERE phone = '+2348000000001' LIMIT 1));
