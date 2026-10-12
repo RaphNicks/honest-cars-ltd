@@ -3040,7 +3040,7 @@ router.post('/security/disable', auth.requireStaff('staff.security'), auth.sameO
       return done(
         res,
         back,
-        `${roles.ROLE_LABELS[req.user.role] || req.user.role} can move money or grant roles, so §12.2 keeps a second factor on it. Ask an admin if you need to move to a new phone — that is what the recovery codes are for.`,
+        `${roles.ROLE_LABELS[req.user.role] || req.user.role} can move money or grant roles, so the second factor must stay enabled. Ask an admin if you need to change phones — recovery codes are there for that.`,
         { error: true },
       );
     }

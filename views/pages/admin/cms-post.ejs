@@ -58,7 +58,7 @@
               <option value="<%= value %>" <%= post && post.category === value ? 'selected' : '' %>><%= label %></option>
             <% }); %>
           </select>
-          <span class="cms-hint">Fixed by §6.9 — categories are not free text.</span>
+          <span class="cms-hint">Categories are fixed. Please choose from the list.</span>
         </div>
       </div>
 
@@ -85,7 +85,7 @@
         </table>
       </details>
 
-      <h2 class="panel__title mt-3">Search &amp; cards (§14.3)</h2>
+      <h2 class="panel__title mt-3">Search &amp; cards</h2>
       <div class="admin-grid admin-grid--2">
         <div class="field">
           <label class="field__label" for="f-meta-title">Meta title</label>
@@ -212,7 +212,7 @@
 
   <aside>
     <section class="panel">
-      <h2 class="panel__title">House rules (§6.9)</h2>
+      <h2 class="panel__title">Publishing checks</h2>
       <% if (isNew) { %>
         <p class="empty-line">Save the draft first — the rules are checked against the saved copy.</p>
       <% } else { %>
@@ -222,7 +222,7 @@
             <span>
               <strong>Publishable</strong><br>
               <% if (check.ok) { %>
-                Meta and links are within the §14.3 limits.
+                Meta and links meet the publishing guidelines.
               <% } else { %>
                 <span class="cms-flag"><%= check.issues.join(' ') %></span>
               <% } %>

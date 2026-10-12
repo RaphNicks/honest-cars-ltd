@@ -152,6 +152,7 @@ maybe('a band past the weekly refresh says so rather than reading as current', a
   assert.equal(result.band.stale, true);
   assert.equal(result.band.ageDays >= 40, true);
   assert.match(result.verdict.staleNote, /weekly refresh/);
+  assert.doesNotMatch(result.verdict.staleNote, /§\s*\d|\bPRD\b|\bFR-\d+\b/);
   assert.equal(result.verdict.tone, 'amber', 'the card changes colour with the caveat');
 });
 

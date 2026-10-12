@@ -278,7 +278,8 @@ maybe('an enrolment nobody confirmed leaves the account unprotected', async () =
 
   const followed = await client.request(console_.headers.get('location'));
   assert.equal(followed.status, 200);
-  assert.match(followed.text, /asks for a second factor/, 'and why it is asking');
+  assert.match(followed.text, /two-step sign-in is required/, 'and why it is asking');
+  assert.doesNotMatch(followed.text, /§\s*\d|\bPRD\b|\bFR-\d+\b/, 'the notice uses no internal specification reference');
 
   // The unproved secret is not a way in: nobody is even asked for it, because
   // there is nothing on this account to ask about.
@@ -547,7 +548,8 @@ maybe('a required role cannot turn its own factor off, and is told why', async (
   const refused = await client.form('/admin/security/disable', { code: nextCode(secret) });
   assert.equal(refused.status, 303);
   const flash = await client.request(refused.headers.get('location'));
-  assert.match(flash.text, /keeps a second factor on it/, 'the refusal explains itself');
+  assert.match(flash.text, /second factor must stay enabled/, 'the refusal explains itself in plain language');
+  assert.doesNotMatch(flash.text, /§\s*\d/, 'the notice contains no internal specification reference');
   assert.equal((await db.mfa.state(finance.id)).enrolled, true, 'and nothing changed');
 });
 

@@ -168,7 +168,7 @@ async function estimate(input = {}) {
   }
 
   const staleNote = stale
-    ? 'Worth knowing: this band is past the weekly refresh §7.3 asks for, so the human valuation is the one to trust.'
+    ? 'Worth knowing: this band has passed its weekly refresh date, so the human valuation is the one to trust.'
     : null;
 
   const browsePath = await facetPathFor({ make, model });

@@ -153,7 +153,7 @@ function sessionId() {
 export function track(name, payload = {}) {
   if (!ALLOWED.has(name)) {
     if (window.HonestCars && window.HonestCars.config && /localhost|127\.0\.0\.1/.test(location.host)) {
-      console.warn(`[events] unknown event name "${name}" — not in the §15.1 plan`);
+      console.warn(`[events] unknown event name "${name}" — not in the event plan`);
     }
     return;
   }

@@ -1666,7 +1666,7 @@ INSERT INTO data_requests (reference, request_type, status, channel, user_id, na
   ('HC-DSR-000003', 'erasure', 'completed', 'self_service', NULL,
    'Chidi Nwosu', '+2348025000011', NULL,
    'Closed their account from /account',
-   'Account closed; requests, bookings, orders and leads anonymised in place. Transaction history kept without the person attached (§12.2).',
+   'Account closed; requests, bookings, orders and leads anonymised in place. Transaction history kept without the person attached.',
    DATE_SUB(UTC_TIMESTAMP(), INTERVAL 30 DAY), UTC_TIMESTAMP(),
    DATE_SUB(UTC_TIMESTAMP(), INTERVAL 30 DAY), NULL, '/account',
    DATE_SUB(UTC_TIMESTAMP(), INTERVAL 30 DAY));
@@ -1789,9 +1789,9 @@ INSERT INTO orders (order_no, name, phone, delivery_area, delivery_fee_kobo, sub
 
 INSERT INTO orders (order_no, name, phone, delivery_area, delivery_fee_kobo, subtotal_kobo, total_kobo, status, payment_ref, notes) VALUES
   ('HC-ORD-0002', 'Ngozi Eze', '+2348031234568', 'Rumuokoro', 0, 4500000, 4500000, 'paid', 'SEED-DEMO-0002',
-   'FR-28 demo: the order that makes her referral count.'),
+   'Order that qualifies the referral reward.'),
   ('HC-ORD-0003', 'Ifeoma Nwosu', '+2348031234570', 'Woji', 0, 8500000, 8500000, 'fulfilled', 'SEED-DEMO-0003',
-   'FR-28 demo: a referral that has already been paid out.');
+   'Referral reward already paid.');
 
 INSERT INTO order_items (order_id, product_id, name, qty, unit_price_kobo, install_requested) VALUES
   ((SELECT id FROM orders WHERE order_no = 'HC-ORD-0001' LIMIT 1),

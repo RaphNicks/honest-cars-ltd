@@ -194,7 +194,7 @@ const GROUPS = [
     key: 'thresholds',
     title: 'Limits and windows',
     hint:
-      'How much of the catalogue a page shows, and how long a sold car stays visible before it is archived. These are the numbers the §14 archive rule and the crawl budget depend on.',
+      'These settings control how many cars each catalogue page shows and how long a sold car stays visible before it is archived.',
     fields: [
       {
         key: 'listings.per_page',
@@ -223,7 +223,7 @@ const GROUPS = [
         min: 1,
         max: 30,
         unit: 'days',
-        hint: '§14: a sold car stays up briefly — a buyer who bookmarked it should see that it went, not a 404.',
+        hint: 'A sold car stays visible briefly so anyone with a saved link can see that it has sold, rather than meeting a 404.',
         default: () => int(process.env.SOLD_VISIBLE_DAYS, 7),
       },
       {

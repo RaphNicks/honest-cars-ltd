@@ -26,8 +26,8 @@
     <div>
       <h2>This role needs a second factor</h2>
       <p class="mb-0">
-        Your role can move money or grant roles, so §12.2 asks for two-step sign-in — and until it is set up you
-        cannot open the rest of the console. Everything else in here still works the moment you finish; nothing
+        Your role can move money or grant roles, so two-step sign-in is required. Until you set it up, you
+        cannot open the rest of the console. Everything else will work as soon as you finish; nothing
         is lost.
       </p>
     </div>
@@ -220,7 +220,7 @@
       <div>
         <h2 class="panel__title">Who is protected</h2>
         <p class="cms-hint">
-          §12.2 asks for a second factor on the roles that can move money or grant roles.
+          Two-step sign-in is required for roles that can move money or grant roles.
           <%= coverage.complete
             ? 'Every account that requires one has one.'
             : coverage.missing + ' account' + (coverage.missing === 1 ? '' : 's') + ' that require one still do not have it.' %>

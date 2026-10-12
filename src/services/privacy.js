@@ -427,7 +427,7 @@ const SELF_SERVICE = {
   erasure: {
     subject: 'Closed their account from /account',
     resolution:
-      'Account closed; requests, bookings, orders and leads anonymised in place. Transaction history kept without the person attached (§12.2).',
+      'Account closed; requests, bookings, orders and leads anonymised in place. Transaction history kept without the person attached.',
   },
 };
 

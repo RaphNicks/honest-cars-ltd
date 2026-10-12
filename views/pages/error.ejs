@@ -4,9 +4,8 @@
     <% if (typeof reason !== 'undefined' && reason === 'forbidden') { %>
       <h1>This part of the console is not yours to open</h1>
       <p>
-        You are signed in as <strong><%= role %></strong>. The operations console is gated by the
-        role matrix (§7.4) — if you need a module, an admin can grant the role that holds it.
-        Nothing has gone wrong and nothing was changed.
+        You are signed in as <strong><%= role %></strong>. Access to this area is limited. If you need a module,
+        ask an administrator to grant you access. Nothing has gone wrong and nothing was changed.
       </p>
       <div class="btn-row mt-2" style="justify-content:center">
         <a class="btn btn--primary" href="/account">Back to your account</a>

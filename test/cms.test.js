@@ -149,6 +149,7 @@ test('metaCheck reports each §6.9/§14.3 rule separately', () => {
 
   const noLinks = cms.metaCheck({ title: 'fine', description: 'fine', links: 2 });
   assert.match(noLinks.issues.join(' '), /link at least 3 listing or service pages/);
+  assert.doesNotMatch(noLinks.issues.join(' '), /§\s*\d|\bPRD\b|\bFR-\d+\b/);
 
   const empty = cms.metaCheck({ title: '', description: '', links: 0 });
   assert.equal(empty.issues.length, 3);

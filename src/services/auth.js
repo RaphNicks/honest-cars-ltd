@@ -383,7 +383,7 @@ function mfaGate(req, res, next) {
         mfaEnrolmentRequired: true,
       });
     }
-    return res.redirect(302, `/admin/security?err=${encodeURIComponent('Your role can move money or grant roles, so §12.2 asks for a second factor. Set it up here and the console opens.')}`);
+    return res.redirect(302, `/admin/security?err=${encodeURIComponent('Your role can move money or grant roles, so two-step sign-in is required. Set it up here to continue.')}`);
   }
 
   return next();

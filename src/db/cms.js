@@ -95,7 +95,7 @@ function metaCheck({ title, description, links = null }) {
   if (!description) issues.push('There is no meta description.');
   else if (length(description) > DESCRIPTION_LIMIT) issues.push(`Meta description is ${length(description)} characters — aim for ${DESCRIPTION_LIMIT} or fewer.`);
   if (links !== null && links < MIN_LINKS) {
-    issues.push(`A post must link at least ${MIN_LINKS} listing or service pages (§6.9) — this one links ${links}.`);
+    issues.push(`A post must link at least ${MIN_LINKS} listing or service pages — this one links ${links}.`);
   }
   return { ok: issues.length === 0, issues, titleLength: length(title), descriptionLength: length(description), links };
 }

@@ -70,6 +70,7 @@ test.after(async () => {
 maybe('homepage renders the hero, the trust chips and the live feed', async () => {
   const { response, html } = await getHtml(ctx.baseUrl, '/');
   assert.equal(response.status, 200);
+  assert.doesNotMatch(html, /§\s*(?:\d|Appendix)|\bPRD\b|\bFR-\d+\b/, 'the public page contains no internal spec references');
   // The hero now carries the reference's three-beat headline; the <br> and the
   // green <em> are presentation, so the assertion tolerates tags between beats.
   assert.match(html, /Quality Cars\.[\s\S]{0,12}Real People\.[\s\S]{0,40}Honest Deals\./);
@@ -277,6 +278,7 @@ maybe('unknown URLs render the 404 page with a 404 status', async () => {
   const { response, html } = await getHtml(ctx.baseUrl, '/definitely-not-a-page');
   assert.equal(response.status, 404);
   assert.match(html, /We can’t find that page/);
+  assert.doesNotMatch(html, /§\s*(?:\d|Appendix)|\bPRD\b|\bFR-\d+\b|Port backlog|next batch of work/);
 });
 
 maybe('response headers carry the security baseline (§12.2)', async () => {
