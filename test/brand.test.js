@@ -86,6 +86,18 @@ test('the install icons are opaque, the in-page mark keeps its transparency', as
   assert.ok(rule, 'img.header__logo-mark needs a rule of its own');
   assert.doesNotMatch(rule[1], /background/, 'the emblem stands alone — no chip behind it');
   assert.match(rule[1], /width:\s*36px/, 'the lone emblem is sized to keep its detail');
+
+  // A page-scoped override once re-added the chip (owner caught it on the
+  // landing page, 2026-10-12): no stylesheet may put a field behind the mark.
+  for (const name of fs.readdirSync(path.join(ROOT, 'public', 'css'))) {
+    if (!name.endsWith('.css')) continue;
+    const css = fs.readFileSync(path.join(ROOT, 'public', 'css', name), 'utf8');
+    const marks = [...css.matchAll(/[^{}]*header__logo-mark[^{}]*\{([^}]*)\}/g)];
+    for (const match of marks) {
+      assert.doesNotMatch(match[1], /background\s*:/, `${name} must not put a background behind the mark`);
+      assert.doesNotMatch(match[1], /outline\s*:/, `${name} must not outline the mark`);
+    }
+  }
 });
 
 test('the brand block asks for the mark only while the file is there', () => {

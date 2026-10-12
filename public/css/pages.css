@@ -403,10 +403,6 @@ body[data-page="/"] .area-switcher--header .area-switcher__toggle:hover {
   background: var(--white-glass);
 }
 
-/* The gold mark sits on a navy chip; on the navy header the chip recedes,
-   so lift it one step instead of introducing a new colour. */
-body[data-page="/"] img.header__logo-mark { background: var(--honest-navy); outline: 1px solid var(--white-glass-line); }
-
 /* --- Cinematic hero ------------------------------------------------------- */
 .hero--cinematic {
   position: relative;
