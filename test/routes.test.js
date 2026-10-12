@@ -75,6 +75,8 @@ maybe('homepage renders the hero, the trust chips and the live feed', async () =
   assert.match(html, /Quality Cars\.[\s\S]{0,12}Real People\.[\s\S]{0,40}Honest Deals\./);
   assert.match(html, /Hassle-Free/, 'the reference trust pill is in force');
   assert.match(html, /hero--cinematic/, 'the cinematic hero is in force');
+  assert.match(html, /data-hero-video/, 'the landing hero runs the owner video with the lot photo as poster');
+  assert.match(html, /Car_driving_on_highway\.mp4/, 'the hero video source is the uploaded file');
   assert.match(html, /Find your perfect ride/, 'category cards render');
   assert.match(html, /cars live now/);
   assert.match(html, /Fresh on the market/);

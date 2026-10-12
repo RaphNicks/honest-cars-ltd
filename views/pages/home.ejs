@@ -32,9 +32,13 @@
 <% } %>
 
 <section class="hero hero--cinematic">
-  <img class="hero__bg" src="<%= helpers.photoSrc('/img/site/hero-lot.jpg') %>"
-       <% if (helpers.srcsetFor('/img/site/hero-lot.jpg')) { %>srcset="<%= helpers.srcsetFor('/img/site/hero-lot.jpg') %>" sizes="100vw"<% } %>
-       alt="" aria-hidden="true" width="1200" height="900" fetchpriority="high" decoding="async">
+  <%# The lot photo is the poster: it paints first, stays for no-JS and for
+      visitors who asked for less motion or less data. The video only starts
+      when js/hero says both are fine (owner upload dff0114). %>
+  <video class="hero__bg" data-hero-video poster="<%= helpers.photoSrc('/img/site/hero-lot.jpg') %>"
+         muted loop playsinline preload="none" aria-hidden="true" tabindex="-1">
+    <source src="/video/Car_driving_on_highway.mp4" type="video/mp4">
+  </video>
   <div class="hero__scrim" aria-hidden="true"></div>
   <div class="container hero__grid">
     <div class="hero__copy">

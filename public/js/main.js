@@ -14,6 +14,7 @@ import {
   initPrintButtons,
   initWhatsappFloat,
   initGallery,
+  initHeroVideo,
   initCompare,
   initRecentlyViewed,
   rememberViewed,
@@ -71,6 +72,7 @@ function boot() {
   initTableOfContents();
   initHelpful();
   initGallery();
+  initHeroVideo();
   initCompare();
   initLogin();
   // §12.2 — the second factor, when a staff account signs in.
