@@ -20,6 +20,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 
 const { dbAvailable, startTestServer, sweepOrphanAudit } = require('./helpers');
+const roles = require('../src/services/roles');
 
 /** One column, one row — for the small "what does the database say now" checks. */
 async function scalar(db, sql, params) {
@@ -464,6 +465,17 @@ maybe('a customer account is refused, and told why', async () => {
   const landing = await web.request('/dealer');
   assert.equal(landing.status, 200);
   assert.match(landing.text, /customer<\/strong> account|Go to my account/, 'the landing page tells them which role they hold');
+});
+
+maybe('a dealer account cannot enter the staff console', async () => {
+  const db = require('../src/db');
+  const session = await signIn();
+  await db.query("UPDATE `users` SET role = 'dealer' WHERE id = ?", [session.account.id]);
+
+  assert.equal(roles.isStaff('dealer'), false, 'dealer capabilities do not make the role staff');
+  const response = await session.web.request('/admin');
+  assert.equal(response.status, 403);
+  assert.match(response.text, /not yours to open|No access/i);
 });
 
 maybe('a linked dealer account gets its own lot, and only its own lot', async () => {

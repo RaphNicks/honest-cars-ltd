@@ -98,8 +98,8 @@ const MATRIX = {
  */
 const MFA_ROLES = ['admin', 'finance'];
 
-/** Roles that may open the console at all. */
-const STAFF_ROLES = [...new Set(Object.values(MATRIX).flat())];
+/** Console roles only; dealer capabilities stay scoped to their separate portal. */
+const STAFF_ROLES = ROLES.filter((role) => role !== 'customer' && role !== 'dealer');
 
 function isStaff(role) {
   return STAFF_ROLES.includes(role);
