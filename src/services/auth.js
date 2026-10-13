@@ -115,8 +115,11 @@ async function sendOtp(phone, code, { provider = config.auth.provider } = {}) {
       return { channel, delivered: false, reason: 'sms_provider_not_configured' };
 
     default: {
-      // Development: the code goes to the server log so the flow is testable
-      // without a phone, and (outside production) back to the caller.
+      // The console is a development-only fixture. Never put a production code
+      // in logs; production must have a working SMS/WhatsApp delivery adapter.
+      if (config.isProduction) {
+        return { channel: 'console', delivered: false, reason: 'console_provider_disabled_in_production' };
+      }
       console.log(`[auth] OTP for ${maskPhone(phone)} → ${code}  (console provider, ${config.env})`);
       void text;
       return {
@@ -158,6 +161,18 @@ async function requestCode({ rawPhone, ip, userAgent, roleRequired = null }) {
   const expiresAt = new Date(Date.now() + config.auth.otpTtlMinutes * 60_000);
   const provider = config.auth.provider;
   const delivery = await sendOtp(phone, code, { provider });
+
+  if (config.isProduction && !delivery.delivered) {
+    await db.analytics.record('otp_request_failed', {
+      payload: { channel: delivery.channel, reason: delivery.reason || 'provider_not_delivered' },
+      sourcePath: '/api/auth/otp',
+    }).catch(() => {});
+    return {
+      ok: false,
+      status: 503,
+      error: 'Phone sign-in is temporarily unavailable. Please contact Honest Cars for help.',
+    };
+  }
 
   await db.users.createCode({
     phone,

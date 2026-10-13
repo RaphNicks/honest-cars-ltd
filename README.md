@@ -275,10 +275,12 @@ staff accounts:
 | `+2348000000005` | marketing | `admin.honestcarsltd.com` — CMS content and homepage modules |
 
 In development the code is printed to the server log (`[auth] OTP for … → 123456`)
-and returned as `devCode`, so the console can be driven without a phone. A role
-you do not hold returns an honest 403 page naming your role — never a blank
-response and never a redirect loop. The whole console is `noindex, nofollow`
-and `Cache-Control: private, no-store`.
+and returned as `devCode`, so the console can be driven without a phone. Production
+phone delivery is not wired yet: SMS/WhatsApp are stubs, and the console fallback
+is disabled there, so staff/dealer OTP returns 503 until a real provider adapter
+is implemented and configured. A role you do not hold returns an honest 403
+page naming your role — never a blank response or redirect loop. The whole
+console is `noindex, nofollow` and `Cache-Control: private, no-store`.
 
 ### The demo day in the seed
 

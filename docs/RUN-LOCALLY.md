@@ -170,9 +170,10 @@ the development code display; for real delivery, configure `SMTP_URL` and
 `SMTP_FROM`. Google sign-in requires `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`,
 and `GOOGLE_REDIRECT_URI`. Add those values in the hosting environment for
 production — never paste secrets into source control or chat. Payments continue
-to use the local bank-transfer/cash path unless merchant keys are configured;
-SMS and WhatsApp also need their provider credentials. An unconfigured channel
-is recorded as **`skipped`** rather than reported as sent.
+to use the local bank-transfer/cash path unless merchant keys are configured.
+Phone OTP delivery is not implemented yet: SMS and WhatsApp are stubs, and the
+console fallback is disabled in production. Add and configure a real provider
+adapter before staff/dealer sign-in can go live.
 
 ## 8. Everyday commands
 

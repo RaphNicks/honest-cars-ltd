@@ -193,6 +193,39 @@ maybe('staff and dealer phone entry is role-bound and cannot create a customer a
   assert.equal(verified.user.role, 'ops');
 });
 
+maybe('production phone sign-in fails closed without a real delivery provider', async () => {
+  const db = require('../src/db');
+  const auth = require('../src/services/auth');
+  const config = require('../src/config');
+  const phones = require('../src/lib/phone');
+  const phone = nextPhone();
+  const account = await db.users.upsertByPhone({ phone: phones.canonical(phone), name: 'Delivery Test Staff' });
+  createdPhones.add(account.phone);
+  await db.query("UPDATE `users` SET role = 'ops' WHERE id = ?", [account.id]);
+
+  const recentBefore = await db.users.countRecentCodes(account.phone, { withinMinutes: 60 });
+  const productionBefore = config.isProduction;
+  const providerBefore = config.auth.provider;
+  config.isProduction = true;
+  config.auth.provider = 'console';
+  let delivery;
+  let result;
+  try {
+    delivery = await auth.sendOtp(account.phone, '123456', { provider: 'console' });
+    result = await auth.requestCode({ rawPhone: phone, roleRequired: 'staff' });
+  } finally {
+    config.isProduction = productionBefore;
+    config.auth.provider = providerBefore;
+  }
+
+  assert.equal(delivery.delivered, false);
+  assert.equal(delivery.devCode, undefined, 'production never reveals a console code');
+  assert.equal(delivery.reason, 'console_provider_disabled_in_production');
+  assert.equal(result.ok, false);
+  assert.equal(result.status, 503);
+  assert.equal(await db.users.countRecentCodes(account.phone, { withinMinutes: 60 }), recentBefore, 'an undelivered code is not stored');
+});
+
 maybe('email OTP opens a phone-free account and a contact phone cannot expose another account’s history', async () => {
   const db = require('../src/db');
   const email = `email-${process.pid}-${Date.now()}@example.net`;
