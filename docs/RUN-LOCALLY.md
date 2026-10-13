@@ -155,6 +155,15 @@ that DNS name and its TLS certificate at the app, and set `SITE_URL` to the
 public origin. Requests to the old public `/admin` path redirect to the admin
 host; the staff dashboard is its root page.
 
+The seeded staff numbers and TOTP keys below are public demo data; never use
+them as production credentials. For a clean production database, run
+`node scripts/db-setup.js --no-seed`, set `NODE_ENV=production` and a strong
+`AUTH_PEPPER`, then run `npm run admin:bootstrap` on the host. It prompts for
+the first admin's real name and mobile number, refuses if an active admin exists,
+and records the bootstrap without pre-seeding an authenticator secret. Once a
+real phone OTP adapter is installed, sign in at `ADMIN_URL/login` and enroll
+TOTP at `/admin/security`.
+
 **Admin and finance also ask for a 6-digit code from an authenticator app**
 (this is PRD §12.2). Add the seeded secret to Google Authenticator, Authy, 1Password
 or any TOTP app — *enter setup key manually*:

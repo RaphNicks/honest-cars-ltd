@@ -264,7 +264,7 @@ customer sign-in method. Dealer partners have a separate phone sign-in at
 public `/admin` path to the configured `ADMIN_URL`; point that host's DNS and TLS
 at this app. In the single-origin development preview, use `/admin/login` for
 staff access. There are no passwords in this build. The seed creates these
-staff accounts:
+demo staff accounts (local seed data only):
 
 | Number | Role | Opens |
 |---|---|---|
@@ -273,6 +273,15 @@ staff accounts:
 | `+2348000000003` | inspector | `admin.honestcarsltd.com` — My jobs only |
 | `+2348000000004` | finance | `admin.honestcarsltd.com` — Orders, Money, Escrow and the KPI home |
 | `+2348000000005` | marketing | `admin.honestcarsltd.com` — CMS content and homepage modules |
+
+These seeded numbers and their demo TOTP secrets are public test data; never use
+one as a production administrator. For a clean production database, apply the
+schema without the demo seed (`node scripts/db-setup.js --no-seed`), set
+`NODE_ENV=production` and a strong `AUTH_PEPPER`, then run `npm run admin:bootstrap`
+in the host shell. It prompts for the first admin’s real name and mobile number,
+refuses if an active admin already exists, and does not install a demo MFA secret.
+After phone delivery is live, sign in on `ADMIN_URL` and enroll TOTP at
+`/admin/security`.
 
 In development the code is printed to the server log (`[auth] OTP for … → 123456`)
 and returned as `devCode`, so the console can be driven without a phone. Production

@@ -10,6 +10,7 @@
     "dev": "node --watch src/server.js",
     "db:setup": "node scripts/db-setup.js",
     "db:migrate": "node scripts/migrate.js",
+    "admin:bootstrap": "node scripts/bootstrap-admin.js",
     "db:purge-demo": "node scripts/purge-demo-data.js",
     "db:seed": "node scripts/generate-seed.js && node scripts/db-setup.js",
     "build:static": "node scripts/build-static.js",
