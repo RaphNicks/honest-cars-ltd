@@ -1,10 +1,11 @@
 'use strict';
 
 /**
- * Accounts — §7.1. Phone-first: the phone number is the account key, the
- * email is optional, and everything else in the dashboard (requests, bookings,
- * orders, subscriptions) is read straight off the tables the public site
- * already writes, matched by phone.
+ * Accounts — verified customer email identities with legacy phone sign-in.
+ * A login phone remains on `users.phone`; a contact number is stored separately
+ * in `users.contact_phone` and never grants access to phone-keyed history. Email
+ * credentials are kept in `user_email_identities`, separate from legacy profile
+ * emails that have not been verified.
  *
  * Nothing in here sees a raw OTP or a raw session token: the service layer
  * hashes both before they reach this module, and the database only ever stores
@@ -15,14 +16,30 @@ const crypto = require('node:crypto');
 const { query, queryOne, transaction } = require('./pool');
 
 const USER_STATUSES = ['active', 'blocked', 'deleted'];
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+
+function normaliseEmail(email) {
+  const address = String(email || '').trim().toLowerCase();
+  if (address.length > 160 || !EMAIL_PATTERN.test(address)) return null;
+  return address;
+}
+
+function identityError(code, message) {
+  const error = new Error(message);
+  error.code = code;
+  return error;
+}
 
 function shapeUser(row) {
   if (!row) return null;
   return {
     id: row.id,
-    phone: row.phone,
+    phone: row.phone || null,
+    contactPhone: row.contact_phone || null,
     name: row.name || null,
     email: row.email || null,
+    emailVerified: Boolean(row.email_verified_at),
+    emailVerifiedAt: row.email_verified_at || null,
     marketingOptIn: Boolean(row.marketing_opt_in),
     status: row.status,
     // §7.4 — 'customer' unless a staff role was granted in the console.
@@ -52,12 +69,59 @@ function maskPhone(phone) {
   return `${phone.startsWith('+') ? '+' : ''}${digits.slice(0, 3)} ${digits.slice(3, 6)} ••• ${digits.slice(-4)}`;
 }
 
+const USER_SELECT = `SELECT u.*, ei.verified_at AS email_verified_at
+                       FROM \`users\` u
+                       LEFT JOIN user_email_identities ei
+                         ON ei.user_id = u.id AND ei.email = u.email`;
+
 async function findByPhone(phone) {
-  return shapeUser(await queryOne('SELECT * FROM `users` WHERE phone = ? LIMIT 1', [phone]));
+  return shapeUser(await queryOne(`${USER_SELECT} WHERE u.phone = ? LIMIT 1`, [phone]));
 }
 
 async function findById(id) {
-  return shapeUser(await queryOne('SELECT * FROM `users` WHERE id = ? LIMIT 1', [id]));
+  return shapeUser(await queryOne(`${USER_SELECT} WHERE u.id = ? LIMIT 1`, [id]));
+}
+
+async function findByVerifiedEmail(email) {
+  const address = normaliseEmail(email);
+  if (!address) return null;
+  const row = await queryOne(
+    `SELECT u.*, ei.verified_at AS email_verified_at, ei.email AS authenticated_email
+       FROM user_email_identities ei
+       JOIN \`users\` u ON u.id = ei.user_id
+      WHERE ei.email = ? LIMIT 1`,
+    [address],
+  );
+  return shapeUser(row);
+}
+
+async function findByGoogleSubject(subject) {
+  const googleSubject = String(subject || '').trim().slice(0, 255);
+  if (!googleSubject) return null;
+  const row = await queryOne(
+    `SELECT u.*, ei.verified_at AS email_verified_at, ei.email AS authenticated_email
+       FROM user_email_identities ei
+       JOIN \`users\` u ON u.id = ei.user_id
+      WHERE ei.google_subject = ? LIMIT 1`,
+    [googleSubject],
+  );
+  return shapeUser(row);
+}
+
+async function findLegacyEmailOwner(email) {
+  const address = normaliseEmail(email);
+  if (!address) return null;
+  return queryOne(
+    `SELECT u.id, u.role, u.status
+       FROM \`users\` u
+      WHERE u.email = ? AND u.status <> 'deleted'
+        AND NOT EXISTS (
+          SELECT 1 FROM user_email_identities ei
+           WHERE ei.user_id = u.id AND ei.email = u.email
+        )
+      ORDER BY u.id LIMIT 1`,
+    [address],
+  );
 }
 
 /**
@@ -94,7 +158,7 @@ async function upsertByPhone({ phone, name = null, referralCode = null }) {
     if (!existing.name && name) {
       await query('UPDATE `users` SET name = ? WHERE id = ?', [String(name).slice(0, 120), existing.id]);
     }
-    return shapeUser(await queryOne('SELECT * FROM `users` WHERE id = ? LIMIT 1', [existing.id]));
+    return findById(existing.id);
   }
 
   // Unique index on referral_code: retry the (unlikely) collision.
@@ -109,7 +173,7 @@ async function upsertByPhone({ phone, name = null, referralCode = null }) {
       if (error.code !== 'ER_DUP_ENTRY') throw error;
       // Either the phone (a race) or the code: only the code is worth retrying.
       const raced = await queryOne('SELECT id FROM `users` WHERE phone = ? LIMIT 1', [phone]);
-      if (raced) return shapeUser(await queryOne('SELECT * FROM `users` WHERE id = ? LIMIT 1', [raced.id]));
+      if (raced) return findById(raced.id);
     }
   }
   if (!inserted) throw new Error('Could not allocate a referral code');
@@ -119,6 +183,138 @@ async function upsertByPhone({ phone, name = null, referralCode = null }) {
     await query('UPDATE `users` SET referred_by = ? WHERE id = ?', [referrerId, inserted.insertId]);
   }
   return findById(inserted.insertId);
+}
+
+/** Create a new customer after an email or Google identity has been verified. */
+async function createEmailAccount({ email, name, referralCode = null, googleSubject = null }) {
+  const address = normaliseEmail(email);
+  if (!address) throw identityError('INVALID_EMAIL', 'Enter a valid email address.');
+  const cleanName = String(name || '').trim().slice(0, 120);
+  if (cleanName.length < 2) throw identityError('NAME_REQUIRED', 'Tell us your name to open an account.');
+  const subject = String(googleSubject || '').trim().slice(0, 255) || null;
+
+  const userId = await transaction(async (conn) => {
+    const [emailRows] = await conn.query(
+      'SELECT user_id FROM user_email_identities WHERE email = ? LIMIT 1 FOR UPDATE',
+      [address],
+    );
+    if (emailRows.length) throw identityError('EMAIL_IDENTITY_EXISTS', 'That verified email is already linked to an account.');
+
+    if (subject) {
+      const [subjectRows] = await conn.query(
+        'SELECT user_id FROM user_email_identities WHERE google_subject = ? LIMIT 1 FOR UPDATE',
+        [subject],
+      );
+      if (subjectRows.length) throw identityError('GOOGLE_IDENTITY_EXISTS', 'That Google account is already linked.');
+    }
+
+    // An older profile email is not proof of ownership. The person must sign in
+    // to that phone account and verify the address there instead of creating a
+    // duplicate or inheriting its phone-keyed history.
+    const [legacyRows] = await conn.query(
+      "SELECT id FROM `users` WHERE email = ? AND status <> 'deleted' ORDER BY id LIMIT 1 FOR UPDATE",
+      [address],
+    );
+    if (legacyRows.length) {
+      throw identityError('LEGACY_EMAIL_REQUIRES_PHONE_LINK', 'Sign in to your existing phone account first, then verify this email from your account.');
+    }
+
+    let inserted = null;
+    for (let attempt = 0; attempt < 5 && !inserted; attempt += 1) {
+      try {
+        const [result] = await conn.query(
+          'INSERT INTO `users` (phone, name, email, referral_code, last_seen_at) VALUES (NULL, ?, ?, ?, UTC_TIMESTAMP())',
+          [cleanName, address, newReferralCode()],
+        );
+        inserted = result;
+      } catch (error) {
+        if (error.code !== 'ER_DUP_ENTRY') throw error;
+      }
+    }
+    if (!inserted) throw new Error('Could not allocate a referral code');
+
+    await conn.query(
+      'INSERT INTO user_email_identities (user_id, email, google_subject, verified_at) VALUES (?, ?, ?, UTC_TIMESTAMP())',
+      [inserted.insertId, address, subject],
+    );
+
+    const cleanReferral = String(referralCode || '').trim().toUpperCase().slice(0, 16);
+    if (cleanReferral) {
+      const [referrers] = await conn.query(
+        "SELECT id FROM `users` WHERE referral_code = ? AND status = 'active' LIMIT 1",
+        [cleanReferral],
+      );
+      if (referrers.length && Number(referrers[0].id) !== Number(inserted.insertId)) {
+        await conn.query('UPDATE `users` SET referred_by = ? WHERE id = ?', [referrers[0].id, inserted.insertId]);
+      }
+    }
+    return inserted.insertId;
+  });
+
+  return findById(userId);
+}
+
+/**
+ * Link a verified email to the account that is already authenticated. This is
+ * the only path that can connect an unverified legacy profile email to its old
+ * phone-keyed account.
+ */
+async function linkVerifiedEmail(userId, email, { googleSubject = null } = {}) {
+  const address = normaliseEmail(email);
+  if (!address) throw identityError('INVALID_EMAIL', 'Enter a valid email address.');
+  const subject = String(googleSubject || '').trim().slice(0, 255) || null;
+
+  await transaction(async (conn) => {
+    const [users] = await conn.query(
+      'SELECT id, role, status FROM `users` WHERE id = ? LIMIT 1 FOR UPDATE',
+      [userId],
+    );
+    const account = users[0];
+    if (!account) throw identityError('ACCOUNT_NOT_FOUND', 'That account no longer exists.');
+    if (account.role !== 'customer') throw identityError('CUSTOMER_ONLY', 'This sign-in method is for customer accounts.');
+    if (account.status !== 'active') throw identityError('ACCOUNT_NOT_ACTIVE', 'That account cannot be linked right now.');
+
+    const [emailRows] = await conn.query(
+      'SELECT id, user_id, google_subject FROM user_email_identities WHERE email = ? LIMIT 1 FOR UPDATE',
+      [address],
+    );
+    const emailIdentity = emailRows[0] || null;
+    if (emailIdentity && Number(emailIdentity.user_id) !== Number(userId)) {
+      throw identityError('EMAIL_IN_USE', 'That verified email is already linked to another account.');
+    }
+
+    let subjectIdentity = null;
+    if (subject) {
+      const [subjectRows] = await conn.query(
+        'SELECT id, user_id, email FROM user_email_identities WHERE google_subject = ? LIMIT 1 FOR UPDATE',
+        [subject],
+      );
+      subjectIdentity = subjectRows[0] || null;
+      if (subjectIdentity && (Number(subjectIdentity.user_id) !== Number(userId) || subjectIdentity.email !== address)) {
+        throw identityError('GOOGLE_IDENTITY_IN_USE', 'That Google account is already linked.');
+      }
+    }
+
+    if (emailIdentity) {
+      if (subject && emailIdentity.google_subject && emailIdentity.google_subject !== subject) {
+        throw identityError('GOOGLE_IDENTITY_IN_USE', 'A different Google account is already linked to this email.');
+      }
+      if (subject && !emailIdentity.google_subject) {
+        await conn.query('UPDATE user_email_identities SET google_subject = ? WHERE id = ?', [subject, emailIdentity.id]);
+      }
+    } else {
+      await conn.query(
+        'INSERT INTO user_email_identities (user_id, email, google_subject, verified_at) VALUES (?, ?, ?, UTC_TIMESTAMP())',
+        [userId, address, subject],
+      );
+    }
+
+    // The profile displays the most recently verified address; older verified
+    // addresses stay attached and remain usable for sign-in.
+    await conn.query('UPDATE `users` SET email = ? WHERE id = ?', [address, userId]);
+  });
+
+  return findById(userId);
 }
 
 /**
@@ -150,6 +346,12 @@ async function referralStats(user) {
     qualifiedAt: user.referralQualifiedAt || null,
     people,
   };
+}
+
+async function updateContactPhone(userId, phone) {
+  const contact = phone ? String(phone).trim().slice(0, 40) : null;
+  await query('UPDATE `users` SET contact_phone = ? WHERE id = ?', [contact, userId]);
+  return findById(userId);
 }
 
 async function updateProfile(userId, { name, email, marketingOptIn }) {
@@ -226,6 +428,66 @@ async function countRecentCodes(phone, { withinMinutes = 60 } = {}) {
   return Number(row.n);
 }
 
+const EMAIL_CODE_PURPOSES = ['sign_in', 'link'];
+
+async function createEmailCode({ email, purpose = 'sign_in', codeHash, expiresAt, ip, maxAttempts }) {
+  const address = normaliseEmail(email);
+  if (!address) throw identityError('INVALID_EMAIL', 'Enter a valid email address.');
+  if (!EMAIL_CODE_PURPOSES.includes(purpose)) throw identityError('INVALID_EMAIL_CODE_PURPOSE', 'That email code request is not valid.');
+  await query(
+    'UPDATE email_auth_codes SET consumed_at = UTC_TIMESTAMP() WHERE email = ? AND purpose = ? AND consumed_at IS NULL',
+    [address, purpose],
+  );
+  const result = await query(
+    `INSERT INTO email_auth_codes (email, purpose, code_hash, expires_at, ip, max_attempts)
+     VALUES (?, ?, ?, ?, ?, ?)`,
+    [address, purpose, codeHash, expiresAt, ip || null, maxAttempts],
+  );
+  return result.insertId;
+}
+
+async function findActiveEmailCode(email, purpose = 'sign_in') {
+  const address = normaliseEmail(email);
+  if (!address || !EMAIL_CODE_PURPOSES.includes(purpose)) return null;
+  const row = await queryOne(
+    `SELECT * FROM email_auth_codes
+      WHERE email = ? AND purpose = ? AND consumed_at IS NULL AND expires_at > UTC_TIMESTAMP()
+      ORDER BY id DESC LIMIT 1`,
+    [address, purpose],
+  );
+  if (!row) return null;
+  return {
+    id: row.id,
+    email: row.email,
+    purpose: row.purpose,
+    codeHash: row.code_hash,
+    attempts: Number(row.attempts),
+    maxAttempts: Number(row.max_attempts),
+    expiresAt: row.expires_at,
+  };
+}
+
+async function registerEmailAttempt(codeId) {
+  await query('UPDATE email_auth_codes SET attempts = attempts + 1 WHERE id = ?', [codeId]);
+  const row = await queryOne('SELECT attempts FROM email_auth_codes WHERE id = ?', [codeId]);
+  return row ? Number(row.attempts) : 1;
+}
+
+async function consumeEmailCode(codeId) {
+  await query('UPDATE email_auth_codes SET consumed_at = UTC_TIMESTAMP() WHERE id = ?', [codeId]);
+}
+
+async function countRecentEmailCodes(email, purpose = 'sign_in', { withinMinutes = 60 } = {}) {
+  const address = normaliseEmail(email);
+  if (!address || !EMAIL_CODE_PURPOSES.includes(purpose)) return 0;
+  const row = await queryOne(
+    `SELECT COUNT(*) AS n FROM email_auth_codes
+      WHERE email = ? AND purpose = ? AND created_at > DATE_SUB(UTC_TIMESTAMP(), INTERVAL ? MINUTE)`,
+    [address, purpose, withinMinutes],
+  );
+  return Number(row.n);
+}
+
 // ---------------------------------------------------------------------------
 // Sessions
 // ---------------------------------------------------------------------------
@@ -261,9 +523,11 @@ async function recordMfaFailure(sessionId) {
 /** Returns the session + its user, or null when missing/expired/revoked. */
 async function findSession(tokenHash) {
   const row = await queryOne(
-    `SELECT s.id AS session_id, s.expires_at, s.revoked_at, s.mfa_pending, s.mfa_attempts, u.*
+    `SELECT s.id AS session_id, s.expires_at, s.revoked_at, s.mfa_pending, s.mfa_attempts,
+            u.*, ei.verified_at AS email_verified_at
        FROM sessions s
        JOIN \`users\` u ON u.id = s.user_id
+       LEFT JOIN user_email_identities ei ON ei.user_id = u.id AND ei.email = u.email
       WHERE s.token_hash = ? AND s.revoked_at IS NULL AND s.expires_at > UTC_TIMESTAMP()
       LIMIT 1`,
     [tokenHash],
@@ -577,15 +841,27 @@ module.exports = {
   USER_STATUSES,
   maskPhone,
   shapeUser,
+  normaliseEmail,
   findByPhone,
   findById,
+  findByVerifiedEmail,
+  findByGoogleSubject,
+  findLegacyEmailOwner,
   upsertByPhone,
+  createEmailAccount,
+  linkVerifiedEmail,
+  updateContactPhone,
   updateProfile,
   createCode,
   findActiveCode,
   registerAttempt,
   consumeCode,
   countRecentCodes,
+  createEmailCode,
+  findActiveEmailCode,
+  registerEmailAttempt,
+  consumeEmailCode,
+  countRecentEmailCodes,
   createSession,
   findSession,
   revokeSession,

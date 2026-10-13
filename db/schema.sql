@@ -19,18 +19,20 @@ SET time_zone = '+00:00';
 -- add a constraint against a table that does not exist yet.
 -- ---------------------------------------------------------------------------
 -- ---------------------------------------------------------------------------
--- users · auth_codes · sessions — phone-first accounts (§7.1)
+-- users · auth_codes · sessions — customer accounts and staff authentication
 --
--- OTP login: the code is stored HMAC-SHA256 hashed and single-use; sessions are
--- server-side and revoked by hash lookup, so a stolen cookie can be killed from
--- the database. Saved cars/searches hang off the user; dashboard reads (requests,
--- bookings, orders, subscriptions) are keyed by phone — the account key.
+-- New customer identities use a verified email; Google can be linked to that
+-- same verified identity. Existing phone identities remain available for staff
+-- and for customers linking older accounts. `contact_phone` is optional contact
+-- information, never a sign-in credential. Phone-keyed legacy history is not
+-- exposed to an email-only account merely because a number was typed into a form.
 -- ---------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS `users` (
   id               INT UNSIGNED  NOT NULL AUTO_INCREMENT,
-  phone            VARCHAR(40)   NOT NULL,              -- normalised +234…
+  phone            VARCHAR(40)   NULL,                  -- legacy sign-in identity; normalised +234…
+  contact_phone    VARCHAR(40)   NULL,                  -- optional contact number; never an identity key
   name             VARCHAR(120)  NULL,
-  email            VARCHAR(160)  NULL,
+  email            VARCHAR(160)  NULL,                  -- profile/display value; verified logins live below
   marketing_opt_in TINYINT(1)    NOT NULL DEFAULT 0,    -- NDPA: explicit, revocable
   status           ENUM('active','blocked','deleted') NOT NULL DEFAULT 'active',
   role             ENUM('customer','dealer','ops','inspector','marketing','finance','admin')
@@ -53,6 +55,23 @@ CREATE TABLE IF NOT EXISTS `users` (
   KEY idx_user_email (email),
   KEY idx_user_referred_by (referred_by),
   CONSTRAINT fk_user_referrer FOREIGN KEY (referred_by) REFERENCES `users` (id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- A verified email is a customer credential only after the customer completes
+-- an email OTP or proves control through Google's verified-email assertion.
+-- Multiple verified addresses may safely belong to one account.
+CREATE TABLE IF NOT EXISTS `user_email_identities` (
+  id             INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  user_id        INT UNSIGNED NOT NULL,
+  email          VARCHAR(160) NOT NULL,
+  google_subject  VARCHAR(255) CHARACTER SET ascii COLLATE ascii_bin NULL,
+  verified_at    DATETIME     NOT NULL,
+  created_at     TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  UNIQUE KEY uq_user_email_identity_email (email),
+  UNIQUE KEY uq_user_email_identity_google (google_subject),
+  KEY idx_user_email_identity_user (user_id, created_at),
+  CONSTRAINT fk_user_email_identity_user FOREIGN KEY (user_id) REFERENCES `users` (id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ---------------------------------------------------------------------------
@@ -213,6 +232,22 @@ CREATE TABLE IF NOT EXISTS listing_media (
   CONSTRAINT fk_media_listing FOREIGN KEY (listing_id) REFERENCES vehicle_listings (id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+
+CREATE TABLE IF NOT EXISTS `email_auth_codes` (
+  id           INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  email        VARCHAR(160) NOT NULL,
+  purpose      ENUM('sign_in','link') NOT NULL DEFAULT 'sign_in',
+  code_hash    CHAR(64)     NOT NULL,
+  attempts     TINYINT UNSIGNED NOT NULL DEFAULT 0,
+  max_attempts TINYINT UNSIGNED NOT NULL DEFAULT 5,
+  expires_at   DATETIME     NOT NULL,
+  consumed_at  DATETIME     NULL,
+  ip           VARCHAR(45)  NULL,
+  created_at   TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  KEY idx_email_auth_code (email, purpose, created_at),
+  KEY idx_email_auth_expiry (expires_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS `auth_codes` (
   id           INT UNSIGNED  NOT NULL AUTO_INCREMENT,
