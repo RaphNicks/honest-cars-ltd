@@ -1,0 +1,177 @@
+<%#
+  /admin/dealers — §5.1 “dealers”, the partner desk (FR-18).
+
+  Every lot on one screen with the four questions the desk asks: is the account
+  linked, is the stock alive, is the commission settled, and is anything
+  paid-for running. The add-on rail below answers the last one fleet-wide, and
+  is the only place a purchase can be seen before its lot is opened.
+
+  Money here is read from the same ledger and purchase rows the portal shows —
+  the two screens cannot disagree.
+
+  Locals: lots, totals, purchases, statementService
+%>
+<% var naira = helpers.formatNaira; %>
+<% var monthLabel = function (iso) {
+  return new Date(iso).toLocaleDateString('en-NG', { day: 'numeric', month: 'short', year: 'numeric' });
+}; %>
+
+<div class="admin-grid admin-grid--4">
+  <div class="kpi kpi--sm">
+    <span class="kpi__label">Partner lots</span>
+    <strong class="kpi__value tabular"><%= totals.lots %></strong>
+    <span class="kpi__foot">
+      <%= totals.unlinked %> without an account
+      <%= totals.unsigned ? ` · ${totals.unsigned} without a signed agreement` : '' %>
+    </span>
+  </div>
+  <div class="kpi kpi--sm">
+    <span class="kpi__label">Commission owed</span>
+    <strong class="kpi__value tabular"><%= naira(totals.balanceKobo) %></strong>
+    <span class="kpi__foot">across every lot's ledger</span>
+  </div>
+  <div class="kpi kpi--sm">
+    <span class="kpi__label">Add-ons running</span>
+    <strong class="kpi__value tabular"><%= totals.addonsActive %></strong>
+    <span class="kpi__foot">
+      <%= totals.addonsLapsed ? `${totals.addonsLapsed} window(s) closed but not swept` : 'paid windows still open' %>
+    </span>
+  </div>
+  <div class="kpi kpi--sm">
+    <span class="kpi__label">Add-ons unpaid</span>
+    <strong class="kpi__value tabular"><%= totals.addonsPending %></strong>
+    <span class="kpi__foot"><%= naira(totals.addonsPendingKobo) %> raised and not yet paid</span>
+  </div>
+</div>
+
+<section class="panel mt-3">
+  <div class="panel__head">
+    <h2 class="panel__title">Lots</h2>
+    <span class="cms-hint">Premium first, then by live stock</span>
+  </div>
+
+  <% if (!lots.length) { %>
+    <p class="empty-line">No partner lots yet. A lot appears here as soon as ops onboards it.</p>
+  <% } else { %>
+    <div class="table-scroll">
+      <table class="table table--stack">
+        <caption class="visually-hidden">Every partner lot with its stock, commission and paid add-ons</caption>
+        <thead>
+          <tr>
+            <th scope="col">Lot</th>
+            <th scope="col">Account</th>
+            <th scope="col">Stock</th>
+            <th scope="col">Commission balance</th>
+            <th scope="col">Add-ons</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% lots.forEach(function (lot) { %>
+            <tr>
+              <th scope="row">
+                <a href="/admin/dealers/<%= lot.id %>"><%= lot.name %></a>
+                <span class="listing-row__meta">
+                  <%= lot.tierLabel %> · <%= lot.lotArea %>
+                  <% if (lot.commissionPct !== null) { %> · <%= lot.commissionPct %>% commission<% } %>
+                </span>
+                <% if (!lot.agreementSigned) { %>
+                  <span class="badge badge--attention">Agreement unsigned</span>
+                <% } %>
+              </th>
+              <td>
+                <% if (lot.account) { %>
+                  <%= lot.account.name %>
+                  <span class="listing-row__meta tabular"><%= lot.account.phone || '' %></span>
+                <% } else { %>
+                  <span class="badge badge--attention">Not linked</span>
+                  <span class="listing-row__meta">link it from <a href="/admin/staff">Staff &amp; roles</a></span>
+                <% } %>
+              </td>
+              <td class="tabular">
+                <%= lot.counts.live %> live
+                <span class="listing-row__meta">
+                  <%= lot.counts.reserved %> reserved · <%= lot.counts.in_review %> in review · <%= lot.counts.sold %> sold
+                </span>
+              </td>
+              <td class="tabular">
+                <%= naira(lot.ledger.balanceKobo) %>
+                <span class="listing-row__meta">earned <%= naira(lot.ledger.owedKobo) %></span>
+              </td>
+              <td>
+                <%= lot.addons.active %> running
+                <span class="listing-row__meta">
+                  <% if (lot.addons.pending) { %>
+                    <%= lot.addons.pending %> unpaid · <%= naira(lot.addons.pendingKobo) %>
+                  <% } else { %>
+                    nothing outstanding
+                  <% } %>
+                </span>
+              </td>
+            </tr>
+          <% }); %>
+        </tbody>
+      </table>
+    </div>
+  <% } %>
+</section>
+
+<section class="panel">
+  <div class="panel__head">
+    <h2 class="panel__title">Add-on purchases</h2>
+    <span class="cms-hint">Newest across every lot — delivered when the payment lands</span>
+  </div>
+
+  <% if (!purchases.length) { %>
+    <p class="empty-line">No add-on has been bought yet.</p>
+    <p class="mb-0 muted">
+      The catalogue is seeded and the dealer portal sells it. An unpaid purchase stays
+      <em>pending</em> until ops confirms the transfer on <a href="/admin/payments">Money</a> — that
+      confirmation is what switches the benefit on, so there is no button here that can promise it.
+    </p>
+  <% } else { %>
+    <div class="table-scroll">
+      <table class="table table--stack">
+        <caption class="visually-hidden">The newest dealer add-on purchases</caption>
+        <thead>
+          <tr>
+            <th scope="col">Add-on</th>
+            <th scope="col">Lot</th>
+            <th scope="col">For</th>
+            <th scope="col">Amount</th>
+            <th scope="col">Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% purchases.forEach(function (purchase) { %>
+            <tr>
+              <th scope="row">
+                <%= purchase.addonName %>
+                <span class="listing-row__meta tabular"><%= purchase.reference %></span>
+              </th>
+              <td>
+                <% if (purchase.dealerId) { %>
+                  <a href="/admin/dealers/<%= purchase.dealerId %>"><%= purchase.dealerName %></a>
+                <% } else { %>
+                  <%= purchase.dealerName %>
+                <% } %>
+              </td>
+              <td>
+                <% if (purchase.listing) { %>
+                  <a href="<%= purchase.listing.url %>" target="_blank" rel="noopener"><%= purchase.listing.title %></a>
+                  <span class="listing-row__meta"><%= purchase.listing.stockNo %></span>
+                <% } else { %>
+                  <span class="muted">The whole lot</span>
+                <% } %>
+              </td>
+              <td class="tabular"><%= naira(purchase.amountKobo) %></td>
+              <td>
+                <span class="badge badge--<%= purchase.status === 'active' ? 'ok' : purchase.status === 'pending' ? 'attention' : 'closed' %>"><%= purchase.statusLabel %></span>
+                <span class="listing-row__meta tabular"><%= purchase.paymentReference || 'no payment raised' %></span>
+              </td>
+            </tr>
+          <% }); %>
+        </tbody>
+      </table>
+    </div>
+  <% } %>
+</section>

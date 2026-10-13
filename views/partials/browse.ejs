@@ -1,0 +1,84 @@
+<%#
+  Shared listing browser — §6.2. Used by /cars (all stock) and by every curated
+  facet page (§14.1) so the store never has two different feels.
+  Locals: result {listings,total,page,pages,sort}, facets, filters (view),
+          models, basePath, queryString, activePills, nearMatches, pageTitleForCount,
+          hiddenQuery, emptyStateHeading
+%>
+<div class="result-bar">
+  <p class="result-bar__count mb-0" data-result-count-text>
+    <strong><%= result.total %></strong> car<%= result.total === 1 ? '' : 's' %> in <%= locationLabel %>
+    <% if (result.total !== 1 && result.total > 0) { %><span class="note-inline">· page <%= result.page %> of <%= result.pages %></span><% } %>
+  </p>
+
+  <div class="result-bar__tools">
+    <button class="filters-toggle" type="button" data-filters-open
+            aria-controls="filters" aria-expanded="false">
+      <%- helpers.icon('filter', { size: 18 }) %> Filter
+      <% if (activePills.length) { %><span class="filters-toggle__count"><%= activePills.length %></span><% } %>
+    </button>
+
+    <%# Sort: Recommended / Price ↑↓ / Newest / Lowest mileage (§6.2) %>
+    <form method="get" action="<%= basePath %>" data-sort-form class="row">
+      <% Object.entries(hiddenQuery || {}).forEach(function ([key, value]) { %>
+        <input type="hidden" name="<%= key %>" value="<%= value %>">
+      <% }); %>
+      <label class="visually-hidden" for="sort-select">Sort listings</label>
+      <select class="select select--compact" id="sort-select" name="sort" data-sort-select>
+        <% Object.entries(helpers.SORT_LABELS ? helpers.SORT_LABELS : {}).forEach(function ([token, label]) { %>
+          <option value="<%= token %>" <%= result.sort === token ? 'selected' : '' %>><%= label %></option>
+        <% }); %>
+      </select>
+      <noscript><button class="btn btn--secondary btn--sm" type="submit">Sort</button></noscript>
+    </form>
+
+    <% if (typeof user !== 'undefined' && user) { %>
+      <button class="btn btn--secondary btn--sm" type="button" data-save-search
+              data-label="<%= typeof pageTitleForCount === 'string' ? pageTitleForCount : 'Search' %>"
+              data-event="saved_search_created" data-source="<%= basePath %>">
+        <%- helpers.icon('heart', { size: 18 }) %> Save search
+      </button>
+    <% } else { %>
+      <a class="btn btn--secondary btn--sm"
+         href="/login?next=<%= encodeURIComponent(basePath + (typeof queryString !== 'undefined' && queryString ? '?' + queryString : '')) %>">
+        <%- helpers.icon('heart', { size: 18 }) %> Save search
+      </a>
+    <% } %>
+  </div>
+</div>
+
+<% if (activePills.length) { %>
+  <div class="active-filters mt-2" aria-label="Active filters">
+    <% activePills.forEach(function (pill) { %>
+      <a class="filter-pill" href="<%= pill.href %>" data-remove-filter="<%= pill.key %>">
+        <span class="note-inline"><%= pill.label %>:</span> <%= pill.value %>
+        <%- helpers.icon('close', { size: 14 }) %>
+      </a>
+    <% }); %>
+    <a class="filter-pill" href="<%= basePath %>" data-clear-filters>Clear all</a>
+  </div>
+<% } %>
+
+<div class="listings">
+  <%- include('../partials/filters', {
+        facets: facets, filters: filters, models: models, action: basePath,
+        resultCount: result.total, hiddenQuery: hiddenQuery
+      }) %>
+
+  <div class="listings__results" data-results-region aria-live="polite">
+    <% if (result.listings.length === 0) { %>
+      <div style="grid-column: 1 / -1">
+        <%- include('../partials/empty-state', { nearMatches: nearMatches, city: (typeof serviceCity !== 'undefined' ? serviceCity : null) }) %>
+      </div>
+    <% } else { %>
+      <% result.listings.forEach(function (listing, index) { %>
+        <%- include('../partials/car-card', { listing: listing, helpers: helpers, eager: index < 3 }) %>
+      <% }); %>
+    <% } %>
+  </div>
+</div>
+
+<%- include('../partials/pagination', {
+      page: result.page, pages: result.pages, basePath: basePath,
+      queryString: queryString, total: result.total
+    }) %>

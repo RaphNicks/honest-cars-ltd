@@ -1,0 +1,83 @@
+<%#
+  /admin/reports — §7.3 Reports.
+  Four date-ranged exports over the same window: pillar (what the work was),
+  inspector (who did it), dealer (what a lot lists and earns) and UTM (which
+  link brought the person in). Each one downloads as CSV or PDF.
+
+  Deliberately read-only: no filter here writes anything, so every role with
+  reports.view may pull the whole window (§7.4).
+
+  Locals: by, spec, reports, rows, columns, from, to, today, cell, naira
+%>
+<%
+  var query = function (overrides) {
+    var params = { by: by, from: from, to: to };
+    Object.keys(overrides || {}).forEach(function (key) { params[key] = overrides[key]; });
+    return '/admin/reports?' + Object.keys(params).map(function (key) {
+      return encodeURIComponent(key) + '=' + encodeURIComponent(params[key]);
+    }).join('&');
+  };
+%>
+
+<div class="tabs" role="tablist" aria-label="Report">
+  <% Object.keys(reports).forEach(function (key) { %>
+    <a class="tab" role="tab" href="<%= query({ by: key }) %>" aria-selected="<%= key === by %>"><%= reports[key].label %></a>
+  <% }); %>
+</div>
+
+<section class="panel mt-2">
+  <div class="panel__head">
+    <div>
+      <h2 class="panel__title">Report — <%= spec.label %></h2>
+      <p class="cms-hint"><%= spec.description %></p>
+    </div>
+    <div class="admin-filters">
+      <a class="btn btn--secondary btn--sm" href="<%= query({ format: 'csv' }) %>">Download CSV</a>
+      <a class="btn btn--secondary btn--sm" href="<%= query({ format: 'pdf' }) %>">Download PDF</a>
+    </div>
+  </div>
+
+  <form class="admin-filters" method="get" action="/admin/reports">
+    <input type="hidden" name="by" value="<%= by %>">
+    <label class="visually-hidden" for="report-from">From</label>
+    <input class="input input--compact" type="date" id="report-from" name="from" value="<%= from %>" max="<%= today %>">
+    <span class="muted" aria-hidden="true">to</span>
+    <label class="visually-hidden" for="report-to">To</label>
+    <input class="input input--compact" type="date" id="report-to" name="to" value="<%= to %>" max="<%= today %>">
+    <button class="btn btn--secondary btn--sm" type="submit">Apply window</button>
+  </form>
+
+  <p class="cms-hint mt-2">
+    <span class="tabular"><%= from %></span> to <span class="tabular"><%= to %></span> ·
+    <%= rows.length %> row<%= rows.length === 1 ? '' : 's' %>
+  </p>
+
+  <% if (!rows.length) { %>
+    <p class="empty-line">Nothing was recorded in this window. Widen the dates, or check that the source form has been used yet.</p>
+  <% } else { %>
+    <div class="table-wrap mt-2">
+      <table class="table table--stack">
+        <thead>
+          <tr>
+            <% columns.forEach(function (column) { %>
+              <th scope="col" class="<%= column.numeric ? 'tabular' : '' %>"><%= column.label %></th>
+            <% }); %>
+          </tr>
+        </thead>
+        <tbody>
+          <% rows.forEach(function (row) { %>
+            <tr>
+              <% columns.forEach(function (column) { %>
+                <td data-label="<%= column.label %>" class="<%= column.numeric ? 'tabular' : '' %>"><%= cell(column, row) %></td>
+              <% }); %>
+            </tr>
+          <% }); %>
+        </tbody>
+      </table>
+    </div>
+  <% } %>
+
+  <p class="cms-hint mt-2">
+    Money reads in naira. A window includes its <strong>from</strong> day and its <strong>to</strong> day, and never overlaps the next window — so two months add up to the quarter.
+  </p>
+</section>

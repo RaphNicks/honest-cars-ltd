@@ -1,0 +1,56 @@
+<%# Dealer-partner sign-in; intentionally separate from customer authentication. %>
+<section class="page-hero">
+  <div class="container container--narrow">
+    <%- include('../../partials/breadcrumbs', { crumbs: [{ label: 'Dealer portal', href: '/dealer' }, { label: 'Sign in' }] }) %>
+    <p class="eyebrow">Dealer portal</p>
+    <h1>Sign in to your lot</h1>
+    <p class="lead">Use the phone number on your dealer-partner account. Customer accounts use email sign-in instead.</p>
+  </div>
+</section>
+
+<section class="section">
+  <div class="container container--narrow">
+    <% if (reason === 'expired') { %>
+      <p class="auth-message auth-message--banner" data-state="error">Your session ended, so please sign in again.</p>
+    <% } %>
+
+    <div class="auth-card" data-auth-card data-next="<%= next %>" data-ref="" data-save="">
+      <form class="auth-form" data-auth-step="phone" action="/api/auth/otp" method="post" novalidate>
+        <h2 class="mb-1">Dealer account phone</h2>
+        <p class="note-inline">We will send a one-time code to the number already linked to your partner account.</p>
+        <div class="field">
+          <label class="field__label" for="login-phone">Phone number</label>
+          <input class="input" id="login-phone" name="phone" type="tel" inputmode="tel" autocomplete="tel" placeholder="0803 123 4567" required aria-describedby="login-phone-hint">
+          <p class="field__hint" id="login-phone-hint">Enter your registered number, for example <span class="tabular">0803 123 4567</span>.</p>
+        </div>
+        <input type="hidden" name="next" value="<%= next %>">
+        <div class="btn-row">
+          <button class="btn btn--primary" type="submit">Send dealer sign-in code</button>
+          <a class="btn btn--ghost" href="<%= otp.whatsappLink %>" target="_blank" rel="noopener" data-event="whatsapp_click" data-source="dealer_login">Need help? WhatsApp the desk</a>
+        </div>
+        <p class="auth-message" data-auth-message role="status" aria-live="polite"></p>
+      </form>
+
+      <form class="auth-form hidden" data-auth-step="phone-code" action="/api/auth/verify" method="post" novalidate hidden>
+        <h2 class="mb-1">Enter your dealer code</h2>
+        <p class="note-inline">We sent a one-time code to <strong data-auth-phone>your number</strong>.</p>
+        <input type="hidden" name="phone">
+        <input type="hidden" name="next" value="<%= next %>">
+        <div class="field">
+          <label class="field__label" for="login-code">Sign-in code</label>
+          <input class="input input--code tabular" id="login-code" name="code" type="text" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]*" maxlength="<%= otp.length %>" placeholder="<%= '0'.repeat(otp.length) %>" required>
+        </div>
+        <div class="btn-row">
+          <button class="btn btn--primary" type="submit">Continue</button>
+          <button class="btn btn--ghost" type="button" data-auth-restart>Use a different number</button>
+          <button class="btn btn--secondary" type="button" data-auth-resend>Send a new code</button>
+        </div>
+        <p class="auth-message" data-auth-message role="status" aria-live="polite"></p>
+      </form>
+
+      <% if (otp.provider === 'console') { %>
+        <p class="auth-devnote"><strong>Development:</strong> the local sign-in code appears in the response and server log.</p>
+      <% } %>
+    </div>
+  </div>
+</section>

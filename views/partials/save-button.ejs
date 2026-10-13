@@ -1,0 +1,28 @@
+<%#
+  Save-to-account toggle — §7.1 “Saved cars”.
+  Signed in: posts to /api/account/saved-cars (account.js keeps state in sync).
+  Signed out: links to /login?next=…&save=<id> so the car is saved the moment the
+  visitor finishes signing in — the intent is not thrown away.
+  Locals: listing, helpers, [savedIds], [variant]
+%>
+<% var variant = typeof variant === 'undefined' ? 'icon' : variant; %>
+<% var signedIn = typeof user !== 'undefined' && Boolean(user); %>
+<% var isSaved = typeof savedIds !== 'undefined' && savedIds.map(Number).includes(Number(listing.id)); %>
+<% if (signedIn) { %>
+  <button class="save-toggle<%= variant === 'wide' ? ' save-toggle--wide' : '' %><%= isSaved ? ' is-saved' : '' %>"
+          type="button" data-save-car data-listing-id="<%= listing.id %>"
+          data-action="<%= isSaved ? 'remove' : 'add' %>" data-saved="<%= isSaved ? 'true' : 'false' %>"
+          aria-pressed="<%= isSaved ? 'true' : 'false' %>"
+          aria-label="<%= isSaved ? 'Remove ' + helpers.esc(listing.title) + ' from saved cars' : 'Save ' + helpers.esc(listing.title) + ' to your account' %>">
+    <%- helpers.icon(isSaved ? 'heartFilled' : 'heart', { size: 18 }) %>
+    <% if (variant === 'wide') { %><span data-save-label><%= isSaved ? 'Saved' : 'Save' %></span><% } %>
+  </button>
+<% } else { %>
+  <a class="save-toggle<%= variant === 'wide' ? ' save-toggle--wide' : '' %>"
+     href="/login?next=<%= encodeURIComponent(listing.url) %>&amp;save=<%= listing.id %>"
+     data-event="viewing_requested" data-source="save_signed_out"
+     aria-label="Sign in to save <%= helpers.esc(listing.title) %>">
+    <%- helpers.icon('heart', { size: 18 }) %>
+    <% if (variant === 'wide') { %><span>Save</span><% } %>
+  </a>
+<% } %>

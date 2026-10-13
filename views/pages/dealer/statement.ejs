@@ -1,0 +1,168 @@
+<%
+/**
+ * One month's commission statement — FR-18, §7.2 “Commission statements per
+ * closed deal”.
+ *
+ * The ledger is append-only, so a month can be stated honestly: an opening
+ * balance carried from before it, every entry inside it with a running
+ * balance, and a closing balance that ties back to the ledger. `ties` is shown
+ * rather than assumed — if the arithmetic and the ledger ever disagree, this
+ * page says so instead of printing a tidy lie.
+ *
+ * Locals: statement
+ */
+function day(value) {
+  return new Date(value).toLocaleDateString('en-NG', { day: 'numeric', month: 'short' });
+}
+function money(kobo) {
+  var value = Number(kobo || 0);
+  return (value < 0 ? '−' : '') + helpers.formatNaira(Math.abs(value));
+}
+%>
+<section class="page-hero page-hero--account">
+  <div class="container">
+    <p class="eyebrow">Commission statement</p>
+    <h1><%= statement.label %></h1>
+    <p class="lead mb-0">
+      <%= statement.dealer.name %> · opening <%= money(statement.openingKobo) %> →
+      closing <strong><%= money(statement.closingKobo) %></strong>
+    </p>
+    <p class="page-hero__meta">
+      <a href="/dealer/billing/statements/<%= statement.month %>.pdf">Download the PDF</a> ·
+      <a href="/dealer/billing">Back to commission</a>
+    </p>
+  </div>
+</section>
+
+<section class="section">
+  <div class="container">
+    <% if (!statement.ties) { %>
+      <div class="panel">
+        <h2 class="panel__title">This statement does not tie to the ledger</h2>
+        <p class="mb-0">
+          It closes at <%= money(statement.closingKobo) %> and the ledger says
+          <%= money(statement.ledgerClosingKobo) %>. Please raise it with the desk before paying against it.
+        </p>
+      </div>
+    <% } %>
+
+    <div class="admin-grid admin-grid--4">
+      <div class="kpi kpi--sm">
+        <span class="kpi__label">Commission earned</span>
+        <strong class="kpi__value tabular"><%= money(statement.totals.commissionKobo) %></strong>
+        <span class="kpi__foot"><%= statement.closedDeals.length %> closed deal<%= statement.closedDeals.length === 1 ? '' : 's' %></span>
+      </div>
+      <div class="kpi kpi--sm">
+        <span class="kpi__label">Paid to the lot</span>
+        <strong class="kpi__value tabular"><%= money(statement.totals.payoutKobo) %></strong>
+        <span class="kpi__foot">settled against this month</span>
+      </div>
+      <div class="kpi kpi--sm">
+        <span class="kpi__label">Adjustments</span>
+        <strong class="kpi__value tabular"><%= money(statement.totals.adjustmentKobo + statement.totals.clawbackKobo) %></strong>
+        <span class="kpi__foot">corrections and reversals</span>
+      </div>
+      <div class="kpi kpi--sm">
+        <span class="kpi__label">Closing balance</span>
+        <strong class="kpi__value tabular"><%= money(statement.closingKobo) %></strong>
+        <span class="kpi__foot"><%= statement.ties ? 'ties to the ledger' : 'does not tie — see above' %></span>
+      </div>
+    </div>
+
+    <section class="panel mt-3">
+      <div class="panel__head">
+        <h2 class="panel__title">Closed deals</h2>
+        <span class="cms-hint">One line per car that sold, with the payment behind it</span>
+      </div>
+      <% if (!statement.closedDeals.length) { %>
+        <p class="empty-line">No closed deal was commissioned in this month.</p>
+      <% } else { %>
+        <div class="table-scroll">
+          <table class="table">
+            <caption class="visually-hidden">Deals commissioned in <%= statement.label %></caption>
+            <thead>
+              <tr>
+                <th scope="col">Date</th>
+                <th scope="col">Car</th>
+                <th scope="col">Payment</th>
+                <th scope="col">Commission</th>
+              </tr>
+            </thead>
+            <tbody>
+              <% statement.closedDeals.forEach(function (deal) { %>
+                <tr>
+                  <td class="muted"><%= day(deal.date) %></td>
+                  <th scope="row">
+                    <% if (deal.listing) { %>
+                      <%= deal.listing.title %>
+                      <span class="listing-row__meta"><%= deal.listing.stockNo %></span>
+                    <% } else { %>
+                      <%= deal.detail || 'Closed deal' %>
+                    <% } %>
+                  </th>
+                  <td class="tabular muted"><%= deal.paymentReference || '—' %></td>
+                  <td class="tabular"><%= money(deal.amountKobo) %></td>
+                </tr>
+              <% }); %>
+            </tbody>
+          </table>
+        </div>
+      <% } %>
+    </section>
+
+    <section class="panel">
+      <div class="panel__head">
+        <h2 class="panel__title">Every entry</h2>
+        <span class="cms-hint">Oldest first, with the balance running</span>
+      </div>
+      <% if (!statement.entries.length) { %>
+        <p class="empty-line">No ledger entries in this month.</p>
+      <% } else { %>
+        <div class="table-scroll">
+          <table class="table">
+            <caption class="visually-hidden">Ledger entries for <%= statement.label %></caption>
+            <thead>
+              <tr>
+                <th scope="col">Date</th>
+                <th scope="col">Entry</th>
+                <th scope="col">Amount</th>
+                <th scope="col">Balance</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td class="muted"><%= day(statement.period.start) %></td>
+                <td colspan="2"><strong>Opening balance</strong> <span class="listing-row__meta">carried from before this statement</span></td>
+                <td class="tabular"><%= money(statement.openingKobo) %></td>
+              </tr>
+              <% statement.entries.forEach(function (entry) { %>
+                <tr>
+                  <td class="muted"><%= day(entry.date) %></td>
+                  <th scope="row">
+                    <%= entry.label %>
+                    <span class="listing-row__meta">
+                      <% if (entry.listing) { %><%= entry.listing.stockNo %> · <% } %>
+                      <%= entry.detail || '' %>
+                      <% if (entry.paymentReference) { %> · paid <%= entry.paymentReference %><% } %>
+                    </span>
+                  </th>
+                  <td class="tabular"><%= money(entry.amountKobo) %></td>
+                  <td class="tabular muted"><%= money(entry.balanceKobo) %></td>
+                </tr>
+              <% }); %>
+              <tr>
+                <td class="muted"><%= day(statement.period.endExclusive) %></td>
+                <td colspan="2"><strong>Closing balance</strong></td>
+                <td class="tabular"><strong><%= money(statement.closingKobo) %></strong></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      <% } %>
+      <p class="cms-hint mt-2">
+        Nothing here is edited by hand. A correction is its own ledger row, so this statement can always be
+        checked against the one before it.
+      </p>
+    </section>
+  </div>
+</section>

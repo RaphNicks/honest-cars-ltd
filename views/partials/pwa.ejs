@@ -1,0 +1,14 @@
+<%#
+  FR-30 — everything the browser needs to treat this as an installable app.
+  Kept in one partial so the manifest, the icons and the iOS meta tags can never
+  drift apart: a manifest without a 192px icon is simply not installable, and
+  that failure is invisible in the browser.
+%>
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="icon" href="/favicon.png" sizes="48x48" type="image/png">
+<link rel="icon" href="/icons/icon-192.png" sizes="192x192" type="image/png">
+<link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="HonestCars">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="mobile-web-app-capable" content="yes">

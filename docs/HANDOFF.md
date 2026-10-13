@@ -1,0 +1,1318 @@
+# Handoff — where this build is, and how to continue it
+
+**Written 2026-10-07, updated for §12.2, on branch `arena/01a0f7df-honest-cars-ltd`.**
+If you are picking this up (a person or an agent in a new session), read this file
+first, then `docs/GAPS.md` for the row-by-row list of what is left.
+
+---
+
+## 1. What this is
+
+honestcarsltd.com rebuilt as a **Node + Express + EJS + vanilla JS + MySQL** site,
+to the specification in `Honest_Cars_LTD_Website_Specifications_Final.pdf`
+(extracted to text at `docs/PRD-extracted.txt`).
+
+The rules that shape every decision:
+
+- **PRD §3 design tokens are the source of truth** — the original Next.js repo this
+  was meant to mirror does not exist (see §7 below). Palette, Inter self-hosted,
+  8px grid, 1200px container, 12px radius, the type ladder.
+- **No React, no Tailwind, no frontend build step.** Vanilla ES modules for
+  interactivity only. CSS is hand-written.
+- **Hybrid rendering (§12.4):** stable pages are generated to `dist/` at build
+  time; `/cars`, the VDP, the concierge flow and the shop render per request.
+- **All data access goes through ONE module:** `src/db/index.js`. Nothing else
+  opens a connection. `db.query` / `db.queryOne` / `db.transaction`.
+- **Honesty is a feature.** No PSP credentials ⇒ bank transfer, recorded as such.
+  A channel that cannot deliver records the message as `skipped` and keeps the
+  text — never silently dropped. No invented numbers, ever.
+
+Run it:
+
+```bash
+bash scripts/sandbox/recover.sh     # after a sandbox wipe: deps, MySQL, .env, head
+npm run db:seed                     # 79 listings across 4 markets, 8 posts, staff + customer accounts
+npm run build:static                # 72 static pages into dist/
+npm start                           # http://localhost:3000
+```
+
+MySQL runs from `/home/user/mysql-runtime` on **port 3307** (see `.env`). Start it
+with `bash scripts/sandbox/mysql-start.sh` in a background process — never
+backgrounded from a plain shell command, it will be killed.
+
+---
+
+## 2. What is built and verified
+
+Every **§9 MUST is built.** The commit trail, most recent first:
+
+| Commit | What it delivered |
+|---|---|
+| *this commit* | **the cinematic storefront** — same site, same data, a premium first screen |
+| `c6836a8` | **a pull is not a deploy** — a half-updated page, and the three things that now stop it |
+| `f53876d` | **opening a market from the console** — the switch the picker was built around |
+| `f00907d` | **the city picker + the Services chevron** — 48 cities, searchable, deepest stock first |
+| `79e0dd2` | **the Services menu + the hidden attribute** — hover no longer drops the panel; `[hidden]` is a real rule; the badge corner wraps |
+| `cb74267` | **Services mega-menu** — the 8px dead band bridged, close delayed, hover gated to hover devices |
+| `7213505` | **migrations refuse to run on a current database** — the schema-state guard, and the parser that read continuation lines as columns |
+| `c62f42f` | phpMyAdmin route documented and proved for XAMPP users |
+| `5d03e87` | `docs/RUN-LOCALLY.md` + the `USE` bug that hijacked the migration session |
+| `95c1fd4` | **OG cards** — titles wrap and fit instead of clipping; the schema logo stopped 404ing |
+| `4aaa1e4` | **§12.2 second factor** — TOTP for admin/finance, recovery codes, the challenge gate |
+| `fbfa63b` | **§18.3 privacy desk** — data-subject requests, the 30-day clock, consent records |
+| `9763e66` | **§5.1 settings** — the rest of the screen: business facts, limits, fees, channels |
+| `b2c08cf` | FR-34 docs — the section, the gates, and the traps it hit |
+| `5c28628` | **FR-34** financing enquiries and the lender handoff |
+| `485bf04` | **FR-30** installable PWA: manifest, generated icons, service worker, `/offline` |
+| `c680d51` | **FR-29** instant valuation widget on /sell-swap, from the price-intel bands |
+| `d1b1da0` | **FR-28** referrals: who came from whom, and the reward status behind it |
+| `c974792` | **FR-32** multi-city inventory + area switcher + `/admin/settings` area manager |
+| `e78fd4c` | **FR-33** dealer CSV/API import + API keys |
+| `9d1b4d8` | **FR-18** dealer add-ons + commission statements |
+| `9cd3b66` | **FR-35** blog: author pages, governed tags, listing embeds, editorial calendar |
+| `b809f8c` / `be55e36` | FR-35 groundwork — migration 021, `content.js`, tag/author routes |
+| `f4f0a01` / `f1fbba4` / `c51946a` / `0f424bc` | **FR-22** hire management + docs |
+| `a6ba608` | `docs/GAPS.md` retired FR-20 (27 left) |
+| `0f424bc` | **FR-22** hire management: pool, availability, bookings, incidents, invoice PDF |
+| `3f01527` | **FR-20** tracker subscriptions: renewals, reminders, dealer retainers |
+| `a834c71` | `docs/HANDOFF.md` (this file) |
+| `8c53572` | FR-20 groundwork — migration 019, `src/db/subscriptions.js`, `src/services/renewals.js` |
+| `88a2882` | `docs/GAPS.md` retired §13.2 + FR-24 rows (28 left) |
+| `6a2e989` | §13.2 low-bandwidth set + FR-24/§16 video |
+| `eeb409e` | `docs/GAPS.md` retired the §15.2 row |
+| `1c960a4` | §15.2 marketing dashboard (`/admin/marketing`, CAC guardrail, UTM capture) |
+| `406f87a` | FR-19 concierge shortlist + options PDF |
+| `de9485b` | §6.4 comparison (≤3) |
+| `e104991` / `9456905` | §7.3 reports (pillar/inspector/dealer/UTM) + fixtures |
+| `feaff5b` `a496a9b` `bdf6bc4` | §7.3 price-intel bands + staleness |
+| `ecc0bbd` | FR-05 concierge retainer |
+| `3db5694` | FR-25 alerts + §7.2 dealer portal |
+| `d3957a9` | FR-24 CMS |
+| `f76fbf4` `5bd9b0a` `5357649` `8a960c5` | role smoke, payments/escrow/report PDF, admin console + §7.4 matrix, FR-01–FR-15 vertical slice |
+
+Two full acceptance passes are recorded in the PR comments: **§7.2 dealer portal**
+(dashboard → listings → wizard → leads → scorecard → orders & billing → profile,
+admin approval before Live) and **FR-25 alerts** (per-user switches driving a real
+watcher, deduped by baselines/watermarks).
+
+**§13.2 low-bandwidth, closed out in `6a2e989`** — the four PRD asks plus the
+resilience ask:
+
+- 42 photos each have a 20px inline WebP placeholder (`src/lib/image-blur.json`,
+  ~200 B each) and a 600×450 sibling; the frame paints from the placeholder.
+- `Save-Data: on` ⇒ server sends the 600px file and **no srcset**, with
+  `Vary: Save-Data`. Static pages read `navigator.connection.saveData` themselves.
+- Video is strictly tap-to-load, labelled with its **measured** duration and size
+  (`0:12 · 244 KB`) from `src/lib/video-manifest.json`; nothing is fetched before
+  the press.
+- Forms keep a draft and offer it back; a send that fails on the **network** is
+  held in an outbox and sent when the connection returns. A 4xx is never queued.
+
+**FR-24/§16 in the same commit** — migration 018 (`duration_seconds`,
+`size_bytes`, `poster_url` on `listing_media`), a `video` content block with a
+`[clip:…]` directive, clips on two listings' galleries, and 8 blog posts with 3
+embedded videos. All four clips total 726 KB.
+
+---
+
+## 3r. Just shipped: the cinematic storefront
+
+A reference mockup arrived with one instruction: elevate the visuals, keep
+every route, every sentence of copy, every live counter and every working
+control exactly as they are. So the redesign is one template plus CSS, driven
+by the same locals the page already had — nothing was re-platformed.
+
+- **The hero is now a full-bleed golden-hour photograph** (new asset, run
+  through the existing `prepare-images` pipeline like every other photo) with a
+  tuned left scrim, the same three-sentence headline with its closing line in
+  brand green, the same instant-search form, and the same three live chips
+  restyled as dark glass. On the homepage only, the header sits above it in
+  deep navy.
+- **Two new strips, drawn only from live data.** Category cards take each body
+  type's facet count and one real listing photo (`categoryShowcase()` in the
+  one data module) and link to `/cars?body=…`; the brand row takes the top
+  makes and links to `/cars?make=…`. No invented counts, no downloaded logos —
+  a body type with no live photo simply gets no card.
+- **Existing sections, restyled, not removed.** "How it works" now stands
+  beside the inspector photograph with a floating "inspected, documented and
+  verified" chip; social proof moved onto deep navy with the live counters in
+  green; the dealer band sits over a new dusk-road photograph. Every heading,
+  link, tab, grade card, testimonial and form is the one that was already
+  there.
+- **Motion is one small module** (`reveal.js`): sections fade and rise once as
+  they enter view, and stop entirely under `prefers-reduced-motion` — and with
+  the module absent the page is fully visible, because the class is only added
+  by script. The service worker precaches it (`hc-v7`); the PWA suite caught
+  the first draft that forgot.
+
+Tokens grew a cinematic family — `--navy-deep`, `--green-bright`, glass tints
+and scrim gradients — while the six-step type ladder and the 8px grid stayed
+untouched, which the type-scale lint confirms. 556 tests pass, 147 pages
+audited with 0 findings.
+
+---
+
+## 3s. Just fixed: a pull is not a deploy
+
+A reader sent two screenshots of the city picker: a panel with no cities in it, a
+search box reading **“Search 4 cities”**, and a search for “kano” answering *“No
+city matches”*. Nothing in the picker was broken. The **page was new and the
+server was old**: the process had been started before the pull, so Express was
+rendering the new `views/` from disk against modules loaded from the previous
+release, where `site.cityDirectory` does not exist yet.
+
+Reproduced exactly, in a two-minute probe: render `partials/area-switcher.ejs`
+with the old locals (`site.cities` = the four markets, no directory) and you get
+a search box, `placeholder="Search 4 cities"`, one row (“All cities”), and no
+catalogue island. Why it looked so completely empty is worth writing down: the
+fallback list is the *markets*, whose rows come from `db.areas.cities()` and
+carry `active`, not `served` — so `cities.filter(city => city.served)` returned
+nothing, the market rows were dropped, and the picker kept only the reset link.
+
+Three fixes, one per layer, because each is a different way for "the code on disk"
+and "the code answering the request" to disagree:
+
+1. **The partial degrades instead of breaking.** A row that does not say it is a
+   market is treated as one (`served !== false`, which is what the markets list
+   is), and the search box is drawn only when there is something beyond the
+   rendered markets to search. Rendered with locals that predate it, the switcher
+   now lists the four markets, with their counts, and no box that can only answer
+   "no match". A control that cannot succeed is worse than no control.
+2. **A build older than the code is not served.** `git pull` leaves `dist/`
+   exactly as it was, so the server now walks `views/`, `src/`, `public/css` and
+   `public/js` at boot and compares the newest mtime with the manifest's
+   `generatedAt` (`render.newestSourceTime`, `app.locals.staticManifestStale`).
+   Older means the prebuilt HTML is the previous revision's: `respond.js` renders
+   per request and says so — `X-HonestCars-Stale-Build: build-older-than-code` —
+   and the terminal says why in one line. The setting rule keeps priority when
+   both are true (it is the recent, deliberate act whose operator was told).
+3. **Scripts and styles cannot outlive a deploy.** The worker was cache-first for
+   its shell assets, which is how a fresh page ends up running last release's
+   modules with no way for the reader to fix it. `.js` and `.css` are now
+   network-first with the cache as the offline fallback (`networkFirst` grew a
+   `readFrom` so it can still find what install precached); fonts and icons keep
+   stale-while-revalidate, where an old icon is a much smaller lie than old code.
+   `hc-v4` → `hc-v5`.
+
+And it is said out loud in the terminal, which is where a local operator is
+looking: boot prints `picker: 48 cities, 4 of them markets we operate`, a stale
+build prints the warning and the command that fixes it, and a **drift watcher**
+(one minute, `unref`'d) notices the code changing under a running process and
+says `the code changed while this process was running — restart`. That last one
+is the exact bug, caught by the server instead of by a screenshot.
+
+`docs/RUN-LOCALLY.md` §9 grew the sentence it was missing — *restart is what
+makes a pull take effect* — plus the `dist/` note, the service-worker note, and a
+row in the troubleshooting table for "a new feature is missing or a control is
+half-working". `test/stale-code.test.js` pins all of it: the degraded render, the
+island being skipped rather than empty, the current render still drawing the
+country, a stale build refused with its header and a fresh one served, and the
+worker's strategy split. (That suite boots the real app, so it closes the MySQL
+pool in `test.after` — the redirect middleware opens it on the first request, and
+a pool left open hangs `node --test` on a suite whose assertions all passed.)
+
+---
+
+## 3t. Just finished: opening a market from the console
+
+The city picker offers forty-eight Nigerian cities and the site operates in four.
+The gap between those two numbers was the last thing FR-32 was missing: a city
+became a market by somebody inserting a `service_cities` row, which made the one
+action the picker's whole design depends on invisible to the desk that owns it.
+`/admin/settings` now has the form, and this is what it decided.
+
+**The form offers the country, not a text box.** The select is the national
+catalogue (`src/lib/nigeria-cities.js`) minus the markets that already exist,
+grouped by state — forty-four options, Lagos and Kano among them. Free text was
+the other choice and it is the wrong one: the picker and the country list are the
+same list precisely so they cannot drift, and a typo in a text box opens a market
+nobody can find. A city genuinely missing from the catalogue gets a line in that
+file, which is reviewable in a diff.
+
+**A market owns a stock series, so it cannot share one.** `HC-OW-0142` is how a
+stock number says which market issued it, which is exactly the moment an
+ambiguous prefix becomes a phone call. Two markets also cannot share a *name* —
+`listing-query.buildWhere` filters by the name, so duplicates would pool two
+cities' stock into one grid and make both counts untrue. Both are refusals with a
+sentence, not silent overwrites.
+
+**Closing is the part with a guard.** A retired market leaves the picker, so
+retiring one with cars in it would either answer *"we are not there yet"* over a
+grid of forty cars or drop the filter and show the rest of the country as if the
+buyer had not asked. `db.areas.updateCity` refuses while live or reserved stock
+remains and says the count: *"Port Harcourt still has 43 live cars — sell, move
+or expire them before closing the market."* An empty city closes cleanly, the row
+stays (its areas and its history are filed under it), and the **picker falls back
+to the catalogue entry** — served `false`, live `0` — so `/cars?city=lagos` keeps
+its honest empty state instead of 404ing. Re-opening is a correction rather than
+a duplicate, the rule `addArea` already follows for a retired area.
+
+**Not a rename, and that is a decision.** Listings carry the city's name and the
+area's name; a rename here would leave every car filed under a city that no
+longer exists — a silent data loss wearing a convenience. Both screens refuse it
+and say how many listings still carry the old spelling. The screen that would
+*re-file* them is now the FR-32 row in `docs/GAPS.md`, which is a smaller and
+more honest gap than the one it replaced.
+
+**The reach is every stable page.** The market list is in the header (and the
+footer's city links), so opening or closing a market is not one page's problem:
+`TOUCHES.market` is `['*']`, and `publish.revalidate` re-renders the build as it
+stands — 74 pages in about a second — never inventing a route (a path that is not
+in the manifest is skipped, so a new market's own city page is still a curated
+facet decision, not a side effect). The flash says how many pages moved.
+
+**One bug worth keeping in mind, caught by the test rather than by a person.**
+`src/lib/locals.js` caches the site chrome — services, counters, the markets —
+for 60 seconds, and `invalidateChrome()` was exported and **never called
+anywhere**. So the first version re-rendered the build *before* dropping the
+cache: every page it had just written carried the market list from before the
+change, and would have kept carrying it until the next full `npm run build:static`
+— a stale header baked into 74 files, with a success message on top. The test
+that opens Kano and then greps the built home page for `href="/cars?city=kano"`
+is what failed, which is exactly what it was written for. `invalidateChrome()`
+now runs **before** the re-render, and has its first caller.
+
+`test/market-admin.test.js` is nine tests over the whole loop: the select's
+contents and grouping (`<optgroup label="FCT">` — the label rule is shared with
+the storefront, so it is not spelled again as "FCT State"), opening, the series
+and name refusals, the close guard with its count, the close/re-open round trip
+and the catalogue fallback, `/cars?city=lagos` becoming a remembered market, and
+the re-render itself. It builds its own fixture build in `.test-static/market`
+(set through `TEST_STATIC_DIR` before `./helpers` is imported) rather than
+asserting about a developer's `dist/`, and it deletes it afterwards — no other
+suite's build is read or written.
+
+---
+
+## 3u. Just finished: the city picker, and the Services chevron
+
+Two requests from the site: the Services arrow had dropped onto a second line
+under the word, and "All cities" should offer the whole country, searchable, with
+the cities that have the most cars at the top.
+
+**The chevron.** `.header__nav-link` was a plain inline `<a>` with an inline
+`<svg>` in it, and the icon's box did not reliably share the line box — so
+"Services ⌄" broke, with the arrow underneath. It is now an inline-flex row with
+`align-items: center` and a gap: **the box model the city control beside it has
+always used**, which is exactly what the report asked for. Pinned in
+`test/menu.test.js` by comparing the two rules, so the two controls cannot drift
+apart again.
+
+**The city list — the decision that shaped everything.** "All cities" is now
+forty-eight Nigerian cities: the 36 state capitals, the FCT, and the major
+commercial towns (Aba, Onitsha, Nnewi, Warri, Ijebu-Ode, Zaria, Ile-Ife and
+the rest — see the file).
+The obvious way to do that was to insert rows into `service_cities`, and it is
+the wrong way: that table means **a market we operate**. It carries the stock
+prefix and the area list, and `db.listings.filterFacets` reads it straight into
+the /cars filter rail — deliberately, so "a market with no stock still shows as a
+real 0". Forty-eight rows there would put forty-eight radio buttons in that rail
+on every /cars request and four hundred-odd links on every static page.
+
+So the catalogue lives in code (`src/lib/nigeria-cities.js`) and is **merged**
+with the markets in `src/services/city-directory.js`:
+
+- a market row wins for a city we operate (ops own its name, state and prefix);
+- anything the database knows that the catalogue does not is still listed, so
+  adding a market can never make it disappear from the picker;
+- every row carries a live count and orders by it — **deepest stock first**,
+  ties by ops position then name, so the list is deterministic;
+- `cityDirectory.resolve()` resolves a catalogue city too, which is what makes
+  `/cars?city=lagos` filter to Lagos and tell the truth, rather than silently
+  dropping the filter and showing the whole network.
+
+**A city we have no lots in is honest, not hidden.** `/cars?city=lagos` is a real
+page: its own title ("we are not there yet"), a description that offers the
+concierge instead of stock, an empty state that names the city and says why, and
+`noindex,follow` — only a city with a curated facet is a page worth indexing
+(the previous rule would have published that empty page as *"Cars for sale in
+Lagos — verified stock"*, and meant it). It is also **never written to the
+visitor's cookie**: remembering "Lagos" for someone who would land on an empty
+grid on every future visit is not the memory they asked for, and the server and
+`js/area.js` apply the same rule so the two cannot disagree.
+
+**Weight was a design constraint, not an afterthought.** The picker appears
+twice per page (header and drawer), so forty-eight cities of list markup would
+have cost every page about 20 KB — bytes a visitor cannot reach without
+JavaScript anyway, since the panel only opens with it. Instead:
+
+- the markets we operate are server-rendered links, as before (that is also the
+  whole list for a crawler, and it keeps the raw-combo link count where §14.1
+  wants it);
+- the catalogue rides along once per page as a `type="application/json"` island
+  (`views/partials/city-index.ejs`, read at document level by both switchers);
+- `js/area.js` clones one `<template>` per city on first open, so the item markup
+  is written once, in one language.
+
+Net: the build went from 4,623 kB to 5,106 kB (+6.5 kB/page, island included),
+and the /cars page — server-rendered per request — grows by the same order.
+
+**Search.** By city name *or* state ("rivers" finds Port Harcourt, "fct" finds
+Abuja, because the label is what a person reads and so it is what the search
+matches). Case-insensitive, "All cities" hides while a query is up (it is a
+reset, not a city), a no-match line says so and offers the concierge, Escape
+clears the query before it closes the panel, and Enter takes the first city still
+showing. `test/city-search.test.js` drives all of it against the minimal DOM in
+`test/dom.js`.
+
+**Two traps worth keeping.** A `<template>`'s children are not in the document:
+`switcher.querySelectorAll('[data-area-option]')` cannot reach them in a browser,
+and the first version of the DOM stub *did* — which deleted the template's own
+row during hydration and broke every city. The stub now models the real rule, and
+`hydrate()` reads `list.children` instead of a document-wide query, so the code
+says what it means either way. And a test file that touches the database must
+close the pool (`test.after` → `db.pool.end()`): `npm test` hung for 900 seconds
+because `city-directory.test.js` did not.
+
+**Remember:** `public/sw.js` `VERSION` → `hc-v4` (base.css, components.css and
+area.js are all precached), and `docs/GAPS.md` gained a row for the one thing
+this leaves undone — there is still no screen that creates a *city*, only areas.
+
+---
+
+## 3v. Just finished: the Services menu, and the hidden attribute
+
+Two defects the user found by using the site, and a third, fourth and fifth
+found while fixing the second. Both fixes are in `public/css/` and are about the
+same habit of mind: a component solving a problem locally that belongs to the
+stylesheet as a whole.
+
+**The Services menu closed as you reached for it.** `.mega` is the trigger's
+box, and `.mega__panel` was positioned `top: calc(100% + var(--space-1))` — an
+8px band belonging to neither the trigger nor the panel. A pointer crossing it
+leaves `.mega`, which fired `mouseleave`, whose listener hid the panel outright.
+Fixed at both layers: the air is named once (`--mega-gap`), the panel is offset
+by it, and `.mega__panel::before` bridges exactly that distance (absolutely
+positioned, or it becomes a grid item in the panel's two-column layout); and the
+close is delayed 160ms and cancelled by coming back, which also covers the
+sideways step from the narrow trigger onto the wider panel. Hover listeners now
+bind only where `(hover: hover)` matches — a touchscreen fires an emulated
+`mouseenter` just before its click, which would open and immediately shut it.
+Keyboard stays immediate.
+
+**The `hidden` attribute was being beaten by `display`.** The UA stylesheet
+implements the attribute as `display: none`, and any author rule that sets a
+`display` silently outranks it. Five components had each grown a guard of their
+own — `.mega__panel`, `.area-switcher__panel`, `.footer__install`,
+`.flow__panel`, `.info-tip__panel` — and the ones that had not were visible
+while marked hidden: the instant-estimate result card on `/sell-swap` (an empty
+card under the button, `display: grid`), `.field` on `/financing` ("The car you
+asked about" showing before any car was chosen, `display: flex`), and the home
+page's four tab feeds, which all rendered at once because toggling the attribute
+did nothing (`display: grid`). One rule replaced the whole pattern:
+
+    [hidden] { display: none !important; }
+
+The five guards went with it, and `test/hidden-attribute.test.js` fails if the
+rule loses its `!important`, leaves `base.css`, or is joined by a sixth local
+guard. **The general lesson: when the same one-line fix appears in N components,
+the N+1th has already been forgotten — the pattern is the bug.**
+
+**The "Certified report" ribbon sat on top of the grade.** The ribbon was
+absolute with `right: 8px; top: 8px` *inside* `.car-card__badges`, which is
+itself positioned — so those 8px measured from the badge column, and the column
+shrink-wraps to the grade chip. The ribbon therefore sat 8px inside the chip's
+own right edge, over the end of "HonestCars-Certified" and the tooltip button,
+at every card width. The corner is now a wrapping flex row spanning the photo
+(`left` **and** `right`), the ribbon rides it with `margin-left: auto`, and
+`flex-wrap` guarantees the two chips can never overlap however long the label
+gets. `.badge--reserved` keeps its own line, as it sat under the grade before.
+`test/car-card-badges.test.js` pins the row, the ribbon's place in flow, and
+re-derives the desktop width budget from the tokens (1200px container, padding,
+grid gap, insets) against the shipped Inter.
+
+**Remember:** a guard is a smell when it is the fifth copy of itself; `public/sw.js`
+`VERSION` must be bumped whenever `base.css` or `components.css` changes, or a
+returning visitor keeps the old shell from cache and the fix looks like it did
+not work (bumped to `hc-v3` here).
+
+---
+
+## 3z. Earlier: §5.1 settings — the rest of the screen
+
+**Built in this commit.** FR-32 built the market/area half of §5.1's settings
+screen; this is the other half. Business facts, page limits, the sold-car
+windows, the concierge SLA card, the referral and CAC figures, and the channel
+each message takes are now editable at `/admin/settings` — off `.env`, without a
+deploy.
+
+**The registry is the screen**
+
+`src/lib/settings-schema.js` declares all 42 settings: type, range, built-in
+default, and one sentence an operator needs. `services/settings.js` draws the
+form from it. Two rules make the screen trustworthy rather than decorative:
+
+- **If it is on the screen, the code reads it.** `test/settings.test.js` walks
+  `src/`, `views/` and `scripts/` and requires every key to appear in a consumer
+  file. A row with no reader fails the suite — which is the failure mode this
+  screen actually has: an operator changes a number, believes something
+  happened, and nothing did.
+- **The default is the environment, and it is written down once.** An override is
+  a row in `settings` (migration 027); **resetting is a DELETE**, and what comes
+  back is the registry's default. A fresh install has an empty table and behaves
+  exactly as the site did before this screen existed.
+
+**How a value travels**
+
+`config.js` reads overrides through getters — `overrides.value('listings.per_page')`
+— so nothing has to know whether a value came from `.env` or the console. That
+also means the numbers the *same* code path uses move together:
+`concierge.slaOptions()` feeds the card on /find-my-car, the price
+`POST /api/service-requests` charges, and the amount on the payment record.
+
+**Prebuilt pages and a changed setting**
+
+A static page has the footer's phone number, the CAC line and the retainer prices
+baked in. So `respond.js` refuses to serve a build that predates the newest
+setting: it renders on request, sets `X-HonestCars-Stale-Build`, and returns to
+the prebuilt file after the next `npm run build:static`. Self-healing, visible in
+a header and in the save flash — and the alternative (a footer quietly showing
+last month's phone number) is exactly the kind of lie this project does not ship.
+
+**What is deliberately absent**
+
+Provider credentials — PSP, SMS, SMTP, GA4, Meta — are not settings and never
+appear on the screen; they are deployment secrets and the panel says so. Same for
+the DB connection and the auth pepper.
+
+**Files**
+
+- `src/lib/settings-schema.js` — the registry, with `parse`/`coerce`/`display`.
+- `src/lib/overrides.js` — the in-memory overrides, `changedSince()` for the
+  stale-build rule.
+- `src/db/settings.js`, `src/services/settings.js` — load, save a group, reset,
+  and the console's view.
+- `db/migrations/027-site-settings.sql` + `db/schema.sql` — one table.
+- `src/routes/admin.js` — `POST /admin/settings/group/:key` and `.../reset`,
+  audited as `settings.updated` / `settings.reset`.
+- `views/pages/admin/settings.ejs` — the four groups, drawn from the registry.
+- `scripts/generate-seed.js` — two changed settings, so a fresh database shows
+  the mechanism.
+- `test/settings.test.js` — 17 tests, fixture build and all.
+
+---
+
+## 3z. Just finished: the company number
+
+`0913 562 6182` is the real number. It lives in `src/lib/settings-schema.js` as
+the registry default (`business.phone` = `+2349135626182`, `business.whatsapp` =
+`2349135626182`), which is the single source every surface reads:
+
+- `tel:` links — footer, `/contact`, `/about`, the report-inspection page;
+- every WhatsApp link and button — the floating button, the header, every form's
+  success state, `public/js/nav.js`, all built from `config.business.whatsapp`;
+- the `AutoDealer` JSON-LD `telephone` in `src/services/seo.js`;
+- the letterhead on all four PDFs — `services/{concierge,invoice,report,statement}.js`
+  all print `phone.pretty(x.phone)`.
+
+**Stored canonical, displayed grouped.** Links must be `+2349135626182`; eyes
+read `+234 913 562 6182`. `src/lib/phone.js` gained `pretty()`, exposed to views
+as `helpers.phonePretty` (`src/lib/locals.js`). Anything it cannot parse is
+printed exactly as given — never mangled into a wrong number. `/admin/settings`
+edits both without a deploy, and `.env.example` carries the real number as the
+template.
+
+**The bug worth remembering:** the `require('../lib/phone')` I first added to
+`concierge.js` landed *inside* `businessInfo()` (where `config` is required
+lazily) instead of at module scope, so the shortlist PDF threw
+`ReferenceError: phone is not defined` and 500ed. The file's own test did not
+catch it; the full-suite options-PDF test did. Assert your anchors, then read
+the whole-suite result — not just the file you touched.
+
+## 3y. The brand mark — done
+
+The company's artwork arrived through GitHub (commit `8910331` on this branch,
+`public/img/logo.png`), because the sandbox destroys uploads: a restore at the
+start of a turn empties `/home/user/uploads/` before the turn runs, and it ate
+this file twice. **Uploads are not a delivery mechanism here; a commit is.**
+
+The master now lives at `assets/brand/logo.png`. `npm run icons` cuts every size
+from it:
+`public/img/logo.png` (header, drawer, console), `public/favicon.png` (tabs —
+`favicon.svg` is retired), `icons/icon-192|512`, `icons/maskable-192|512`,
+`icons/apple-touch-icon.png`, and rewrites `public/manifest.webmanifest`.
+Derived files are committed; `npm run icons:check` byte-compares them.
+
+**The master is gold on transparency** — the black visible in the original
+preview was the viewing backdrop, not the artwork. So where the mark lands
+decides whether it gets a field of its own, and that was settled by looking at
+rendered pixels at the sizes that ship:
+
+| Surface | Field | Why |
+| --- | --- | --- |
+| Header mark (32px chip) | navy, via CSS | the header is white; gold on white loses the laurel, hand and car |
+| Drawer mark | same 32px chip | the drawer header is white too |
+| Console bar mark | none | the bar is already `--colour-navy` (#0E2A47) |
+| Favicon (48px) | navy | a tab strip is light in every browser |
+| `icon-192/512`, maskable, apple-touch | navy, flattened | a launcher wants an opaque square; iOS forces black on transparency |
+| Share cards | none | the card is navy |
+
+The install icons are **flattened**, not merely composited: a PNG with a fully
+opaque alpha channel still declares itself transparent, and a launcher that
+believes it paints the icon on white. `test/brand.test.js` asserts both halves —
+opaque install icons, a transparent in-page mark, and the chip rule that makes
+the transparent one legible.
+
+`masterRatio` is height, because the mark is portrait (~0.81). Maskable is
+deliberately smaller than the any-purpose pair: Android may crop it to a circle
+of 80% of the canvas, and the test walks every pixel of the shipped file against
+that circle rather than trusting the number.
+
+Nothing points at a logo that is not there. `helpers.brandMark`
+(`src/lib/locals.js`) is null exactly when `public/img/logo.png` is absent, so
+each brand block draws the mark when it exists and its inline shield when it
+does not. `views/layouts/admin.ejs` had no favicon at all; it has one now.
+
+`assets/brand/logo.png` is the delivered file, committed as received. The icon
+recipe is code (`scripts/generate-icons.js`), so a future master needs no
+hand-exported PNGs — but note the delivered file is what standard tooling
+writes: **an untouched output of an image tool, not the vector source**. Keep
+the original vector when it turns up; an SVG master would render sharper at
+every size and could be embedded in the OG card directly.
+
+Changing the master is one file plus `npm run icons && npm run build:static` —
+no template, test or CSS edit. The OG card carries the mark above the eyebrow
+line when one exists, and the mark is part of the card's cache key, so a newly
+supplied logo cannot leave stale cards behind.
+
+## 3. Just finished: the OG cards that were clipping every title
+
+**Found while answering "are images still missing?"** — the pictures were all
+fine; two things that *point at* pictures were not.
+
+**The card layout clipped text instead of fitting it.** `cardSvg()` drew one
+`<text>` line per field and let librsvg cut whatever ran past the 1200px edge.
+Anything past about thirty characters was chopped mid-word — which is nearly
+every car in stock ("2018 Toyota Land Cruiser Prado" came out as "…Cruiser
+Prad"), and the site-wide fallback card clipped its own headline. A shared link
+is the first thing a customer sees, and it was arriving broken.
+
+The fix measures rather than guesses. Each distinct word is rendered once at
+100px and trimmed to its ink, and every later decision is arithmetic on that
+number — advance widths are linear in font size, and across Inter the error was
+under 0.1%, so a wrap costs one render per word instead of one per candidate
+layout. Titles take the largest size that fits on one line (keeping the card's
+original geometry exactly), then two, then shrink; the subtitle shrinks; the
+badge pill is measured to its label rather than `label.length * 15 + 62`. A
+title that still will not fit is ellipsised, so a preview never shows half a
+word. `test/og.test.js` parses the SVG, measures every `<text>` with the same
+renderer, and fails if any run ends past the edge.
+
+**The structured-data logo was a 404.** `src/services/seo.js` pointed
+`schema.org/Organization.logo` at `/img/logo.svg`, a file that was never
+created — invisible because the visible logo is an inline icon. It now points
+at `/icons/icon-512.png`, which is generated, committed and checked by
+`npm run icons:check`.
+
+**One subtlety worth keeping:** the fallback card is now re-rendered at boot
+rather than only when missing, and the write is skipped when the bytes match.
+A cached PNG from the previous layout would otherwise keep showing the clipped
+headline forever, which is exactly the kind of fix that looks done and is not.
+
+---
+
+## 3a. Just finished: §12.2 the second factor
+
+**Built in this commit.** §12.2 asks for MFA on the admin roles. The reading
+taken here is narrow and deliberate: the two roles that can *move money or grant
+a role* — `admin` (holds `users.manage`, so it can hand out capabilities,
+including to itself) and `finance` (holds `payments.approve`). Ops, inspectors
+and marketing are not locked out of a shift by it; they may enrol voluntarily,
+and the console says how many colleagues have.
+
+**What it does.** After the phone step, a session for an enrolled account is
+*nothing*: it can open `/login/mfa`, the static shell, and the endpoint that
+answers it. Everything else is a 302 to the challenge (or a 401 JSON for the
+API). The challenge is a plain form — six digits, or one of ten recovery codes
+typed into the same box. Getting it wrong five times kills the session outright
+rather than leaving a first-factor foothold open.
+
+**The decisions that took the longest, and why:**
+
+- **No QR code anywhere.** A QR is the secret drawn as pixels, and drawing it
+  means either a dependency that writes the secret into a data URL or an outside
+  service receiving it. The setup screen prints the key, grouped in fours, with
+  the `otpauth://` URI beside it for anything that can take one. Ten seconds of
+  typing, and the secret never leaves the server and the phone.
+- **Codes are spent where they are compared.** `UPDATE users SET totp_last_step =
+  ? WHERE id = ? AND (totp_last_step IS NULL OR totp_last_step < ?)` — the second
+  request racing with the same code affects no rows. A replay gets "that code has
+  already been used", not "wrong code", because the two send people to different
+  places.
+- **A half-finished enrolment protects nothing.** `totp_confirmed_at` is what
+  counts, and it is set only by a proved code — the same code that then cannot be
+  used to sign in.
+- **One gate, one door.** A required role without a factor may reach
+  `/admin/security` and nothing else; the whole-request gate and the per-route
+  guard read the same `mfaEnrolmentOpen(path)`, so the screen that fixes the
+  problem can never be closed by the rule it exists to satisfy. (It was, for one
+  afternoon, until the suite caught it.)
+- **Recovery codes are rendered, never redirected to.** The first cut sent
+  `/admin/security?codes=…` — a credential in the browser history, the access log
+  and the next request's `Referer`. They appear in exactly one response body.
+- **Losing a phone is an admin act with a reason**, revoking every session that
+  account held and writing to the audit log. Turning the factor off yourself
+  needs a live code; a role that must have one cannot turn off its own at all.
+- **Demo accounts carry seeded secrets** (`db/seed.sql`, and the smokes' copy of
+  them) because this database has to be sign-in-able by a script. A real install
+  has none: everyone enrols their own phone and nobody else holds the key.
+
+**Files**
+
+- `db/migrations/029-admin-mfa.sql` + `db/schema.sql` — `users.totp_secret` /
+  `totp_confirmed_at` / `totp_last_step`, `sessions.mfa_pending` /
+  `mfa_attempts`, `mfa_recovery_codes` (hashes only).
+- `src/lib/totp.js` — RFC 6238, no dependencies, checked against the published
+  vectors.
+- `src/db/mfa.js` — enrolment, the step claim, recovery codes, coverage.
+- `src/services/mfa.js` — policy, the challenge, the console's view.
+- `src/services/{auth,roles,events,icons}.js`, `src/app.js` — the gate, the
+  matrix (`MFA_ROLES`, `staff.security`), the two server-recorded events.
+- `src/routes/auth.js` (`POST /api/auth/mfa`), `src/routes/account.js`
+  (`GET /login/mfa`), `src/routes/admin.js` (`/admin/security` + its four posts,
+  `/admin/staff/:id/mfa/off`).
+- `views/pages/mfa.ejs`, `views/pages/admin/security.ejs`,
+  `public/js/account.js` (`initMfaChallenge`), `public/css/components.css`.
+- `test/mfa.test.js` — 25 tests; `test/helpers.js` gained `enrolMfa` /
+  `completeMfa` for the nine suites that sign in as staff;
+  `scripts/{smoke-roles,cms-smoke}.mjs` complete the challenge, and
+  `scripts/lib/dev-codes.mjs` clears the spent step for a repeat run (never in
+  production).
+
+---
+
+## 3b. Just finished: §18.3 the privacy desk (NDPA)
+
+**Built in this commit.** §18.3's acceptance line — "NDPA consent records exist
+for deal-alert signups; privacy requests actionable in admin" — is a claim about
+paperwork, which is the kind of claim software can satisfy on paper and miss in
+fact. So both halves are built against the way they could be false.
+
+**Requests.** §12.2's self-service rights already worked: `/account/export`
+downloads everything and `/api/account/delete` closes the account and anonymises
+its records. What was missing was a *record* that someone asked. Both paths now
+file themselves as rows the moment they happen — `self_service`, already
+`completed`, with the act written down — deduplicated per person per day, so a
+refresh is not a second request. Anything that arrived by WhatsApp, on the phone
+or over the counter is logged by hand at `/admin/privacy`.
+
+**Two rules live in the data layer, not the view:**
+
+- **A closure carries a human sentence.** `completed` or `refused` with nothing
+  written down is refused by `db/privacy.js`. "Completed" with nothing behind it
+  is what a log of this kind looks like when it is theatre. Reopening a request
+  clears the handler and the closing stamp, so a row cannot be both open and
+  closed.
+- **The clock is the person's.** `requested_at` is when they asked — which may be
+  days before the row exists — and `due_at` is 30 days from *that*, stored rather
+  than computed at render time so a request logged late is visibly late.
+
+**Consent is events, not a flag.** `consent_records` is append-only: the box that
+was ticked, the radio card that was chosen, the switch that was turned off, each
+carrying the wording the person was reading. Withdrawing is a second row, never
+an edit, so the history of what somebody agreed to stays intact. The register of
+wording lives in `src/services/privacy.js`; `test/privacy.test.js` greps the
+views for every sentence and requires every consent checkbox on the site to
+belong to a notice — which is how "consent records exist" stays from quietly
+becoming "for the forms somebody remembered".
+
+**The screen answers the obvious question from where the flag lives.**
+"How many people are on the deal-alert list?" is answered from `users`,
+`saved_cars` and `saved_searches`; the log answers a different question — what
+changed in the last 30 days. Deriving the first from the second would be a
+plausible-looking lie.
+
+**Files**
+
+- `db/migrations/028-privacy-desk.sql` + `db/schema.sql` — `consent_records`
+  (with the wording) and `data_requests` (with the clock).
+- `src/db/privacy.js` — the requests, the events, the counts, and the refusal to
+  close without a sentence.
+- `src/services/privacy.js` — the **register of consent notices**, the
+  self-service filing, and the desk view.
+- `src/routes/admin.js` — `GET /admin/privacy`, `/privacy/requests.csv`,
+  `POST /privacy/requests`, `POST /privacy/requests/:id`, audited.
+- `views/pages/admin/privacy.ejs` — the queue, the log form, the consent tables.
+- Hooks: `src/routes/account.js` (export, erasure, marketing switch, saved cars,
+  saved searches), `src/routes/api.js` (every intake form, checkout, financing),
+  `src/routes/auth.js` + `src/services/auth.js` (sign-in), `src/services/roles.js`
+  (`privacy.view` / `privacy.manage`).
+- `scripts/generate-seed.js` — three requests (one open on its 24th day), six
+  consent events including a withdrawal.
+- `test/privacy.test.js` — 17 tests; `scripts/smoke-roles.mjs` probes the desk
+  for every role including the three it must refuse.
+
+---
+
+## 3c. Just finished: FR-34 financing handoff
+
+**Built in this commit.** FR-34 (COULD): *"financing-lead partner handoff"* — the
+answer to §6.5 step 3, which until now only ever sat in the brief.
+
+**The honesty rule, first, because everything else follows from it**
+
+There is **no rate, no APR, no approval and no "you qualify" anywhere** in the
+service, the page, the messages or the console. What `plan()` does is arithmetic
+the customer can check themselves:
+
+```
+price − down payment = the gap that has to be financed
+gap ÷ months         = what the principal alone costs per month
+```
+
+A payment that does not cover the principal says *"this plan does not add up
+yet"* and names the three levers (bigger down payment, longer tenor, a monthly
+closer to the principal figure). A price fully covered by the down payment is
+answered *"you do not need financing"*. Every answer carries the caveat: *"This
+is arithmetic, not an offer. No credit decision has been made, and no rate is
+implied."* `test/financing.test.js` fails if that ever stops being true.
+
+**What shipped**
+
+- **`db/migrations/026-financing-handoff.sql`** — `finance_partners` (empty by
+  design: the list is ops') and `financing_leads`. `leads.type` gains
+  `'financing'`, so the enquiry is also an inbox item. Reference
+  `HC-FIN-######`, allocated with a retry on the unique key. The `plan` column
+  stores the exact sentences the customer was shown, so a later dispute is
+  answered from the record rather than from memory.
+  **`db/schema.sql` is mirrored — new tables go in both.**
+- **`src/services/financing.js`** — `plan()`, `capture()`, `route()`,
+  `outcome()`, `accountView()`, `desk()`. `READINESS` is the list of what a
+  Nigerian lender usually asks for, phrased as wording rather than a guarantee.
+- **`src/routes/financing.js` + `views/pages/financing.ejs`** — the public page.
+  It works with JavaScript off (a real form); with JavaScript on,
+  `public/js/financing.js` posts to `/api/financing/plan` and prints the
+  server's own sentences back, so there is **one** implementation of the
+  arithmetic and the page cannot disagree with the record. A named car
+  (`?car=`) is priced from the database, gets canonical `/financing` and
+  `noindex,follow`, and is served through `sendPrebuiltOrRender('/financing?car=')`
+  — the deliberately-different path is what stops the hub's prebuilt HTML being
+  handed to a car URL.
+- **The §6.5 handoff** (`src/routes/api.js`) — a concierge brief with
+  `brief.financing === 'yes'` creates the financing lead itself, linked to the
+  `service_request`, using the brief's budget as the amount, and the response
+  carries `financing: { reference, status }` for the success screen. The
+  customer does not fill in a second form. `public/js/service-forms.js` copies
+  the radio's value into the brief — **a radio group contributes nothing to
+  `FormData` when unchecked, and a missing key would silently mean "no"**.
+- **`/admin/financing`** (`src/routes/admin.js`, `views/pages/admin/financing.ejs`) —
+  the partner book (add, activate, switch off) and the queue, with the two
+  states that need acting on kept apart: *waiting on us* (no partner yet) and
+  *routed, no answer yet*. Capabilities `financing.view` (admin/ops/finance) and
+  `financing.manage` (admin/ops); audit actions `financing.partner_added`,
+  `financing.routed`, `financing.<status>`.
+- **`notify.send` gains `mustDeliver`** (`src/services/notify.js`) — the one
+  cross-cutting change. Where the message *is* the handoff, a console sink is not
+  a delivery: it prints, records `skipped` **with the text intact**, and returns
+  `ok:false`. So the console says *"recorded as routed to X, but nothing was
+  delivered"* instead of *"they have the details"*, and the row carries a
+  WhatsApp deep link so ops can send it by hand. A switched-off partner cannot be
+  routed to at all.
+- **`/account`** shows the customer their own enquiry — reference, car, figures,
+  who it went to, and one sentence per state (`STATUS_SENTENCE`) that never says a
+  lender has answered when they have not. The message and the account page share
+  that sentence, so they cannot drift.
+- **Seed** — two lenders (one switched off) and four enquiries, one per state,
+  one linked to the concierge flow, one owned by the demo customer. The VDP
+  carries a link (`/financing?car=<slug>`) with an honest sentence.
+- **`scripts/generate-seed.js` gained `stockAt(n)`** — listing lookups now
+  resolve from the generator's own list instead of a literal stock number. City
+  prefixes move with the market cycle (FR-32), and a literal
+  `'HC-PH-0018'` silently attaches a lead to **nothing** the moment they do.
+  This closed a live bug: seeded leads were pointing at `NULL` listings.
+- **`public/sw.js`** — the module joins the shell; `/js/admin.js` and
+  `/js/dealer.js` leave it, because `/admin` and `/dealer` are bypassed by the
+  worker and those bytes were paid by every visitor for nothing (the FR-30 test
+  already documents them as deliberately absent).
+
+**Config:** `NOTIFY_CHANNEL_FINANCING` in `.env.example` — empty, so it follows
+the general channel.
+
+---
+
+## 3d. Just finished: FR-30 installable PWA
+
+**Built in this commit.** FR-30 (COULD/P3): *"PWA (installable, offline shell,
+push via web notifications)"* — plus §13.2's *"Offline-tolerant PWA shell COULD:
+cached listings shell + queued enquiries that send when back online."*
+
+**What shipped**
+
+- **`scripts/generate-icons.js` → `public/icons/`** — 192/512 "any" icons, a
+  maskable pair whose artwork is inset so Android's circular crop cannot eat it,
+  a 180×180 apple-touch icon, and `public/favicon.svg`. All drawn from the same
+  shield-and-check as `src/services/icons.js`, on the §3.2 navy. `npm run
+  icons` builds them, `npm run icons:check` fails if they drift.
+- **`public/manifest.webmanifest`** — generated by the same script (name,
+  `start_url: /?utm_source=pwa`, scope `/`, standalone, portrait, theme
+  `#0e2a47`, shortcuts to `/cars`, `/sell-swap`, `/account`). Generated, not
+  hand-kept, because a manifest that names a missing icon is simply not
+  installable and nothing tells you.
+- **`public/sw.js`** — four caches, all named from one `VERSION`:
+  - `shell` (29 URLs: the six public stylesheets, the two fonts the layout
+    preloads, the icons, the manifest, every JS module, `/offline`),
+  - `pages` (navigations, network-first with a 6 s ceiling, capped at 24),
+  - `runtime` (CSS/JS/fonts picked up after install, capped at 40),
+  - `assets` (images and video, stale-while-revalidate, capped at 80).
+  It refuses anything that is not a same-origin `GET`; it never answers `/api/`,
+  `/admin`, `/dealer`, `/account`, `/login`, `/checkout`, `/order/` or `/cart/`;
+  and it will not store a response the server marked `private` or `no-store` —
+  the header decides, not a hand-kept path list, so a signed-in page can never
+  be handed to the next visitor.
+- **`views/pages/offline.ejs`** — a real page (buildable, linked, tested,
+  noindex) precached at install, listing what still works on the device and what
+  needs a connection. It says "you are offline"; it does not say "please check
+  your connection", which blames the visitor for our failure to fetch.
+- **`public/js/pwa.js`** — registers the worker after `load` (never in front of
+  first paint), reveals the footer install button only when the browser fires
+  `beforeinstallprompt`, and mentions a newer version once. No auto-reload, no
+  nag. §13.3 forbids app-download nagging; a button that does nothing when the
+  browser has not offered install would be the dishonest option.
+- **No second enquiry queue.** §13.2's queued enquiries are `drafts.js`'s job and
+  have been since it shipped. A background-sync queue inside the worker would be
+  a second, invisible place for a lead to go missing.
+
+**The bug the harness caught.** `public/sw.js` is untestable in Node the normal
+way, so a scratch harness (`/home/user/sw-harness.mjs`, outside the repo) runs it
+against the live server with stubbed caches, `self`, and `Response`/`Request`.
+It found that assets were read from the write cache only: a visitor who installed
+the app and walked out of signal got unstyled pages, because the CSS was in
+`shell` while the handler looked in `runtime`. Reads now check `shell` first
+(`readFromAny`) and write to `runtime`. 12/12 behaviours verified, including
+offline navigation to a cached page, `/offline` for one never opened, offline
+CSS and JS, and the 24-page cap.
+
+**Push is not built and is not pretended.** Web push needs VAPID keys, a push
+service and a consented reason to send; the `docs/GAPS.md` row moved to the
+blocked table rather than being quietly closed. `npm run icons:check` is in the
+gate list below so a renamed asset cannot silently break installability.
+
+---
+
+## 3e. Just finished: FR-29 instant valuation
+
+**Built in this commit.** §6.6's last line: *"Instant estimate widget COULD:
+rough band from pricing DB with 'confirm with free human valuation' CTA."*
+
+What it does:
+
+- **The band is the one the site already trusts.** `src/services/valuation.js`
+  reads `price_bands` (§7.3) through `db.pricing.findBand`, which applies the
+  same rule as the VDP price badge in `db/listings.js` — exact condition beats
+  `any`, most evidence wins a tie. One band, two screens, no drift.
+- **Every answer carries its evidence and its age** — sample size, year range and
+  how long since the refresh are all in the sentence. A band past §7.3's weekly
+  refresh renders in amber with the caveat beside the number.
+- **Mileage is described, never applied.** There is no mileage curve in this
+  database, so the widget prints the median mileage of the live comparable stock
+  (`db.listings.comparablesFor`) beside the seller's figure, says which way that
+  usually moves the price, and says out loud that the human valuation decides.
+- **"No band" is a real answer.** The reply names the year range we do cover, or
+  the models of that make we hold, then hands over to the human valuation. It
+  never invents a number.
+- **One endpoint, one page.** `GET /api/valuation` (rate-limited 30/min,
+  name-shape validated, JSON only) answers; `public/js/valuation.js` renders it
+  with `textContent`; the CTA carries make/model/year/mileage into the intake
+  form below and selects the matching condition radio. The three-step intake
+  still works with JavaScript off — the widget is an upgrade, not the mechanism.
+- **Nothing new is recorded in analytics.** §15.1 has no valuation event and this
+  build does not invent event names; the lead the widget produces does record.
+
+Where the code is: `src/services/valuation.js`, `src/db/pricing.js`
+(`findBand`/`coverageFor`/`modelsFor`), `src/db/listings.js`
+(`comparablesFor`), `src/routes/api.js`, `public/js/valuation.js`,
+`views/pages/sell-swap.ejs`, `public/css/sections.css`, and
+`test/valuation.test.js` (10 tests, each with its own invented model so a fixture
+from one test can never answer another's question).
+
+---
+
+## 3f. Just finished: FR-28 referrals
+
+**Built in this commit.** §7.1 asked for *"Referrals (personal link + reward
+status)"*. The link and the attribution have existed since migration 007 — the
+card on `/account` shows the code, the count and the orders. The **status** was
+the missing half: a referral that counted was a number with no answer to "and
+then what?".
+
+What it does:
+
+- **Two columns and one table** (migration **025**): `users.referral_qualified_at`
+  is the permanent moment a referral started to count, `users.referral_note` is
+  the desk's line on it, and `referral_rewards` carries the decision —
+  `pending → approved → paid`, or `void` with a reason. The unique key
+  `(referrer_id, referred_user_id)` is the honesty constraint: a person counts
+  once, and a sweep that runs twice cannot inflate the queue.
+- **Counting is automatic, paying never is.** `sweep()` finds referred accounts
+  with a paid order and no qualification (the threshold is
+  `REFERRAL_QUALIFY_ORDERS`, default one) and queues a **pending** row with
+  `amount_kobo = 0`. Nothing is promised until a human types an amount on
+  `/admin/referrals`. `npm run referrals [-- --dry-run]` is the cron entry point
+  and prints who would count without writing anything; the button on the console
+  runs the same function.
+- **The desk's page** (capability `referrals.view` = admin/ops/finance,
+  `referrals.reward` = admin/ops) shows the queue, the totals (waiting, approved
+  but unpaid, paid, voided) and the links that worked. Approve / mark paid / void
+  / restore — every transition audited (`referral.*`) with the actor's name, and
+  every customer-facing step announced through `notify` (so an unconfigured
+  channel is recorded `skipped` with its text intact, never dropped).
+- **The customer's card** now says what happened to each person their link
+  brought in: *not counted yet*, *with the desk*, *approved · ₦2,000*, *paid ·
+  ₦2,000 on 12 Oct*, or *voided — reason*. No figure appears until the desk sets
+  one, which is why the reward amount is a form field and not a constant.
+- **The seed exercises every state**: Ngozi (qualified, pending), Emeka (signed
+  up, no order), Ifeoma (qualified, approved and paid), all under Ada's code —
+  and two real paid orders with their payment rows behind them, because a paid
+  order with no payment row is the thing the console flags.
+
+Where the code is: `db/migrations/025-referral-rewards.sql`, `src/db/referrals.js`,
+`src/services/referrals.js`, `scripts/referrals.js`, `src/routes/admin.js`
+(`/admin/referrals` + its POSTs), `views/pages/admin/referrals.ejs`, the
+Referrals card in `views/pages/account.ejs`, and `test/referrals.test.js`
+(11 tests).
+
+**A note on the time it saves:** `sweep()` is idempotent by SQL rather than by
+state in memory, so a cron job, the console button and a manual run can all
+happen in the same minute and the queue still gains one row per person.
+
+---
+
+## 3g. FR-32 multi-city inventory
+
+**Built in this commit.** FR-32 is *"Multi-city inventory structure (Owerri/Aba/
+Benin) with area switcher"*, COULD/P3 — but the PRD's data model already decided
+the important part: *"city / area enum/str ✓ Default Port Harcourt; area list
+admin-managed"*. So this is two things: a city dimension through the inventory,
+and an area list ops owns.
+
+What it does:
+
+- **Markets are rows, not strings.** `service_cities` (slug, name, state,
+  `stock_prefix`, blurb, position, active) and `service_areas` (city, name,
+  position, active), migration **024**. A retired area is `is_active = 0`; the
+  listings that mention it keep mentioning it.
+- **Seeded to be real, not a token listing.** 79 cars now split 43 / 7 / 6 / 7
+  (Port Harcourt / Owerri / Aba / Benin City) across 18 lots — two new lots per
+  expansion market, and the new-city cars are filed under that city's own
+  neighbourhoods. Each market has 10 areas.
+- **Stock numbers run per market:** `HC-PH-0079`, `HC-OW-0080`, `HC-AB-0072`,
+  `HC-BN-0073`. A listing inherits its lot's market (`db.dealers.marketFor`), so
+  a lot can never file a car in a city it does not sit in, and an area-less car
+  falls back to its market, not to Port Harcourt.
+- **The city is governed, never free text.** `?city=owerri` is parsed as a slug,
+  resolved against `service_cities` (`db.areas.cityByToken`) and only then used
+  as a filter; anything else is dropped — `?city=lagoos` is the whole network
+  again, and a hand-edited `<script>` value never reaches SQL.
+- **The rail follows the market.** `db.listings.filterFacets({city})` scopes
+  makes, areas, budget range and counts to the market in view; areas render
+  grouped under a market caption when the whole network is on screen.
+- **Four indexable market pages** (`/cars/port-harcourt`, `/cars/owerri`,
+  `/cars/aba`, `/cars/benin-city`) are curated facets (`page_type = 'city'`,
+  added to the enum), statically built and in the sitemap at priority 0.8. A
+  `?city=owerri` URL with nothing else canonicalises onto `/cars/owerri`.
+- **The switcher** is in the header on every page (drawer copy for phones), with
+  live counts per market. Picking one writes the `hc_city` cookie: the server
+  applies it on /cars when no `?city=` is given (private cache, `Vary: Cookie`,
+  noindex — a preference-shaped page is not the page we index), and
+  `public/js/area.js` labels the control on prebuilt static pages, where Node
+  never runs. No cookie-parser in this build — it is hand-read like
+  `auth.readSessionToken`.
+- **Ops owns the list** at `/admin/settings` (§5.1's settings screen, capability
+  `settings.manage`, admin/ops): add, rename, retire, restore and reorder areas
+  per market, every change audited. A rename is **not** retroactive — the cars
+  keep the old spelling and the desk is told how many — and a separate panel
+  lists cars filed under areas the list does not know about, with a one-click
+  "add to <market>".
+- **Dealer side:** the wizard and edit form suggest the lot's own market's
+  areas, and FR-33's CSV import leaves the area blank rather than assuming Port
+  Harcourt — and warns when a row's area is not on the lot's market list.
+
+Where the code is: `db/migrations/024-service-areas.sql`, `src/db/areas.js`,
+`src/services/area-pref.js`, `views/partials/area-switcher.ejs`,
+`views/pages/admin/settings.ejs`, `public/js/area.js`, plus `city` in
+`src/db/listings.js`, `src/services/listing-query.js`, `src/db/dealers.js`,
+`src/services/imports.js`, `src/routes/{public,api,admin,dealer}.js`,
+`test/areas.test.js` (15 tests) and three route tests in `test/routes.test.js`.
+
+**A latent bug found on the way:** `db.listings.filterFacets` interpolated
+`buildWhere().sql` into eight queries but never passed `buildWhere().params` —
+harmless while every filter in it was empty, and a 1210 the moment a real filter
+(city) arrived. It now takes the WHERE fragment and its params together.
+
+---
+
+## 3h. FR-35 blog enhancements
+
+**Built in this commit.** §6.9 asked for five things on top of the blog that
+existed — author pages, a governed tag taxonomy, a smarter related-posts
+engine, dynamic listing embeds, and an editorial calendar in the CMS.
+
+What it does:
+
+- **A byline is a person.** `blog_authors` is an entity with one bio, so a role
+  change is one edit rather than one per post, and `/blog/author/{slug}` exists
+  to link to. Deleting an author never deletes their work — the FK is ON DELETE
+  SET NULL and the post keeps the printed byline it was published with.
+- **Tags are governed, not free text.** `blog_tags` + `blog_post_tags` sit
+  beside (not on top of) `make_tags`: make tags pull live listings into an
+  article, tags say what the article is *about*. `/blog/tag/{slug}` is a real
+  shelf, and an unused tag is still listed in the console — it is a decision
+  that was made, not a gap.
+- **Related posts rank by what they share** — a shared tag beats a shared
+  category, a shared make beats recency, recency breaks the tie.
+- **`[listing:slug]`** puts one named car into the body as a real card, and
+  renders nothing at all when that car has sold. A dead card is worse than no
+  card.
+- **The editorial calendar** (`/admin/cms/calendar`) is a month at a glance:
+  every post on the day it is due, in its workflow colour, one click into the
+  editor. Publishing twice on a Monday morning is the mistake it prevents.
+- **Saving rebuilds the shelves.** A post that moves between tags or changes
+  author changes three or four pages; `publish.TOUCHES.post` takes
+  `{slug, tagSlugs, authorSlug}` and the console passes all three.
+- **The shelves are static.** Tag and author pages are collections of published
+  posts, so they are exactly as stable as the posts: 53 pages → 68. An empty
+  shelf is skipped, and so is an empty author page in the sitemap.
+
+Where the code is: `db/migrations/021-blog-authors-tags.sql`, `src/db/content.js`,
+`src/db/cms.js`, `src/routes/blog.js`, `src/routes/admin-cms.js`,
+`src/services/blocks.js`, `src/services/sitemap.js`, `src/services/publish.js`,
+`views/pages/blog-tag.ejs`, `views/pages/blog-author.ejs`,
+`views/pages/admin/cms-calendar.ejs`, `test/blog-tags.test.js` (12 tests).
+
+**Also fixed, found by building a database from empty for the first time:**
+`db/schema.sql` created `hire_bookings` before `service_requests` and
+`hire_incidents` before `payments`, so a fresh `npm run db:setup` failed with
+`ER_CANNOT_ADD_FOREIGN`. Every existing database was unaffected because
+migration 020 adds the same objects after the targets exist — which is exactly
+why nobody had seen it.
+
+**Next in order:** FR-34 financing handoff, then the rest of the
+`/admin/settings` groups (§18.3 privacy requests and §12.2 admin MFA are the
+other buildable rows).
+`docs/GAPS.md` is canonical: 21 rows — 5 buildable here, 9 blocked on an account
+(FR-30's push half is one), 7 with no home in this sandbox.
+
+## 3x. Running it on a laptop
+
+`docs/RUN-LOCALLY.md` is the guide: prerequisites (Node 20+, one MySQL),
+`docker-compose.yml` for the Docker path, the seeded sign-in numbers, the
+admin/finance second factor, and a symptom→cause table. `README.md`'s quick
+start points there.
+
+Two facts worth keeping:
+
+- **There is no build step.** The site renders every page on demand, so
+  `npm install && npm run db:setup && npm start` is the whole laptop path —
+  verified by moving `dist/` aside and curling `/`, `/cars`, `/contact`, `/shop`
+  (all 200). `npm run build:static` is only the speed-up that fills `dist/`.
+- **`docker-compose.yml` is for local testing, not deployment.** It is a MySQL
+  container whose credentials already match `.env.example`, so `cp
+  .env.example .env` needs no editing beyond `DB_ADMIN_PASSWORD=honestcars-root`.
+  The production Dockerfile is still on `docs/GAPS.md`.
+
+### The phpMyAdmin route (XAMPP)
+
+Most people testing this have XAMPP, which means MariaDB and phpMyAdmin rather
+than a terminal. That path is **Option A** in the guide: create the database in
+phpMyAdmin, import `db/schema.sql` then `db/seed.sql`, set `.env` to XAMPP's
+defaults (`root`, blank password, port 3306) and `npm start`. No migration step,
+and no `npm run db:setup`.
+
+That route is only sound while `db/schema.sql` describes the *current* database
+— it is the phpMyAdmin path's entire schema. Verified by doing exactly it on an
+empty database: both files imported, 56 tables + 3 views, 79 listings, then the
+app booted against it, signed in as admin, and reached the MFA challenge. A new
+test in `test/migrations.test.js` fails if a migration ever creates a table that
+`schema.sql` does not also create, so the route cannot rot silently.
+
+XAMPP specifics worth keeping: it is **MariaDB**, which the code already
+anticipated (`src/db/pool.js`, `src/db/shape.js`); every JSON function in use
+(`JSON_ARRAY`, `JSON_EXTRACT`, `JSON_OBJECT`, `JSON_UNQUOTE`) is MariaDB 10.2+
+and XAMPP ships 10.4; phpMyAdmin's 2 MB default import limit is far above the
+80 kB + 380 kB the two files take.
+
+The terminal route with XAMPP credentials was verified too — `DB_USER=root`,
+blank password, database absent: `npm run db:setup` created it, applied 28
+migrations and loaded the seed.
+
+### The bug that found: migrations must never run on a current database
+
+Second one, and worse than the first. The guide told laptop users that after a
+pull they should run `npm run db:setup` to pick up a new table. On a database
+built by importing `schema.sql` by hand — the phpMyAdmin route — that command
+**rewound the schema and truncated data**:
+
+    ✗ setup failed: WARN_DATA_TRUNCATED Data truncated for column 'purpose' at row 12
+
+`db/schema.sql` is the *state* of the database. `db/migrations/` is the path an
+older database takes to reach it, and a path passes through intermediate shapes
+that are sometimes narrower than the destination: `020-hire-management.sql`
+narrows `payments.purpose` to an enum without `'addon'`, which `022` adds back.
+Replaying the series against a database that is already current moves it
+*bacwards* through that narrowing, and MySQL truncates the rows that use the
+value the intermediate shape does not know. It only ever passed on an empty
+database here, where there were no rows to truncate — luck, not correctness.
+
+Both runners now decide, before touching the migrations:
+
+    has the database ever run one?   (a schema_migrations row)
+      yes → run the pending ones          (the genuine upgrade path)
+      no  → compare the database against db/schema.sql
+              matches    → record every migration as applied, execute none
+              does not   → refuse, name what is missing, and say to rebuild
+
+`scripts/lib/schema-state.js` does the comparison (tables, columns and views, by
+parsing `schema.sql`). `migrate.js` asks *before* it creates `schema_migrations`,
+because creating it destroys the very signal the question needs. Exit code 1 on
+refusal, so a script can rely on it.
+
+Seven scenarios verified against real databases: hand-import then db:setup
+(data preserved — the `addon` rows survive and the enum keeps its value); empty
+database; the normal history path, unchanged; a stale hand-import with and
+without history (both refuse, one naming the raw error as well as the gap);
+`db:migrate` on a hand-imported database (records, executes nothing);
+`db:migrate --list`; and `db:migrate` on an empty one (says to run db:setup).
+
+One parser trap worth remembering: a wrapped definition — `CONSTRAINT …
+FOREIGN KEY (x)` on one line and `REFERENCES y (z)` on the next, or an enum with
+its `NOT NULL` on the following line — read as columns named `references` and
+`not`, which made a perfectly current database look like it was missing thirteen
+columns. A definition now only starts on a line following a comma.
+
+### The bug that found: migrations hardcoded the database name
+
+`db/migrations/012-dealer-ledger.sql` and `013-cms.sql` opened with `USE
+honestcars;`. On any install whose database is named anything else, that
+switches the *session* — so the rest of the file ran against a different
+database, and so did the `INSERT INTO schema_migrations` that records it.
+`npm run db:setup` died with `ER_DUP_ENTRY Duplicate entry
+'012-dealer-ledger.sql'`, which says nothing about the cause. It only ever
+worked here because this sandbox's database happens to be called `honestcars`.
+
+Fixed at both ends: the two `USE` lines are gone, both runners share
+`scripts/lib/sql-statements.js` which drops any `USE` statement rather than
+passing it on, and `test/migrations.test.js` fails if a migration file contains
+one. Verified by running the guide's commands on an empty database called
+`honestcars_laptop` — 28 migrations, seed loaded, pages served — and then
+dropping it.
+
+## 4. Conventions that are not negotiable
+
+- **Money** in kobo, integer, through `src/lib/money.js`. Phones through
+  `src/lib/phone.js` (`variants()` for lookups — never a raw `0808…` match).
+- **Listing identity** is `seo_slug`; `vehicle_listings` has no `slug` column.
+- **No locals key named `page`**; `defaultPage()` owns title/robots/og/jsonLd.
+- **Admin chrome:** `done(res, path, msg, { error, params })` → 303 with `?ok`/`?err`.
+  Role gates come from `src/services/roles.js` — never a role string inline.
+- **§15.1 event names verbatim.** `EVENT_NAMES` is a `Set`; the client payload
+  allowlist in `src/services/events.js` silently drops anything not listed
+  (`save_data`, `video_duration`, `video_size`, `blur_up` were added for §13.2).
+- **`src/**` and `views/**` do not hot-reload.** Restart the site process after
+  editing them, then re-verify — a stale process once produced a 500 that did not
+  exist on disk.
+- **`node --check` cannot parse `public/js/*.js`** (they are ES modules) — use
+  `npm run lint`. Backticks inside `scripts/generate-seed.js` break its template
+  literal; escape them and re-check.
+- **Tests** (`node:test`) skip themselves when MySQL is unreachable. They must not
+  read `dist/`. Mint sessions directly rather than signing in via OTP — OTP tests
+  leak `auth_codes` and `otp_*` rows nothing can clean up.
+- **The service worker (FR-30)** must never cache what the server marked
+  `private`/`no-store`, must never answer `/api/`, `/admin`, `/dealer`,
+  `/account` or checkout, and must not grow a second enquiry queue — that is
+  `public/js/drafts.js`'s job. A new CSS or JS file belongs in `SHELL_URLS`; if
+  you forget, `test/pwa.test.js` fails rather than shipping a page that loads
+  unstyled offline. Console assets (`admin.css`, `admin.js`, `dealer.js`) are the
+  deliberate exceptions.
+
+## 5. Gates before any commit
+
+```bash
+npm test          # 458/458 (17 privacy, 17 settings, 24 financing, 15 areas, 16 imports, 11 referrals, 11 pwa …)
+npm run lint      # type ladder + 18 ES modules / 75 event references
+npm run build:static && npm run crawl && npm run audit:pages
+npm run smoke && npm run smoke:cms      # role matrix + CMS round trip
+npm run images:check && npm run videos:check && npm run icons:check
+```
+
+`crawl` must report 0 broken links; `audit:pages` 0 findings.
+
+Two cron-style sweeps run outside the request path, and both are also buttons in
+the console: `npm run alerts` (FR-25 price/new-match alerts) and `npm run
+referrals` (FR-28 — counts referrals that have earned it; `-- --dry-run` prints
+who would count and writes nothing).
+
+## 6. Housekeeping
+
+- **PR #1** is open on purpose — the user tests from it. **Do not merge** until they
+  sign off. Comment substantive changes there.
+- Regenerating media: images `generate_image` → `npm run images` → `db:seed`;
+  video needs `npm i --no-save @ffmpeg-installer/ffmpeg` after a wipe, then
+  `node scripts/generate-videos.js`. The committed media works without ffmpeg.
+- The sandbox wipes between sessions: HEAD resets, `node_modules`, `.env` and MySQL
+  go. `bash scripts/sandbox/recover.sh` restores all of it from the pushed branch —
+  which is why every green step is committed and pushed immediately.
+- Wipe #9 (2026-10-06) left the working tree intact and only reset HEAD: recover
+  with `git fetch origin arena/01a0f7df-honest-cars-ltd && git reset --mixed
+  FETCH_HEAD`, then `bash scripts/sandbox/bootstrap.sh`, start MySQL **with a
+  process tool** (`bash scripts/sandbox/mysql-start.sh` — run from a one-shot
+  shell it dies with the shell), `node scripts/db-setup.js`, `npm run build:static`.
+- **Prebuilt pages carry settings.** After changing a business fact in the console
+  the build is stale: the server renders on request (`X-HonestCars-Stale-Build`)
+  until `npm run build:static` runs again. If a footer looks old in a screenshot,
+  that is the reason — rebuild, do not chase the template.
+- **A fully clean `db:setup` was verified on 2026-10-06** on a freshly initialised
+  data directory: schema, then all 25 migrations in order (including 025's plain
+  `ALTER TABLE`, the one that had no `IF NOT EXISTS`), 79 listings, 44 service
+  areas, `referral_rewards` present. The migration-ordering risk flagged before
+  FR-28 is retired.
+
+## 7. Dead ends — do not retry
+
+- The referenced Next.js repo (`RaphNicks/honest-cars-ltd` @ `c765c8a`,
+  `src/app/globals.css`) **does not exist**; the PDF is the design source of truth.
+- **`config.js` is getters over the settings registry now** — `config.listings.perPage`
+  reads `overrides.value('listings.per_page')`. Do not assign to a config value
+  (a test that did got away with it until the getter arrived), and do not read one
+  at module load: `const perPage = config.listings.perPage` at the top of a file
+  freezes the value before `settings.hydrate()` has run.
+- **A consent checkbox that the register does not know about fails the suite.**
+  Add the wording to `NOTICES` in `src/services/privacy.js` *and* keep the
+  sentence in the view byte-identical — the test compares whitespace-collapsed
+  text, so a rewrapped line is fine and a reworded one is not.
+- **Renaming a `purpose` value means three files and a re-seed:** the migration,
+  `db/schema.sql` (whose mirror has its own copy), `db/privacy.js`, the seed, and
+  then `npm run db:seed`. A column that is correct in the schema and wrong in
+  `db/seed.sql` fails as `WARN_DATA_TRUNCATED … at row 4`, which reads like an
+  enum problem rather than a stale seed.
+- **`scripts/generate-seed.js` is one template literal.** Any backtick added
+  inside it (`` \`users\` ``, a `` `code` `` sample) must be escaped as `\``, or the
+  literal ends early and the next `${...}` becomes a JS syntax error hundreds of
+  lines later. This has now bitten twice — once on financing, once on settings.
+- **A radio group contributes nothing to `FormData` when unchecked.** The
+  concierge's "do you need financing?" is a radio pair, so `buildPayload` has to
+  copy `values.financing` across explicitly — a missing key reads as "no" and the
+  answer is silently dropped. (Pre-filling one is the same trap from the other
+  side: set `checked` per radio, never `.value`.)
+- **Seed lookups by stock number must go through `stockAt(n)`.** The city prefix
+  follows the market cycle (FR-32), so a literal `'HC-PH-0018'` in a subquery
+  returns `NULL` the moment that car moves to Benin — and the lead it was meant to
+  attach to is seeded with no car at all, silently.
+- **`INSERT … SET ?` is invalid under `pool.execute`** — explicit column list plus
+  `COLUMNS.map(() => '?')`. And MySQL 5.7 has no `RETURNING`; `::SIGNED` is
+  Postgres.
+- `honestcarsltd.com` does not resolve; no headless browser is available. Also
+  no PDF rasteriser (`pdftoppm`/`gs`/`mutool` are absent and ImageMagick's PDF
+  coder is disabled by policy), so a PDF's *appearance* cannot be verified here
+  — only its text and structure. The OG cards are PNGs and can be looked at.
+- **A migration must never contain `USE <database>;`.** The session is already on
+  the right database; a `USE` silently moves it, taking the `schema_migrations`
+  row with it. Add the file to `db/migrations/` and let the runner connect.
+- **Uploads do not survive a sandbox restore.** `/home/user/uploads/` is emptied
+  before the next turn runs, and the file cannot be reconstructed from the
+  message it arrived in. If an attachment is missing, ask for it again; for the
+  logo, ask for it as `logo.png` so it needs no renaming before `npm run icons`.
+- Two consecutive pushes to this branch can non-fast-forward:
+  `git fetch origin arena/01a0f7df-honest-cars-ltd` + `git reset --mixed FETCH_HEAD`,
+  keep the tree, re-commit.
+- In this sandbox only the npm registry is reachable, and MySQL 5.7 is built from
+  the `mysql-server-5.7-lin-x64` tarball by `scripts/sandbox/`.

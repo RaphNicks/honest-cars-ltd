@@ -1,0 +1,147 @@
+<%#
+  Order confirmation — §6.8 “order confirmation + WhatsApp notification”. Private
+  (noindex, not cached): it carries the buyer’s details.
+%>
+<section class="page-hero">
+  <div class="container">
+    <%- include('../partials/breadcrumbs', { crumbs: trail }) %>
+    <p class="eyebrow">Order confirmed</p>
+    <h1 class="mb-1">Thank you, <%= order.name.split(' ')[0] %></h1>
+    <p class="reference-big mb-2"><%= order.orderNo %></p>
+    <p class="page-hero__meta">
+      <span class="badge badge--verified"><%= order.status.replace(/_/g, ' ') %></span>
+      <span>Placed <%= helpers.relativeDays(order.createdAt) %></span>
+      <span>Delivery: <%= order.deliveryArea %></span>
+    </p>
+  </div>
+</section>
+
+<section class="section">
+  <div class="container">
+    <div class="grid grid--2" style="align-items:start">
+      <div class="card card__body">
+        <h2 class="mb-1">What you ordered</h2>
+        <div class="table-wrap">
+          <table class="table">
+            <caption class="visually-hidden">Order lines</caption>
+            <thead>
+              <tr><th scope="col">Item</th><th scope="col">Qty</th><th scope="col">Line total</th></tr>
+            </thead>
+            <tbody>
+              <% order.items.forEach(function (item) { %>
+                <tr>
+                  <th scope="row">
+                    <%= item.name %>
+                    <% if (item.installRequested) { %><br><span class="badge badge--ghost">Installation requested</span><% } %>
+                  </th>
+                  <td><%= item.qty %></td>
+                  <td><%= helpers.formatNaira(item.lineTotalKobo) %></td>
+                </tr>
+              <% }); %>
+            </tbody>
+          </table>
+        </div>
+
+        <dl class="summary-list mt-2">
+          <div class="summary-list__row"><dt>Subtotal</dt><dd><%= helpers.formatNaira(order.subtotalKobo) %></dd></div>
+          <div class="summary-list__row"><dt>Delivery — <%= order.deliveryArea %></dt><dd><%= order.deliveryFeeKobo ? helpers.formatNaira(order.deliveryFeeKobo) : 'Free' %></dd></div>
+          <div class="summary-list__row"><dt>Total</dt><dd><strong><%= helpers.formatNaira(order.totalKobo) %></strong></dd></div>
+        </dl>
+
+        <% if (pendingPayment) { %>
+          <div class="panel panel--pay mt-3">
+            <h2 class="panel__title">How to pay <%= helpers.formatNaira(order.totalKobo) %></h2>
+            <p class="mb-2">
+              Transfer to the account below and use the payment reference as the narration. Your order stays
+              <em>pending payment</em> until the money lands — nothing was charged on this page.
+            </p>
+            <dl class="summary-list">
+              <div class="summary-list__row"><dt>Account name</dt><dd><%= bank.name %></dd></div>
+              <div class="summary-list__row"><dt>Bank</dt><dd><%= bank.bank %></dd></div>
+              <div class="summary-list__row"><dt>Account number</dt><dd class="tabular"><strong><%= bank.account %></strong></dd></div>
+              <div class="summary-list__row"><dt>Amount</dt><dd class="tabular"><strong><%= helpers.formatNaira(pendingPayment.amountKobo) %></strong></dd></div>
+              <div class="summary-list__row"><dt>Payment reference</dt><dd class="tabular"><strong><%= pendingPayment.reference %></strong></dd></div>
+            </dl>
+            <p class="field__hint mb-0"><%= bank.note %></p>
+          </div>
+        <% } else if (payments.length && payments[0].status === 'paid') { %>
+          <div class="panel panel--paid mt-3">
+            <h2 class="panel__title">Paid in full — thank you</h2>
+            <p class="mb-0">
+              <%= helpers.formatNaira(payments[0].amountKobo) %> received against
+              <span class="tabular"><%= payments[0].reference %></span>. A receipt lives on your account page
+              (<a href="/account">sign in with this phone number</a>), and we will confirm the delivery or install slot on
+              WhatsApp.
+            </p>
+          </div>
+        <% } else if (payments.length && payments[0].refundKobo) { %>
+          <div class="panel mt-3">
+            <h2 class="panel__title">Refunded</h2>
+            <p class="mb-0">
+              <%= helpers.formatNaira(payments[0].refundKobo) %> went back to you against
+              <span class="tabular"><%= payments[0].reference %></span><%= payments[0].refundReason ? ` — ${payments[0].refundReason}` : '' %>.
+            </p>
+          </div>
+        <% } %>
+
+        <% if (order.notes) { %>
+          <p class="field__hint mt-2 mb-0">Your note: “<%= order.notes %>”</p>
+        <% } %>
+      </div>
+
+      <aside class="stack">
+        <div class="card card__body">
+          <h2 class="mb-1">What happens next</h2>
+          <ol class="steps steps--compact">
+            <li class="step"><span class="step__num">1</span><div><strong>Ops confirms stock</strong><p class="mb-0">Usually within working hours — on the WhatsApp number you gave.</p></div></li>
+            <li class="step"><span class="step__num">2</span><div><strong>Payment link or transfer details</strong><p class="mb-0">The order stays <em>pending payment</em> until it clears. Nothing was charged on this page.</p></div></li>
+            <li class="step"><span class="step__num">3</span><div><strong>Delivery or install slot</strong><p class="mb-0"><%= order.deliveryArea %>, or a booked install if the item is a tracker.</p></div></li>
+          </ol>
+          <a class="btn btn--primary btn--block" href="<%= site.nav.whatsapp.general %>" target="_blank" rel="noopener"
+             data-event="whatsapp_click" data-source="order_confirmation">Confirm on WhatsApp</a>
+          <p class="field__hint mb-0">Quote <strong><%= order.orderNo %></strong> so nobody has to ask again.</p>
+        </div>
+
+        <% if (subscriptions.length) { %>
+          <div class="card card__body">
+            <h2 class="mb-1">Tracker subscription created</h2>
+            <p class="mb-2">
+              A subscription record opens automatically with every tracker — device installed, platform
+              activated, renewal date set a year out. You get the checklist states as they happen.
+            </p>
+            <ul class="tick-list">
+              <% subscriptions.forEach(function (sub) { %>
+                <li class="tick-list__yes"><%- helpers.icon('check', { size: 16 }) %>
+                  <span>
+                    <%= sub.productName %> — <%= sub.deviceState.replace(/_/g, ' ') %>
+                    <% if (sub.renewalAt) { %>(renews <%= new Date(sub.renewalAt).toLocaleDateString('en-NG', { day: 'numeric', month: 'short', year: 'numeric' }) %>)<% } %>
+                  </span>
+                </li>
+              <% }); %>
+            </ul>
+          </div>
+        <% } %>
+
+        <div class="card card__body">
+          <h2 class="mb-1">Keep this order</h2>
+          <p class="mb-2">This page is the receipt; it is private and will not appear in search. Save the link, or open it later from your account (phase 2).</p>
+          <button class="btn btn--secondary btn--block" type="button" data-copy-link>Copy this page’s link</button>
+        </div>
+      </aside>
+    </div>
+  </div>
+</section>
+
+<section class="section section--surface">
+  <div class="container">
+    <div class="section-head">
+      <h2>Often bought with this</h2>
+      <a class="section-head__link" href="/shop">All products →</a>
+    </div>
+    <div class="btn-row">
+      <a class="btn btn--primary" href="/services/tracking">Tracker installation &amp; renewal</a>
+      <a class="btn btn--secondary" href="/services/inspection">Book an inspection</a>
+      <a class="btn btn--ghost" href="/services/parts">Source a part by VIN</a>
+    </div>
+  </div>
+</section>

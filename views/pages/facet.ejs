@@ -1,0 +1,60 @@
+<%#
+  Curated facet page — §14.1. Built statically (`npm run build:static`) with its
+  own H1, intro copy, canonical and indexable robots. Raw filter combinations
+  never reach this template: they render /cars with noindex instead.
+  Locals: facet, trail, result, facets, filters, models, basePath, queryString,
+          activePills, nearMatches, siblings, hiddenQuery
+%>
+<section class="container">
+  <%- include('../partials/breadcrumbs', { crumbs: trail }) %>
+
+  <div class="facet-hero">
+    <h1 class="facet-hero__h1"><%= facet.h1 %></h1>
+    <p class="facet-hero__intro"><%= facet.introCopy %></p>
+
+    <div class="facet-hero__facts">
+      <span class="trust-chip"><%- helpers.icon('car', { size: 16 }) %><strong><%= result.total %></strong> cars right now</span>
+      <span class="trust-chip"><%- helpers.icon('checkCircle', { size: 16 }) %><strong><%= certifiedCount %></strong> certified</span>
+      <% if (facet.rules.max_price_kobo) { %>
+        <span class="trust-chip"><%- helpers.icon('gauge', { size: 16 }) %>Under <strong><%= helpers.formatNaira(facet.rules.max_price_kobo) %></strong></span>
+      <% } %>
+    </div>
+
+    <% if (siblings.length) { %>
+      <div class="facet-links">
+        <% siblings.forEach(function (sibling) { %>
+          <a class="chip" href="<%= sibling.canonicalPath %>"><%= sibling.title %></a>
+        <% }); %>
+      </div>
+    <% } %>
+  </div>
+
+  <%- include('../partials/browse', {
+        result: result, facets: facets, filters: filters, models: models,
+        basePath: basePath, queryString: queryString, activePills: activePills,
+        nearMatches: nearMatches, hiddenQuery: hiddenQuery, locationLabel: locationLabel
+      }) %>
+</section>
+
+<% if (facetFaqs.length) { %>
+  <section class="section section--surface" aria-labelledby="facet-faq-heading">
+    <div class="container">
+      <h2 id="facet-faq-heading">Questions about this search</h2>
+      <%- include('../partials/accordion', { faqs: facetFaqs, idPrefix: 'facet-faq' }) %>
+    </div>
+  </section>
+<% } %>
+
+<section class="section">
+  <div class="container">
+    <div class="surface-panel">
+      <div class="row row--between">
+        <div>
+          <h2 class="mb-0">Want us to shortlist for you?</h2>
+          <p class="mb-0 note-inline">Tell us the brief once — we inspect and compare up to 3 options within 48–72 hours.</p>
+        </div>
+        <a class="btn btn--primary" href="/find-my-car" data-event="concierge_started" data-source="facet:<%= facet.slug %>">Find It For Me</a>
+      </div>
+    </div>
+  </div>
+</section>

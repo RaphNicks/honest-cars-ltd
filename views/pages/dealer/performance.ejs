@@ -1,0 +1,139 @@
+<%
+/**
+ * Performance — §7.2 “views, enquiries, response-time scorecard, freshness
+ * score + nudge when stale >14 days”.
+ *
+ * Deliberately plain: three numbers a lot can act on today, and the list of
+ * cars that need a refresh, oldest first.
+ * Locals: performance
+ */
+var t = performance.totals;
+var r = performance.response;
+var stale = performance.freshness.filter(function (row) { return row.daysSinceUpdate === null || row.daysSinceUpdate > 14; });
+var rate = performance.enquiryRate;
+var rateCopy = rate >= 0.03 ? 'Healthy — the photos and the price are working'
+  : rate >= 0.015 ? 'Fair — worth a price check on the quiet cars'
+    : 'Thin — most viewers leave without asking. Photos and price are the usual reasons';
+%>
+
+<div class="admin-grid admin-grid--4">
+  <div class="kpi kpi--sm">
+    <span class="kpi__label">Views</span>
+    <strong class="kpi__value tabular"><%= t.views.toLocaleString('en-NG') %></strong>
+    <span class="kpi__foot">last 7 days: <%= t.views7d.toLocaleString('en-NG') %></span>
+  </div>
+  <div class="kpi kpi--sm">
+    <span class="kpi__label">Enquiries</span>
+    <strong class="kpi__value tabular"><%= t.enquiries %></strong>
+    <span class="kpi__foot"><%= t.saves %> saves across <%= t.listings %> listings</span>
+  </div>
+  <div class="kpi kpi--sm">
+    <span class="kpi__label">Enquiry rate</span>
+    <strong class="kpi__value tabular"><%= (rate * 100).toFixed(1) %>%</strong>
+    <span class="kpi__foot">of everyone who opened a listing</span>
+  </div>
+  <div class="kpi kpi--sm">
+    <span class="kpi__label">Average reply time</span>
+    <strong class="kpi__value tabular"><%= r.avgHours === null ? '—' : r.avgHours + 'h' %></strong>
+    <span class="kpi__foot"><%= r.answered %> answered · <%= r.unanswered %> waiting</span>
+  </div>
+</div>
+
+<div class="admin-grid admin-grid--2 mt-3">
+  <section class="panel">
+    <div class="panel__head">
+      <h2 class="panel__title">Response scorecard</h2>
+      <span class="cms-hint"><%= r.verdict %></span>
+    </div>
+    <% if (r.avgHours === null) { %>
+      <p class="empty-line">No enquiry has been answered yet, so there is nothing to score.</p>
+      <p class="mb-0"><a class="btn btn--primary btn--sm" href="/dealer/leads">Open the leads inbox</a></p>
+    <% } else { %>
+      <p class="mb-1"><strong><%= r.verdict %></strong></p>
+      <p class="mb-0">
+        Answers go out on average <strong><%= r.avgHours %> hours</strong> after the buyer writes.
+        <% if (r.avgHours > 24) { %>
+          Past a day, most buyers have already called another lot — even when your car is the better one.
+        <% } else if (r.avgHours > 4) { %>
+          Inside a day is acceptable. Inside a few hours is where deals actually come from.
+        <% } else { %>
+          That is the behaviour that wins the sale, and it is visible in the lead history.
+        <% } %>
+      </p>
+      <p class="muted mb-0"><%= r.answered %> of <%= t.enquiries %> enquiries carry an answer, so the average is honest about the ones still waiting.</p>
+    <% } %>
+  </section>
+
+  <section class="panel">
+    <div class="panel__head">
+      <h2 class="panel__title">Enquiry rate, plainly</h2>
+      <span class="cms-hint">views that turn into a conversation</span>
+    </div>
+    <p class="mb-1"><strong><%= rateCopy %>.</strong></p>
+    <ul class="mini-list">
+      <li><strong>Under 1%</strong> — usually photos or a price that is above the market band.</li>
+      <li><strong>1–3%</strong> — normal for a well-listed used car in Port Harcourt.</li>
+      <li><strong>Over 3%</strong> — the car is priced to move; answer fast and it will.</li>
+    </ul>
+    <p class="muted mb-0">Views are counted once per visitor per day. Enquiries are genuine form submissions, not clicks.</p>
+  </section>
+</div>
+
+<section class="panel mt-3">
+  <div class="panel__head">
+    <h2 class="panel__title">Freshness scorecard</h2>
+    <span class="cms-hint">
+      <%= stale.length ? stale.length + ' car' + (stale.length === 1 ? '' : 's') + ' need a refresh' : 'everything refreshed inside a fortnight' %>
+    </span>
+  </div>
+
+  <% if (!performance.freshness.length) { %>
+    <p class="empty-line">No live cars to score yet.</p>
+  <% } else { %>
+    <div class="table-scroll">
+      <table class="table">
+        <caption class="visually-hidden">Live listings, oldest update first</caption>
+        <thead>
+          <tr>
+            <th scope="col">Car</th>
+            <th scope="col">Last touched</th>
+            <th scope="col">Interest</th>
+            <th scope="col">Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% performance.freshness.forEach(function (row) { %>
+            <tr>
+              <th scope="row">
+                <a href="/dealer/listings/<%= row.id %>"><%= row.title %></a>
+                <span class="listing-row__meta"><%= row.stockNo %> · <%= helpers.formatNaira(row.priceKobo) %></span>
+              </th>
+              <td class="<%= row.daysSinceUpdate === null || row.daysSinceUpdate > 14 ? 'warn' : '' %>">
+                <% if (row.daysSinceUpdate === null) { %>
+                  never confirmed
+                <% } else if (row.daysSinceUpdate === 0) { %>
+                  today
+                <% } else { %>
+                  <%= row.daysSinceUpdate %> day<%= row.daysSinceUpdate === 1 ? '' : 's' %> ago
+                <% } %>
+                <% if (row.daysSinceUpdate === null || row.daysSinceUpdate > 14) { %>
+                  <br><span class="muted">stale — buyers scroll past it</span>
+                <% } %>
+              </td>
+              <td class="muted tabular"><%= row.views.toLocaleString('en-NG') %> views · <%= row.enquiries %> enquiries</td>
+              <td>
+                <form method="post" action="/dealer/listings/<%= row.id %>/fresh">
+                  <button class="btn btn--secondary btn--sm" type="submit">Still available</button>
+                </form>
+              </td>
+            </tr>
+          <% }); %>
+        </tbody>
+      </table>
+    </div>
+    <p class="cms-hint mt-2">
+      “Still available” restarts the clock. If a car has genuinely not changed, a price review is the
+      refresh that matters — buyers filter on price far more than on description.
+    </p>
+  <% } %>
+</section>

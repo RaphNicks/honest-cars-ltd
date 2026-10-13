@@ -1,0 +1,11 @@
+<%# Fragment: the card grid only — returned by GET /api/listings for the AJAX
+    filter update (§6.2 “no full-page reloads”). Same partial as SSR. %>
+<% if (result.listings.length === 0) { %>
+  <div style="grid-column: 1 / -1">
+    <%- include('../partials/empty-state', { nearMatches: nearMatches || 0 }) %>
+  </div>
+<% } else { %>
+  <% result.listings.forEach(function (listing, index) { %>
+    <%- include('../partials/car-card', { listing: listing, helpers: helpers, eager: index < 3 }) %>
+  <% }); %>
+<% } %>

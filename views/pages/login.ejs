@@ -1,0 +1,117 @@
+<%#
+  /login — customer-only email OTP or Google sign-in. Staff use the separate
+  admin host; dealer sign-in has its own portal route.
+  Locals: next, reason, ref, save, authErrorMessage, googleReady, otp
+%>
+<section class="page-hero">
+  <div class="container container--narrow">
+    <% if (trail) { %><%- include('../partials/breadcrumbs', { crumbs: trail }) %><% } %>
+    <p class="eyebrow">Account</p>
+    <h1>Sign in or create your account</h1>
+    <p class="lead">
+      Use your email and a one-time code, or continue with Google. You do not need a phone number to open an account.
+    </p>
+  </div>
+</section>
+
+<section class="section">
+  <div class="container container--narrow">
+    <% if (reason === 'expired') { %>
+      <p class="auth-message auth-message--banner" data-state="error">
+        Your session ended, so we asked you to sign in again. Nothing was lost.
+      </p>
+    <% } %>
+    <% if (authErrorMessage) { %>
+      <p class="auth-message auth-message--banner" data-state="error"><%= authErrorMessage %></p>
+    <% } %>
+
+    <div class="auth-card" data-auth-card data-next="<%= next %>" data-ref="<%= ref %>" data-save="<%= save || '' %>">
+      <div data-auth-panel="email">
+        <form class="auth-form mt-3" data-auth-step="email" action="/api/auth/email/otp" method="post" novalidate>
+          <h2 class="mb-1">Your details</h2>
+          <p class="note-inline">New here? We will create your customer account after you verify your email. Returning customers can use the same code sign-in.</p>
+
+          <% if (ref) { %>
+            <p class="note-inline">
+              Invitation code <strong class="tabular"><%= ref %></strong> — it is recorded on your account when you sign in for the first time.
+            </p>
+          <% } %>
+
+          <div class="field">
+            <label class="field__label" for="login-name">Your name</label>
+            <input class="input" id="login-name" name="name" type="text" autocomplete="name" minlength="2" maxlength="120" placeholder="Ada Obi" required>
+          </div>
+          <div class="field">
+            <label class="field__label" for="login-email">Email address</label>
+            <input class="input" id="login-email" name="email" type="email" inputmode="email" autocomplete="email" maxlength="160" placeholder="you@example.com" required>
+            <p class="field__hint">We will send a one-time code to this address. No phone number or password needed. <a href="/privacy">Privacy</a>.</p>
+          </div>
+
+          <input type="hidden" name="ref" value="<%= ref %>">
+          <input type="hidden" name="next" value="<%= next %>">
+          <div class="auth-signin-options" role="group" aria-label="Choose a customer sign-in method">
+            <button class="btn btn--primary btn--block" type="submit">Continue with email</button>
+            <div class="auth-option-divider" aria-hidden="true"><span>or</span></div>
+            <a class="btn btn--secondary btn--block auth-google-button" href="/api/auth/google?next=<%= encodeURIComponent(next || '/account') %><%= save ? '&save=' + encodeURIComponent(save) : '' %>">
+              <svg class="auth-google-button__icon" viewBox="0 0 48 48" aria-hidden="true" focusable="false">
+                <path fill="#4285F4" d="M43.6 20.5h-1.4V20H24v8h11.3A12 12 0 0 1 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.8 1.2 8 3.1l5.7-5.7C34.9 6 29.8 4 24 4 13 4 4 13 4 24s9 20 20 20 20-9 20-20c0-1.3-.1-2.5-.4-3.5z"/>
+                <path fill="#34A853" d="M24 44c5.5 0 10.3-1.8 13.9-4.9l-7.1-5.5C28.9 35.1 26.6 36 24 36c-5.2 0-9.6-3.3-11.2-8l-7.4 5.7C9 39.8 16 44 24 44z"/>
+                <path fill="#FBBC05" d="M12.8 28a12.2 12.2 0 0 1 0-8l-7.4-5.7C3.9 17.3 3 20.5 3 24s.9 6.7 2.4 9.7l7.4-5.7z"/>
+                <path fill="#EA4335" d="M24 12c3.1 0 5.8 1.2 8 3.1l5.7-5.7C34.2 6.1 29.5 4 24 4 16 4 9 8.2 5.4 14.3l7.4 5.7c1.6-4.7 6-8 11.2-8z"/>
+              </svg>
+              <span>Continue with Google</span>
+            </a>
+          </div>
+          <% if (!googleReady) { %>
+            <p class="field__hint">Google sign-in will work once its OAuth credentials are added to the hosting settings.</p>
+          <% } %>
+          <p class="auth-message" data-auth-message role="status" aria-live="polite"></p>
+        </form>
+
+        <form class="auth-form hidden" data-auth-step="email-code" action="/api/auth/email/verify" method="post" novalidate hidden>
+          <h2 class="mb-1">Check your email</h2>
+          <p class="note-inline">We sent a one-time code to <strong data-auth-email>your email</strong>. It expires in <%= otp.ttlMinutes %> minutes.</p>
+          <input type="hidden" name="email">
+          <input type="hidden" name="name">
+          <input type="hidden" name="ref" value="<%= ref %>">
+          <input type="hidden" name="next" value="<%= next %>">
+          <div class="field">
+            <label class="field__label" for="login-email-code">Email code</label>
+            <input class="input input--code tabular" id="login-email-code" name="code" type="text" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]*" maxlength="<%= otp.length %>" placeholder="<%= '0'.repeat(otp.length) %>" required>
+          </div>
+          <div class="btn-row">
+            <button class="btn btn--primary" type="submit">Sign in</button>
+            <button class="btn btn--ghost" type="button" data-auth-restart>Use a different email</button>
+            <button class="btn btn--secondary" type="button" data-auth-resend>Send a new code</button>
+          </div>
+          <p class="auth-message" data-auth-message role="status" aria-live="polite"></p>
+        </form>
+      </div>
+
+      <% if (!mailReady && development) { %>
+        <p class="auth-devnote">
+          <strong>Development:</strong> SMTP is not configured. Email codes appear in the development response and server log. Set <code>SMTP_URL</code> and <code>SMTP_FROM</code> for delivery.
+        </p>
+      <% } else if (!mailReady) { %>
+        <p class="auth-devnote">
+          Email sign-in is temporarily unavailable until email delivery is configured. Please try again later or contact Honest Cars.
+        </p>
+      <% } %>
+    </div>
+
+    <div class="grid grid--3 mt-4">
+      <div class="card card__body">
+        <h3 class="mb-1">Requests</h3>
+        <p class="mb-0">Keep track of your concierge, sell, swap, parts and hire requests.</p>
+      </div>
+      <div class="card card__body">
+        <h3 class="mb-1">Bookings &amp; orders</h3>
+        <p class="mb-0">See your inspections, installations, shop orders and tracker subscriptions.</p>
+      </div>
+      <div class="card card__body">
+        <h3 class="mb-1">Saved cars &amp; searches</h3>
+        <p class="mb-0">Shortlist cars and save a search to pick up later.</p>
+      </div>
+    </div>
+  </div>
+</section>

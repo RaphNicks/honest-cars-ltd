@@ -1,0 +1,383 @@
+<%#
+  /admin/privacy — §18.3's privacy desk (NDPA).
+
+  Two halves, because §18.3's acceptance line has two halves:
+
+    • "privacy requests actionable in admin" — the log. A customer who uses
+      /account/export or closes their account files a row here the moment it
+      happens; anything that arrives by WhatsApp or over the counter is logged
+      by hand. The 30-day clock NDPA sets is on every row, and the screen says
+      out loud when one is late.
+    • "NDPA consent records exist for deal-alert signups" — the consent log.
+      Not a flag: events, each one carrying the wording the person actually saw.
+      The *current* state of each list is read from where it lives (the account
+      flag, the saved cars and searches), never re-derived from the log.
+
+  Locals: counts, queue, openList, overdue, status, type, canManage, types,
+          typeLabels, typeSentences, channels, channelLabels, purposeLabels,
+          tally, recent, state, dueDays
+%>
+<% var dayLabel = function (value) {
+  return value ? new Date(value).toLocaleDateString('en-NG', { day: 'numeric', month: 'short', year: 'numeric' }) : '—';
+}; %>
+<% var badgeFor = function (request) {
+  if (request.status === 'completed') return 'badge--ok';
+  if (request.status === 'refused') return 'badge--fail';
+  if (request.status === 'in_progress') return 'badge--pending';
+  return 'badge--new';
+}; %>
+<% var dueLabel = function (request) {
+  if (request.completedAt) return request.status === 'completed' ? `closed ${dayLabel(request.completedAt)}` : `refused ${dayLabel(request.completedAt)}`;
+  if (request.overdue) return `overdue by ${Math.abs(request.daysLeft)} day${Math.abs(request.daysLeft) === 1 ? '' : 's'}`;
+  if (request.daysLeft === 0) return 'due today';
+  return `due in ${request.daysLeft} day${request.daysLeft === 1 ? '' : 's'}`;
+}; %>
+
+<div class="admin-grid admin-grid--5">
+  <div class="kpi kpi--sm">
+    <span class="kpi__label">Open now</span>
+    <strong class="kpi__value tabular"><%= counts.open %></strong>
+    <span class="kpi__foot">received or in progress</span>
+  </div>
+  <div class="kpi kpi--sm">
+    <span class="kpi__label">Past the 30-day clock</span>
+    <strong class="kpi__value tabular"><%= counts.overdue %></strong>
+    <span class="kpi__foot"><%= counts.overdue ? 'act on these first' : 'nothing is late' %></span>
+  </div>
+  <div class="kpi kpi--sm">
+    <span class="kpi__label">Due within a week</span>
+    <strong class="kpi__value tabular"><%= counts.dueSoon %></strong>
+    <span class="kpi__foot">still time to answer</span>
+  </div>
+  <div class="kpi kpi--sm">
+    <span class="kpi__label">Closed this month</span>
+    <strong class="kpi__value tabular"><%= counts.closedThisMonth %></strong>
+    <span class="kpi__foot"><%= counts.completed %> completed · <%= counts.refused %> refused, all time</span>
+  </div>
+  <div class="kpi kpi--sm">
+    <span class="kpi__label">Ever filed</span>
+    <strong class="kpi__value tabular"><%= counts.total %></strong>
+    <span class="kpi__foot">every request the site or the desk has recorded</span>
+  </div>
+</div>
+
+<% if (counts.overdue) { %>
+  <div class="alert-band mt-3">
+    <div>
+      <h2><%= counts.overdue %> request<%= counts.overdue === 1 ? '' : 's' %> past the deadline</h2>
+      <p class="mb-0">
+        The Nigeria Data Protection Act gives 30 days from the day the person asked — not from the day the row
+        was typed. Each one below says when it was asked and by how long it is late; close it with a sentence
+        saying what was actually done, or record why it is refused.
+      </p>
+    </div>
+  </div>
+<% } %>
+
+<section class="panel mt-3">
+  <div class="panel__head">
+    <div>
+      <h2 class="panel__title">Data-subject requests</h2>
+      <p class="cms-hint">
+        Exports and account closures file themselves — the customer did not have to ask a human, so the row is
+        already <code>completed</code> with the act written down. Everything else here was logged by hand from a
+        WhatsApp message, a phone call or a visit.
+      </p>
+    </div>
+    <div class="admin-filters">
+      <form method="get" action="/admin/privacy" class="admin-filters">
+        <div class="field">
+          <label class="field__label" for="privacy-status">Status</label>
+          <select class="select" id="privacy-status" name="status">
+            <option value="open" <%= status === 'open' ? 'selected' : '' %>>Open (both stages)</option>
+            <% ['received', 'in_progress', 'completed', 'refused'].forEach(function (option) { %>
+              <option value="<%= option %>" <%= status === option ? 'selected' : '' %>><%= option.replace('_', ' ') %></option>
+            <% }); %>
+            <option value="all" <%= status === 'all' ? 'selected' : '' %>>Everything</option>
+          </select>
+        </div>
+        <div class="field">
+          <label class="field__label" for="privacy-type">Asked for</label>
+          <select class="select" id="privacy-type" name="type">
+            <option value="">Anything</option>
+            <% types.forEach(function (option) { %>
+              <option value="<%= option %>" <%= type === option ? 'selected' : '' %>><%= typeLabels[option] %></option>
+            <% }); %>
+          </select>
+        </div>
+        <button class="btn btn--secondary btn--sm" type="submit">Filter</button>
+      </form>
+      <a class="btn btn--secondary btn--sm" href="/admin/privacy/requests.csv">Download the log (CSV)</a>
+    </div>
+  </div>
+
+  <% if (!queue.length) { %>
+    <p class="cms-hint">
+      Nothing here yet. That is the normal state when nobody has asked — the log fills itself the moment a
+      customer downloads their data or closes their account, and by hand when someone asks another way.
+    </p>
+  <% } else { %>
+    <div class="table-scroll">
+      <table class="table table--stack">
+        <caption class="visually-hidden">Data-subject requests and their handling</caption>
+        <thead>
+          <tr>
+            <th scope="col">Request</th>
+            <th scope="col">Who asked</th>
+            <th scope="col">What they asked for</th>
+            <th scope="col">Clock</th>
+            <th scope="col">Status</th>
+            <% if (canManage) { %><th scope="col">Action</th><% } %>
+          </tr>
+        </thead>
+        <tbody>
+          <% queue.forEach(function (request) { %>
+            <tr>
+              <td>
+                <strong class="tabular"><%= request.reference %></strong>
+                <br><span class="muted"><%= request.channelLabel %></span>
+                <br><span class="muted">asked <%= dayLabel(request.requestedAt) %></span>
+              </td>
+              <td>
+                <%= request.name || '—' %>
+                <% if (request.phone) { %><br><span class="muted tabular"><%= request.phone %></span><% } %>
+                <% if (request.email) { %><br><span class="muted"><%= request.email %></span><% } %>
+                <% if (request.userId) { %>
+                  <br><span class="muted">account #<%= request.userId %></span>
+                <% } else { %>
+                  <br><span class="muted">no account on file</span>
+                <% } %>
+              </td>
+              <td>
+                <strong><%= request.typeLabel %></strong>
+                <br><span class="muted"><%= request.subject || request.typeSentence %></span>
+              </td>
+              <td>
+                <span class="badge <%= request.overdue ? 'badge--fail' : 'badge--new' %>"><%= dueLabel(request) %></span>
+                <br><span class="muted">due <%= dayLabel(request.dueAt) %></span>
+              </td>
+              <td>
+                <span class="badge <%= badgeFor(request) %>"><%= request.status.replace('_', ' ') %></span>
+                <% if (request.resolution) { %>
+                  <details class="mt-1">
+                    <summary class="muted">what was done</summary>
+                    <p class="cms-hint mb-0"><%= request.resolution %></p>
+                  </details>
+                <% } %>
+                <% if (request.handledByName) { %><span class="muted">by <%= request.handledByName %></span><% } %>
+              </td>
+              <% if (canManage) { %>
+                <td>
+                  <form method="post" action="/admin/privacy/requests/<%= request.id %>" class="stack">
+                    <div class="field">
+                      <label class="field__label" for="status-<%= request.id %>">Move it to</label>
+                      <select class="select" id="status-<%= request.id %>" name="status" required>
+                        <% ['received', 'in_progress', 'completed', 'refused'].forEach(function (option) { %>
+                          <option value="<%= option %>" <%= request.status === option ? 'selected' : '' %>><%= option.replace('_', ' ') %></option>
+                        <% }); %>
+                      </select>
+                    </div>
+                    <div class="field">
+                      <label class="field__label" for="resolution-<%= request.id %>">What was done</label>
+                      <input class="input" id="resolution-<%= request.id %>" name="resolution" maxlength="240"
+                             placeholder="e.g. export sent by WhatsApp" value="<%= request.resolution || '' %>">
+                      <p class="field__hint">Needed to close or refuse it — that sentence is the record.</p>
+                    </div>
+                    <button class="btn btn--secondary btn--sm" type="submit">Save</button>
+                  </form>
+                </td>
+              <% } %>
+            </tr>
+          <% }); %>
+        </tbody>
+      </table>
+    </div>
+  <% } %>
+</section>
+
+<% if (canManage) { %>
+  <section class="panel mt-3">
+    <div class="panel__head">
+      <div>
+        <h2 class="panel__title">Log a request that came in another way</h2>
+        <p class="cms-hint">
+          WhatsApp, the phone, the counter. The date asked matters more than the date typed: the 30 days run
+          from when the person asked, so a message that reached the desk on Monday keeps Monday&rsquo;s clock.
+        </p>
+      </div>
+    </div>
+    <form method="post" action="/admin/privacy/requests" class="admin-filters">
+      <div class="field">
+        <label class="field__label" for="log-type">What they asked for</label>
+        <select class="select" id="log-type" name="type" required>
+          <% types.forEach(function (option) { %>
+            <option value="<%= option %>"><%= typeLabels[option] %></option>
+          <% }); %>
+        </select>
+      </div>
+      <div class="field">
+        <label class="field__label" for="log-channel">How they asked</label>
+        <select class="select" id="log-channel" name="channel">
+          <% channels.forEach(function (option) { %>
+            <option value="<%= option %>" <%= option === 'whatsapp' ? 'selected' : '' %>><%= channelLabels[option] %></option>
+          <% }); %>
+        </select>
+      </div>
+      <div class="field">
+        <label class="field__label" for="log-name">Name</label>
+        <input class="input" id="log-name" name="name" maxlength="120" placeholder="Ngozi Eze">
+      </div>
+      <div class="field">
+        <label class="field__label" for="log-phone">Phone</label>
+        <input class="input" id="log-phone" name="phone" maxlength="40" placeholder="+2348031234567">
+      </div>
+      <div class="field">
+        <label class="field__label" for="log-email">Email (optional)</label>
+        <input class="input" id="log-email" name="email" type="email" maxlength="160">
+      </div>
+      <div class="field">
+        <label class="field__label" for="log-asked">They asked on</label>
+        <input class="input" id="log-asked" name="requestedAt" type="date" value="<%= new Date().toISOString().slice(0, 10) %>">
+      </div>
+      <div class="field full-width">
+        <label class="field__label" for="log-subject">In their words</label>
+        <input class="input" id="log-subject" name="subject" maxlength="240" placeholder="e.g. asked us to delete his old enquiry from 2023">
+      </div>
+      <button class="btn btn--primary btn--sm" type="submit">Log it</button>
+    </form>
+    <p class="cms-hint mb-0">
+      A name or a phone number is required — without one there is nobody to action it for, and a row nobody can
+      action is not a request.
+    </p>
+  </section>
+<% } %>
+
+<section class="panel mt-3">
+  <div class="panel__head">
+    <div>
+      <h2 class="panel__title">Consent records</h2>
+      <p class="cms-hint">
+        Every record below is an event — the box that was ticked, the radio card that was chosen, the switch
+        that was turned off — with the wording the person was reading at the time. Withdrawing is a new row,
+        never an edit of the old one, so the history of what somebody agreed to is intact.
+      </p>
+    </div>
+  </div>
+
+  <div class="table-scroll">
+    <table class="table table--stack">
+      <caption class="visually-hidden">Who is on each list right now</caption>
+      <thead>
+        <tr>
+          <th scope="col">List</th>
+          <th scope="col">On it now</th>
+          <th scope="col">Where that number comes from</th>
+          <th scope="col">Last 30 days</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>Marketing messages</strong><br><span class="muted">deal alerts and new-stock notes</span></td>
+          <td class="tabular"><%= state.marketingOptIns %></td>
+          <td class="muted"><code>users.marketing_opt_in</code> — the switch on /account</td>
+          <td class="tabular"><%= tally.marketing.granted %> in · <%= tally.marketing.withdrawn %> out</td>
+        </tr>
+        <tr>
+          <td><strong>Deal alerts</strong><br><span class="muted">price drops on saved cars</span></td>
+          <td class="tabular"><%= state.dealAlertSavers %></td>
+          <td class="muted"><code>saved_cars</code> — saving a car is the signup</td>
+          <td class="tabular"><%= tally.deal_alerts.granted %> in · <%= tally.deal_alerts.withdrawn %> out</td>
+        </tr>
+        <tr>
+          <td><strong>Deal alerts</strong><br><span class="muted">new matches for saved searches</span></td>
+          <td class="tabular"><%= state.alertSearchers %></td>
+          <td class="muted"><code>saved_searches</code> with alerts switched on</td>
+          <td class="muted">same events as above</td>
+        </tr>
+        <tr>
+          <td><strong>Sharing with a lender</strong><br><span class="muted">financing enquiries</span></td>
+          <td class="tabular"><%= state.lenderShares %></td>
+          <td class="muted"><code>financing_leads</code> — the box is required to file one</td>
+          <td class="tabular"><%= tally.lender_share.granted %> in · <%= tally.lender_share.withdrawn %> out</td>
+        </tr>
+        <tr>
+          <td><strong>Contacting them about a request</strong><br><span class="muted">service contact, explicitly not marketing</span></td>
+          <td class="tabular"><%= state.serviceContacts %></td>
+          <td class="muted"><code>service_requests</code> — the box on every intake form</td>
+          <td class="tabular"><%= tally.service_contact.granted %> recorded</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <% if (!recent.length) { %>
+    <p class="cms-hint">
+      No consent event has been recorded yet. The first one will land the moment somebody ticks a box on a form —
+      this is the table that answers &ldquo;what exactly did they agree to?&rdquo;, not just &ldquo;did they
+      agree?&rdquo;
+    </p>
+  <% } else { %>
+    <h3 class="mt-3">The last <%= recent.length %> events</h3>
+    <div class="table-scroll">
+      <table class="table table--stack">
+        <caption class="visually-hidden">Recent consent events, with the wording shown</caption>
+        <thead>
+          <tr>
+            <th scope="col">When</th>
+            <th scope="col">Who</th>
+            <th scope="col">What</th>
+            <th scope="col">Where from</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% recent.forEach(function (event) { %>
+            <tr>
+              <td class="tabular"><%= dayLabel(event.createdBy) %></td>
+              <td>
+                <%= event.name || '—' %>
+                <% if (event.phone) { %><br><span class="muted tabular"><%= event.phone %></span><% } %>
+              </td>
+              <td>
+                <span class="badge <%= event.granted ? 'badge--ok' : 'badge--fail' %>"><%= event.granted ? 'gave' : 'withdrew' %></span>
+                <%= event.purposeLabel %>
+                <details class="mt-1">
+                  <summary class="muted">the wording they saw</summary>
+                  <p class="cms-hint mb-0">&ldquo;<%= event.notice %>&rdquo;</p>
+                </details>
+              </td>
+              <td>
+                <span class="muted"><%= event.source.replace(/_/g, ' ') %></span>
+                <% if (event.path) { %><br><code class="muted"><%= event.path %></code><% } %>
+                <% if (event.actor === 'staff') { %><br><span class="muted">entered by staff</span><% } %>
+              </td>
+            </tr>
+          <% }); %>
+        </tbody>
+      </table>
+    </div>
+  <% } %>
+</section>
+
+<section class="panel mt-3">
+  <div class="panel__head">
+    <div>
+      <h2 class="panel__title">What this screen does and does not do</h2>
+    </div>
+  </div>
+  <ul class="checklist">
+    <li><strong>It does not delete anything by itself.</strong> A customer can close their own account at
+      <code>/account</code>, and that is written here as an erasure request with the anonymisation already
+      recorded. Moving a request to <code>completed</code> here closes the ticket, not the data.</li>
+    <li><strong>The clock is the person&rsquo;s.</strong> Every row carries the date they asked and a due date
+      <%= dueDays %> days later. A request logged late is still late on the screen — that is the point of it.</li>
+    <li><strong>Closures need a sentence.</strong> &ldquo;Completed&rdquo; with nothing written down is refused,
+      because a log of what was done that does not say what was done is decoration.</li>
+    <li><strong>The record keeps the requester&rsquo;s identity.</strong> When an account is closed, the
+      account row goes and this request row stays — with its own copy of the contact details, because a record
+      of &ldquo;someone asked us to delete their data&rdquo; that cannot say who asked is not evidence the duty
+      was discharged.</li>
+    <li><strong>Consent wording is in the code, and tested against the pages.</strong> The register lives in
+      <code>src/services/privacy.js</code>, and the suite greps the view for each sentence — so a record cannot
+      quote a sentence the site no longer shows.</li>
+  </ul>
+</section>

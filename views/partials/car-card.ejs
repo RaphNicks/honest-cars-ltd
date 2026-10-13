@@ -1,0 +1,91 @@
+<%#
+  Car card anatomy — §6.2
+    photo (4:3, lazy) · verification badge top-left · certified report ribbon
+    · Year Make Model Trim · price (bold navy) · price-position dot
+    · spec line: mileage · transmission · fuel · area
+    · actions: [View] · ＋ Compare · WhatsApp (prefilled with the car ref)
+  Sold/Reserved states: badge overlay; sold cars stay visible for 7 days and
+  show "Sold in N days" as social proof.
+  Locals: listing, helpers, [compareIds], [eager]
+%>
+<% var eager = typeof eager === 'undefined' ? false : eager; %>
+<article class="car-card" data-listing-card data-listing-id="<%= listing.id %>" data-stock="<%= listing.stockNo %>">
+  <div class="car-card__media media-blur"
+       <% var cardBlur = listing.primaryImage ? helpers.blurFor(listing.primaryImage.url) : null; %>
+       <% if (cardBlur) { %>style="background-image:url('<%= cardBlur %>')"<% } %>>
+    <% if (listing.primaryImage) { %>
+      <img class="car-card__img" data-blur-img
+           src="<%= helpers.photoSrc(listing.primaryImage.url) %>"
+           <% if (helpers.srcsetFor(listing.primaryImage.url)) { %>srcset="<%= helpers.srcsetFor(listing.primaryImage.url) %>" sizes="(min-width: 1024px) 320px, (min-width: 640px) 45vw, 92vw"<% } %>
+           alt="<%= helpers.esc(listing.primaryImage.alt) %>"
+           width="1200" height="900"
+           <%= eager ? 'fetchpriority="high"' : 'loading="lazy" decoding="async"' %>>
+    <% } else { %>
+      <div class="car-card__img placeholder-media" aria-hidden="true"></div>
+    <% } %>
+
+    <div class="car-card__badges">
+      <%- include('grade-badge', { listing: listing, helpers: helpers }) %>
+      <% if (listing.inspectionSummary) { %>
+        <span class="car-card__ribbon">Certified report</span>
+      <% } %>
+      <% if (listing.status === 'reserved') { %>
+        <span class="badge badge--reserved">Reserved</span>
+      <% } %>
+    </div>
+
+    <% if (listing.status === 'sold') { %>
+      <div class="car-card__overlay">
+        <span class="car-card__overlay-text">
+          Sold<% if (listing.soldInDays) { %> in <%= listing.soldInDays %> day<%= listing.soldInDays === 1 ? '' : 's' %><% } %>
+        </span>
+      </div>
+    <% } %>
+  </div>
+
+  <div class="car-card__body">
+    <h3 class="car-card__title">
+      <a href="<%= listing.url %>" data-event="listing_impression"
+         data-listing-id="<%= listing.id %>" data-grade="<%= listing.grade %>"
+         data-price-position="<%= listing.pricePosition %>"><%= listing.title %></a>
+    </h3>
+
+    <p class="car-card__price mb-0">
+      <%= helpers.formatNaira(listing.priceKobo) %>
+      <% if (listing.status !== 'sold') { %>
+        <span class="car-card__price-note">&nbsp;· <%= helpers.PRICE_POSITION[listing.pricePosition].label %></span>
+      <% } %>
+    </p>
+
+    <p class="car-card__specs mb-0">
+      <span class="mileage"><%= helpers.formatMileage(listing.mileageKm) %></span>
+      <span class="dot" aria-hidden="true">·</span>
+      <span><%= listing.transmissionLabel %></span>
+      <span class="dot" aria-hidden="true">·</span>
+      <span><%= listing.fuelTypeLabel %></span>
+      <span class="dot" aria-hidden="true">·</span>
+      <span><%= listing.area %></span>
+    </p>
+
+    <div class="car-card__actions">
+      <a class="btn btn--secondary btn--sm" href="<%= listing.url %>">View</a>
+
+      <%- include('save-button', { listing: listing, helpers: helpers }) %>
+
+      <label class="compare-toggle">
+        <input type="checkbox" name="compare" value="<%= listing.id %>"
+               data-compare-toggle data-listing-id="<%= listing.id %>"
+               aria-label="Add <%= helpers.esc(listing.title) %> to the comparison"
+               <%= (typeof compareIds !== 'undefined' && compareIds.includes(String(listing.id))) ? 'checked' : '' %>>
+        <span>＋ Compare</span>
+      </label>
+
+      <a class="icon-btn" target="_blank" rel="noopener"
+         href="<%= helpers.whatsappLink('Hi HonestCars, I am interested in ' + listing.title + ' (' + listing.stockNo + ', ' + helpers.formatNaira(listing.priceKobo) + '). Is it still available?', 'vdp:' + listing.stockNo) %>"
+         data-event="whatsapp_click" data-source="car_card" data-listing-id="<%= listing.id %>"
+         aria-label="Ask about <%= helpers.esc(listing.title) %> on WhatsApp">
+        <%- helpers.icon('whatsapp', { size: 20 }) %>
+      </a>
+    </div>
+  </div>
+</article>

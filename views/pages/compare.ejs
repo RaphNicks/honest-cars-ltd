@@ -1,0 +1,127 @@
+<%#
+  /cars/compare — §6.4. Up to 3 cars side-by-side across price, price-position,
+  year, mileage, transmission, fuel, condition grade, documents status, known
+  faults (certified) and a running-cost estimate. Best value per row is
+  highlighted; “Ask HonestCars to choose for me” carries the compare context
+  into the concierge.
+%>
+<section class="page-hero">
+  <div class="container">
+    <%- include('../partials/breadcrumbs', { crumbs: trail }) %>
+    <h1>Compare cars</h1>
+    <p class="lead">
+      Up to three cars, side by side, on the things that actually decide it: price position, mileage,
+      condition, documents, known faults and what it will cost to run.
+    </p>
+    <p class="page-hero__meta">
+      <span class="badge badge--verified"><%= comparedCount %> of 3 cars</span>
+      <a href="/cars">Add another from the listings →</a>
+    </p>
+  </div>
+</section>
+
+<section class="section">
+  <div class="container">
+    <% if (comparedCount >= 2) { %>
+      <div class="compare-wrap">
+        <table class="compare-table" data-compare-table>
+          <caption class="visually-hidden">Comparison of <%= comparedCount %> cars</caption>
+          <thead>
+            <tr>
+              <td class="compare-row-label">Car</td>
+              <% listings.forEach(function (listing) { %>
+                <th scope="col">
+                  <div class="compare-card__media">
+                    <% if (listing.primaryImage) { %>
+                      <img src="<%= helpers.photoSrc(listing.primaryImage.url) %>" alt="<%= helpers.esc(listing.title) %>"
+                           width="1200" height="900" loading="lazy" decoding="async">
+                    <% } %>
+                  </div>
+                  <p class="mb-0 mt-1"><a href="<%= listing.url %>"><%= listing.title %></a></p>
+                  <p class="compare-card__price mb-0"><%= helpers.formatNaira(listing.priceKobo) %></p>
+                  <p class="page-hero__meta mb-0"><%= listing.area %>, Port Harcourt · <%= listing.stockNo %></p>
+                  <p class="mb-0 mt-1">
+                    <button class="btn btn--sm btn--ghost" type="button"
+                            data-compare-remove="<%= listings.filter(function (l) { return l.id !== listing.id; }).map(function (l) { return l.id; }).join(',') %>">
+                      Remove
+                    </button>
+                  </p>
+                </th>
+              <% }); %>
+            </tr>
+          </thead>
+          <tbody>
+            <% rows.forEach(function (row) { %>
+              <tr>
+                <th scope="row" class="compare-row-label"><%= row.label %></th>
+                <% row.values.forEach(function (value, index) { %>
+                  <td class="<%= row.bestIndex === index ? 'best-value' : '' %>">
+                    <%= value %>
+                    <% if (row.bestIndex === index) { %> <span aria-label="best value">✔</span><% } %>
+                  </td>
+                <% }); %>
+              </tr>
+            <% }); %>
+          </tbody>
+        </table>
+      </div>
+
+      <p class="field__hint">
+        The five-year running-cost estimate is arithmetic, not a quote: fuel at PH pump price, servicing at
+        today’s rates and an insurance band, from the car’s own spec. Ask us and we will do the real
+        numbers on a specific car.
+      </p>
+
+      <div class="cta-band mt-3">
+        <div>
+          <h2>Ask HonestCars to choose for me</h2>
+          <p class="mb-0">
+            Send these <%= comparedCount %> cars to the ops desk with the comparison attached. We will tell you
+            which one we would buy — and which one we would walk away from.
+          </p>
+        </div>
+        <div class="btn-row">
+          <a class="btn btn--primary" href="/find-my-car?compare=<%= compareIds %>"
+             data-compare-context="<%= compareIds %>"
+             data-event="concierge_started" data-source="compare_tool">Send to the concierge</a>
+          <a class="btn btn--ghost" href="<%= site.nav.whatsapp.general %>" target="_blank" rel="noopener"
+             data-event="whatsapp_click" data-source="compare_tool">Ask on WhatsApp</a>
+        </div>
+      </div>
+    <% } else { %>
+      <div class="empty-state">
+        <h3><%= comparedCount === 1 ? 'One car picked — add at least one more' : 'Nothing to compare yet' %></h3>
+        <p>
+          Tick “＋ Compare” on up to three cars while you browse. Your picks are remembered on this device,
+          so you can come back to this page.
+        </p>
+        <div class="btn-row mt-2" style="justify-content:center">
+          <a class="btn btn--primary" href="/cars">Browse cars</a>
+          <a class="btn btn--secondary" href="/cars?grade=certified">Start with certified cars</a>
+        </div>
+      </div>
+    <% } %>
+  </div>
+</section>
+
+<section class="section section--surface">
+  <div class="container">
+    <div class="section-head">
+      <h2>How the best-value highlights work</h2>
+    </div>
+    <div class="promise-cols">
+      <div>
+        <h3>Price and running cost</h3>
+        <p>Cheapest wins the green tick — but a cheaper car with a tired engine is not cheaper. Read the faults column first.</p>
+      </div>
+      <div>
+        <h3>Mileage and year</h3>
+        <p>Lowest mileage and newest year are highlighted separately, because they rarely belong to the same car.</p>
+      </div>
+      <div>
+        <h3>Grade and documents</h3>
+        <p>Higher grade and more completed documents win. That is the column that decides how much risk you are carrying.</p>
+      </div>
+    </div>
+  </div>
+</section>

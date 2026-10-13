@@ -1,0 +1,14 @@
+<%# §5.2 persistent bottom bar after first scroll: Home · Cars · Find My Car · Chat · Account %>
+<nav class="bottom-nav" id="bottom-nav" data-visible="false" aria-label="Quick navigation">
+  <% var signedIn = typeof user !== 'undefined' && Boolean(user); %>
+  <% site.nav.bottom.forEach(function (item) { %>
+    <% var href = item.href === '/login' && signedIn ? '/account' : item.href; %>
+    <a class="bottom-nav__item" href="<%= href %>"
+       <%= item.external ? 'target="_blank" rel="noopener"' : '' %>
+       <%= item.current ? 'aria-current="page"' : '' %>
+       <% if (item.event) { %>data-event="<%= item.event %>" data-source="bottom_nav"<% } %>>
+      <%- helpers.icon(item.icon, { size: 22 }) %>
+      <span><%= item.label %></span>
+    </a>
+  <% }); %>
+</nav>

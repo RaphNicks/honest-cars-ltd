@@ -1,0 +1,91 @@
+<%#
+  /admin/cms/testimonials — social proof (§7.3).
+  Only published quotes reach the homepage and /about. Everything else stays
+  here, which is what makes “hidden” a real state rather than a deletion.
+  Locals: testimonials, published
+%>
+<div class="admin-head">
+  <h1>Testimonials</h1>
+  <p class="admin-head__lead">
+    <%= testimonials.length %> quotes, <%= published %> published. Published ones appear on the
+    homepage and /about; hidden ones stay in the console.
+  </p>
+</div>
+
+<section class="panel">
+  <h2 class="panel__title">Add a testimonial</h2>
+  <form method="post" action="/admin/cms/testimonials" class="admin-grid admin-grid--3">
+    <div class="field">
+      <label class="field__label" for="t-name">Customer</label>
+      <input class="input" id="t-name" name="customer_name" type="text" maxlength="120" required>
+    </div>
+    <div class="field">
+      <label class="field__label" for="t-area">Area</label>
+      <input class="input" id="t-area" name="area" type="text" maxlength="80" placeholder="Woji" required>
+    </div>
+    <div class="field">
+      <label class="field__label" for="t-tag">Service</label>
+      <input class="input" id="t-tag" name="service_tag" type="text" maxlength="60" placeholder="inspection">
+    </div>
+    <div class="field" style="grid-column: 1 / -1;">
+      <label class="field__label" for="t-quote">Quote</label>
+      <textarea class="input" id="t-quote" name="quote" rows="2" maxlength="1000" required></textarea>
+    </div>
+    <div class="field">
+      <label class="field__label" for="t-position">Position</label>
+      <input class="input" id="t-position" name="position" type="number" min="0" max="999" value="<%= testimonials.length + 1 %>">
+    </div>
+    <div class="field">
+      <label class="cms-check"><input type="checkbox" name="is_published" value="1" checked> Publish immediately</label>
+    </div>
+    <div class="field" style="align-self: end;">
+      <button class="btn btn--primary" type="submit">Add testimonial</button>
+    </div>
+  </form>
+</section>
+
+<section class="panel" style="margin-top: var(--space-3);">
+  <h2 class="panel__title">All quotes</h2>
+  <table class="table table--stack">
+    <thead>
+      <tr>
+        <th scope="col">Quote</th>
+        <th scope="col">Customer</th>
+        <th scope="col">Service</th>
+        <th scope="col">Position</th>
+        <th scope="col">Published</th>
+        <th scope="col"></th>
+      </tr>
+    </thead>
+    <tbody>
+      <% testimonials.forEach(function (row) { %>
+        <tr>
+          <th scope="row">
+            <form method="post" action="/admin/cms/testimonials/<%= row.id %>" id="t-<%= row.id %>">
+              <textarea class="input" name="quote" rows="2" maxlength="1000"><%= row.quote %></textarea>
+            </form>
+          </th>
+          <td>
+            <input class="input" name="customer_name" form="t-<%= row.id %>" type="text" value="<%= row.customerName %>" maxlength="120">
+            <input class="input" name="area" form="t-<%= row.id %>" type="text" value="<%= row.area %>" maxlength="80" style="margin-top: 4px;">
+          </td>
+          <td>
+            <input class="input" name="service_tag" form="t-<%= row.id %>" type="text" value="<%= row.serviceTag %>" maxlength="60">
+          </td>
+          <td>
+            <input class="input tabular" name="position" form="t-<%= row.id %>" type="number" min="0" max="999" value="<%= row.position %>" style="max-width: 90px;">
+          </td>
+          <td>
+            <label class="cms-check">
+              <input type="checkbox" name="is_published" value="1" form="t-<%= row.id %>" <%= row.isPublished ? 'checked' : '' %>>
+              <span class="visually-hidden">Published</span>
+            </label>
+          </td>
+          <td>
+            <button class="btn btn--secondary btn--sm" type="submit" form="t-<%= row.id %>">Save</button>
+          </td>
+        </tr>
+      <% }); %>
+    </tbody>
+  </table>
+</section>

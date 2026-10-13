@@ -1,0 +1,135 @@
+<%#
+  /admin/jobs — the inspector mobile view (§7.3).
+  Big tap targets, one card per job, the seven-section checklist, a verdict and
+  notes. Saving writes checklist + verdict + notes onto the booking, which is
+  what the report is generated from.
+  Locals: jobs, date, sections, verdicts
+%>
+<section class="panel">
+  <div class="panel__head">
+    <div>
+      <h2 class="panel__title">My jobs</h2>
+      <p class="note-inline mb-0">Only jobs assigned to you can be filed from here.</p>
+    </div>
+    <form class="admin-filters" method="get" action="/admin/jobs">
+      <label class="visually-hidden" for="jobs-date">Date</label>
+      <input class="input input--compact" id="jobs-date" name="date" type="date" value="<%= date || '' %>">
+      <button class="btn btn--secondary btn--sm" type="submit">Show</button>
+      <% if (date) { %><a class="btn btn--ghost btn--sm" href="/admin/jobs">Clear</a><% } %>
+    </form>
+  </div>
+
+  <% if (!jobs.length) { %>
+    <p class="empty-line">
+      Nothing assigned to you<%= date ? ' on that day' : '' %>. Dispatch assigns jobs in
+      <a href="/admin/bookings">/admin/bookings</a>.
+    </p>
+  <% } else { %>
+    <div class="stack">
+      <% jobs.forEach(function (job) { %>
+        <article class="panel job-card" aria-labelledby="job-<%= job.id %>">
+          <div class="panel__head">
+            <div>
+              <h3 class="job-card__title" id="job-<%= job.id %>">
+                <%= job.reference %>
+                <span class="badge badge--<%= job.status %>"><%= job.status %></span>
+                <span class="chip"><%= job.type %></span>
+              </h3>
+              <p class="job-card__meta">
+                <% if (job.slotAt) { %>
+                  <strong><%= new Date(job.slotAt).toLocaleString('en-NG', { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) %></strong>
+                <% } else { %>
+                  <span class="warn">no slot booked</span>
+                <% } %>
+                <% if (job.location) { %> · <%= job.location %><% } %>
+              </p>
+              <p class="job-card__meta">
+                <%= job.name %> · <a class="tabular" href="tel:<%= job.phone %>"><%= job.maskedPhone %></a>
+              </p>
+              <% if (job.vehicle && job.vehicle.make) { %>
+                <p class="job-card__meta">
+                  Car: <strong><%= job.vehicle.year %> <%= job.vehicle.make %> <%= job.vehicle.model %><% if (job.vehicle.trim) { %> <%= job.vehicle.trim %><% } %></strong>
+                </p>
+              <% } %>
+              <% if (job.reportNotes) { %>
+                <p class="note-inline mb-0"><strong>Filed:</strong> <%= job.reportNotes.slice(0, 160) %></p>
+              <% } %>
+            </div>
+            <div class="btn-row btn-row--tight">
+              <a class="btn btn--secondary btn--sm" href="tel:<%= job.phone %>">Call customer</a>
+              <% if (job.checklist) { %>
+                <a class="btn btn--primary btn--sm" href="/admin/jobs/<%= job.id %>/report">Open the report</a>
+                <a class="btn btn--ghost btn--sm" href="/admin/jobs/<%= job.id %>/report.pdf">PDF</a>
+              <% } %>
+            </div>
+          </div>
+
+          <form method="post" action="/admin/jobs/<%= job.id %>/report" class="job-form">
+            <table class="table table--check">
+              <caption class="visually-hidden">Inspection checklist</caption>
+              <thead>
+                <tr>
+                  <th scope="col">Section</th>
+                  <th scope="col">OK</th>
+                  <th scope="col">Attention</th>
+                  <th scope="col">Fail</th>
+                </tr>
+              </thead>
+              <tbody>
+                <% sections.forEach(function (section) { %>
+                  <tr>
+                    <th scope="row"><%= section.label %></th>
+                    <% ['ok','attention','fail'].forEach(function (value) { %>
+                      <td>
+                        <label class="check-tap">
+                          <input type="radio" name="section_<%= section.key %>" value="<%= value %>"
+                            <%= (job.checklist && job.checklist.sections && job.checklist.sections[section.key]) === value ? 'checked' : '' %>>
+                          <span class="visually-hidden"><%= section.label %>: <%= value %></span>
+                        </label>
+                      </td>
+                    <% }); %>
+                  </tr>
+                <% }); %>
+              </tbody>
+            </table>
+
+            <div class="job-form__fields">
+              <label class="field">
+                <span class="field__label">OBD2 codes read</span>
+                <input class="input" name="obd2_codes" type="text" value="<%= job.checklist && job.checklist.obd2_codes ? job.checklist.obd2_codes : '' %>" placeholder="e.g. P0420, none">
+              </label>
+              <label class="field">
+                <span class="field__label">Photos (links or filenames)</span>
+                <input class="input" name="photos" type="text" value="<%= job.checklist && job.checklist.photos ? job.checklist.photos : '' %>" placeholder="Where the photos are stored">
+              </label>
+              <label class="field">
+                <span class="field__label">Verdict</span>
+                <select class="select" name="verdict">
+                  <option value="">Not decided yet</option>
+                  <% verdicts.forEach(function (value) { %>
+                    <option value="<%= value %>" <%= job.verdict === value ? 'selected' : '' %>><%= value.replace(/_/g, ' ') %></option>
+                  <% }); %>
+                </select>
+              </label>
+              <label class="field field--full">
+                <span class="field__label">Notes the client will read</span>
+                <textarea class="textarea" name="report_notes" rows="4" placeholder="Plain language: what you found, what it will cost, what you would do."><%= job.reportNotes || '' %></textarea>
+              </label>
+            </div>
+
+            <button class="btn btn--primary btn--block" type="submit">Save the report</button>
+            <p class="note-inline mb-0">
+              Saving produces the client report: the seven sections, the OBD2 codes, your notes and the verdict.
+              <% if (job.checklist) { %>
+                It is ready now — <a href="/admin/jobs/<%= job.id %>/report">open it</a> or
+                <a href="/admin/jobs/<%= job.id %>/report.pdf">download the PDF</a>.
+              <% } else { %>
+                The PDF appears here the moment you save.
+              <% } %>
+            </p>
+          </form>
+        </article>
+      <% }); %>
+    </div>
+  <% } %>
+</section>

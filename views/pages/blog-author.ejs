@@ -1,0 +1,71 @@
+<%#
+  FR-35 — author page (/blog/author/{slug}).
+  The E-E-A-T page §6.9 asks the author card to point at: who this is, what
+  they do here, and everything they have published.
+%>
+<section class="page-hero">
+  <div class="container">
+    <%- include('../partials/breadcrumbs', { crumbs: trail }) %>
+    <p class="eyebrow">Honest Cars editorial</p>
+    <h1><%= author.name %></h1>
+    <p class="lead"><%= author.role %><%= author.bio ? ' — ' + author.bio : '' %></p>
+    <p class="page-hero__meta">
+      <strong><%= author.count %></strong> published post<%= author.count === 1 ? '' : 's' %> ·
+      <a href="/blog">All posts</a> ·
+      <a href="/about">Who we are</a>
+    </p>
+  </div>
+</section>
+
+<section class="section">
+  <div class="container">
+    <% if (shelf.posts.length) { %>
+      <div class="grid grid--3">
+        <% shelf.posts.forEach(function (post) { %>
+          <%- include('../partials/post-card', { post: post, helpers: helpers }) %>
+        <% }); %>
+      </div>
+
+      <% if (shelf.pages > 1) { %>
+        <nav class="btn-row mt-3" style="justify-content:center" aria-label="Pages">
+          <% if (shelf.page > 1) { %>
+            <a class="btn btn--secondary" href="<%= author.url %>?page=<%= shelf.page - 1 %>">Newer</a>
+          <% } %>
+          <span class="page-hero__meta mb-0">Page <%= shelf.page %> of <%= shelf.pages %></span>
+          <% if (shelf.page < shelf.pages) { %>
+            <a class="btn btn--secondary" href="<%= author.url %>?page=<%= shelf.page + 1 %>">Older</a>
+          <% } %>
+        </nav>
+      <% } %>
+    <% } else { %>
+      <div class="empty-state">
+        <h3>Nothing published yet</h3>
+        <p>This byline is set up but has no live posts.</p>
+        <a class="btn btn--primary mt-2" href="/blog">Read the guide</a>
+      </div>
+    <% } %>
+  </div>
+</section>
+
+<% if (authors.length) { %>
+  <section class="section section--surface">
+    <div class="container">
+      <div class="section-head">
+        <h2>The rest of the desk</h2>
+        <a class="section-head__link" href="/about">Meet the team →</a>
+      </div>
+      <div class="grid grid--3">
+        <% authors.forEach(function (person) { %>
+          <article class="card">
+            <div class="card__body">
+              <span class="author-card__avatar" aria-hidden="true"><%= person.name.slice(0, 1) %></span>
+              <h3 class="mt-1 mb-0"><a href="<%= person.url %>"><%= person.name %></a></h3>
+              <p class="author-card__role"><%= person.role %></p>
+              <% if (person.bio) { %><p class="mb-0"><%= person.bio %></p><% } %>
+            </div>
+          </article>
+        <% }); %>
+      </div>
+    </div>
+  </section>
+<% } %>

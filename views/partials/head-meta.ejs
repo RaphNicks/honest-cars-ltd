@@ -1,0 +1,37 @@
+<%# Title, description, canonical, robots, OG/Twitter and all JSON-LD (§12.4, §14.2) %>
+<title><%= page.title %></title>
+<meta name="description" content="<%= page.description %>">
+<link rel="canonical" href="<%= page.canonical %>">
+<meta name="robots" content="<%= page.robots %>">
+<meta name="author" content="Honest Cars LTD">
+<meta name="format-detection" content="telephone=no">
+
+<%# Open Graph — tuned for WhatsApp chat previews (1200×630) %>
+<meta property="og:site_name" content="HonestCars">
+<meta property="og:type" content="<%= page.og.type %>">
+<meta property="og:locale" content="en_NG">
+<meta property="og:title" content="<%= page.metaTitle %>">
+<meta property="og:description" content="<%= page.description %>">
+<meta property="og:url" content="<%= page.canonical %>">
+<meta property="og:image" content="<%= page.og.image %>">
+<meta property="og:image:secure_url" content="<%= page.og.image %>">
+<meta property="og:image:width" content="<%= page.og.imageWidth %>">
+<meta property="og:image:height" content="<%= page.og.imageHeight %>">
+<meta property="og:image:alt" content="<%= helpers.esc(page.og.imageAlt) %>">
+
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="<%= page.metaTitle %>">
+<meta name="twitter:description" content="<%= page.description %>">
+<meta name="twitter:image" content="<%= page.og.image %>">
+
+<%# Local trust signals for Port Harcourt searches (§14.3) %>
+<meta name="geo.region" content="NG-RI">
+<meta name="geo.placename" content="Port Harcourt">
+<meta name="geo.position" content="<%= site.business.latitude %>;<%= site.business.longitude %>">
+
+<%# JSON-LD: LocalBusiness site-wide, plus page-specific schemas %>
+<script type="application/ld+json"><%- helpers.jsonLdScript(helpers.localBusinessSchema()) %></script>
+<script type="application/ld+json"><%- helpers.jsonLdScript(helpers.webSiteSchema()) %></script>
+<% page.jsonLd.filter(Boolean).forEach(function (schema) { %>
+<script type="application/ld+json"><%- helpers.jsonLdScript(schema) %></script>
+<% }); %>

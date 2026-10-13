@@ -1,0 +1,1641 @@
+
+
+===== PAGE 1 =====
+HONEST CARS  LTD
+Website Design & Build
+Working Document
+honestcarsltd.com
+Functional & design specification for the official Honest Cars LTD
+digital platform — car storefront, full services suite, dealer portal &
+operations back-office
+This document tells the web development team exactly what to design and build,
+why, and in what order. It covers the minimalist design system, the listings-first
+storefront, every service and product page, customer accounts, the dealer partner
+portal, the admin back-office that runs day-to-day business operations,
+integrations, performance & SEO requirements, phased delivery and acceptance
+criteria.
+CLIENT / PRODUCT
+OWNER
+Honest Cars LTD, Port Harcourt, Rivers State, Nigeria
+PRODUCT Public website + dealer portal + admin console for honestcarsltd.com
+AUDIENCE OF THIS
+DOCUMENT
+Project manager, UI/UX designer, front-end & back-end developers, QA,
+content writer, digital marketer
+COMPANION
+DOCUMENT
+Honest Cars LTD — Business Operating Document v1.0 (defines the
+services & pricing this website must sell and support)
+VERSION 1.0  •  Prepared: September 2026  •  Review: at each build-phase gate
+CONFIDENTIAL — Prepared for Honest Cars LTD and its appointed web development team. All service names, prices
+and workflows referenced from the Business Operating Document. Feature priorities use MoSCoW notation: Must /
+Should / Could / Won't (this phase).
+
+===== PAGE 2 =====
+Table of Contents
+1. Purpose, Scope & How to Use This Document ......................................................................  3
+2. Product Vision, Objectives & Success Metrics ......................................................................  5
+3. Brand & Design Direction — The Minimalist System .............................................................  7
+4. Audiences & User Personas ...................................................................................................  9
+5. Information Architecture & Navigation ...............................................................................  10
+6. Public-Facing Pages — Detailed Specifications ...................................................................  11
+6.1 Homepage ..................................................................................................................................................  11
+6.2 Car Listings (The Marketplace) ...................................................................................................................  11
+6.3 Vehicle Detail Page (VDP) ...........................................................................................................................  12
+6.4 Compare Cars T ool ......................................................................................................................................  13
+6.5 “Find My Car” Concierge Flow ....................................................................................................................  13
+6.6 Sell / Swap Your Car Flow ...........................................................................................................................  13
+6.7 Services Hub & Service Pages ....................................................................................................................  13
+6.8 Products Shop .............................................................................................................................................  14
+6.9 Blog — Home of the Honest Buyer's Guide ................................................................................................  14
+6.10 About, Trust, FAQ, Contact & Legal Pages .................................................................................................  15
+7. Accounts, Dealer Portal & Admin Back-Office (Runs the Business) ....................................  16
+8. Key User Journeys ................................................................................................................  19
+9. Functional Requirements Register (MoSCoW) ....................................................................  20
+10. Data & Content Model ........................................................................................................  22
+11. Integrations & Third-Party Services ..................................................................................  23
+12. Non-Functional Requirements ...........................................................................................  24
+13. Mobile-First & Low-Bandwidth Strategy ...........................................................................  26
+14. SEO & Growth Foundations ................................................................................................  27
+15. Analytics & Event Tracking ................................................................................................  28
+16. Content Requirements & Copy Direction ..........................................................................  29
+17. Technical Approach & Stack Options .................................................................................  30
+18. Build Phasing, Deliverables & Acceptance ........................................................................  31
+19. Open Questions & Decisions for the Client .......................................................................  33
+20. Appendices (A–E): Wireframes • Data Schema • Microcopy • Checklists ........................  34
+HonestCars Web
+honestcarsltd.com — Website Working Document (Confidential) Page 2 of 37
+
+===== PAGE 3 =====
+1 Purpose, Scope & How to Use This Document
+What this document is, who it is for, and how decisions get made
+1.1 Purpose
+This working document is the single source of truth for designing and building honestcarsltd.com,
+the official digital platform of Honest Cars LTD. It translates the company’s Business Operating
+Document (v1.0) into a concrete website: a minimalist, listings-first storefront fed by dealer-
+partner inventory, wrapped by the complete suite of HonestCars services and products, and backed
+by portals/tools that allow the team to run the day-to-day business through the website.
+1.2 The One-Sentence Brief
+BRIEF IN ONE LINE
+Build a fast, mobile-first, minimalist website where the cars are the hero and every visitor is
+never more than two clicks from any HonestCars service — while the back-office quietly powers
+listings, leads, bookings, payments, dispatches and reporting for the operations team.
+1.3 In Scope vs. Out of Scope (v1)
+In Scope — build now Out of Scope — later / never via this project
+Public marketing site + car marketplace fed by
+dealer partners
+All consumer services: concierge search,
+inspections, customs & documents, swap/sell,
+research reports, consultations, tracking, car hire,
+parts sourcing
+Products shop (trackers, OBD2 scanners, care kits)
+Blog & content engine (the Honest Buyer’s Guide)
+with live car-listing embeds, CMS publishing
+workflow and RSS
+Customer accounts, dealer partner portal, admin
+back-office
+Payments, WhatsApp integration, notifications,
+analytics, SEO foundations
+Native iOS/Android apps (mobile web / PWA-first
+strategy)
+Financing/loan origination engine (sectioned as
+“future”)
+Vehicle auction bidding engine
+HonestCars becoming a telematics platform (we
+integrate partners, not rebuild them)
+Multi-country versions (single-country, multi-city
+structure only)
+1.4 How the Team Should Use It
+Role Sections to Own
+Project Manager Everything; especially §18 phasing, §19 open questions, §9 requirements register
+UI/UX Designer §3 design system, §5 IA, §6 page specs, Appendix A wireframes, §13 mobile strategy
+Front-end Developer §6, §12 NFRs, §13, §14 SEO, Appendix A
+Back-end Developer §7 portals/admin, §9 requirements, §10 data model, §11 integrations, §12 security
+QA §9 requirement IDs, §18.3 acceptance checklist, §12 NFRs, §8 journeys as test scripts
+Content / Marketing §16 content requirements, §14 SEO, Appendix D microcopy
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+HonestCars Web
+honestcarsltd.com — Website Working Document (Confidential) Page 3 of 37
+
+===== PAGE 4 =====
+1.5 Decision & Change Control
+Anything marked MUST  is contractual for launch; SHOULD  is in launch unless timeline forces
+deferral to Phase 2; COULD  is backlog.
+Changes require a written change request to the Product Owner (HonestCars MD) with impact on
+cost/timeline noted.
+Unspecified visual decisions default to the design principles in §3 — when in doubt, choose the
+simpler option.
+• 
+• 
+• 
+HonestCars Web
+honestcarsltd.com — Website Working Document (Confidential) Page 4 of 37
+
+===== PAGE 5 =====
+2 Product Vision, Objectives & Success Metrics
+What winning looks like for honestcarsltd.com
+2.1 Vision Statement
+VISION
+honestcarsltd.com is the most trusted place in the South-South to find a verified car and get
+anything automobile-related done — the digital front door and operating backbone of the
+HonestCars ecosystem.
+2.2 Business Objectives (in priority order)
+# Objective What the Website Must Do to Achieve It
+1 Sell partner inventory Listings front-and-centre; high-quality vehicle pages; frictionless
+enquiry → viewing → concierge close; every lead captured, routed and
+tracked
+2 Convert visitors into
+service customers
+Clear services suite (inspections, concierge, documents, tracking, hire,
+research, consultations) with online booking & payment
+3 Run daily operations on
+the platform
+Admin console for listing moderation, booking dispatch, order &
+payment management, lead routing, subscriptions and reporting —
+reducing WhatsApp chaos, not adding to it
+4 Grow the dealer network Dealer portal for self-serve listings, lead inbox and performance stats;
+a public “Partner With Us” funnel
+5 Build the brand & organic
+pipeline
+SEO-strong architecture + the blog (home of the Honest Buyer’s
+Guide) + shareable WhatsApp-friendly pages
+6 Establish recurring digital
+revenue
+Tracking subscription activation/renewals, dealer retainers visible &
+payable online
+2.3 Measurable Success Criteria (launch + 90 days)
+Metric Target
+Page speed — LCP on mid-range Android
+over “Fast 3G”
+< 2.5s on listings & vehicle pages
+Live listings on launch day / +90 days 150+ / 400+
+Listing → enquiry conversion ≥ 4% of vehicle page views generate a lead
+Concierge requests via site ≥ 20/month by day 90
+Online bookings (inspections/consultations) ≥ 40% of total bookings processed via site by day 90
+Dealer portal adoption ≥ 60% of partner listings dealer-submitted (not admin-
+typed) by day 90
+Admin time saved Listing publish < 10 min; lead routing automatic; daily report
+auto-generated
+HonestCars Web
+honestcarsltd.com — Website Working Document (Confidential) Page 5 of 37
+
+===== PAGE 6 =====
+2.4 Guiding Product Principles
+1. Cars front and centre
+The store is the beachhead. Search, inventory
+and car cards dominate the homepage; services
+orbit them visibly.
+2. Two clicks to anything
+Every service and product is reachable in ≤ 2
+clicks from anywhere (persistent nav + smart
+cross-links).
+3. Mobile is the product
+Most visitors arrive on phones over mobile data.
+Design mobile first; treat PC as an
+enhancement, not the baseline.
+4. Speed is a feature
+Every image, script and font is justified against a
+performance budget (§12, §13). Slow = broken.
+5. Trust is visual, not claimed
+Verification badges, inspection grades, price-
+position indicators and real photos do the
+persuading — not adjectives.
+6. Protect the middleman position
+Dealer contact details are never exposed; all
+buyer contact flows through HonestCars
+channels (enquiry forms, masked WhatsApp).
+7. WhatsApp is a native citizen
+Deep links, share previews and chat CTAs
+everywhere — that is how this market transacts.
+8. Minimalism with warmth
+Whitespace, restraint, one accent action colour
+— paired with plain-language, human copy (§3,
+§16).
+HonestCars Web
+honestcarsltd.com — Website Working Document (Confidential) Page 6 of 37
+
+===== PAGE 7 =====
+3 Brand & Design Direction — The Minimalist System
+Look, feel, voice and the rules that keep it honest
+3.1 Design Personality
+“A quiet showroom run by a straight-talker.” Minimalist and functional like a premium
+showroom — nothing decorative without a job — with the frankness of a trusted mechanic. Reference
+feel: clean automotive marketplaces (white space, strong photography, disciplined grids) crossed with
+a modern fintech’s clarity.
+3.2 Colour System
+Token Hex Usage
+--honest-navy #0E2A47 Primary brand — headers, footer, headings, key text
+--honest-green #12A150 The one action colour — primary CTAs, verified badges, success
+states
+--honest-amber #E8A13D Sparing accents — “Field-Checked” badge, warnings, highlights
+(never for primary CTAs)
+--ink / --muted #1D2733 /
+#5B6B7C
+Body text / secondary text
+--surface / --
+line
+#F7FAFC /
+#D8E0E8
+Card backgrounds / dividers & borders
+--white #FFFFFF Dominant canvas — the site should feel mostly white
+3.3 Typography & Iconography
+Primary typeface: Inter (self-hosted; system stack -apple-system, Segoe UI, Roboto  as instant
+fallback). One family only, weights 400/500/600/700.
+Scale (mobile base): 12 / 14 / 16 (body) / 20 / 24 / 32 — headings clamp up on desktop; never
+below 14px for readable content.
+Prices always in ₦ with figure-friendly tabular styling; mileage in km.
+Icons: single-line icon set (e.g., Lucide/Feather style), 1.5px stroke, no mixing of icon families.
+3.4 Layout & Component Rules
+8px spacing grid; max content width 1200px; generous whitespace; no carousels that hide
+content (static grids with “View all”).
+Cards: white, 1px #D8E0E8 border, 12px radius, subtle shadow on hover (desktop only).
+Buttons: 3 kinds only — primary (solid green), secondary (navy outline), ghost (text). One primary
+action visible per screen area.
+Photography direction: real lot photos, daylight, consistent framing guide issued to dealers
+(front ¾, side, rear ¾, interior, dashboard, engine bay, odometer close-up). No stock-photo
+handshakes.
+Motion: ≤ 200ms ease transitions; no parallax, no autoplay sliders, respect prefers-reduced-
+motion .
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+HonestCars Web
+honestcarsltd.com — Website Working Document (Confidential) Page 7 of 37
+
+===== PAGE 8 =====
+Accessibility: WCAG 2.1 AA contrast (test green on white), focus states visible, all forms labelled,
+tap targets ≥ 44px.
+3.5 The Trust Component System (signature UI)
+Component Meaning & Visual
+Verification
+badge
+Three grades shown on every car card & VDP: ● Network-Listed (grey — dealer data,
+unverified) · ● Field-Checked (amber — physically seen) · ● HonestCars-Certified (green
+— full inspection passed). T ooltip explains each grade in one line.
+Price-Position
+indicator
+Subtle label on VDP: “Within market band / Below market / Premium” — driven by the
+pricing database (§10). Where price history exists, show “price unchanged 21 days”.
+Documents
+strip
+Icon row: Customs verified ✓ · Registration ✓ · Duty papers sighted ✓ — green when
+verified, grey when pending.
+Timeline chip “Listed 3 days ago · Updated today” — freshness is trust.
+Honest note A short, plainly-written condition truth on certified cars, e.g. “AC blows cold; two panels
+resprayed; tyres at ~60%.” Framed box, amber border.
+3.6 Tone of Voice
+Plain English, short sentences, zero jargon without explanation, numbers over adjectives. Say “We
+checked this car ourselves on 14 Sept” not “quality assured”. Humour allowed in content hub, never
+in checkout flows. Write like the honest friend who knows cars — never like a marketer.
+• 
+HonestCars Web
+honestcarsltd.com — Website Working Document (Confidential) Page 8 of 37
+
+===== PAGE 9 =====
+4 Audiences & User Personas
+Design and build for these five people
+Persona Profile & Device Reality Primary Goals on
+the Site Design Implications
+“The Careful
+Buyer” — Chidi,
+34, oil-servicing
+engineer
+iPhone/Android on MTN data;
+browses evenings; shares
+everything to WhatsApp
+groups for opinions
+Browse verified cars,
+compare prices
+honestly, book
+inspection, use
+concierge, pay
+securely
+Fast listing grids, prominent
+filter by budget, share
+buttons with rich OG
+previews, verification
+badges, saved-cars list, clear
+₦ totals
+“The Upgrader”
+— Mrs. Amadi,
+47, business
+owner
+Low patience for forms;
+prefers talking to a human on
+WhatsApp
+Sell/swap current car,
+valuation, get
+documents sorted
+Short forms with WhatsApp
+fallback at every step;
+human-callout CTAs;
+progress saved
+automatically
+“The Dealer” —
+Emeka, lot
+owner, Aba Road
+Android phone, moderate
+digital skill, busy
+Upload cars fast, see
+leads, know what he
+owes/earns, order
+media shoots
+Dealer portal mobile-first,
+photo-first upload (camera →
+fields pre-filled later),
+WhatsApp notifications, one-
+screen dashboard
+“The Fleet
+Admin” — HR/
+Facilities officer,
+oil & gas firm
+Desktop at office, needs
+documentation
+Book hire vehicles,
+request fleet quotes,
+tracking proposals,
+download invoices
+Clean B2B pages, RFQ forms,
+downloadable PDF quotes/
+invoices, account-style
+billing
+“The Operator”
+— HonestCars
+staff
+Laptops + phones; lives in the
+admin console
+Moderate listings,
+dispatch inspectors,
+route leads, track
+payments, publish
+content
+Admin optimized for speed:
+bulk actions, keyboard-
+friendly, WhatsApp
+templates, daily KPI home
+HonestCars Web
+honestcarsltd.com — Website Working Document (Confidential) Page 9 of 37
+
+===== PAGE 10 =====
+5 Information Architecture & Navigation
+Sitemap, menus and the 2-click rule
+5.1 Top-Level Sitemap
+Public — Storefront
+/  Home
+/cars  All listings  ·  /cars/{slug}  VDP
+/cars/compare  Compare tool
+/find-my-car  Concierge request
+/sell-swap  Sell or swap flow
+/hire  Car hire
+/services  Services hub + 8 service pages
+/shop  Products + categories + checkout
+/blog  Blog — posts, categories, tags, search ·
+/blog/{slug}  article
+/guide  Curated “Honest Buyer’s Guide”
+evergreen shelf (start-here reads from the blog)
+/how-it-works  · /about  · /verification  (trust
+page) · /faq  · /contact
+/partner  Dealer recruitment page
+Legal: /terms /privacy /refunds /
+disclaimer
+Authenticated
+/account  Customer dashboard (overview,
+requests, bookings, orders, saved cars,
+documents, tracked vehicles, referrals)
+/dealer  Dealer portal (dashboard, my listings,
+add listing, leads, performance, orders &
+commissions, profile)
+/admin  Ops console (KPI home, listings
+moderation, verification queue, bookings &
+dispatch, orders & payments, concierge pipeline,
+hire calendar, CRM/leads, dealers, subscriptions,
+CMS, price-intel, reports, settings) 
+5.2 Navigation Model
+Desktop header (sticky, white, slim): Logo · Buy Cars · Services ▾ (mega-menu with 8 services,
+icon + one-liner each) · Sell/Swap · Hire · Blog · Search icon · Account icon · [Find My Car]
+primary green button.
+Mobile: hamburger opens full-height drawer (same items, accordion Services). Persistent
+bottom bar (after first scroll): Home · Cars · Find My Car · Chat (WhatsApp) · Account.
+Persistent floating WhatsApp button bottom-right on all public pages (respects bottom nav —
+sits above it, collapsible).
+Footer: 4 columns — Shop (All cars, Compare, Find My Car, Sell/Swap, Hire) / Services (all 8 +
+shop links) / Company (About, Verification, Partner, Blog, Contact, Careers-later) / Legal; plus
+contact block, CAC/registration line, payment-partner marks, and “Port Harcourt, Nigeria” local
+note.
+Cross-links: every service page ends with related listings or related service cards; every VDP
+surfaces inspection, concierge, tracking and hire cross-sells (§6.3). This is how the “plethora of
+services” stays discoverable without cluttering the store.
+THE 2-CLICK ACCEPTANCE TEST
+From the homepage, a first-time mobile user must reach any of: (a) a car listing, (b) the
+concierge form, (c) an inspection booking, (d) the shop, (e) WhatsApp chat — in no more than 2
+taps. QA verifies this in §18.3.
+• 
+• 
+• 
+• 
+• 
+HonestCars Web
+honestcarsltd.com — Website Working Document (Confidential) Page 10 of 37
+
+===== PAGE 11 =====
+6 Public-Facing Pages — Detailed Specifications
+Every page: purpose, modules, CTAs, priority. Wireframes in Appendix A.
+6.1 Homepage MUST
+Purpose: Put live cars in front of the visitor within one viewport, prove trust in 5 seconds, and route
+every other intent (services, sell/swap, hire, B2B) with zero hunting.
+Section-by-section (top → bottom)
+Module Specification
+1. Sticky header As §5.2. Slim (≤64px), white, soft shadow after scroll.
+2. Hero + instant
+search
+H1: “Every vehicle verified. Every price compared. Every deal honest.” Sub: one line
+on what HonestCars is. Search bar (Make · Model · Max budget ₦ · [Search]) →
+results at /cars  with filters applied. Beneath: 3 trust chips — {n} cars live now ·
+{n} partner dealers in PH · Verified listings only badge system.
+3. Live inventory
+grid
+“Fresh on the market” — 8 car cards (randomised mix of certified first), “View all
+{n} cars →”. T abs: All / Certified ✓ / Under ₦10m / SUVs (tab values configurable in
+admin).
+4. How it works 3 steps with icons: ① Pick a car or tell us what you want → ② We verify & compare
+prices for you → ③ Buy with protection, documents sorted.
+5. Verification
+grades strip
+The 3-badge explainer (§3.5) — one horizontal strip, links to /verification .
+6. Services suite
+grid
+“More than a car store” — 8 icon cards (Inspection, Concierge Search, Customs &
+Documents, Sell/Swap, Tracking, Car Hire, Research & Reports, Spare Parts) each
+with one-line promise + arrow. This is the primary discovery surface for the service
+suite.
+7. Social proof 3–4 testimonials with real names/areas + counters (cars verified, deals closed, ₦
+saved for buyers — admin-editable).
+8. From the Blog 3 latest posts/videos — led by the Honest Buyer’s Guide series.
+9. Dealer CTA band Navy band: “Own a car lot in PH? We bring you buyers.” → /partner .
+10. Deal-alert opt-
+in
+“Get hot verified deals on WhatsApp first” — phone input + consent checkbox
+(NDPA-compliant).
+11. Footer As §5.2.
+6.2 Car Listings — /cars MUST
+Purpose: The store. Fast, filterable, honest browsing of partner inventory.
+Layout
+Desktop: left filter rail (sticky 260px) + results grid (3-col). Mobile: full-width 1–2 col cards;
+“Filter” button opens a bottom-sheet with Apply/Clear and live result count.
+Result header: “128 cars in Port Harcourt” + sort (Recommended / Price ↑↓ / Newest / Lowest
+mileage) + saved-search button.
+• 
+• 
+HonestCars Web
+honestcarsltd.com — Website Working Document (Confidential) Page 11 of 37
+
+===== PAGE 12 =====
+Filters (left rail / sheet)
+Budget range (₦ slider + inputs) · Make & model (dependent selects, counts shown) · Year range ·
+Condition (T okunbo / Nigerian-used / New) · Body type · Transmission · Fuel type · Mileage max · 
+Verification grade (Certified only toggle — defaults off, visually promoted) · Location (PH areas;
+future cities) · Documents (customs-verified only) · Colour.
+Car card anatomy
+Photo (4:3, WebP, lazy-loaded), verification badge top-left, “Certified report” ribbon if inspection
+exists.
+Year Make Model Trim · price (₦, bold navy) · price-position dot (if data) · spec line: mileage ·
+transmission · fuel · location area.
+Actions row: [View], “＋ Compare” checkbox, WhatsApp icon (prefilled message with car ref).
+Sold/Reserved states: badge overlay; sold cars remain visible 7 days (“Sold in 6 days” is social
+proof) then archive to SEO-friendly “sold archive” with similar-cars links.
+Behaviour rules
+URL reflects filters (shareable links); no full-page reloads (AJAX or static-filter approach); “Load
+more” pagination (24/page) — no infinite scroll traps before footer cross-links.
+Empty state: “No exact matches — {n} near matches” + concierge CTA (“We’ll find it for you in
+48–72 hours →”). Every empty state routes to the concierge.
+6.3 Vehicle Detail Page (VDP) — /cars/{slug} MUST
+Purpose: The closing page. Everything needed to trust and act, nothing else.
+Desktop layout
+Left (60%): gallery (main image + thumbs, pinch-zoom on mobile, video tab if present, 360°
+embed if media package exists) → below: full spec grid (12–16 fields), features list, description,
+“Honest note” condition box (certified cars), documents strip.
+Right rail (40%, sticky): price + price-position · verification badge · key facts (year/mileage/
+transmission/location) · CTA stack: [Request Viewing] (primary) · [Buy via HonestCars
+Concierge] (secondary, explains protected purchase) · [Chat on WhatsApp] (ghost) · share icons
+(WhatsApp, copy link) · “＋ Compare” · safety note (“All payments go through HonestCars-
+protected channels. Never pay a seller directly.”) · dealer shown only as “Partner dealer · PH —
+verified by HonestCars” (no contact info — lead protection, §2.4-6).
+Below fold: inspection section (if certified: grade summary, OBD2 code count, 6-photo strip,
+“download full report PDF” gated by enquiry or ₦ micro-fee config) → service cross-sell strip
+(tracker install · insurance/docs · hire-a-driver note) → similar cars (same make or budget band) →
+recently viewed.
+VDP rules
+Every VDP carries: freshness chip, stock #, canonical URL, Vehicle schema markup (§14), and OG
+tags tuned for WhatsApp sharing (image + “2015 T oyota Camry · ₦8.5m · HonestCars-Verified”
+title).
+“Request Viewing” opens a 3-field modal (name, phone, preferred day) → creates lead in admin +
+auto-WhatsApp to ops queue. No account required to enquire (guest-first; account offered post-
+action).
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+HonestCars Web
+honestcarsltd.com — Website Working Document (Confidential) Page 12 of 37
+
+===== PAGE 13 =====
+6.4 Compare Cars — /cars/compare SHOULD
+Up to 3 selected cars side-by-side (sticky header row of photos/prices) across: price, price-position,
+year, mileage, transmission, fuel, condition grade, documents status, known faults (certified),
+running-cost estimate.
+Highlight best value per row (green tick); “Ask HonestCars to choose for me” button → concierge
+lead with compare context attached.
+6.5 “Find My Car” Concierge — /find-my-car MUST
+Purpose: Flagship service. A guided multi-step form replaces the intimidating search — SLA: 3
+verified options in 48–72 hours.
+Flow (4 steps, progress bar, auto-saved)
+The car you want: budget slider (min–max), make/model multi-select or “not sure”, body type,
+transmission, fuel, must-haves (chips: “AC must chill”, “low mileage”, “first-car friendly”, “fuel
+economy”, “family size”…), intended use (commute/family/business/ride-hailing).
+Protection options: pre-checked “physical inspection of every option ✓” (included), optional add-
+ons: document deep-verification, tracker install on delivery, post-purchase service intro.
+About you: name, WhatsApp number (OTP-lite later), timeline (ASAP/2 weeks/month/researching),
+financing needed? Y/N (routes to partner note).
+Retainer & confirmed SLA: price card (retainer ₦X — credited against success fee; “refunded if
+we find nothing that meets your brief”), Paystack/Flutterwave inline pay → success screen with 
+tracking ID + status page link ( /concierge/{id} : Searching → Options ready → Viewings →
+Closed stages; pushes WhatsApp updates at each stage).
+Admin side drives this pipeline (§7.3). Abandoned step-3 forms trigger one polite WhatsApp follow-up template.
+6.6 Sell / Swap — /sell-swap MUST
+Tab 1 — Sell my car: 3-step intake (car basics + photos upload guide → condition & documents →
+contact). Output promise: “Free valuation within 24h from live network data.” Books optional paid
+inspection for certified listing (higher price positioning).
+Tab 2 — Swap/upgrade: combines sell intake + “what you want instead” (reuses concierge
+step-1 component) → creates swap engagement in admin.
+Instant estimate widget COULD : rough band from pricing DB with “confirm with free human
+valuation” CTA.
+6.7 Services Hub & Service Pages — /services MUST
+Hub: grid of all services (same 8 as homepage + any future), each card → dedicated page. Consistent
+service-page template (so all “plethora of services” feel like one coherent suite):
+Template
+block Content
+Hero Service name, one-line promise, “from ₦X” price anchor, primary CTA (Book/Request),
+WhatsApp ghost CTA, small trust line (jobs done count)
+What you get 4–6 bullet deliverables with icons; what’s included / not included mini-table
+How it works 3–5 numbered steps with realistic timelines
+Pricing table Tiers as per Business Operating Document §12 (admin-editable price cards)
+• 
+• 
+1. 
+2. 
+3. 
+4. 
+• 
+• 
+• 
+HonestCars Web
+honestcarsltd.com — Website Working Document (Confidential) Page 13 of 37
+
+===== PAGE 14 =====
+Proof 1–2 mini case notes / testimonials for that service
+FAQ accordion 5–8 service-specific FAQs
+Conversion
+block
+Inline booking/request form + related services + related listings (where sensible)
+The service pages (slugs & booking mechanism)
+Page Slug Inline Action (all create admin records; payment where
+priced)
+Pre-Purchase
+Inspection
+/services/
+inspection
+Book: car details + location + time-slot picker + pay → calendar
+booking + inspector dispatch queue
+Customs &
+Document Services
+/services/
+documents
+Request wizard (verification / licence renewal / registration /
+tinted permit / insurance) + upload papers photos + pay
+Find-My-Car
+Concierge
+/services/
+concierge
+Rich service page wrapping §6.5 flow
+Car Tracking &
+Security
+/services/
+tracking
+Bundle picker (Standard / Premium / Fleet) → install booking +
+subscription checkout (recurring via PSP)
+Car Hire /hire Request form (dates, vehicle class, with-driver?, airport pickup
+toggle for Omagwa) → quote workflow; corporate RFQ variant
+Research & Reports /services/
+research
+Product cards: TCO report · Auction sourcing analysis · Market
+price check → brief form + pay (48–72h delivery to account)
+Paid Consultation /services/
+consultation
+30-min slot picker (calendar of rep availability) + pay → video-
+call link auto-issued
+Spare-Parts Sourcing
+(Escrow)
+/services/parts Part request form (VIN-compatible fields) → quote → milestone
+payment flow
+B2B: Dealer
+Services
+/partner Recruitment + media/lead-gen/intelligence packages enquiry →
+B2B lead pipeline; links to dealer portal login
+6.8 Products Shop — /shop MUST
+Categories: Trackers & Security · OBD2 & Diagnostics · Care Kits · (Parts are service-led → route to
+§6.7 parts page, not self-checkout).
+Product card/page: photo(s), price, stock status, key specs, “installation included?” toggle where
+relevant (tracker install = booking at checkout), warranty line, delivery options (pickup meet-
+point / PH delivery).
+Cart + checkout: guest checkout allowed; Paystack/Flutterwave inline; delivery-fee rules by area
+(admin table); order confirmation + WhatsApp notification; orders visible in account + admin order
+manager.
+Tracker SKUs auto-create a subscription record (activation checklist in admin: device installed →
+platform activated → renewal date set).
+6.9 Blog — Home of the Honest Buyer’s Guide — /blog MUST
+Purpose: The organic-growth and trust engine. Every post is a silent salesperson: it answers a real
+Nigerian car question, proves expertise, and routes the reader to live listings and paid services. The
+• 
+• 
+• 
+• 
+HonestCars Web
+honestcarsltd.com — Website Working Document (Confidential) Page 14 of 37
+
+===== PAGE 15 =====
+flagship editorial strand is the “Honest Buyer’s Guide” series (brutally honest vehicle reality
+content), supported by market intel and company news.
+Blog home — /blog
+Featured post hero card (admin-pinned) + category chip bar: All · Honest Buyer’s Guide ·
+Ownership & Maintenance · Market Intel & Prices · Company News · Video.
+Latest-posts grid (9 per “load more”), search box, tag links, “Get hot verified deals on WhatsApp”
+opt-in band, RSS link.
+Post page — /blog/{slug}
+16:9 hero image, H1, meta row (author, date, read time); long posts get an auto table-of-contents
+with anchor links.
+Body components: callout boxes, checklists, comparison tables, quote blocks, embedded YouT ube
+(facade lazy-embed for speed).
+“Cars mentioned in this article” module — auto-pulls live listings matching the post’s make/
+model tags (content sells inventory).
+Author card (name, role, short bio — E-E-A-T), share row (WhatsApp · X · Facebook · copy link — OG
+cards tuned for chat previews), related posts (3), prev/next navigation.
+Contextual service CTA footer (inspection / concierge / consultation, chosen by category); optional
+FAQ block (FAQPage schema).
+“Was this helpful?” feedback widget; no public comments at launch (moderation cost — 
+COULD  later).
+Publishing & governance (CMS)
+Workflow states: draft → in review → scheduled → published; Content/Marketing role publishes
+(§7.4); revision history; slug/meta editor; auto Article schema, branded OG card template and
+sitemap inclusion.
+/guide  serves as the curated evergreen shelf — a “start-here” reading path drawn from the
+Honest Buyer’s Guide category.
+Cadence 2–3 posts/week (owner assigned per §19); house rules: every post links ≥ 3 listing/service
+pages; categories fixed, tags governed; video scripts repurposed into posts and vice versa.
+6.10 Trust, Company & Legal Pages MUST
+/verification  — the trust page: explains the three grades, the HonestCars Checklist, photo
+examples of catches (flood, odometer), integrity rules (“inspectors never take seller money”). 
+Most underrated page on the site — give it design love.
+/how-it-works , /about  (story, mission, team, CAC details), /faq  (searchable, grouped), /contact
+(form + WhatsApp + address-note “We operate virtually in PH — inspections come to you”).
+Legal: /terms /privacy  (NDPA-aligned) /refunds /disclaimer  (inspection-report liability wording,
+price-band disclaimer) — copy supplied by HonestCars legal retainer; dev builds CMS-editable
+pages.
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+HonestCars Web
+honestcarsltd.com — Website Working Document (Confidential) Page 15 of 37
+
+===== PAGE 16 =====
+7 Accounts, Dealer Portal & Admin Back-Office
+The machinery that lets HonestCars run its daily business on the website
+7.1 Customer Account — /account MUST
+Phone-number-first auth (OTP via WhatsApp/SMS), email optional. Dashboard cards: Requests
+(concierge/sell/swap/parts statuses with timeline) · Bookings (inspections, consultations, installs) · 
+Orders (shop + receipts/invoice PDFs) · Saved cars & searches (with price-drop / new-match
+toggles) · Hire bookings · My tracked vehicles (link-out to telematics partner app + subscription
+status/renewal) · Documents (reports, memos, receipts in one place) · Referrals (personal link +
+reward status).
+7.2 Dealer Partner Portal — /dealer SHOULD (PHASE 2 HARD REQUIREMENT)
+Module Specification
+Dashboard One screen: live listings count, leads this week, views per listing, pending actions (expiring
+listings, unconfirmed stock), commission summary
+My Listings T able + card views; states: Draft / In review / Live / Reserved / Sold / Expired; quick actions
+(mark sold, edit price, add photos); bulk CSV upload COULD
+Add Listing
+wizard
+Mobile-first: photograph first (guided shot list: front ¾, rear, interior, dash, odometer,
+engine) → spec form (per schema §10) → documents status checklist → submit for review.
+Draft autosaves; admin approval required before Live (moderation queue)
+Leads inbox Buyer enquiries attributed to his listings (name, phone masked or full per policy, car ref,
+message, status); must update lead status (contacted/viewing/sold/lost) — feeds admin
+pipeline
+Performance Listing views, enquiries, response time scorecard; freshness score (+ nudge when listings
+go stale >14 days)
+Orders &
+Billing
+Commission statements per closed deal; pay for add-on services (media shoot, featured
+placement, intelligence subscription) via PSP
+Profile &
+Agreement
+Business details, lot location, digital copy of signed partnership agreement, tier badge
+7.3 Admin Console — /admin MUST
+Module Key Functions (what “runs the business” means concretely)
+KPI Home T oday: new leads, bookings, payments ₦, pending verifications, listings expiring.
+Charts: listings trend, lead funnel, revenue by service line. One-click daily summary
+to WhatsApp/email
+Listings
+Moderation
+Approval queue (dealer submissions), edit/override, verification-grade setter
+(Network-Listed → Field-Checked → Certified with checklist attachment), expiry
+automation (14-day stale → request refresh → auto-unlist), sold archive
+Leads / CRM-lite Unified inbox: listing enquiries, concierge, service requests, hire, B2B. Auto-assign
+rules (round-robin/owner), status pipeline, WhatsApp reply templates, follow-up
+reminders, lost-reason capture
+HonestCars Web
+honestcarsltd.com — Website Working Document (Confidential) Page 16 of 37
+
+===== PAGE 17 =====
+Concierge Pipeline Board view by stage (New → Searching → Options ready → Viewings → Closed);
+attach candidate cars to a request (generates the buyer’s comparison PDF semi-
+auto from listing data + inspector notes); SLA timer per request (48–72h)
+Bookings &
+Dispatch
+Calendar of inspections/consultations/installs; assign inspector; inspector mobile
+view (today’s jobs, checklist form: OBD2 codes, photo capture per section, verdict
+grades → auto-generates the client report PDF); slot capacity settings
+Orders & Payments All PSP transactions; statuses (paid/pending/refunded); receipts; payout/commission
+ledger per dealer; milestone tracker for protected purchases & parts escrow (stage:
+funds received → inspection pass → documents verified → released — manual
+approvals with audit log)
+Hire Management Vehicle pool registry (partner-owned units, docs, tracker status), availability
+calendar, booking records, incident log
+Subscriptions Tracking subscriptions (unit, client, plan, renewal date, status); renewal queue +
+auto reminders (30/7/1 day); dealer retainer/subs management
+Inventory Pricing
+Intel
+Market price-band table per make/model/year (drives price-position indicator +
+valuation tool); weekly update form + audit history
+CMS Blog posts & media, pages, FAQs, testimonials, homepage modules (featured cars,
+trust counters, banners), service price cards
+Users & Roles Staff accounts with role matrix (§7.4); dealer approvals; watchlist flag; audit log of
+sensitive actions (price overrides, payment releases, grade changes)
+Reports Date-ranged exports: sales/leads/revenue by pillar, inspector productivity, dealer
+performance, marketing UTMs (CSV/PDF)
+7.4 Roles & Permission Matrix
+Capability Super
+Admin
+Ops
+Manager Inspector Content/
+Marketing Finance Dealer
+Moderate & publish
+listings
+✓ ✓ — — — Submit only
+Set verification
+grade
+✓ ✓ (with
+audit)
+Recommend — — —
+Manage leads &
+concierge
+✓ ✓ View assigned — — Own leads
+only
+Bookings &
+dispatch
+✓ ✓ Own jobs +
+checklist
+— — —
+Payments, refunds,
+milestones, payouts
+✓ View — — ✓
+(approvals)
+Own
+statements
+CMS & marketing
+modules
+✓ ✓ — ✓ — —
+Price-intel table ✓ ✓ — — View —
+Users, roles, audit
+log
+✓ — — — — —
+HonestCars Web
+honestcarsltd.com — Website Working Document (Confidential) Page 17 of 37
+
+===== PAGE 18 =====
+7.5 Day-to-Day Workflow → Module Mapping (acceptance scenarios)
+Daily business moment (from
+Operations Plan) How the website handles it
+9:00 — Dealer posts 6 new cars Dealer portal upload → moderation queue badge → ops approves → live
++ auto “fresh on the market” eligibility
+10:15 — Buyer enquiry on a
+Camry
+VDP form/WhatsApp → CRM inbox → auto-assign → template reply → lead
+status tracked to outcome
+11:30 — Inspection booked Payment confirmed → calendar slot → inspector gets job on phone →
+checklist → client report PDF auto-emailed & filed to VIN record
+14:00 — Concierge options
+ready
+Ops attaches 3 cars + notes → system renders comparison page/PDF →
+buyer gets WhatsApp link, status auto-moves
+16:45 — Tracker installed Install checklist → subscription record activated → renewal reminders
+scheduled → MRR dashboard updates
+Friday — Pricing refresh Ops updates price-intel table → price-position indicators recalc site-wide
+Month-end — Dealer
+commissions
+Ledger → statement → dealer sees in portal → payout via PSP; results
+feed monthly report export
+HonestCars Web
+honestcarsltd.com — Website Working Document (Confidential) Page 18 of 37
+
+===== PAGE 19 =====
+8 Key User Journeys (acceptance test scripts)
+Each must run end-to-end without staff leaving the admin console
+Journey Steps (happy path) Done when…
+J1 — Buyer finds &
+acts on a car
+Home search → filters → VDP → compare 2 cars →
+Request Viewing → WhatsApp confirmation →
+viewing scheduled → buyer opts “Buy via Concierge”
+→ milestone payments → handover → review prompt
+Lead, viewing, payment
+milestones, review all
+recorded against the
+listing & user; dealer
+notified at each stage
+J2 — “Find it for me” Concierge form → retainer paid → tracking ID issued
+→ admin search → options page → viewing → close →
+cross-sell tracker/docs
+SLA timer visible; buyer
+never had to call; all
+artefacts stored in
+account
+J3 — Inspection
+booking
+Service page → slot → pay → inspector executes
+checklist on mobile → report delivered ≤4h → upsell
+prompt
+Report auto-generated
+from checklist (no re-
+typing); dispute flags exist
+J4 — Dealer submits
+stock
+Portal login → photo-first wizard → review queue →
+live → receives lead → marks sale → statement
+updates
+Dealer needs zero admin
+chat for the whole loop;
+stale-listing nudge fires at
+day 14
+J5 — Tracker
+purchase →
+subscription
+Shop bundle → checkout with install slot → install
+checklist → subscription active → renewal reminder →
+renewal pays online
+Subscription lifecycle fully
+visible in admin; no
+spreadsheet needed
+J6 — Corporate hire
+request
+/hire  RFQ → ops quote (template) → client accepts
+& pays → booking calendar → completion + invoice
+PDF
+Quote/accept/pay trail
+digital end-to-end
+J7 — Research report
+purchase
+Pick report → brief → pay → ops delivers file to
+account ≤72h → client notified → feedback request
+Delivery happens inside
+the platform (not “check
+your email thread”)
+HonestCars Web
+honestcarsltd.com — Website Working Document (Confidential) Page 19 of 37
+
+===== PAGE 20 =====
+9 Functional Requirements Register (MoSCoW)
+IDs referenced in specs, QA and invoicing milestones
+ID Requirement Priority Phase
+FR-01 Responsive listings catalogue with filter/sort/search from dealer-fed
+inventory (§6.2)
+MUST P1
+FR-02 Vehicle detail pages with gallery, spec grid, trust components, enquiry &
+WhatsApp CTAs (§6.3)
+MUST P1
+FR-03 Three-grade verification badge system + tooltips, admin-controlled (§3.5) MUST P1
+FR-04 Homepage per §6.1 incl. car search bar, inventory grid, services suite grid MUST P1
+FR-05 Concierge multi-step request with retainer payment + tracking-ID status
+page (§6.5)
+MUST P1
+FR-06 Services hub + 9 service pages on shared template with inline booking/
+request forms (§6.7)
+MUST P1
+FR-07 Inspection booking: slots, payment, assignment, mobile checklist → auto
+PDF report (§6.7, §7.3)
+MUST P1
+FR-08 Paystack/Flutterwave checkout incl. webhooks, receipts, refund flagging
+(§11)
+MUST P1
+FR-09 WhatsApp integration: deep links with prefilled refs, floating button, click-
+to-chat on leads (§11)
+MUST P1
+FR-10 Admin: listings moderation, verification grades, expiry automation, sold
+archive (§7.3)
+MUST P1
+FR-11 Admin: leads/CRM-lite inbox with assignment, statuses, WhatsApp
+templates (§7.3)
+MUST P1
+FR-12 Admin: bookings calendar & inspector dispatch incl. mobile job view (§7.3) MUST P1
+FR-13 Auth: phone-first customer accounts with dashboard (requests/bookings/
+orders/saved) (§7.1)
+MUST P1
+FR-14 Sell/Swap intake flows + auto valuation request task (§6.6) MUST P1
+FR-15 Products shop: categories, cart, guest checkout, delivery fee rules, orders
+module (§6.8)
+MUST P1
+FR-16 Compare tool (≤3 cars, admin-defined comparison rows) (§6.4) SHOULD P1
+FR-17 Dealer portal: dashboard, listing wizard, leads inbox, freshness nudges
+(§7.2)
+SHOULD P2
+FR-18 Dealer commission ledger & statements; add-on service purchases (§7.2) SHOULD P2
+FR-19 Concierge options-page auto-render (comparison PDF/page from listing
+data) (§7.3)
+SHOULD P2
+FR-20 Tracking subscriptions module: activation checklist, renewal reminders,
+online renewals (§7.3)
+SHOULD P2
+FR-21 Milestone/protected-payment tracker with approvals & audit log (§7.3) SHOULD P2
+HonestCars Web
+honestcarsltd.com — Website Working Document (Confidential) Page 20 of 37
+
+===== PAGE 21 =====
+FR-22 Hire management: pool registry, calendar, booking records (§7.3) SHOULD P2
+FR-23 Price-intel table driving price-position indicators + valuation bands (§7.3) SHOULD P2
+FR-24 Blog core: CMS publishing workflow (draft/review/schedule/publish), post
+pages with Article schema & OG cards, categories, video posts, service-CTA
+footers, feedback widget (§6.9)
+MUST P1
+FR-25 Saved cars & saved searches with price-drop/new-match alerts (WhatsApp/
+email)
+SHOULD P2
+FR-26 Dealer recruitment funnel page /partner  with application form → admin
+approval (§6.7)
+MUST P1
+FR-27 Reports: sales/leads/revenue exports, KPI dashboard home (§7.3) SHOULD P2
+FR-28 Referral module (links, attribution, reward status) (§7.1) COULD P3
+FR-29 Instant valuation widget from price-intel data (§6.6) COULD P3
+FR-30 PWA (installable, offline shell, push via web notifications) COULD P3
+FR-31 WhatsApp Cloud API two-way bot (lead capture inside chat, template
+journeys)
+COULD P3
+FR-32 Multi-city inventory structure (Owerri/Aba/Benin) with area switcher COULD P3
+FR-33 Dealer bulk CSV/API listing import COULD P3
+FR-34 Financing-lead partner handoff module COULD P3
+FR-35 Blog enhancements: author pages, tag taxonomy with listing auto-
+suggestions, RSS feed, related-posts engine, dynamic car-listing embeds,
+editorial calendar view (§6.9)
+SHOULD P2
+Phases defined in §18. “P1” = MVP launch scope. Any MUST  failing at acceptance = no sign-off.
+HonestCars Web
+honestcarsltd.com — Website Working Document (Confidential) Page 21 of 37
+
+===== PAGE 22 =====
+10 Data & Content Model
+Core entities and the vehicle listing schema developers should implement
+10.1 Core Entities (relationship overview)
+VehicleListing ← belongs to → Dealer; has many Media, Lead; optional one InspectionReport.
+User (customer) has many ServiceRequest (types: concierge, sell, swap, documents, research,
+parts, consultation), Booking (inspection/install/consultation), Order (shop/tracker), 
+Subscription (tracking), SavedCar/SavedSearch. 
+Dealer has many Listings, LeadAssignment, CommissionEntry, DealerOrder.
+Payment polymorphic: retainer, order, booking, subscription renewal, milestone; links to PSP
+reference.
+Article, Page, FAQ, Testimonial via CMS. PriceBand (make/model/year → min/max) powers
+price-position.
+HireVehicle (pool), HireBooking, IncidentLog.
+10.2 Vehicle Listing Schema (summary — full field table in Appendix B)
+Group Fields (abridged)
+Identity id, stock_no, dealer_id, status(draft/in_review/live/reserved/sold/expired), verification_grade,
+created/updated/published_at, expires_at
+Vehicle make, model, year, trim, vin(hidden), body_type, transmission, fuel_type, engine_size,
+drivetrain, ext_colour, int_colour, condition(tokunbo/nigerian_used/new), mileage_km,
+features[]
+Commercial asking_price, negotiable(bool), market_band_min/max (auto from PriceBand), price_position
+(computed), commission_terms_ref
+Location &
+docs
+city, area, documents{customs, registration, duty_sighted}, flood_check(none/pass/
+suspect), accident_flag
+Content description, honest_note, media[] {url,type,video}, inspection_report_id?, seo_slug
+Metrics views, enquiries, saves (counters for dealer/admin stats)
+VIN visible to ops only. All prices stored as integer kobo internally; displayed ₦ formatted.
+• 
+• 
+• 
+• 
+• 
+• 
+HonestCars Web
+honestcarsltd.com — Website Working Document (Confidential) Page 22 of 37
+
+===== PAGE 23 =====
+11 Integrations & Third-Party Services
+Plumbing list with purpose, phase and failure behaviour
+Service Purpose Phase Notes / Failure Behaviour
+Paystack or
+Flutterwave
+Card/bank/transfer payments;
+recurring (subscriptions); transfers
+API for dealer payouts; split
+payments later
+P1 Webhooks verified; pending-transfer
+states supported (bank transfer is
+common); all amounts confirmed via
+webhook, never client-side
+WhatsApp
+Business
+P1: wa.me  deep links w/ prefilled
+text incl. car stock #; click-to-chat
+lead source tags. P3: Cloud API bot
+P1 /
+P3
+Every chat entry tagged with source
+(VDP id, service page) for attribution
+OTP SMS (e.g.,
+T ermii/T wilio)
+Phone verification, critical alerts
+fallback
+P1 WhatsApp-first where possible; SMS as
+fallback channel
+Email (SendGrid/
+Resend etc.)
+Receipts, reports delivery,
+notifications, deal alerts
+P1 Transactional templates branded; SPF/
+DKIM configured
+Google Maps /
+Places
+Inspection-location capture, area
+autocomplete (PH areas), meet-
+point pins
+P2 Graceful degradation to manual text
+input offline/low-data mode
+GA4 + Meta Pixel Analytics & ad attribution (§15) P1 Consent banner; server-side events for
+purchases where feasible
+Telematics
+partner portal
+Tracker provisioning/subscription
+status; deep-link from customer
+account
+P2 Manual sync acceptable initially; API if
+partner offers one
+reCAPTCHA /
+Turnstile
+Spam control on all public forms P1 Invisible mode to protect the
+minimalist UX
+Storage + CDN
+(S3-compatible +
+CDN)
+Media pipeline: on-upload
+compress/resize WebP variants,
+video transcoding later
+P1 Serve scaled variants only; originals
+retained
+HonestCars Web
+honestcarsltd.com — Website Working Document (Confidential) Page 23 of 37
+
+===== PAGE 24 =====
+12 Non-Functional Requirements
+Performance budgets, security, privacy, SEO-tech, reliability
+12.1 Performance Budgets (hard requirements)
+Metric Budget Context
+LCP (listings, VDP, home) < 2.5s Moto-G-class Android, Chrome, “Fast 3G”
+profile
+INP / CLS < 200ms / < 0.1 Core Web Vitals all-green on key templates
+Initial page weight
+(compressed)
+≤ 1.2MB home · ≤ 1.5MB VDP Images WebP/AVIF, responsive srcset, lazy
+below fold
+JS bundle ≤ 180KB gz initial Route-level code splitting; no heavy framework
+bleed on public pages
+Fonts 2 families max, subset, font-
+display: swap
+Self-hosted
+Server response (TTFB) < 600ms cached / < 1.2s
+dynamic
+Full-page cache for listings; CDN edge for
+assets
+12.2 Security & Privacy
+HTTPS everywhere (HSTS); OWASP ASVS baseline: parameterised queries, XSS escaping, CSRF
+tokens, rate-limited auth/OTP, secure headers.
+RBAC per §7.4; least-privilege staff accounts; MFA for admin roles; full audit log of sensitive
+actions (grades, refunds, releases, price overrides).
+Payments: never store card data (PSP-hosted fields only); webhook signature verification;
+idempotent order processing.
+NDPA compliance: consent capture for marketing/opt-ins (deal alerts), privacy policy, data-
+subject request handling (export/delete), minimal PII in analytics, encrypted at rest where
+supported.
+Media: strip EXIF geotags from uploaded photos; dealers never see buyer phone unless lead policy
+allows.
+Admin access IP-allowlist COULD ; daily automated backups + quarterly restore test; secrets in
+env vars/manager, never repo.
+12.3 Reliability & Operability
+Uptime target 99.5%+; uptime monitor with alert to ops WhatsApp/email; status handling for PSP
+downtime (queue “awaiting payment” gracefully).
+Error monitoring (e.g., Sentry-class tool) on front & back; structured logs; health endpoint.
+Migrations reversible; staging environment mandatory; feature flags for portal release.
+12.4 SEO-Technical Requirements
+Server-rendered or statically generated public pages (no client-only content); clean slugs (§14);
+canonical tags; XML sitemap auto-regenerating on listing changes; robots directives sane.
+Core Web Vitals green = ranking requirement, not vanity (§12.1).
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+HonestCars Web
+honestcarsltd.com — Website Working Document (Confidential) Page 24 of 37
+
+===== PAGE 25 =====
+Schema.org JSON-LD: Vehicle + Offer  on VDPs, LocalBusiness  site-wide, FAQPage  where FAQs, 
+Article  on blog posts, BreadcrumbList .
+Open Graph/Twitter cards tuned for WhatsApp sharing (og:image 1200×630 auto-
+composited with car photo + price badge would be ideal; minimum: correct image/title/
+description).
+• 
+• 
+HonestCars Web
+honestcarsltd.com — Website Working Document (Confidential) Page 25 of 37
+
+===== PAGE 26 =====
+13 Mobile-First & Low-Bandwidth Strategy
+Because that is how Port Harcourt will actually use this site
+13.1 Responsive Plan
+Breakpoint Key behaviours
+≤ 480px
+(primary)
+Design starts here. 1-col cards (2-col only for shop), bottom-sheet filters, sticky bottom nav,
+sticky VDP CTA bar (“Request Viewing · WhatsApp”), thumb-reach primary actions, no
+hover dependencies
+481–768px 2-col grids; filter sheet persists; header compresses to hamburger earlier
+769–1200px Left filter rail appears; 3-col cards; sticky VDP right rail
+> 1200px Max-width 1200px container; no layout surprises; enhanced hover states
+13.2 Low-Bandwidth & Data-Conscious Features
+Progressive image loading (blur-up placeholders), adaptive quality on Save-Data  header, video
+strictly tap-to-load with duration/size label.
+Filters update via lightweight fetch; forms resilient to connection drops (local-state drafts, “resume
+where you left off”).
+Offline-tolerant PWA shell COULD : cached listings shell + queued enquiries that send when back
+online.
+All critical journeys (view car → enquire → concierge → pay) must complete comfortably on a ₦data-
+conscious connection — QA tests on throttled profiles (§18.3).
+13.3 Mobile-Specific UX Rules
+T ap targets ≥ 44px; calls/WhatsApp links use native protocols; numbers inputmode=”numeric”.
+Photo galleries: swipeable, pinch zoom, fullscreen; upload flows accept camera capture directly
+(dealer wizard, sell/swap, documents).
+Sticky CTAs never cover content; safe-area insets respected; no interstitials or app-download
+nagging.
+• 
+• 
+• 
+• 
+• 
+• 
+• 
+HonestCars Web
+honestcarsltd.com — Website Working Document (Confidential) Page 26 of 37
+
+===== PAGE 27 =====
+14 SEO & Growth Foundations
+Own “car” searches in Port Harcourt, then widen
+14.1 URL & Keyword Architecture
+Page type Pattern Target intent examples
+VDP /cars/2015-toyota-camry-le-
+{stock}
+“2015 camry for sale port harcourt”
+Listing facets (indexable
+subset only)
+/cars/toyota , /cars/toyota/
+camry , /cars/suv-under-15m
+“tokunbo camry price in PH”, “suv under
+15 million naira”
+Services /services/inspection  etc. “car inspection service port harcourt”,
+“customs verification nigeria”
+Blog /blog/{slug} Long-tail ownership & buying questions
+(content plan §16)
+Facet pages hand-curated (title, intro copy, canonical rules); raw filter combinations stay noindex  to avoid thin-
+page bloat. Sold archive pages 301 to relevant facet after 90 days.
+14.2 On-Page Templates (meta patterns)
+VDP title: “{Year} {Make} {Model} {Trim} for Sale in Port Harcourt — ₦{price} | HonestCars” ·
+description with mileage/condition/verification grade.
+Service title: “{Service} in Port Harcourt — {promise + from-price} | HonestCars”.
+H1 uniqueness enforced; image alt text auto-composed from vehicle fields (editable).
+14.3 Local & Off-Site
+Google Business Profile (service-area business), NAP consistency, review capture flow post-delivery
+(§15 events), LocalBusiness schema with geo for PH.
+Directory/profile citations (Nigerian business directories), dealer cross-linking where agreed,
+content-led organic + YouT ube interlinking with the Blog.
+• 
+• 
+• 
+• 
+• 
+HonestCars Web
+honestcarsltd.com — Website Working Document (Confidential) Page 27 of 37
+
+===== PAGE 28 =====
+15 Analytics & Event Tracking
+If it makes money or leaks money, it gets an event
+15.1 Event Plan (implement via GA4 + server-side where feasible)
+Category Events (snake_case)
+Discovery search_used  (query, filters), filter_applied , sort_changed , saved_search_created
+Listing listing_impression , listing_view  (id, grade, price_position), gallery_engaged , 
+compare_added , whatsapp_click  (source), viewing_requested
+Funnels concierge_started/step_completed/abandoned/retainer_paid  · booking_started/completed
+(type) · sell_swap_submitted  · hire_requested  · consultation_purchased
+Commerce view_item/add_to_cart/begin_checkout/purchase  (enhanced ecommerce), 
+subscription_renewed
+Dealer/
+B2B
+dealer_application_submitted , dealer_login_active  (weekly cohort), 
+services_enquiry_submitted
+Brand article_read_75 , blog_post_shared , deal_alert_signup , review_link_clicked
+15.2 Dashboards & Reporting
+Marketing dashboard: channel → lead → paid conversion by funnel; CAC guardrails.
+Ops dashboard (admin home §7.3): funnel counts, SLA timers, revenue by pillar.
+UTM discipline document issued; paid campaigns must not launch before events verified in QA
+(§18.3).
+• 
+• 
+• 
+HonestCars Web
+honestcarsltd.com — Website Working Document (Confidential) Page 28 of 37
+
+===== PAGE 29 =====
+16 Content Requirements & Copy Direction
+What the client must supply / what the writer produces, before build freeze
+16.1 Content Inventory (owner → due)
+Asset Qty (launch) Owner
+Homepage hero + section copy (per §6.1) 1 set Writer with client voice
+review
+Service pages (template §6.7) 9 pages complete (copy,
+FAQs, price cards)
+Writer + client ops review
+Seed listings with full photo sets (12+ shots) ≥ 60 listings across 10+
+partners
+Client network + media
+unit
+Blog posts (incl. Honest Buyer’s Guide series) 8 posts + 3 embedded
+videos
+Client content lead
+T estimonials with photos/areas 6–8 Client (from pilot
+inspections/concierge)
+Verification explainer + case photos 1 page + 6 “catch”
+examples
+Client inspection team
+Legal pages (terms, privacy-NDPA, refunds,
+disclaimer)
+4 docs Client legal retainer → CMS
+Dealer photo-style guide (1-pager PDF) 1 Designer + client
+Microcopy library (buttons, errors, empties,
+notifications, WhatsApp templates)
+Full set Writer (uses Appendix D
+baseline)
+16.2 Voice Rules Recap (bind to §3.6)
+Numbers over adjectives; promise + proof adjacent; every price says what it includes.
+No FOMO spam, no fake countdowns, no “hot deal!!!” — the honesty IS the pitch.
+Nigerian-context fluency without stereotype: “T okunbo”, “PH traffic”, “customs papers” used
+naturally and explained once.
+• 
+• 
+• 
+HonestCars Web
+honestcarsltd.com — Website Working Document (Confidential) Page 29 of 37
+
+===== PAGE 30 =====
+17 Technical Approach & Stack Options
+Regardless-of-stack Requirements
+Git + code review + staging/production environments; CI lint/test; secrets management; daily
+backups; documented handover (repo, hosting, DNS, env README).
+Full code & data ownership by HonestCars LTD (contract clause); admin documentation + 2
+recorded training sessions + 30-day post-launch support window.
+• 
+• 
+H o n e s t C a r s  We b
+honestcarsltd.com — Website Working Document (Confidential) Page 30 of 37
+17
+Technical Approach & Stack
+The website will be built using the following approved technology stack. This stack is the implementation baseline for the project.
+17.1 Approved Technology Stack
+Frontend: Vanilla HTML, CSS & JavaScript
+Backend: Node.js
+Database: MySQL
+PHP: Only where specifically required for an existing integration or
+isolated server-side utility.
+17.2 Architecture Direction
+Browser · Vanilla HTML/CSS/JavaScript · Node.js API / application server
+· MySQL database
+PHP is a server-side programming language, not a database. It must not
+replace Node.js as the primary backend or MySQL as the database.
+CI lint/test checks.
+· Use environment variables/secrets management and daily database
+backups.
+· Provide documented handover covering the repository, hosting, DNS,
+environment setup, and deployment.
+· No frontend frameworks; use semantic HTML, modern CSS, and modular vanilla JavaScript.
+
+===== PAGE 31 =====
+18 Build Phasing, Deliverables & Acceptance
+Suggested 14-week plan to full Phase-2; adjust with team capacity
+Phase / Weeks Scope Exit Gate
+P0 — Discovery
+& Design
+Weeks 1–3
+Kickoff & stack decision; design system in Figma (mobile-
+first templates: home, listings, VDP, concierge, service,
+admin key screens); content production starts (§16); infra/
+DNS/PSP accounts set up
+Approved designs +
+signed scope + content ≥
+50% loaded
+P1 — MVP Build
+Weeks 4–9
+All MUST  FRs (§9): storefront, VDP, concierge, services,
+inspection dispatch, shop, payments, WhatsApp, accounts,
+core admin (moderation/leads/orders), blog module, SEO-
+tech, analytics
+§18.3 acceptance passed
+on staging; 60+ seed
+listings live; soft-launch
+P1.5 — Soft
+Launch
+Hardening
+Weeks 10–11
+Real-traffic burn-in with pilot dealers; bug fixes;
+performance tuning to budgets; staff training; SOP
+alignment with ops team
+Zero critical defects 5
+days; team operating
+daily via admin
+P2 — Portals &
+Recurring
+Weeks 12–14+
+SHOULD  set: dealer portal, subscriptions, milestones, hire
+mgmt, price-intel, blog enhancements, reports, alerts
+Dealer self-serve ≥ 60%
+of new listings; renewals
+& statements digital
+P3 — Growth
+features
+Backlog
+COULD  items (§9) by business priority Quarterly roadmap review
+18.2 Deliverables Checklist (agency/team → client)
+☐ Figma design system + all approved screens (mobile & desktop)
+☐ Production website, dealer portal, admin console on client-owned hosting & domain
+☐ Source repository with README (build, deploy, env), database schema doc
+☐ Payment/webhook configuration evidence + test transaction log
+☐ Analytics property with implemented event plan (§15) + dashboards
+☐ SEO pack: sitemap, schema validation report, OG preview tests (incl. WhatsApp)
+☐ Blog live with launch content loaded (min. 8 posts incl. the Honest Buyer’s Guide series)
+☐ Performance audit report proving §12.1 budgets on key templates
+☐ Training: 2 live sessions + recorded walkthroughs + quick-start PDF for staff & dealers
+☐ 30-day warranty bug-fix window + handover/on-call contacts sheet
+18.3 Acceptance Criteria (samples — QA builds full suite from §8 + §9)
+☐ 2-tap test passes from homepage to: a car, concierge form, inspection booking, shop, WhatsApp
+(mobile)
+☐ J1–J7 journeys complete end-to-end on staging with real PSP test cards and real WhatsApp
+numbers
+☐ Dealer submits listing from a mid-range Android over 3G in < 10 minutes incl. photos
+☐ Inspection checklist → client PDF renders correctly with photos and grades; delivered ≤ 4h SLA
+path works
+☐ Core Web Vitals green on home/listings/VDP on throttled profile; page weights within budget
+HonestCars Web
+honestcarsltd.com — Website Working Document (Confidential) Page 31 of 37
+
+===== PAGE 32 =====
+☐ Payment flows: success, failed, abandoned, webhook-retry, refund flag — all states recorded
+correctly
+☐ Dealer contact info does not appear anywhere public (code & content audit)
+☐ Admin RBAC enforced (test each §7.4 cell); audit log captures sensitive actions
+☐ Sold & expired listings follow §6.2 behaviour; SEO facet rules respected
+☐ NDPA consent records exist for deal-alert signups; privacy requests actionable in admin
+HonestCars Web
+honestcarsltd.com — Website Working Document (Confidential) Page 32 of 37
+
+===== PAGE 33 =====
+19 Open Questions & Decisions for the Client
+Resolve at kickoff — blockers marked ●
+# Decision Needed Options / Recommendation
+● Stack choice (§17) Option A recommended; confirm budget envelope & team
+● Hosting & domain Confirm honestcarsltd.com DNS control; recommended managed VPS/PaaS
+with Nigeria-friendly latency + CDN
+● Payment merchant Paystack vs Flutterwave business account, KYC completed, settlement bank
+linked
+● Launch pricing on
+site
+Final ₦ figures for retainers, inspections, consultations, trackers, delivery fees
+(from Operating Doc §12)
+Brand assets Final logo files, or commission simple wordmark refresh within §3 system
+WhatsApp Business Dedicated business number decision; listed phone vs chat-only policy
+Lead phone-masking
+policy
+Show full buyer phone to dealers vs masked-till-viewing (recommend masked-
+till-appointed)
+Finance partner Any bank/MFB partner for “financing needed?” concierge branch, or defer
+(FR-34)
+Content cadence
+owners
+Who publishes weekly blog content & who maintains price-intel table (ops
+roles)
+Dealer pilot list First 10 dealers for soft launch listing seeding & portal pilot
+HonestCars Web
+honestcarsltd.com — Website Working Document (Confidential) Page 33 of 37
+
+===== PAGE 34 =====
+20 Appendices
+Wireframes • data schema • navigation map • microcopy • pre-flight checklist
+Appendix A — Reference Wireframes (guides, not pixel law)
+A-1. Homepage (desktop)
+DESKTOP · 1200PX CONTAINER
+LOGO · BUY CARS · SERVICES ▾ · SELL/SWAP · HIRE · GUIDE · [SEARCH] · [ACCOUNT] · [FIND MY CAR]
+H1 — “EVERY VEHICLE VERIFIED. EVERY PRICE COMPARED. EVERY DEAL
+HONEST.”
+[ MAKE ▾ ] [ MODEL ▾ ] [ MAX BUDGET ₦ ] [ SEARCH ]
+TRUST CHIPS: 412 CARS LIVE · 37 PARTNER DEALERS · PH
+HERO IMAGE / CERTIFIED CAR OF
+THE WEEK
+FRESH ON THE MARKET — 8 CAR CARDS (TABS: ALL / CERTIFIED / UNDER ₦10M / SUVS) · VIEW ALL →
+HOW IT WORKS ① ② ③
+VERIFICATION GRADES STRIP ● NETWORK-LISTED · ● FIELD-CHECKED · ● CERTIFIED
+SERVICE CARDS ×8 (INSPECTION · CONCIERGE · DOCUMENTS · SELL/SWAP ·
+TRACKING · HIRE · RESEARCH · PARTS)
+TESTIMONIALS +
+COUNTERS
+FROM THE BLOG (3) · DEALER CTA BAND · DEAL-ALERT OPT-IN
+FOOTER — SHOP / SERVICES / COMPANY / LEGAL + CONTACT + PAYMENT MARKS
+HonestCars Web
+honestcarsltd.com — Website Working Document (Confidential) Page 34 of 37
+
+===== PAGE 35 =====
+A-2. Mobile — Homepage & VDP
+MOBILE · HOME
+☰ HONESTCARS [SEARCH][ACCOUNT]
+H1 + SEARCH BAR + TRUST CHIPS
+FRESH CARS — CARDS ×6 (1-COL)
+GRADE STRIP
+SERVICES ×8 (2-COL ICONS)
+…FOOTER…
+STICKY BOTTOM NAV: HOME · CARS ·
+FIND MY CAR · [CHAT] · ACCOUNT
+MOBILE · VEHICLE DETAIL
+← GALLERY (SWIPE) ● CERTIFIED
+BADGE
+PRICE ₦8,650,000 · WITHIN MARKET
+BAND
+2015 TOYOTA CAMRY LE · SPECS LINE
+HONEST NOTE BOX
+SPEC GRID · DOCS STRIP ✓✓✓
+SIMILAR CARS (SCROLL-SNAP)
+STICKY CTA BAR: [REQUEST
+VIEWING] · [CHAT] WHATSAPP
+Appendix B — Vehicle Listing Field Schema (full)
+Field Type Req? Notes
+stock_no string, unique ✓ Auto: HC-PH-0001
+dealer_id FK dealer ✓ Source listing owner
+status enum ✓ draft/in_review/live/reserved/sold/expired
+verification_grade enum ✓ network_listed/field_checked/certified; default
+network_listed
+make / model / year / trim taxonomy+str ✓ Controlled lists; feeds facets/SEO
+vin string — Ops-only visibility; encrypted at rest
+body_type / transmission /
+fuel_type / drivetrain
+enums ✓/✓/✓/
+—
+Filter facets
+engine_size, ext_colour,
+int_colour
+str —
+condition enum ✓ tokunbo / nigerian_used / new
+mileage_km int ✓ Odometer; + mileage_verified bool (inspector)
+asking_price int (kobo) ✓ + negotiable bool
+price_band_min/max int auto From PriceBand table; powers price_position
+enum(below/within/premium/no_data)
+city / area enum/str ✓ Default Port Harcourt; area list admin-
+managed
+HonestCars Web
+honestcarsltd.com — Website Working Document (Confidential) Page 35 of 37
+
+===== PAGE 36 =====
+documents{} json ✓ customs_verified, registration, duty_sighted,
+tinted_permit
+flood_check / accident_flag enums — none/pass/suspect ; none/yes/repaired
+features[] json array — Chips on VDP
+description / honest_note text ✓/— honest_note required when certified
+media[] rel ≥ 8
+photos
+type: image/video/360; order; alt auto
+inspection_report_id FK — Attaches grade, codes, photos, verdict
+views / enquiries / saves ints auto Dealer + admin stats
+seo_slug string auto {year}-{make}-{model}-{trim}-{stock}
+created/published/updated/
+expires_at
+datetime auto 14-day expiry default w/ refresh flow
+Appendix C — Navigation & Footer Map (final labels)
+Header
+Buy Cars (→/cars) · Services ▾ [Inspection · Find
+My Car · Customs & Documents · Sell/Swap ·
+Tracking · Car Hire · Research & Reports ·
+Consultation · Spare Parts] · Sell/Swap (/sell-
+swap) · Hire (/hire) · Blog · Find My Car [button] ·
+Search · Account
+Footer columns
+① Shop: All Cars, Certified Cars, Compare, Find
+My Car, Sell/Swap, Hire ② Services: all 8 + Shop
+③ Company: About, Verification, Partner With Us,
+Blog, FAQ, Contact ④ Legal: T erms, Privacy,
+Refunds, Disclaimer + contact block + CAC line
+Appendix D — Microcopy Library (starting set)
+Context Copy
+Hero H1/sub “Every vehicle verified. Every price compared. Every deal honest.” / “Verified cars from
+37+ trusted Port Harcourt lots — with inspections, documents and negotiation handled
+for you.”
+Empty results “No exact matches in the network right now — but {n} cars are close. Or tell us what you
+want and we’ll find and verify it within 72 hours.” [Find It For Me]
+VDP safety note “All payments for this car go through HonestCars-protected channels. Never pay a seller
+or third party directly.”
+Price-position
+“within”
+“Priced within the current PH market band for this model and condition.”
+Concierge
+success
+“Brief received and retainer confirmed. Your search ID is HC-2481. We’ll present up to 3
+verified, inspected options within 48–72 hours — watch this page or your WhatsApp.”
+Booking
+confirmation
+“Inspection booked: {date}, {slot}, {location}. Our inspector will call 30 minutes before
+arrival. Report lands here within 4 hours of the check.”
+Stale dealer
+nudge
+“5 of your listings expire in 2 days. T ap to confirm they’re still available, or they’ll pause
+automatically.”
+HonestCars Web
+honestcarsltd.com — Website Working Document (Confidential) Page 36 of 37
+
+===== PAGE 37 =====
+Error (payment) “Payment didn’t complete — no money has moved (or any debit reverses automatically).
+Try again, or chat with us and we’ll sort it.”
+Document Control & Sign-Off
+Version Date Author Product Owner
+Sign-Off Next Review
+1.0 September
+2026
+Honest Cars LTD — Strategy
+documentation
+At Phase-0 gate
+(design freeze)
+Scope of this document: design & functional specification for honestcarsltd.com. It references, and should be read alongside,
+the Honest Cars LTD Business Operating Document v1.0 for service definitions, pricing philosophy and operational SOPs.
+Nothing herein is a commitment of final visual design, vendor selection, or legal text (legal pages to be supplied by the
+client’s counsel). © 2026 Honest Cars LTD — Confidential.
+HonestCars Web
+honestcarsltd.com — Website Working Document (Confidential) Page 37 of 37

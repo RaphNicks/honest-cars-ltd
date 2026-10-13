@@ -1,0 +1,255 @@
+<%#
+  Service page template — §6.7, blocks in PRD order:
+    Hero (name · promise · from-price · primary CTA · WhatsApp ghost · trust line)
+    What you get (4–6 deliverables + included / not-included mini-table)
+    How it works (3–5 steps with realistic timelines)
+    Pricing table (admin-editable tiers)
+    Proof (1–2 case notes / testimonials for this service)
+    FAQ accordion (5–8 service-specific answers)
+    Conversion block (inline booking/request form + related services + related listings)
+%>
+
+<section class="service-hero">
+  <div class="container">
+    <%- include('../partials/breadcrumbs', { crumbs: trail }) %>
+    <div class="service-hero__grid">
+      <div>
+        <p class="eyebrow">HonestCars service</p>
+        <h1 class="service-hero__title"><%= service.name %></h1>
+        <p class="lead"><%= service.heroCopy %></p>
+
+        <div class="service-hero__facts">
+          <% if (service.fromPriceKobo) { %>
+            <span class="service-hero__price">
+              from <strong><%= helpers.formatNaira(service.fromPriceKobo) %></strong>
+            </span>
+          <% } %>
+          <% if (service.jobsDone) { %>
+            <span class="trust-chip"><%- helpers.icon('checkCircle', { size: 16 }) %><strong><%= service.jobsDone %></strong> jobs done</span>
+          <% } %>
+          <% if (service.slaCopy) { %>
+            <span class="trust-chip"><%- helpers.icon('clock', { size: 16 }) %><%= service.slaCopy %></span>
+          <% } %>
+        </div>
+
+        <div class="btn-row mt-2">
+          <a class="btn btn--primary btn--lg" href="#book"
+             data-event="booking_started" data-source="service_hero" data-type="<%= service.slug %>">
+            <%= service.ctaLabel %>
+          </a>
+          <a class="btn btn--ghost btn--lg" href="<%= site.nav.whatsapp.general %>" target="_blank" rel="noopener"
+             data-event="whatsapp_click" data-source="service_hero">
+            <%- helpers.icon('whatsapp', { size: 20 }) %> Ask on WhatsApp
+          </a>
+        </div>
+      </div>
+
+      <aside class="service-hero__card card card__body">
+        <h2 class="service-hero__card-title">Start here</h2>
+        <ul class="tick-list">
+          <li>One brief, one point of contact</li>
+          <li>Written report or quote before you commit</li>
+          <li>Port Harcourt only — inspections come to the car</li>
+        </ul>
+        <a class="btn btn--secondary btn--block" href="/services">See the whole suite</a>
+      </aside>
+    </div>
+  </div>
+</section>
+
+<% if (service.deliverables && service.deliverables.length) { %>
+<section class="section" aria-labelledby="what-you-get">
+  <div class="container">
+    <div class="section-head">
+      <h2 id="what-you-get">What you get</h2>
+    </div>
+    <div class="grid grid--2">
+      <% service.deliverables.forEach(function (item) { %>
+        <div class="deliverable">
+          <span class="deliverable__icon"><%- helpers.icon('checkCircle', { size: 20 }) %></span>
+          <div>
+            <h3 class="deliverable__title"><%= item.title %></h3>
+            <p class="mb-0"><%= item.copy %></p>
+          </div>
+        </div>
+      <% }); %>
+    </div>
+
+    <% if ((service.included && service.included.length) || (service.excluded && service.excluded.length)) { %>
+      <div class="table-wrap mt-3">
+        <table class="table table--split">
+          <caption class="visually-hidden">What is included and what is not</caption>
+          <thead>
+            <tr>
+              <th scope="col">Included</th>
+              <th scope="col">Not included</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>
+                <ul class="tick-list">
+                  <% service.included.forEach(function (line) { %>
+                    <li class="tick-list__yes"><%- helpers.icon('check', { size: 16 }) %> <span><%= line %></span></li>
+                  <% }); %>
+                </ul>
+              </td>
+              <td>
+                <ul class="tick-list">
+                  <% service.excluded.forEach(function (line) { %>
+                    <li class="tick-list__no"><%- helpers.icon('close', { size: 16 }) %> <span><%= line %></span></li>
+                  <% }); %>
+                </ul>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    <% } %>
+  </div>
+</section>
+<% } %>
+
+<% if (service.steps && service.steps.length) { %>
+<section class="section section--surface" aria-labelledby="how-it-works">
+  <div class="container">
+    <div class="section-head">
+      <h2 id="how-it-works">How it works</h2>
+    </div>
+    <ol class="steps steps--numbered">
+      <% service.steps.forEach(function (step, index) { %>
+        <li class="step">
+          <span class="step__num"><%= index + 1 %></span>
+          <div>
+            <strong><%= step.title %></strong>
+            <p class="mb-0"><%= step.copy %></p>
+            <% if (step.timeline) { %>
+              <span class="timeline-chip"><%- helpers.icon('clock', { size: 14 }) %> <%= step.timeline %></span>
+            <% } %>
+          </div>
+        </li>
+      <% }); %>
+    </ol>
+  </div>
+</section>
+<% } %>
+
+<% if (service.pricing && service.pricing.length) { %>
+<section class="section" aria-labelledby="pricing">
+  <div class="container">
+    <div class="section-head">
+      <h2 id="pricing">Pricing</h2>
+      <p class="section-head__note mb-0">Placeholder pricing for review — final numbers come from the Business Operating Document.</p>
+    </div>
+    <div class="price-cards">
+      <% service.pricing.forEach(function (tier, index) { %>
+        <div class="price-card<%= index === 0 ? ' price-card--lead' : '' %>">
+          <h3 class="price-card__tier"><%= tier.tier %></h3>
+          <p class="price-card__price"><%= tier.price %></p>
+          <ul class="tick-list">
+            <% (tier.includes || []).forEach(function (line) { %>
+              <li class="tick-list__yes"><%- helpers.icon('check', { size: 16 }) %> <span><%= line %></span></li>
+            <% }); %>
+          </ul>
+          <a class="btn <%= index === 0 ? 'btn--primary' : 'btn--secondary' %> btn--block" href="#book"><%= service.ctaLabel %></a>
+        </div>
+      <% }); %>
+    </div>
+  </div>
+</section>
+<% } %>
+
+<% if ((service.proof && service.proof.length) || testimonials.length) { %>
+<section class="section section--surface" aria-labelledby="proof">
+  <div class="container">
+    <div class="section-head">
+      <h2 id="proof">Proof, not promises</h2>
+      <a class="section-head__link" href="/verification">How we verify →</a>
+    </div>
+    <div class="grid grid--2">
+      <% (service.proof && service.proof.length ? service.proof : testimonials).forEach(function (note) { %>
+        <figure class="testimonial">
+          <span class="testimonial__stars" aria-hidden="true">★★★★★</span>
+          <blockquote class="testimonial__quote">“<%= note.quote %>”</blockquote>
+          <figcaption class="testimonial__meta"><%= note.name %><%= note.area ? ` · ${note.area}` : '' %></figcaption>
+        </figure>
+      <% }); %>
+    </div>
+  </div>
+</section>
+<% } %>
+
+<% if (faqs.length) { %>
+<section class="section" aria-labelledby="service-faq">
+  <div class="container container--narrow">
+    <div class="section-head">
+      <h2 id="service-faq"><%= service.name %> — questions</h2>
+    </div>
+    <%- include('../partials/accordion', { faqs: faqs, idPrefix: 'service-faq' }) %>
+  </div>
+</section>
+<% } %>
+
+<%# ------------------------------------------- Conversion block (§6.7 last row) %>
+<section class="section section--surface" id="book" aria-labelledby="book-heading">
+  <div class="container">
+    <div class="grid grid--2 grid--book">
+      <div>
+        <h2 id="book-heading"><%= service.ctaLabel %></h2>
+        <p>
+          Two fields to start. We confirm on WhatsApp — usually within minutes during working hours,
+          and the same day otherwise.
+        </p>
+        <ul class="tick-list">
+          <li class="tick-list__yes"><%- helpers.icon('check', { size: 16 }) %> <span>No account needed — guest-first, like every form on this site.</span></li>
+          <li class="tick-list__yes"><%- helpers.icon('check', { size: 16 }) %> <span>Your details are used for this request only (NDPA-aligned, see <a href="/privacy">privacy</a>).</span></li>
+        </ul>
+      </div>
+      <div>
+        <%- include('../partials/service-form', { service: service, helpers: helpers }) %>
+      </div>
+    </div>
+  </div>
+</section>
+
+<% if (related && related.length) { %>
+<section class="section" aria-labelledby="related-services">
+  <div class="container">
+    <div class="section-head">
+      <h2 id="related-services">Often booked together</h2>
+      <a class="section-head__link" href="/services">All services →</a>
+    </div>
+    <div class="grid grid--3">
+      <% related.forEach(function (item) { %>
+        <%- include('../partials/service-card', { service: item, helpers: helpers }) %>
+      <% }); %>
+    </div>
+  </div>
+</section>
+<% } %>
+
+<% if (listingBlock && listingBlock.listings.length) { %>
+<section class="section section--surface" aria-labelledby="related-listings">
+  <div class="container">
+    <div class="section-head">
+      <h2 id="related-listings"><%= listingBlock.heading %></h2>
+      <a class="section-head__link" href="/cars">Browse all cars →</a>
+    </div>
+    <div class="grid grid--3">
+      <% listingBlock.listings.forEach(function (listing) { %>
+        <%- include('../partials/car-card', { listing: listing, helpers: helpers }) %>
+      <% }); %>
+    </div>
+  </div>
+</section>
+<% } %>
+
+<div class="sticky-cta" data-sticky-cta>
+  <a class="btn btn--primary" href="#book" data-event="booking_started" data-source="service_sticky" data-type="<%= service.slug %>">
+    <%= service.ctaLabel %>
+  </a>
+  <a class="btn btn--ghost" href="<%= site.nav.whatsapp.general %>" target="_blank" rel="noopener"
+     data-event="whatsapp_click" data-source="service_sticky" aria-label="Ask on WhatsApp">
+    <%- helpers.icon('whatsapp', { size: 20 }) %>
+  </a>
+</div>

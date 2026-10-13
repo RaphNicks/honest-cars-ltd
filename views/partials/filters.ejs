@@ -1,0 +1,213 @@
+<%#
+  Filter panel — §6.2. One markup source for both presentations:
+    · desktop ≥769px  → sticky 260px left rail
+    · mobile ≤768px   → bottom sheet with Apply/Clear and a live result count
+  The form is a real GET form, so filters work with JavaScript disabled;
+  js/filters.js upgrades it to a fetch + history.pushState update.
+  Locals: facets, filters, action (form action path), resultCount, hiddenQuery
+%>
+<div class="filters" id="filters" data-open="false">
+  <div class="filters__scrim" data-filters-close></div>
+  <div class="filters__panel" role="dialog" aria-modal="true" aria-label="Filter cars">
+    <div class="filters__head">
+      <strong>Filter cars</strong>
+      <button class="icon-btn" type="button" aria-label="Close filters" data-filters-close>
+        <%- helpers.icon('close', { size: 20 }) %>
+      </button>
+    </div>
+
+    <form class="filters__body filter-form" id="filter-form" method="get"
+          action="<%= typeof action === 'undefined' ? '/cars' : action %>"
+          data-filter-form data-result-count="<%= resultCount %>">
+  <% if (typeof hiddenQuery !== 'undefined' && hiddenQuery) { %>
+    <% Object.entries(hiddenQuery).forEach(function ([key, value]) { %>
+      <input type="hidden" name="<%= key %>" value="<%= value %>">
+    <% }); %>
+  <% } %>
+
+  <%# Budget range — slider + inputs %>
+  <div class="filter-rail__group">
+    <h3 class="filter-rail__title">Budget (₦)</h3>
+    <div class="row row--gap-2">
+      <label class="visually-hidden" for="filter-price-min">Minimum price in naira</label>
+      <input class="input" id="filter-price-min" name="min" type="number" inputmode="numeric" step="100000"
+             min="0" placeholder="Min" value="<%= filters.min || '' %>">
+      <label class="visually-hidden" for="filter-price-max">Maximum price in naira</label>
+      <input class="input" id="filter-price-max" name="max" type="number" inputmode="numeric" step="100000"
+             min="0" placeholder="Max" value="<%= filters.max || '' %>">
+    </div>
+    <p class="field__hint mt-1">Live range: <%= helpers.formatNaira(facets.range.minPrice) %> – <%= helpers.formatNaira(facets.range.maxPrice) %></p>
+  </div>
+
+  <%# Make — dependent model select with counts %>
+  <div class="filter-rail__group">
+    <h3 class="filter-rail__title">Make &amp; model</h3>
+    <label class="visually-hidden" for="filter-make">Make</label>
+    <select class="select" id="filter-make" name="make" data-make-select>
+      <option value="">Any make</option>
+      <% facets.makes.forEach(function (row) { %>
+        <option value="<%= row.value %>" <%= filters.make === row.value ? 'selected' : '' %>><%= row.value %> (<%= row.count %>)</option>
+      <% }); %>
+    </select>
+    <label class="visually-hidden" for="filter-model">Model</label>
+    <select class="select mt-1" id="filter-model" name="model" data-model-select data-selected="<%= filters.model || '' %>">
+      <option value="">Any model</option>
+      <% (models || []).forEach(function (row) { %>
+        <option value="<%= row.value %>" <%= filters.model === row.value ? 'selected' : '' %>><%= row.value %> (<%= row.count %>)</option>
+      <% }); %>
+    </select>
+  </div>
+
+  <%# Year range %>
+  <div class="filter-rail__group">
+    <h3 class="filter-rail__title">Year</h3>
+    <div class="row row--gap-2">
+      <label class="visually-hidden" for="filter-year-min">From year</label>
+      <input class="input" id="filter-year-min" name="year_min" type="number" inputmode="numeric"
+             min="1990" max="2030" placeholder="From" value="<%= filters.year_min || '' %>">
+      <label class="visually-hidden" for="filter-year-max">To year</label>
+      <input class="input" id="filter-year-max" name="year_max" type="number" inputmode="numeric"
+             min="1990" max="2030" placeholder="To" value="<%= filters.year_max || '' %>">
+    </div>
+  </div>
+
+  <%# Condition %>
+  <div class="filter-rail__group">
+    <h3 class="filter-rail__title">Condition</h3>
+    <div class="filter-rail__list">
+      <% ['tokunbo', 'nigerian_used', 'new'].forEach(function (value) { %>
+        <% var row = facets.conditions.find(function (c) { return c.value === value; }); %>
+        <% if (!row) return; %>
+        <label class="filter-rail__option">
+          <input type="radio" name="condition" value="<%= value %>" <%= filters.condition === value ? 'checked' : '' %>>
+          <span><%= helpers.CONDITION_LABELS[value] %></span>
+          <span class="count"><%= row.count %></span>
+        </label>
+      <% }); %>
+    </div>
+  </div>
+
+  <%# Body type %>
+  <div class="filter-rail__group">
+    <h3 class="filter-rail__title">Body type</h3>
+    <div class="filter-rail__list">
+      <% facets.bodyTypes.forEach(function (row) { %>
+        <label class="filter-rail__option">
+          <input type="radio" name="body" value="<%= row.value %>" <%= filters.body === row.value ? 'checked' : '' %>>
+          <span><%= helpers.BODY_TYPE_LABELS[row.value] || row.value %></span>
+          <span class="count"><%= row.count %></span>
+        </label>
+      <% }); %>
+    </div>
+  </div>
+
+  <%# Transmission + fuel %>
+  <div class="filter-rail__group">
+    <h3 class="filter-rail__title">Transmission</h3>
+    <div class="filter-rail__list">
+      <% facets.transmissions.forEach(function (row) { %>
+        <label class="filter-rail__option">
+          <input type="radio" name="transmission" value="<%= row.value %>" <%= filters.transmission === row.value ? 'checked' : '' %>>
+          <span><%= helpers.TRANSMISSION_LABELS[row.value] || row.value %></span>
+          <span class="count"><%= row.count %></span>
+        </label>
+      <% }); %>
+    </div>
+    <h3 class="filter-rail__title mt-2">Fuel</h3>
+    <div class="filter-rail__list">
+      <% facets.fuels.forEach(function (row) { %>
+        <label class="filter-rail__option">
+          <input type="radio" name="fuel" value="<%= row.value %>" <%= filters.fuel === row.value ? 'checked' : '' %>>
+          <span><%= helpers.FUEL_LABELS[row.value] || row.value %></span>
+          <span class="count"><%= row.count %></span>
+        </label>
+      <% }); %>
+    </div>
+  </div>
+
+  <%# Mileage max %>
+  <div class="filter-rail__group">
+    <h3 class="filter-rail__title">Maximum mileage</h3>
+    <label class="visually-hidden" for="filter-mileage">Maximum mileage in km</label>
+    <input class="input" id="filter-mileage" name="mileage_max" type="number" inputmode="numeric"
+           min="0" step="5000" placeholder="e.g. 120000" value="<%= filters.mileage_max || '' %>">
+  </div>
+
+  <%# Verification grade — “Certified only” toggle, defaults OFF, visually promoted %>
+  <div class="filter-rail__group">
+    <h3 class="filter-rail__title">Verification</h3>
+    <label class="checkbox-row">
+      <input type="checkbox" name="grade" value="certified" <%= filters.grade ? 'checked' : '' %>>
+      <span>
+        <strong>Certified only</strong><br>
+        <span class="field__hint">Fully inspected by HonestCars — OBD2 scan, documents sighted, honest condition note.</span>
+      </span>
+    </label>
+  </div>
+
+  <%# FR-32 — Market: the whole network, or one city. The value is the city
+      slug; /cars resolves it against service_cities before it filters. %>
+  <% var cities = facets.cities || []; %>
+  <% if (cities.length > 1) { %>
+    <div class="filter-rail__group">
+      <h3 class="filter-rail__title">Market</h3>
+      <div class="filter-rail__list">
+        <label class="filter-rail__option">
+          <input type="radio" name="city" value="" <%= filters.city ? '' : 'checked' %>>
+          <span>All cities</span>
+          <span class="count"><%= cities.reduce(function (sum, row) { return sum + (row.count || 0); }, 0) %></span>
+        </label>
+        <% cities.forEach(function (row) { %>
+          <label class="filter-rail__option">
+            <input type="radio" name="city" value="<%= row.slug %>" <%= filters.city === row.slug ? 'checked' : '' %>>
+            <span><%= row.name %></span>
+            <span class="count"><%= row.count %></span>
+          </label>
+        <% }); %>
+      </div>
+    </div>
+  <% } %>
+
+  <%# Location — areas, grouped under their market. With one market in view the
+      groups collapse to a plain list; across the network (or all cities) a
+      heading separates Port Harcourt's neighbourhoods from Owerri's. %>
+  <div class="filter-rail__group">
+    <h3 class="filter-rail__title">Area</h3>
+    <% var areaGroups = (facets.areaGroups || []).filter(function (group) { return group.areas.length; }); %>
+    <% if (!areaGroups.length) { %>
+      <p class="field__hint">No live stock in this market yet — pick another city, or ask the concierge desk to find one for you.</p>
+    <% } %>
+    <% areaGroups.forEach(function (group) { %>
+      <% if (areaGroups.length > 1) { %>
+        <p class="filter-rail__caption"><%= group.city %></p>
+      <% } %>
+      <div class="filter-rail__list">
+        <% group.areas.forEach(function (row) { %>
+          <label class="filter-rail__option">
+            <input type="radio" name="area" value="<%= row.value %>" <%= filters.area === row.value ? 'checked' : '' %>>
+            <span><%= row.value %></span>
+            <span class="count"><%= row.count %></span>
+          </label>
+        <% }); %>
+      </div>
+    <% }); %>
+  </div>
+
+  <%# Documents %>
+  <div class="filter-rail__group">
+    <h3 class="filter-rail__title">Documents</h3>
+    <label class="checkbox-row">
+      <input type="checkbox" name="customs" value="1" <%= filters.customs ? 'checked' : '' %>>
+      <span>Customs-verified only</span>
+    </label>
+  </div>
+    </form>
+
+    <div class="filters__foot">
+      <button class="btn btn--secondary" type="button" data-filters-clear>Clear all</button>
+      <button class="btn btn--primary" type="submit" form="filter-form" data-filters-apply>
+        Show <span data-filters-count><%= resultCount %></span> cars
+      </button>
+    </div>
+  </div>
+</div>

@@ -1,0 +1,56 @@
+<%#
+  /cart — §6.8. Lines are rendered by cart.js from the device’s localStorage
+  cart; the shell, delivery rules and next steps are server-rendered so the page
+  still makes sense without JavaScript.
+%>
+<section class="page-hero">
+  <div class="container">
+    <%- include('../partials/breadcrumbs', { crumbs: trail }) %>
+    <h1>Your cart</h1>
+    <p class="lead">
+      Guest checkout — nothing here needs an account. Prices are confirmed on the server when the order
+      is placed, so what you pay is what our catalogue says.
+    </p>
+  </div>
+</section>
+
+<section class="section">
+  <div class="container">
+    <div class="grid grid--2" style="align-items:start">
+      <div>
+        <div class="card card__body">
+          <h2 class="mb-1">Items</h2>
+          <div data-cart-lines></div>
+
+          <div class="empty-state hidden mt-2" data-cart-empty>
+            <h3>Your cart is empty</h3>
+            <p>Trackers, diagnostics and care kits live in the shop — or source an exact part by VIN.</p>
+            <div class="btn-row mt-2" style="justify-content:center">
+              <a class="btn btn--primary" href="/shop">Browse the shop</a>
+              <a class="btn btn--secondary" href="/services/parts">Source a part</a>
+            </div>
+          </div>
+        </div>
+
+        <div class="card card__body mt-2">
+          <h2 class="mb-1">Delivery, honestly</h2>
+          <ul class="delivery-list">
+            <% delivery.forEach(function (area) { %>
+              <li><span><%= area.name %></span><strong><%= area.feeKobo ? helpers.formatNaira(area.feeKobo) : 'Free' %></strong></li>
+            <% }); %>
+          </ul>
+          <p class="field__hint mb-0">Trackers with installation are booked into a slot after the order is confirmed.</p>
+        </div>
+      </div>
+
+      <aside class="cart-summary">
+        <h2 class="mb-0">Summary</h2>
+        <div class="cart-summary__row"><span>Subtotal</span><span data-cart-tally>₦0</span></div>
+        <div class="cart-summary__row"><span>Delivery</span><span>Calculated at checkout</span></div>
+        <p class="field__hint mb-0">Prices in naira, VAT-inclusive. Card checkout is not wired in this build — ops sends a payment link or takes a transfer after confirming stock.</p>
+        <a class="btn btn--primary btn--lg btn--block" href="/checkout" data-cart-checkout>Go to checkout</a>
+        <a class="btn btn--ghost btn--block" href="/shop">Keep shopping</a>
+      </aside>
+    </div>
+  </div>
+</section>

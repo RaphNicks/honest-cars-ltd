@@ -1,0 +1,71 @@
+<%#
+  FR-35 — tag page (/blog/tag/{slug}).
+  One shelf per governed tag: what it means, everything published under it, and
+  the other tags worth walking to next. Prerendered, indexable, one canonical.
+%>
+<section class="page-hero">
+  <div class="container">
+    <%- include('../partials/breadcrumbs', { crumbs: trail }) %>
+    <p class="eyebrow">
+      <%= tag.kind === 'make' ? 'Make' : tag.kind === 'format' ? 'Format' : 'Topic' %>
+    </p>
+    <h1><%= tag.label %></h1>
+    <p class="lead">
+      <%= tag.description || ('Everything we have published under ' + tag.label + ' — written by the people who inspect the cars.') %>
+    </p>
+    <p class="page-hero__meta">
+      <strong><%= shelf.total %></strong> post<%= shelf.total === 1 ? '' : 's' %> ·
+      <a href="/blog">All posts</a> ·
+      <a href="/blog/rss.xml">RSS feed</a>
+    </p>
+  </div>
+</section>
+
+<section class="section">
+  <div class="container">
+    <% if (shelf.posts.length) { %>
+      <div class="grid grid--3">
+        <% shelf.posts.forEach(function (post) { %>
+          <%- include('../partials/post-card', { post: post, helpers: helpers }) %>
+        <% }); %>
+      </div>
+
+      <% if (shelf.pages > 1) { %>
+        <nav class="btn-row mt-3" style="justify-content:center" aria-label="Pages">
+          <% if (shelf.page > 1) { %>
+            <a class="btn btn--secondary" href="<%= tag.url %>?page=<%= shelf.page - 1 %>">Newer</a>
+          <% } %>
+          <span class="page-hero__meta mb-0">Page <%= shelf.page %> of <%= shelf.pages %></span>
+          <% if (shelf.page < shelf.pages) { %>
+            <a class="btn btn--secondary" href="<%= tag.url %>?page=<%= shelf.page + 1 %>">Older</a>
+          <% } %>
+        </nav>
+      <% } %>
+    <% } else { %>
+      <div class="empty-state">
+        <h3>Nothing filed under <%= tag.label %> yet</h3>
+        <p>The tag exists because a post is coming. In the meantime the whole guide is one click away.</p>
+        <div class="btn-row mt-2" style="justify-content:center">
+          <a class="btn btn--primary" href="/blog">Read the guide</a>
+          <a class="btn btn--secondary" href="/cars">Browse verified cars</a>
+        </div>
+      </div>
+    <% } %>
+  </div>
+</section>
+
+<% if (siblings.length) { %>
+  <section class="section section--surface">
+    <div class="container">
+      <div class="section-head">
+        <h2>Other tags</h2>
+        <a class="section-head__link" href="/blog">All posts →</a>
+      </div>
+      <nav class="chip-bar" aria-label="Tags">
+        <% siblings.forEach(function (entry) { %>
+          <a class="chip" href="<%= entry.url %>"><%= entry.label %> (<%= entry.count %>)</a>
+        <% }); %>
+      </nav>
+    </div>
+  </section>
+<% } %>

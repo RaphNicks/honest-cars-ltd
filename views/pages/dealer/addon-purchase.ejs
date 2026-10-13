@@ -1,0 +1,84 @@
+<%
+/**
+ * One add-on purchase — what it does, what it costs, how to pay it (§7.2 FR-18).
+ *
+ * The same honest shape as /order/:orderNo and /account/renewals/:reference:
+ * while no PSP keys exist, the dealer gets the bank account and the reference,
+ * and the page says plainly that nothing was charged and that the benefit does
+ * not start until the money lands.
+ *
+ * Locals: purchase, payment, bank
+ */
+%>
+<section class="page-hero page-hero--account">
+  <div class="container">
+    <p class="eyebrow">Add-on · <%= purchase.reference %></p>
+    <h1><%= purchase.addonName %></h1>
+    <p class="lead mb-0">
+      <%= helpers.formatNaira(purchase.amountKobo) %> ·
+      Status: <strong><%= purchase.statusLabel %></strong>
+      <% if (purchase.listing) { %> · for <%= purchase.listing.title %> (<%= purchase.listing.stockNo %>)<% } %>
+    </p>
+  </div>
+</section>
+
+<section class="section">
+  <div class="container container--narrow">
+    <% if (purchase.status === 'active') { %>
+      <div class="panel panel--paid">
+        <h2 class="panel__title">Live</h2>
+        <p class="mb-0">
+          <%= purchase.detail || 'This add-on is active.' %>
+          <% if (purchase.endsAt) { %>
+            It runs until <strong><%= new Date(purchase.endsAt).toLocaleDateString('en-NG', { day: 'numeric', month: 'long', year: 'numeric' }) %></strong>.
+          <% } else { %>
+            It runs until it is cancelled.
+          <% } %>
+        </p>
+      </div>
+
+    <% } else if (purchase.status === 'cancelled') { %>
+      <div class="panel">
+        <h2 class="panel__title">Cancelled</h2>
+        <p class="mb-0"><%= purchase.detail || 'This purchase was cancelled.' %></p>
+      </div>
+
+    <% } else if (purchase.status === 'expired') { %>
+      <div class="panel">
+        <h2 class="panel__title">Finished</h2>
+        <p class="mb-0">The paid window has closed. Buy it again from <a href="/dealer/addons">Add-ons</a> if you want another run.</p>
+      </div>
+
+    <% } else { %>
+      <div class="panel panel--pay">
+        <h2 class="panel__title">Nothing has been charged yet</h2>
+        <p>
+          Pay <strong><%= helpers.formatNaira(purchase.amountKobo) %></strong> by transfer against
+          <span class="tabular"><%= purchase.paymentReference || purchase.reference %></span>.
+          The moment it lands the desk confirms it and this add-on goes live — you will get a message saying exactly what was switched on.
+        </p>
+        <dl class="summary-list">
+          <div class="summary-list__row"><dt>Account name</dt><dd><%= bank.name %></dd></div>
+          <div class="summary-list__row"><dt>Bank</dt><dd><%= bank.bank %></dd></div>
+          <div class="summary-list__row"><dt>Account number</dt><dd class="tabular"><strong><%= bank.account %></strong></dd></div>
+          <div class="summary-list__row"><dt>Amount</dt><dd class="tabular"><strong><%= helpers.formatNaira(purchase.amountKobo) %></strong></dd></div>
+          <div class="summary-list__row"><dt>Reference</dt><dd class="tabular"><strong><%= purchase.paymentReference || purchase.reference %></strong></dd></div>
+        </dl>
+        <p class="cms-hint mb-0"><%= bank.note %></p>
+      </div>
+
+      <div class="panel mt-3">
+        <h2 class="panel__title">What this buys</h2>
+        <p class="mb-0">
+          <%= purchase.detail || purchase.addonName %>.
+          <% if (payment && payment.status === 'pending') { %>Nothing is owed until you pay it, and nothing runs out while it is unpaid — the clock starts the day the money lands.<% } %>
+        </p>
+      </div>
+    <% } %>
+
+    <p class="mt-3">
+      <a class="btn btn--secondary" href="/dealer/addons">All add-ons</a>
+      <a class="btn btn--ghost" href="/dealer/billing">Commission statement</a>
+    </p>
+  </div>
+</section>

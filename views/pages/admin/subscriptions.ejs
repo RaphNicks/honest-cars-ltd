@@ -1,0 +1,325 @@
+<%
+  /**
+   * /admin/subscriptions — FR-20, §7.3.
+   *
+   * The result of every POST above appears in the layout's flash line (done()
+   * puts it in the querystring as ?ok / ?err), so there is no second place for
+   * it to go stale.
+   *
+   *   “Tracking subscriptions (unit, client, plan, renewal date, status);
+   *    renewal queue + auto reminders (30/7/1 day); dealer retainer/subs
+   *    management.”
+   *
+   * Three things on one page: what is due (the queue the desk works from), what
+   * exists (the register, with the activation checklist), and what the reminder
+   * sweep has actually done. The state shown is derived from the renewal date,
+   * not from a column someone forgot to update — a customer who stopped paying
+   * cannot sit here looking active.
+   *
+   * Locals: queue, summary, register, withinDays, filters, dealers, reminders,
+   *         reminderTotals, windows, states, maxPerRun
+   */
+%>
+<% var naira = helpers.formatNaira; %>
+<%
+  var dueSoon = queue.filter(function (s) { return s.daysRemaining !== null && s.daysRemaining >= 0; });
+  var overdue = queue.filter(function (s) { return s.overdue; });
+  var lapsed = queue.filter(function (s) { return s.state === 'lapsed'; });
+  var needingChecklist = register.filter(function (s) { return s.state === 'ordered' || (!s.checklist.renewal_set); });
+%>
+
+<div class="admin-grid admin-grid--4">
+  <div class="kpi kpi--sm">
+    <span class="kpi__label">Due in 30 days</span>
+    <strong class="kpi__value tabular"><%= summary.dueSoon %></strong>
+    <span class="kpi__foot"><%= naira(summary.revenueKobo) %> of renewals if every one lands</span>
+  </div>
+  <div class="kpi kpi--sm">
+    <span class="kpi__label">Overdue</span>
+    <strong class="kpi__value tabular"><%= overdue.length %></strong>
+    <span class="kpi__foot">
+      <% if (lapsed.length) { %>
+        <%= lapsed.length %> past the grace window — lost unless someone calls
+      <% } else { %>
+        inside the grace window, still renewable
+      <% } %>
+    </span>
+  </div>
+  <div class="kpi kpi--sm">
+    <span class="kpi__label">Subscriptions</span>
+    <strong class="kpi__value tabular"><%= summary.trackerCount + summary.retainerCount %></strong>
+    <span class="kpi__foot"><%= summary.trackerCount %> trackers · <%= summary.retainerCount %> dealer retainers</span>
+  </div>
+  <div class="kpi kpi--sm">
+    <span class="kpi__label">Reminders sent</span>
+    <strong class="kpi__value tabular"><%= reminderTotals.last30 || 0 %></strong>
+    <span class="kpi__foot">
+      <% if (Number(reminderTotals.skipped)) { %>
+        <%= reminderTotals.skipped %> recorded but not delivered — no provider for the channel
+      <% } else { %>
+        in the last 30 days, each window once
+      <% } %>
+    </span>
+  </div>
+</div>
+
+<section class="panel">
+  <div class="panel__head">
+    <h2 class="panel__title">Run the reminder sweep</h2>
+    <span class="cms-hint">
+      Same code as <code>npm run renewals</code>. Each subscription is reminded once per
+      <%= windows.join('/') %>-day window regardless of how often this runs.
+    </span>
+  </div>
+  <div class="admin-actions">
+    <form method="post" action="/admin/subscriptions/reminders" class="admin-actions__group">
+      <input type="hidden" name="dry_run" value="1">
+      <button class="btn btn--secondary" type="submit">Dry run</button>
+      <span class="muted">shows the exact sentences — writes nothing, sends nothing</span>
+    </form>
+    <form method="post" action="/admin/subscriptions/reminders" class="admin-actions__group"
+          onsubmit="return confirm('Send every renewal reminder this sweep finds. Continue?')">
+      <button class="btn btn--primary" type="submit">Run and send</button>
+      <span class="muted">up to <%= maxPerRun %> messages per run</span>
+    </form>
+  </div>
+  <% if (Number(reminderTotals.skipped)) { %>
+    <p class="field__hint mb-0">
+      <%= reminderTotals.skipped %> reminder<%= Number(reminderTotals.skipped) === 1 ? '' : 's' %> could not be delivered
+      by machine. The text is kept on each row below — send it from WhatsApp by hand; the customer still needs to hear it.
+    </p>
+  <% } %>
+</section>
+
+<section class="panel mt-3">
+  <div class="panel__head">
+    <h2 class="panel__title">
+      Renewal queue
+      <span class="muted">
+        <%= withinDays === null ? 'every subscription' : 'next ' + withinDays + ' days' %>
+      </span>
+    </h2>
+    <form method="get" action="/admin/subscriptions" class="admin-filters">
+      <label class="visually-hidden" for="sub-kind">Kind</label>
+      <select class="input" id="sub-kind" name="kind">
+        <option value="">All kinds</option>
+        <option value="tracker" <%= filters.kind === 'tracker' ? 'selected' : '' %>>Trackers</option>
+        <option value="dealer_retainer" <%= filters.kind === 'dealer_retainer' ? 'selected' : '' %>>Dealer retainers</option>
+      </select>
+      <label class="visually-hidden" for="sub-state">State</label>
+      <select class="input" id="sub-state" name="state">
+        <option value="">Every state</option>
+        <% states.forEach(function (s) { %>
+          <option value="<%= s.value %>" <%= filters.state === s.value ? 'selected' : '' %>><%= s.label %></option>
+        <% }); %>
+      </select>
+      <label class="visually-hidden" for="sub-q">Search</label>
+      <input class="input" id="sub-q" type="search" name="q" value="<%= filters.search || '' %>" placeholder="Name, phone, unit or plan">
+      <label class="checkbox-row">
+        <input type="checkbox" name="all" value="1" <%= withinDays === null ? 'checked' : '' %>>
+        <span>Show everything, not just the window</span>
+      </label>
+      <button class="btn btn--secondary btn--sm" type="submit">Filter</button>
+    </form>
+  </div>
+
+  <% if (!queue.length) { %>
+    <p class="empty-line">
+      Nothing is renewing in this window.
+      <% if (withinDays !== null) { %>Tick “show everything” to see the whole register.<% } %>
+    </p>
+  <% } else { %>
+    <table class="table table--stack">
+      <thead>
+        <tr>
+          <th scope="col">Unit / plan</th>
+          <th scope="col">Client</th>
+          <th scope="col">State</th>
+          <th scope="col">Renews</th>
+          <th scope="col">Amount</th>
+          <th scope="col">Action</th>
+        </tr>
+      </thead>
+      <tbody>
+        <% queue.forEach(function (s) { %>
+          <tr>
+            <th scope="row">
+              <strong><%= s.unitLabel || s.dealerName || '—' %></strong>
+              <br><span class="muted"><%= s.kindLabel %><%= s.planName ? ' · ' + s.planName : '' %></span>
+              <% if (s.orderNo) { %>
+                <br><a class="tabular" href="/order/<%= s.orderNo %>"><%= s.orderNo %></a>
+              <% } %>
+            </th>
+            <td>
+              <%= s.customerName || '—' %>
+              <br><span class="tabular muted"><%= s.maskedPhone || 'no number on file' %></span>
+            </td>
+            <td>
+              <span class="badge badge--<%= s.state === 'activated' ? 'ok' : s.state === 'renewal_due' ? 'attention' : s.state === 'lapsed' || s.state === 'cancelled' ? 'flagged' : 'pending' %>">
+                <%= s.stateLabel %>
+              </span>
+              <% if (s.remindersSent) { %>
+                <br><span class="muted"><%= s.remindersSent %> reminder<%= s.remindersSent === 1 ? '' : 's' %> sent</span>
+              <% } %>
+              <% if (s.paymentId && s.paymentStatus === 'pending') { %>
+                <br><span class="muted">renewal raised · <span class="tabular"><%= s.paymentReference %></span></span>
+              <% } %>
+            </td>
+            <td>
+              <% if (s.renewalAt) { %>
+                <%= new Date(s.renewalAt).toLocaleDateString('en-NG', { day: 'numeric', month: 'short', year: 'numeric' }) %>
+                <br>
+                <span class="<%= s.overdue ? 'text-amber' : 'muted' %>">
+                  <%= s.overdue
+                        ? Math.abs(s.daysRemaining) + ' day' + (Math.abs(s.daysRemaining) === 1 ? '' : 's') + ' overdue'
+                        : s.daysRemaining + ' day' + (s.daysRemaining === 1 ? '' : 's') + ' to go' %>
+                </span>
+              <% } else { %>
+                <span class="text-amber">not set</span>
+              <% } %>
+            </td>
+            <td class="tabular"><%= s.amountKobo ? naira(s.amountKobo) : '—' %></td>
+            <td>
+              <%# The activation checklist is per-row: it is the only thing standing
+                  between "paid for" and "protecting a car". %>
+              <details class="row-details">
+                <summary>Checklist &amp; terms</summary>
+                <form method="post" action="/admin/subscriptions/<%= s.id %>/checklist" class="stack">
+                  <label class="checkbox-row">
+                    <input type="checkbox" name="installed" value="1" <%= s.checklist.installed ? 'checked disabled' : '' %>>
+                    <span>Device installed<%= s.installedAt ? ' — ' + new Date(s.installedAt).toLocaleDateString('en-NG', { day: 'numeric', month: 'short', year: 'numeric' }) : '' %></span>
+                  </label>
+                  <label class="checkbox-row">
+                    <input type="checkbox" name="activated" value="1" <%= s.checklist.activated ? 'checked disabled' : '' %>>
+                    <span>Platform activated<%= s.activatedAt ? ' — ' + new Date(s.activatedAt).toLocaleDateString('en-NG', { day: 'numeric', month: 'short', year: 'numeric' }) : '' %></span>
+                  </label>
+                  <div class="field">
+                    <label class="field__label" for="renewal-<%= s.id %>">Renewal date</label>
+                    <input class="input" id="renewal-<%= s.id %>" type="date" name="renewal_at"
+                           value="<%= s.renewalAt ? new Date(s.renewalAt).toISOString().slice(0, 10) : '' %>">
+                  </div>
+                  <div class="field">
+                    <label class="field__label" for="unit-<%= s.id %>">Unit</label>
+                    <input class="input" id="unit-<%= s.id %>" type="text" name="unit_label" maxlength="80"
+                           value="<%= s.unitLabel || '' %>" placeholder="2016 Honda CR-V · ABC-123-PH">
+                  </div>
+                  <div class="field">
+                    <label class="field__label" for="plan-<%= s.id %>">Plan</label>
+                    <input class="input" id="plan-<%= s.id %>" type="text" name="plan_name" maxlength="80"
+                           value="<%= s.planName || '' %>" placeholder="Tracker — Standard, 12 months">
+                  </div>
+                  <div class="field">
+                    <label class="field__label" for="amount-<%= s.id %>">Renewal price (₦)</label>
+                    <input class="input" id="amount-<%= s.id %>" type="text" name="amount" inputmode="decimal"
+                           value="<%= s.amountKobo ? (s.amountKobo / 100) : '' %>" placeholder="45,000">
+                    <span class="field__hint">What a renewal costs. Without it the customer cannot renew online.</span>
+                  </div>
+                  <div class="field">
+                    <label class="field__label" for="period-<%= s.id %>">Period (months)</label>
+                    <input class="input" id="period-<%= s.id %>" type="number" name="period_months" min="1" max="60"
+                           value="<%= s.periodMonths %>">
+                  </div>
+                  <button class="btn btn--secondary btn--sm" type="submit">Save</button>
+                </form>
+                <% if (s.state !== 'cancelled') { %>
+                  <form method="post" action="/admin/subscriptions/<%= s.id %>/cancel" class="mt-2"
+                        onsubmit="return confirm('Cancel this subscription? The record stays, but it leaves the renewal queue.')">
+                    <input class="input" type="text" name="reason" maxlength="160" placeholder="Why — sold, off the road, refunded…">
+                    <button class="btn btn--ghost btn--sm mt-1" type="submit">Cancel subscription</button>
+                  </form>
+                <% } %>
+              </details>
+            </td>
+          </tr>
+        <% }); %>
+      </tbody>
+    </table>
+  <% } %>
+</section>
+
+<div class="admin-grid admin-grid--2 mt-3">
+  <section class="panel">
+    <h2 class="panel__title">Dealer retainers</h2>
+    <% var retainers = register.filter(function (s) { return s.kind === 'dealer_retainer'; }); %>
+    <% if (!retainers.length) { %>
+      <p class="empty-line">No lot is on a retainer plan yet.</p>
+    <% } else { %>
+      <ul class="mini-list">
+        <% retainers.forEach(function (s) { %>
+          <li>
+            <span>
+              <strong><%= s.dealerName || s.unitLabel %></strong>
+              <br><span class="muted"><%= s.planName %> · <%= naira(s.amountKobo || 0) %> every <%= s.periodMonths %> month<%= s.periodMonths === 1 ? '' : 's' %></span>
+            </span>
+            <span class="mini-list__side badge-row">
+              <span class="badge badge--<%= s.state === 'activated' ? 'ok' : s.state === 'lapsed' || s.state === 'cancelled' ? 'flagged' : 'attention' %>"><%= s.stateLabel %></span>
+              <span class="muted tabular"><%= s.renewalAt ? new Date(s.renewalAt).toLocaleDateString('en-NG', { day: 'numeric', month: 'short' }) : '—' %></span>
+            </span>
+          </li>
+        <% }); %>
+      </ul>
+    <% } %>
+
+    <h3 class="mt-3 mb-1">Put a lot on a plan</h3>
+    <form method="post" action="/admin/subscriptions/retainers" class="stack">
+      <div class="field">
+        <label class="field__label" for="retainer-dealer">Dealer</label>
+        <select class="input" id="retainer-dealer" name="dealer_id" required>
+          <option value="">Choose a lot…</option>
+          <% dealers.forEach(function (d) { %>
+            <option value="<%= d.id %>"><%= d.name %> — <%= d.city %><%= d.tier ? ' · ' + d.tier : '' %></option>
+          <% }); %>
+        </select>
+      </div>
+      <div class="field">
+        <label class="field__label" for="retainer-plan">Plan name</label>
+        <input class="input" id="retainer-plan" type="text" name="plan_name" maxlength="80" value="Dealer retainer — monthly">
+      </div>
+      <div class="field">
+        <label class="field__label" for="retainer-amount">Amount per period (₦)</label>
+        <input class="input" id="retainer-amount" type="text" name="amount" inputmode="decimal" required placeholder="25,000">
+      </div>
+      <div class="field">
+        <label class="field__label" for="retainer-period">Period (months)</label>
+        <input class="input" id="retainer-period" type="number" name="period_months" min="1" max="60" value="1">
+      </div>
+      <div class="field">
+        <label class="field__label" for="retainer-renewal">Next renewal <span class="muted">(optional)</span></label>
+        <input class="input" id="retainer-renewal" type="date" name="renewal_at">
+        <span class="field__hint">Leave it blank and the period above is counted from today.</span>
+      </div>
+      <button class="btn btn--primary" type="submit">Add to the renewal queue</button>
+    </form>
+  </section>
+
+  <section class="panel">
+    <h2 class="panel__title">Reminders recorded</h2>
+    <% if (!reminders.length) { %>
+      <p class="empty-line">
+        No reminder has gone out yet. Run the sweep above — each subscription gets one per
+        <%= windows.join('/') %>-day window.
+      </p>
+    <% } else { %>
+      <ul class="mini-list">
+        <% reminders.forEach(function (r) { %>
+          <li>
+            <span>
+              <strong><%= r.unitLabel || r.planName || 'Subscription #' + r.subscriptionId %></strong>
+              <br><span class="muted">
+                <%= r.windowDays %>-day reminder ·
+                <%= new Date(r.sentAt).toLocaleDateString('en-NG', { day: 'numeric', month: 'short', year: 'numeric' }) %>
+                <% if (r.channel) { %> · <%= r.channel %><% } %>
+              </span>
+              <% if (r.status !== 'sent' && r.detail) { %>
+                <br><span class="muted">Not delivered: <%= r.detail %> — send it by hand.</span>
+              <% } %>
+            </span>
+            <span class="mini-list__side badge-row">
+              <span class="badge badge--<%= r.status === 'sent' ? 'ok' : 'attention' %>"><%= r.status %></span>
+            </span>
+          </li>
+        <% }); %>
+      </ul>
+    <% } %>
+  </section>
+</div>

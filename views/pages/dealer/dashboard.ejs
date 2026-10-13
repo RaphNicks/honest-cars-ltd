@@ -1,0 +1,161 @@
+<%
+/**
+ * Dealer dashboard — §7.2 “Dashboard (live listings, leads this week, views per
+ * listing, pending actions incl. expiring listings + unconfirmed stock,
+ * commission summary)”.
+ *
+ * One screen for the questions a lot actually asks on a Monday morning:
+ * what is live, what is stuck, who is waiting on me, and what am I owed.
+ * Locals: dashboard, statements, shift
+ */
+var c = dashboard.counts;
+var pending = [
+  c.expiring_soon ? {
+    label: c.expiring_soon + (c.expiring_soon === 1 ? ' listing expires this week' : ' listings expire this week'),
+    copy: 'Refresh the price or confirm it is still current to keep it in front of buyers.',
+    href: '/dealer/listings?status=live',
+  } : null,
+  c.unconfirmed ? {
+    label: c.unconfirmed + (c.unconfirmed === 1 ? ' car has not been confirmed this fortnight' : ' cars have not been confirmed this fortnight'),
+    copy: 'Freshness is part of the ranking: an untouched listing slides down the search page.',
+    href: '/dealer/performance',
+  } : null,
+  c.in_review ? {
+    label: c.in_review + (c.in_review === 1 ? ' listing is with the HonestCars team' : ' listings are with the HonestCars team'),
+    copy: 'Nothing to do — review usually finishes the same working day.',
+    href: '/dealer/listings?status=in_review',
+  } : null,
+  dashboard.leads.unread ? {
+    label: dashboard.leads.unread + (dashboard.leads.unread === 1 ? ' enquiry has not been answered' : ' enquiries have not been answered'),
+    copy: 'Buyers who get a reply inside four hours buy far more often. This is the number that matters.',
+    href: '/dealer/leads?status=new',
+  } : null,
+].filter(Boolean);
+%>
+
+<div class="admin-grid admin-grid--4">
+  <div class="kpi kpi--sm">
+    <span class="kpi__label">Live listings</span>
+    <strong class="kpi__value tabular"><%= c.live %></strong>
+    <span class="kpi__foot"><%= c.reserved %> reserved<% if (c.sold) { %> · <%= c.sold %> sold<% } %></span>
+  </div>
+  <div class="kpi kpi--sm">
+    <span class="kpi__label">Leads this week</span>
+    <strong class="kpi__value tabular"><%= dashboard.leads.week %></strong>
+    <span class="kpi__foot"><%= dashboard.leads.month %> in the last 30 days · <%= dashboard.leads.unread %> unread</span>
+  </div>
+  <div class="kpi kpi--sm">
+    <span class="kpi__label">Listing views</span>
+    <strong class="kpi__value tabular"><%= c.views.toLocaleString('en-NG') %></strong>
+    <span class="kpi__foot"><%= c.enquiries %> enquiries · <%= c.saves %> saves</span>
+  </div>
+  <div class="kpi kpi--sm">
+    <span class="kpi__label">Commission balance</span>
+    <strong class="kpi__value tabular"><%= helpers.formatNaira(dashboard.commission.balance_kobo) %></strong>
+    <span class="kpi__foot">earned <%= helpers.formatNaira(dashboard.commission.owed_kobo) %> · paid <%= helpers.formatNaira(dashboard.commission.paid_kobo) %></span>
+  </div>
+</div>
+
+<div class="admin-grid admin-grid--2 mt-3">
+  <section class="panel">
+    <div class="panel__head">
+      <h2 class="panel__title">Waiting on you</h2>
+      <span class="cms-hint">Nothing here is busywork — each line moves a car or a buyer.</span>
+    </div>
+    <% if (!pending.length) { %>
+      <p class="empty-line">All clear. Every listing is live, current and answered.</p>
+      <p class="mb-0 muted">The one thing worth doing anyway: check <a href="/dealer/performance">which cars get views but no enquiries</a> — usually a price or a photo.</p>
+    <% } else { %>
+      <ul class="dealer-todo">
+        <% pending.forEach(function (item) { %>
+          <li class="dealer-todo__item">
+            <span class="dealer-todo__dot" aria-hidden="true"></span>
+            <div>
+              <a class="dealer-todo__label" href="<%= item.href %>"><%= item.label %></a>
+              <p class="dealer-todo__copy"><%= item.copy %></p>
+            </div>
+          </li>
+        <% }); %>
+      </ul>
+    <% } %>
+  </section>
+
+  <section class="panel">
+    <div class="panel__head">
+      <h2 class="panel__title">Recent commission</h2>
+      <a class="btn btn--ghost btn--sm" href="/dealer/billing">Full statement</a>
+    </div>
+    <% if (!statements.length) { %>
+      <p class="empty-line">No commission entries yet. They appear here the moment a deal closes.</p>
+    <% } else { %>
+      <table class="table">
+        <caption class="visually-hidden">The last <%= statements.length %> entries on this lot's commission ledger</caption>
+        <thead>
+          <tr><th scope="col">Entry</th><th scope="col">Amount</th><th scope="col">When</th></tr>
+        </thead>
+        <tbody>
+          <% statements.forEach(function (row) { %>
+            <tr>
+              <th scope="row">
+                <span class="badge badge--<%= row.type %>"><%= row.type.replace(/_/g, ' ') %></span>
+                <br><span class="muted"><%= row.reference || '—' %></span>
+              </th>
+              <td class="tabular<%= row.amountKobo < 0 ? ' muted' : '' %>"><%= helpers.formatNaira(row.amountKobo) %></td>
+              <td class="muted"><%= helpers.relativeDays(row.createdAt) %></td>
+            </tr>
+          <% }); %>
+        </tbody>
+      </table>
+    <% } %>
+  </section>
+</div>
+
+<section class="panel mt-3">
+  <div class="panel__head">
+    <h2 class="panel__title">Your listings by interest</h2>
+    <a class="btn btn--secondary btn--sm" href="/dealer/listings/new">Add a car</a>
+  </div>
+  <% if (!dashboard.topListings.length) { %>
+    <p class="empty-line">No stock yet. <a href="/dealer/listings/new">Add the first car</a> — photograph it with the guided shot list and it is live today.</p>
+  <% } else { %>
+    <div class="table-scroll">
+      <table class="table table--stack">
+        <caption class="visually-hidden">This lot's listings, most viewed first</caption>
+        <thead>
+          <tr>
+            <th scope="col">Car</th>
+            <th scope="col">Status</th>
+            <th scope="col">Price</th>
+            <th scope="col">Views</th>
+            <th scope="col">Enquiries</th>
+            <th scope="col">Updated</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% dashboard.topListings.forEach(function (row) { %>
+            <tr>
+              <th scope="row" class="listing-row__title">
+                <a href="/dealer/listings/<%= row.id %>"><%= row.title %></a>
+                <span class="listing-row__meta"><%= row.stockNo %> · <%= row.photos %> photo<%= row.photos === 1 ? '' : 's' %></span>
+              </th>
+              <td><span class="badge badge--<%= row.status %>"><%= row.status.replace(/_/g, ' ') %></span></td>
+              <td class="tabular"><%= helpers.formatNaira(row.priceKobo) %></td>
+              <td class="tabular"><%= row.views.toLocaleString('en-NG') %></td>
+              <td class="tabular"><%= row.enquiries %></td>
+              <td class="muted">
+                <%= helpers.relativeDays(row.refreshedAt || row.updatedAt) %>
+                <% if (row.stale) { %><br><span class="warn">confirm it is still current</span><% } %>
+              </td>
+            </tr>
+          <% }); %>
+        </tbody>
+      </table>
+    </div>
+  <% } %>
+</section>
+
+<p class="muted mt-3">
+  A buyer’s phone number is shown for this lot’s own enquiries and nowhere else. Answer inside
+  <%= shift %> hours if you can — that is the number the performance page measures, and the
+  one buyers talk about. Stuck on a listing? <a href="<%= site.nav.whatsapp.general %>" target="_blank" rel="noopener">Message the ops desk</a>.
+</p>

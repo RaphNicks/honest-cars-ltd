@@ -1,0 +1,183 @@
+<%#
+  /admin/milestones — the escrow tracker (§7.3).
+  Protected purchases and parts escrow walk one ladder and never skip a rung:
+  funds received → inspection passed → documents verified → released, with
+  manual approvals and an audit row at every step. `released` records the human
+  who released it — escrow does not un-happen.
+  Locals: rows, counts, stages, kinds, stage, listings, bookings, canApprove
+%>
+<div class="admin-grid admin-grid--5">
+  <div class="kpi kpi--sm">
+    <span class="kpi__label">Funds received</span>
+    <strong class="kpi__value tabular"><%= counts.funds_received %></strong>
+    <span class="kpi__foot">nothing checked yet</span>
+  </div>
+  <div class="kpi kpi--sm">
+    <span class="kpi__label">Inspection passed</span>
+    <strong class="kpi__value tabular"><%= counts.inspection_passed %></strong>
+    <span class="kpi__foot">report on file</span>
+  </div>
+  <div class="kpi kpi--sm">
+    <span class="kpi__label">Documents verified</span>
+    <strong class="kpi__value tabular"><%= counts.documents_verified %></strong>
+    <span class="kpi__foot">ready for the buyer’s yes</span>
+  </div>
+  <div class="kpi kpi--sm">
+    <span class="kpi__label">Released</span>
+    <strong class="kpi__value tabular"><%= counts.released %></strong>
+    <span class="kpi__foot">paid out to the seller</span>
+  </div>
+  <div class="kpi kpi--sm">
+    <span class="kpi__label">Money held</span>
+    <strong class="kpi__value tabular"><%= helpers.formatNairaCompact(counts.heldKobo) %></strong>
+    <span class="kpi__foot">across every open milestone</span>
+  </div>
+</div>
+
+<section class="panel">
+  <div class="panel__head">
+    <div>
+      <h2 class="panel__title">Milestones</h2>
+      <p class="note-inline mb-0">Each stage needs a human decision and a note. Nothing is released automatically.</p>
+    </div>
+    <form class="admin-filters" method="get" action="/admin/milestones">
+      <label class="visually-hidden" for="ms-stage">Stage</label>
+      <select class="select select--compact" id="ms-stage" name="stage" data-auto-submit>
+        <option value="">Every stage</option>
+        <% stages.concat(['cancelled']).forEach(function (value) { %>
+          <option value="<%= value %>" <%= stage === value ? 'selected' : '' %>><%= value.replace(/_/g, ' ') %></option>
+        <% }); %>
+      </select>
+      <button class="btn btn--secondary btn--sm" type="submit">Filter</button>
+      <% if (stage) { %><a class="btn btn--ghost btn--sm" href="/admin/milestones">Clear</a><% } %>
+    </form>
+  </div>
+
+  <% if (!rows.length) { %>
+    <p class="empty-line">
+      Nothing in escrow. A deposit is tracked here the moment it is received — the customer sees the same ladder
+      in their account.
+    </p>
+  <% } else { %>
+    <div class="stack">
+      <% rows.forEach(function (row) { %>
+        <article class="panel milestone" aria-labelledby="ms-<%= row.id %>">
+          <div class="panel__head">
+            <div>
+              <h3 class="milestone__title" id="ms-<%= row.id %>">
+                <span class="tabular"><%= row.reference %></span>
+                <span class="badge badge--<%= row.stage %>"><%= row.stage.replace(/_/g, ' ')%></span>
+                <span class="chip"><%= row.kind.replace(/_/g, ' ') %></span>
+              </h3>
+              <p class="milestone__subject"><%= row.subject %></p>
+              <p class="milestone__meta">
+                <strong class="tabular"><%= helpers.formatNaira(row.amountKobo) %></strong>
+                held for <%= row.customerName %> · <span class="tabular"><%= row.maskedPhone %></span>
+                · <span class="muted">opened <%= helpers.relativeDays(row.createdAt) %></span>
+              </p>
+              <p class="milestone__meta">
+                <% if (row.listingStockNo) { %><span class="tabular"><%= row.listingStockNo %></span><% } %>
+                <% if (row.listingSlug) { %> · <a href="/cars/<%= row.listingSlug %>" target="_blank" rel="noopener">open the car</a><% } %>
+                <% if (row.bookingReference) { %> · inspection <span class="tabular"><%= row.bookingReference %></span><% } %>
+              </p>
+              <% if (row.stageNote) { %><p class="note-inline mb-0"><strong>Last note:</strong> <%= row.stageNote %></p><% } %>
+              <% if (row.releasedAt) { %>
+                <p class="note-inline mb-0">Released <%= helpers.relativeDays(row.releasedAt) %><%= row.releasedBy ? ' by #' + row.releasedBy : '' %>.</p>
+              <% } %>
+            </div>
+          </div>
+
+          <ol class="ms-ladder" aria-label="Escrow stages">
+            <% stages.forEach(function (value, index) { %>
+              <li class="ms-ladder__step <%= row.stageIndex > index ? 'is-done' : row.stageIndex === index ? 'is-current' : '' %>">
+                <span class="ms-ladder__dot" aria-hidden="true"><%= row.stageIndex > index ? '✓' : index + 1 %></span>
+                <span class="ms-ladder__label"><%= value.replace(/_/g, ' ') %></span>
+              </li>
+            <% }); %>
+          </ol>
+
+          <% if (canApprove && row.stage !== 'released' && row.stage !== 'cancelled') { %>
+            <div class="milestone__actions">
+              <form method="post" action="/admin/milestones/<%= row.id %>/stage" class="inline-form">
+                <label class="visually-hidden" for="ms-next-<%= row.id %>">Next stage for <%= row.reference %></label>
+                <select class="select select--compact" id="ms-next-<%= row.id %>" name="to">
+                  <% stages.slice(row.stageIndex + 1, row.stageIndex + 2).forEach(function (value) { %>
+                    <option value="<%= value %>"><%= value === 'released' ? 'Release the money' : 'Move to ' + value.replace(/_/g, ' ') %></option>
+                  <% }); %>
+                  <option value="cancelled">Cancel this milestone</option>
+                </select>
+                <label class="visually-hidden" for="ms-note-<%= row.id %>">Note</label>
+                <input class="input input--compact" id="ms-note-<%= row.id %>" name="note" type="text" maxlength="200" placeholder="What was checked, and by whom">
+                <button class="btn btn--primary btn--sm" type="submit">Apply</button>
+              </form>
+              <% if (row.stage === 'inspection_passed') { %>
+                <p class="note-inline mb-0">Stage 2 needs a filed inspection report before it can be signed off.</p>
+              <% } %>
+            </div>
+          <% } else if (row.stage === 'released' || row.stage === 'cancelled') { %>
+            <p class="note-inline mb-0">Closed — the audit log keeps the trail.</p>
+          <% } else { %>
+            <p class="note-inline mb-0">You can view escrow but not move it.</p>
+          <% } %>
+        </article>
+      <% }); %>
+    </div>
+  <% } %>
+</section>
+
+<% if (canApprove) { %>
+  <section class="panel">
+    <div class="panel__head">
+      <div>
+        <h2 class="panel__title">Open a new milestone</h2>
+        <p class="note-inline mb-0">Use this when money is already in hand or arriving — deposits on a protected purchase, or parts held for a customer.</p>
+      </div>
+    </div>
+    <form method="post" action="/admin/milestones" class="form-grid form-grid--3">
+      <label class="field">
+        <span class="field__label">What is it protecting?</span>
+        <select class="select" name="kind">
+          <option value="protected_purchase">Protected purchase (a car)</option>
+          <option value="parts_escrow">Parts escrow (a kit or part)</option>
+        </select>
+      </label>
+      <label class="field field--full">
+        <span class="field__label">Subject</span>
+        <input class="input" name="subject" type="text" maxlength="200" placeholder="2010 Toyota Camry LE — protected purchase deposit" required>
+      </label>
+      <label class="field">
+        <span class="field__label">Car (optional)</span>
+        <select class="select" name="listing_id">
+          <option value="0">—</option>
+          <% listings.forEach(function (listing) { %>
+            <option value="<%= listing.id %>"><%= listing.stock_no %> — <%= listing.year %> <%= listing.make %> <%= listing.model %></option>
+          <% }); %>
+        </select>
+      </label>
+      <label class="field">
+        <span class="field__label">Inspection (optional)</span>
+        <select class="select" name="booking_id">
+          <option value="0">—</option>
+          <% bookings.forEach(function (booking) { %>
+            <option value="<%= booking.id %>"><%= booking.reference %> — <%= booking.name %></option>
+          <% }); %>
+        </select>
+      </label>
+      <label class="field">
+        <span class="field__label">Amount held (₦)</span>
+        <input class="input" name="amount" type="text" inputmode="numeric" placeholder="₦500,000" required>
+      </label>
+      <label class="field">
+        <span class="field__label">Customer</span>
+        <input class="input" name="customer_name" type="text" placeholder="Mrs. Amadi" required>
+      </label>
+      <label class="field">
+        <span class="field__label">Phone</span>
+        <input class="input" name="customer_phone" type="tel" placeholder="+234…" required>
+      </label>
+      <div class="field field--full">
+        <button class="btn btn--primary" type="submit">Track the money</button>
+      </div>
+    </form>
+  </section>
+<% } %>

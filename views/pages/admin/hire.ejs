@@ -1,0 +1,804 @@
+<%
+  /**
+   * /admin/hire — FR-22, §7.3.
+   *
+   *   “Vehicle pool registry (partner-owned units, docs, tracker status),
+   *    availability calendar, booking records, incident log.”
+   *
+   * The page is ordered the way the work happens: the RFQs waiting to be quoted,
+   * the hire book, the calendar the desk answers the phone from, the pool itself,
+   * and what has gone wrong.
+   *
+   * Locals: classes, summary, bookings, pool, calendar, incidents, requests,
+   *         freeByBooking, filters, window, statuses, vehicleStatuses,
+   *         documentsStates, trackerStates, incidentKinds, severities,
+   *         weeklyFromDays, depositRate, canManage
+   */
+%>
+<% var naira = helpers.formatNaira; %>
+<%
+  var dayLabel = function (iso) {
+    var d = new Date(iso + 'T00:00:00Z');
+    return { day: d.toLocaleDateString('en-NG', { day: 'numeric' }), weekday: d.toLocaleDateString('en-NG', { weekday: 'short' }), weekend: d.getUTCDay() === 0 || d.getUTCDay() === 6 };
+  };
+  var badgeFor = function (status) {
+    if (status === 'completed') return 'completed';
+    if (status === 'cancelled') return 'cancelled';
+    if (status === 'on_hire') return 'live';
+    if (status === 'confirmed') return 'ok';
+    if (status === 'accepted') return 'in_review';
+    if (status === 'quoted') return 'attention';
+    return 'pending';
+  };
+  var openIncidents = incidents.filter(function (i) { return i.status === 'open'; });
+  var closedIncidents = incidents.filter(function (i) { return i.status !== 'open'; });
+  var unquoted = requests.filter(function (r) { return !r.bookings.length; });
+%>
+
+<div class="admin-grid admin-grid--4">
+  <div class="kpi kpi--sm">
+    <span class="kpi__label">Pool</span>
+    <strong class="kpi__value tabular"><%= summary.units %></strong>
+    <span class="kpi__foot">
+      <%= summary.available %> free · <%= summary.onHire %> on hire · <%= summary.partnerOwned %> partner-owned
+    </span>
+  </div>
+  <div class="kpi kpi--sm">
+    <span class="kpi__label">Live hires</span>
+    <strong class="kpi__value tabular"><%=
+      (summary.counts.confirmed || 0) + (summary.counts.on_hire || 0) + (summary.counts.accepted || 0)
+    %></strong>
+    <span class="kpi__foot">
+      <%= summary.counts.requested || 0 %> requested · <%= summary.counts.quoted || 0 %> quoted
+      <% if (summary.needsVehicle) { %> · <span class="text-amber"><%= summary.needsVehicle %> with no unit</span><% } %>
+    </span>
+  </div>
+  <div class="kpi kpi--sm">
+    <span class="kpi__label">Papers</span>
+    <strong class="kpi__value tabular"><%= summary.docsLapsed + summary.docsExpiring %></strong>
+    <span class="kpi__foot">
+      <% if (summary.docsLapsed) { %>
+        <span class="text-amber"><%= summary.docsLapsed %> expired — cannot go out</span>
+      <% } else { %>
+        <%= summary.docsExpiring %> due within 30 days · <%= summary.untracked %> without a tracker
+      <% } %>
+    </span>
+  </div>
+  <div class="kpi kpi--sm">
+    <span class="kpi__label">Incidents</span>
+    <strong class="kpi__value tabular"><%= summary.incidents.open %></strong>
+    <span class="kpi__foot">
+      <% if (summary.incidents.costKobo) { %><%= naira(summary.incidents.costKobo) %> recorded<%= summary.incidents.open ? ' ·' : '' %><% } %>
+      <% if (summary.incidents.open) { %> open against the pool<% } else if (!summary.incidents.costKobo) { %> nothing on record<% } %>
+      <% if (summary.dueBack) { %> · <%= summary.dueBack %> due back within 2 days<% } %>
+    </span>
+  </div>
+</div>
+
+<%# ---------------------------------------------------- requests to quote %>
+<section class="panel mt-3">
+  <div class="panel__head">
+    <h2 class="panel__title">
+      Hire requests
+      <span class="muted"><%= unquoted.length ? unquoted.length + ' waiting on a quote' : 'all quoted' %></span>
+    </h2>
+    <span class="cms-hint">
+      Prices come off the class rate card — a <%= weeklyFromDays %>-day-or-longer hire uses the weekly rate, and a
+      <%= Math.round(depositRate * 100) %>% refundable deposit is added and returned at handover. A hire is
+      one car: a four-car RFQ becomes four hire references under this request.
+    </span>
+  </div>
+
+  <% if (!requests.length) { %>
+    <p class="empty-line">No open hire requests. The /hire form drops them here within a minute.</p>
+  <% } else { %>
+    <table class="table table--stack">
+      <thead>
+        <tr>
+          <th scope="col">Request</th>
+          <th scope="col">Client</th>
+          <th scope="col">Brief</th>
+          <th scope="col">Quoted</th>
+          <th scope="col">Quote it</th>
+        </tr>
+      </thead>
+      <tbody>
+        <% requests.forEach(function (r) { %>
+          <tr>
+            <th scope="row">
+              <a class="tabular" href="/admin/bookings?q=<%= r.trackingId %>"><%= r.trackingId %></a>
+              <br><span class="muted"><%= new Date(r.createdAt).toLocaleDateString('en-NG', { day: 'numeric', month: 'short' }) %></span>
+              <% if (r.corporate) { %><br><span class="badge badge--ok">Corporate</span><% } %>
+            </th>
+            <td>
+              <%= r.name %>
+              <br><span class="tabular muted"><%= r.phone %></span>
+              <% if (r.company) { %><br><span class="muted"><%= r.company %></span><% } %>
+            </td>
+            <td>
+              <% if (r.className) { %><%= r.className %><% } else { %><span class="text-amber">class not named</span><% } %>
+              <% if (r.units > 1) { %> · <%= r.units %> vehicles<% } %>
+              <% if (r.days) { %> · <%= r.days %> days<% } %>
+              <br>
+              <span class="muted">
+                <% if (r.dateFrom || r.dateTo) { %>
+                  <%= r.dateFrom || '…' %> → <%= r.dateTo || '…' %>
+                <% } else { %>
+                  dates to fix on the quote
+                <% } %>
+                <%= r.withDriver ? ' · with driver' : '' %><%= r.airportPickup ? ' · airport' : '' %>
+              </span>
+              <% if (r.pickupPoint) { %><br><span class="muted">Deliver to <%= r.pickupPoint %></span><% } %>
+              <% if (r.notes) { %><br><span class="muted"><%= r.notes %></span><% } %>
+            </td>
+            <td>
+              <% if (!r.bookings.length) { %>
+                <span class="muted">not quoted yet</span>
+              <% } else { %>
+                <% r.bookings.forEach(function (b) { %>
+                  <div class="mini-list__side">
+                    <a class="tabular" href="#hire-<%= b.id %>"><%= b.reference %></a>
+                    <span class="badge badge--<%= badgeFor(b.status) %>"><%= b.statusLabel %></span>
+                  </div>
+                  <span class="muted tabular"><%= b.plate || 'no unit yet' %> · <%= naira(b.totalKobo) %></span>
+                <% }); %>
+                <br><strong class="tabular"><%= naira(r.quotedTotalKobo) %></strong> <span class="muted">for the group</span>
+              <% } %>
+            </td>
+            <td>
+              <% if (canManage) { %>
+                <details class="row-details">
+                  <summary><%= r.bookings.length ? 'Requote' : 'Quote' %></summary>
+                  <form method="post" action="/admin/hire/quote" class="stack">
+                    <input type="hidden" name="request_id" value="<%= r.id %>">
+                    <div class="field">
+                      <label class="field__label" for="q-class-<%= r.id %>">Class</label>
+                      <select class="input" id="q-class-<%= r.id %>" name="class_slug">
+                        <% classes.forEach(function (c) { %>
+                          <option value="<%= c.slug %>" <%= r.className === c.slug ? 'selected' : '' %>>
+                            <%= c.name %> — <%= naira(c.daily_rate_kobo) %>/day
+                          </option>
+                        <% }); %>
+                      </select>
+                    </div>
+                    <div class="field">
+                      <label class="field__label" for="q-from-<%= r.id %>">Pick-up</label>
+                      <input class="input" id="q-from-<%= r.id %>" type="date" name="date_from" value="<%= r.dateFrom || '' %>" required>
+                    </div>
+                    <div class="field">
+                      <label class="field__label" for="q-to-<%= r.id %>">Drop-off</label>
+                      <input class="input" id="q-to-<%= r.id %>" type="date" name="date_to" value="<%= r.dateTo || '' %>" required>
+                    </div>
+                    <div class="field">
+                      <label class="field__label" for="q-units-<%= r.id %>">Cars</label>
+                      <input class="input" id="q-units-<%= r.id %>" type="number" name="units" min="1" max="20" value="<%= r.units %>">
+                    </div>
+                    <div class="field">
+                      <label class="field__label" for="q-extras-<%= r.id %>">Extras (₦, optional)</label>
+                      <input class="input" id="q-extras-<%= r.id %>" type="text" name="extras" inputmode="decimal" placeholder="Delivery, child seat…">
+                    </div>
+                    <label class="checkbox-row">
+                      <input type="checkbox" name="with_driver" value="1" <%= r.withDriver ? 'checked' : '' %>>
+                      <span>With a driver — the day rate comes from the class</span>
+                    </label>
+                    <label class="checkbox-row">
+                      <input type="checkbox" name="airport_pickup" value="1" <%= r.airportPickup ? 'checked' : '' %>>
+                      <span>Airport pick-up (Omagwa)</span>
+                    </label>
+                    <div class="field">
+                      <label class="field__label" for="q-note-<%= r.id %>">Note on the quote</label>
+                      <input class="input" id="q-note-<%= r.id %>" type="text" name="note" maxlength="400" placeholder="Held for another 24 hours…">
+                    </div>
+                    <button class="btn btn--primary btn--sm" type="submit"><%= r.bookings.length ? 'Requote' : 'Price it' %></button>
+                  </form>
+                </details>
+              <% } else { %>
+                <span class="muted">finance view</span>
+              <% } %>
+            </td>
+          </tr>
+        <% }); %>
+      </tbody>
+    </table>
+  <% } %>
+</section>
+
+<%# ---------------------------------------------------- the hire book %>
+<section class="panel mt-3">
+  <div class="panel__head">
+    <h2 class="panel__title">
+      Hire book
+      <span class="muted"><%= bookings.length %> record<%= bookings.length === 1 ? '' : 's' %></span>
+    </h2>
+    <form method="get" action="/admin/hire" class="admin-filters">
+      <label class="visually-hidden" for="hire-status">Status</label>
+      <select class="input" id="hire-status" name="status">
+        <option value="">Every status</option>
+        <% statuses.forEach(function (s) { %>
+          <option value="<%= s.value %>" <%= filters.status === s.value ? 'selected' : '' %>><%= s.label %></option>
+        <% }); %>
+      </select>
+      <label class="visually-hidden" for="hire-class">Class</label>
+      <select class="input" id="hire-class" name="class">
+        <option value="">Every class</option>
+        <% classes.forEach(function (c) { %>
+          <option value="<%= c.slug %>" <%= filters.classSlug === c.slug ? 'selected' : '' %>><%= c.name %></option>
+        <% }); %>
+      </select>
+      <label class="visually-hidden" for="hire-q">Search</label>
+      <input class="input" id="hire-q" type="search" name="q" value="<%= filters.search || '' %>" placeholder="Reference, client, company or plate">
+      <button class="btn btn--secondary btn--sm" type="submit">Filter</button>
+    </form>
+  </div>
+
+  <% if (!bookings.length) { %>
+    <p class="empty-line">Nothing in the book for that filter. Quotes from the panel above land here.</p>
+  <% } else { %>
+    <table class="table table--stack">
+      <thead>
+        <tr>
+          <th scope="col">Hire</th>
+          <th scope="col">Client</th>
+          <th scope="col">Dates</th>
+          <th scope="col">Unit</th>
+          <th scope="col">Money</th>
+          <th scope="col">Status</th>
+          <th scope="col">Action</th>
+        </tr>
+      </thead>
+      <tbody>
+        <% bookings.forEach(function (b) { %>
+          <tr id="hire-<%= b.id %>">
+            <th scope="row">
+              <strong class="tabular"><%= b.reference %></strong>
+              <br><span class="muted"><%= b.className %><%= b.withDriver ? ' · with driver' : ' · self-drive' %><%= b.airportPickup ? ' · airport' : '' %></span>
+              <% if (b.trackingId) { %><br><a class="tabular muted" href="/admin/bookings?q=<%= b.trackingId %>"><%= b.trackingId %></a><% } %>
+              <% if (b.incidentCount) { %>
+                <br><span class="badge badge--<%= b.openIncidents ? 'flagged' : 'closed' %>"><%= b.incidentCount %> incident<%= b.incidentCount === 1 ? '' : 's' %></span>
+              <% } %>
+            </th>
+            <td>
+              <%= b.clientName %>
+              <% if (b.company) { %><br><span class="muted"><%= b.company %></span><% } %>
+              <br><span class="tabular muted"><%= b.maskedPhone %></span>
+            </td>
+            <td>
+              <%= new Date(b.pickupAt).toLocaleDateString('en-NG', { day: 'numeric', month: 'short' }) %>
+              → <%= new Date(b.dropoffAt).toLocaleDateString('en-NG', { day: 'numeric', month: 'short' }) %>
+              <br><span class="muted"><%= b.days %> day<%= b.days === 1 ? '' : 's' %></span>
+              <% if (b.daysUntilPickup !== null && ['confirmed', 'accepted'].includes(b.status)) { %>
+                <br><span class="<%= b.daysUntilPickup < 0 ? 'text-amber' : 'muted' %>">
+                  <%= b.daysUntilPickup < 0 ? Math.abs(b.daysUntilPickup) + ' days ago' : b.daysUntilPickup === 0 ? 'today' : 'in ' + b.daysUntilPickup + ' days' %>
+                </span>
+              <% } %>
+            </td>
+            <td>
+              <% if (b.plate) { %>
+                <strong><%= b.plate %></strong>
+                <br><span class="muted"><%= b.vehicleTitle %></span>
+              <% } else if (b.needsVehicle) { %>
+                <span class="text-amber">no unit allocated</span>
+              <% } else { %>
+                <span class="muted">—</span>
+              <% } %>
+              <% if (b.pickupPoint) { %><br><span class="muted"><%= b.pickupPoint %></span><% } %>
+            </td>
+            <td class="tabular">
+              <%= naira(b.totalKobo) %>
+              <br><span class="muted">
+                <%= naira(b.dayRateKobo) %>/<%= b.days >= weeklyFromDays ? 'week' : 'day' %><% if (b.driverKobo) { %> + driver<% } %>
+              </span>
+              <% if (b.depositKobo) { %><br><span class="muted"><%= naira(b.depositKobo) %> deposit</span><% } %>
+              <% if (b.paymentReference) { %>
+                <br><span class="badge badge--<%= b.paymentStatus === 'paid' ? 'paid' : b.paymentStatus === 'refunded' ? 'refunded' : 'pending_payment' %>">
+                  <%= b.paymentStatus %>
+                </span>
+              <% } %>
+            </td>
+            <td>
+              <span class="badge badge--<%= badgeFor(b.status) %>"><%= b.statusLabel %></span>
+              <% if (b.quoteSentAt) { %>
+                <br><span class="muted">quoted <%= new Date(b.quoteSentAt).toLocaleDateString('en-NG', { day: 'numeric', month: 'short' }) %></span>
+              <% } %>
+              <% if (b.completedAt) { %>
+                <br><span class="muted">closed <%= new Date(b.completedAt).toLocaleDateString('en-NG', { day: 'numeric', month: 'short' }) %></span>
+              <% } %>
+              <% if (b.cancelReason) { %><br><span class="muted"><%= b.cancelReason %></span><% } %>
+            </td>
+            <td>
+              <div class="hire-actions">
+                <% if (['confirmed', 'on_hire', 'completed'].includes(b.status)) { %>
+                  <a class="btn btn--secondary btn--sm" href="/admin/hire/<%= b.id %>/invoice">Invoice</a>
+                  <a class="btn btn--ghost btn--sm" href="/admin/hire/<%= b.id %>/invoice.pdf">PDF</a>
+                <% } %>
+                <% if (!b.plate && freeByBooking.has(b.id) && freeByBooking.get(b.id).length && b.status !== 'cancelled' && canManage) { %>
+                  <form method="post" action="/admin/hire/<%= b.id %>/allocate" class="hire-actions__form">
+                    <label class="visually-hidden" for="alloc-<%= b.id %>">Unit</label>
+                    <select class="input" id="alloc-<%= b.id %>" name="vehicle_id">
+                      <% freeByBooking.get(b.id).forEach(function (unit) { %>
+                        <option value="<%= unit.id %>"><%= unit.plate %> — <%= unit.className %><%= unit.owner === 'partner' ? ' (partner)' : '' %></option>
+                      <% }); %>
+                    </select>
+                    <button class="btn btn--secondary btn--sm" type="submit">Allocate</button>
+                  </form>
+                <% } %>
+              </div>
+
+              <% if (canManage && b.status !== 'cancelled' && b.status !== 'completed') { %>
+                <details class="row-details">
+                  <summary>Move it</summary>
+                  <div class="stack">
+                    <% if (b.status === 'quoted') { %>
+                      <form method="post" action="/admin/hire/<%= b.id %>/quote">
+                        <button class="btn btn--secondary btn--sm" type="submit">Send the quote</button>
+                      </form>
+                    <% } %>
+                    <% if (['requested', 'quoted', 'accepted'].includes(b.status)) { %>
+                      <form method="post" action="/admin/hire/<%= b.id %>/accept">
+                        <button class="btn btn--secondary btn--sm" type="submit">Client accepted — raise payment</button>
+                      </form>
+                    <% } %>
+                    <% if (b.status === 'accepted' && b.plate) { %>
+                      <form method="post" action="/admin/hire/<%= b.id %>/status">
+                        <input type="hidden" name="status" value="confirmed">
+                        <button class="btn btn--secondary btn--sm" type="submit">Confirm by hand</button>
+                      </form>
+                    <% } %>
+                    <% if (b.status === 'confirmed') { %>
+                      <form method="post" action="/admin/hire/<%= b.id %>/status">
+                        <input type="hidden" name="status" value="on_hire">
+                        <button class="btn btn--primary btn--sm" type="submit">Car has gone out</button>
+                      </form>
+                    <% } %>
+                    <% if (['on_hire', 'confirmed'].includes(b.status)) { %>
+                      <form method="post" action="/admin/hire/<%= b.id %>/status" class="stack">
+                        <input type="hidden" name="status" value="completed">
+                        <div class="field">
+                          <label class="field__label" for="fuel-<%= b.id %>">Fuel back (%)</label>
+                          <input class="input" id="fuel-<%= b.id %>" type="number" name="fuel_in" min="0" max="100" value="<%= b.fuelOut === null ? '' : b.fuelOut %>">
+                        </div>
+                        <div class="field">
+                          <label class="field__label" for="odo-<%= b.id %>">Odometer back (km)</label>
+                          <input class="input" id="odo-<%= b.id %>" type="number" name="odometer_in" min="0" value="<%= b.odometerOut || '' %>">
+                        </div>
+                        <button class="btn btn--primary btn--sm" type="submit">Car is back — complete</button>
+                      </form>
+                    <% } %>
+                    <form method="post" action="/admin/hire/<%= b.id %>/status" class="stack"
+                          onsubmit="return confirm('Cancel this hire? The unit is freed and the client is told.')">
+                      <input type="hidden" name="status" value="cancelled">
+                      <div class="field">
+                        <label class="field__label" for="reason-<%= b.id %>">Why it stopped</label>
+                        <input class="input" id="reason-<%= b.id %>" type="text" name="reason" maxlength="200" placeholder="Client cancelled, no unit free…">
+                      </div>
+                      <button class="btn btn--ghost btn--sm" type="submit">Cancel the hire</button>
+                    </form>
+                  </div>
+                </details>
+
+                <details class="row-details">
+                  <summary>Log an incident</summary>
+                  <form method="post" action="/admin/hire/incidents" class="stack">
+                    <input type="hidden" name="booking_id" value="<%= b.id %>">
+                    <div class="field">
+                      <label class="field__label" for="ik-<%= b.id %>">What happened</label>
+                      <select class="input" id="ik-<%= b.id %>" name="kind">
+                        <% incidentKinds.forEach(function (k) { %><option value="<%= k.value %>"><%= k.label %></option><% }); %>
+                      </select>
+                    </div>
+                    <div class="field">
+                      <label class="field__label" for="is-<%= b.id %>">Severity</label>
+                      <select class="input" id="is-<%= b.id %>" name="severity">
+                        <% severities.forEach(function (s) { %><option value="<%= s %>"><%= s.replace('_', ' ') %></option><% }); %>
+                      </select>
+                      <span class="field__hint">Above minor, the unit comes off the road until it is closed.</span>
+                    </div>
+                    <div class="field">
+                      <label class="field__label" for="id-<%= b.id %>">Detail</label>
+                      <input class="input" id="id-<%= b.id %>" type="text" name="detail" maxlength="500" placeholder="Rear bumper scuff, offside — seen at handover">
+                    </div>
+                    <div class="field">
+                      <label class="field__label" for="ic-<%= b.id %>">What it cost us (₦)</label>
+                      <input class="input" id="ic-<%= b.id %>" type="text" name="cost" inputmode="decimal" placeholder="45,000">
+                    </div>
+                    <div class="field">
+                      <label class="field__label" for="ich-<%= b.id %>">Charged to the client (₦)</label>
+                      <input class="input" id="ich-<%= b.id %>" type="text" name="charged" inputmode="decimal" placeholder="40,000">
+                    </div>
+                    <button class="btn btn--secondary btn--sm" type="submit">Log it</button>
+                  </form>
+                </details>
+              <% } %>
+            </td>
+          </tr>
+        <% }); %>
+      </tbody>
+    </table>
+  <% } %>
+</section>
+
+<%# ---------------------------------------------------- the calendar %>
+<section class="panel mt-3">
+  <div class="panel__head">
+    <h2 class="panel__title">
+      Availability
+      <span class="muted"><%= window.from %> → <%= window.to %></span>
+    </h2>
+    <form method="get" action="/admin/hire" class="admin-filters">
+      <label class="visually-hidden" for="cal-from">From</label>
+      <input class="input" id="cal-from" type="date" name="from" value="<%= window.from %>">
+      <label class="visually-hidden" for="cal-days">Days</label>
+      <select class="input" id="cal-days" name="days">
+        <% [7, 14, 21, 31].forEach(function (n) { %>
+          <option value="<%= n %>" <%= window.days === n ? 'selected' : '' %>><%= n %> days</option>
+        <% }); %>
+      </select>
+      <label class="visually-hidden" for="cal-class">Class</label>
+      <select class="input" id="cal-class" name="class">
+        <option value="">Every class</option>
+        <% classes.forEach(function (c) { %>
+          <option value="<%= c.slug %>" <%= filters.classSlug === c.slug ? 'selected' : '' %>><%= c.name %></option>
+        <% }); %>
+      </select>
+      <button class="btn btn--secondary btn--sm" type="submit">Show</button>
+    </form>
+  </div>
+
+  <p class="note-inline">
+    <span class="hire-key hire-key--free">free</span>
+    <span class="hire-key hire-key--out">out</span>
+    <span class="hire-key hire-key--held">held on a quote</span>
+    <span class="hire-key hire-key--service">in the workshop</span>
+    <span class="hire-key hire-key--invalid">papers not valid</span>
+    — <%= calendar.counts.freeToday %> free today, <%= calendar.counts.outToday %> out,
+    <%= calendar.counts.heldToday %> held, <%= calendar.counts.blockedToday %> not usable.
+  </p>
+
+  <% if (!calendar.rows.length) { %>
+    <p class="empty-line">No units in the pool yet — add them below and the calendar fills in.</p>
+  <% } else { %>
+    <div class="hire-cal__scroll">
+      <table class="hire-cal">
+        <thead>
+          <tr>
+            <th scope="col" class="hire-cal__unit">Unit</th>
+            <% calendar.days.forEach(function (day) { var d = dayLabel(day); %>
+              <th scope="col" class="<%= d.weekend ? 'hire-cal__day--weekend' : '' %>">
+                <span class="hire-cal__weekday"><%= d.weekday %></span>
+                <span class="hire-cal__day"><%= d.day %></span>
+              </th>
+            <% }); %>
+          </tr>
+        </thead>
+        <tbody>
+          <% calendar.rows.forEach(function (row) { %>
+            <tr>
+              <th scope="row" class="hire-cal__unit">
+                <strong><%= row.vehicle.plate %></strong>
+                <br><span class="muted"><%= row.vehicle.className %><%= row.vehicle.owner === 'partner' ? ' · partner' : '' %></span>
+                <% if (!row.vehicle.documentsValid) { %>
+                  <br><span class="badge badge--flagged">papers <%= row.vehicle.documentsLabel.toLowerCase() %></span>
+                <% } else if (row.vehicle.trackerState !== 'fitted') { %>
+                  <br><span class="badge badge--pending">tracker <%= row.vehicle.trackerLabel.toLowerCase() %></span>
+                <% } %>
+              </th>
+              <% row.cells.forEach(function (cell) { %>
+                <td class="hire-cal__cell hire-cal__cell--<%= cell.state %>"
+                    title="<%= row.vehicle.plate %> · <%= cell.day %> · <%= cell.state %><%= cell.reference ? ' · ' + cell.reference + (cell.client ? ' — ' + cell.client : '') : '' %><%= cell.reason ? ' · ' + cell.reason : '' %>">
+                  <% if (cell.state === 'out') { %>
+                    <a href="#hire-<%= cell.bookingId %>" class="hire-cal__ref tabular"><%= cell.reference.replace('HC-HIRE-', '') %></a>
+                  <% } else if (cell.state === 'held') { %>
+                    <span class="hire-cal__ref tabular"><%= cell.reference.replace('HC-HIRE-', '') %></span>
+                  <% } else if (cell.state === 'invalid') { %>
+                    <span class="hire-cal__mark">!</span>
+                  <% } else if (cell.state === 'service') { %>
+                    <span class="hire-cal__mark">⚙</span>
+                  <% } else if (cell.state === 'retired') { %>
+                    <span class="hire-cal__mark">—</span>
+                  <% } %>
+                </td>
+              <% }); %>
+            </tr>
+          <% }); %>
+        </tbody>
+      </table>
+    </div>
+  <% } %>
+</section>
+
+<%# ---------------------------------------------------- the pool registry %>
+<section class="panel mt-3" id="pool">
+  <div class="panel__head">
+    <h2 class="panel__title">
+      Vehicle pool registry
+      <span class="muted"><%= pool.length %> unit<%= pool.length === 1 ? '' : 's' %></span>
+    </h2>
+    <form method="get" action="/admin/hire#pool" class="admin-filters">
+      <label class="visually-hidden" for="pool-unit">Unit state</label>
+      <select class="input" id="pool-unit" name="unit">
+        <option value="">Every unit state</option>
+        <option value="available" <%= filters.vehicleStatus === 'available' ? 'selected' : '' %>>Available</option>
+        <option value="on_hire" <%= filters.vehicleStatus === 'on_hire' ? 'selected' : '' %>>On hire</option>
+        <option value="service" <%= filters.vehicleStatus === 'service' ? 'selected' : '' %>>In service</option>
+        <option value="retired" <%= filters.vehicleStatus === 'retired' ? 'selected' : '' %>>Retired</option>
+      </select>
+      <label class="visually-hidden" for="pool-q">Search</label>
+      <input class="input" id="pool-q" type="search" name="q" value="<%= filters.search || '' %>" placeholder="Plate, make, partner or location">
+      <button class="btn btn--secondary btn--sm" type="submit">Filter</button>
+    </form>
+  </div>
+
+  <table class="table table--stack">
+    <thead>
+      <tr>
+        <th scope="col">Unit</th>
+        <th scope="col">Owner</th>
+        <th scope="col">Documents</th>
+        <th scope="col">Tracker</th>
+        <th scope="col">State</th>
+        <th scope="col">Work</th>
+        <th scope="col"><%= canManage ? 'Update' : 'Records' %></th>
+      </tr>
+    </thead>
+    <tbody>
+      <% pool.forEach(function (v) { %>
+        <tr>
+          <th scope="row">
+            <strong><%= v.plate %></strong>
+            <br><span class="muted"><%= v.title %> · <%= v.className %><%= v.seats ? ' · ' + v.seats + ' seats' : '' %></span>
+            <% if (v.location) { %><br><span class="muted"><%= v.location %></span><% } %>
+          </th>
+          <td>
+            <%= v.ownerLabel %>
+            <% if (v.driverAvailable) { %><br><span class="muted">driver available</span><% } else { %><br><span class="muted">self-drive only</span><% } %>
+          </td>
+          <td>
+            <span class="badge badge--<%= v.documentsState === 'current' && v.documentsValid ? 'ok' : v.documentsState === 'missing' ? 'flagged' : 'attention' %>">
+              <%= v.documentsLabel %>
+            </span>
+            <% if (v.documentsDue) { %>
+              <br><span class="<%= v.documentsValid ? 'muted' : 'text-amber' %>">
+                <%= v.documentsValid
+                      ? 'to ' + new Date(v.documentsDue).toLocaleDateString('en-NG', { day: 'numeric', month: 'short', year: 'numeric' })
+                      : 'expired ' + Math.abs(v.documentsDays) + ' days ago' %>
+              </span>
+            <% } else { %>
+              <br><span class="text-amber">no expiry on file</span>
+            <% } %>
+          </td>
+          <td>
+            <span class="badge badge--<%= v.trackerState === 'fitted' ? 'ok' : v.trackerState === 'on_order' ? 'pending' : 'flagged' %>"><%= v.trackerLabel %></span>
+          </td>
+          <td>
+            <span class="badge badge--<%= v.status === 'available' ? 'ok' : v.status === 'on_hire' ? 'live' : v.status === 'service' ? 'attention' : 'closed' %>"><%= v.statusLabel %></span>
+          </td>
+          <td>
+            <span class="muted tabular"><%= v.bookings %> hire<%= v.bookings === 1 ? '' : 's' %> · <%= v.hireDays %> days</span>
+            <% if (v.nextBooking) { %>
+              <br><a class="tabular" href="#hire-<%= v.nextBooking.reference %>"><%= v.nextBooking.reference %></a>
+              <br><span class="muted">out <%= new Date(v.nextBooking.pickupAt).toLocaleDateString('en-NG', { day: 'numeric', month: 'short' }) %></span>
+            <% } %>
+            <% if (v.openIncidents) { %>
+              <br><span class="badge badge--flagged"><%= v.openIncidents %> open</span>
+            <% } %>
+          </td>
+          <td>
+            <% if (canManage) { %>
+              <details class="row-details">
+                <summary>Papers &amp; state</summary>
+                <form method="post" action="/admin/hire/vehicles/<%= v.id %>" class="stack">
+                  <div class="field">
+                    <label class="field__label" for="docs-<%= v.id %>">Documents</label>
+                    <select class="input" id="docs-<%= v.id %>" name="documents_state">
+                      <% documentsStates.forEach(function (d) { %>
+                        <option value="<%= d.value %>" <%= v.documentsState === d.value ? 'selected' : '' %>><%= d.label %></option>
+                      <% }); %>
+                    </select>
+                  </div>
+                  <div class="field">
+                    <label class="field__label" for="due-<%= v.id %>">Papers run out</label>
+                    <input class="input" id="due-<%= v.id %>" type="date" name="documents_due" value="<%= v.documentsDue ? new Date(v.documentsDue).toISOString().slice(0, 10) : '' %>">
+                    <span class="field__hint">Insurance and particulars. Past the date, the unit cannot go out.</span>
+                  </div>
+                  <div class="field">
+                    <label class="field__label" for="trk-<%= v.id %>">Tracker</label>
+                    <select class="input" id="trk-<%= v.id %>" name="tracker_state">
+                      <% trackerStates.forEach(function (t) { %>
+                        <option value="<%= t.value %>" <%= v.trackerState === t.value ? 'selected' : '' %>><%= t.label %></option>
+                      <% }); %>
+                    </select>
+                  </div>
+                  <div class="field">
+                    <label class="field__label" for="vstate-<%= v.id %>">State</label>
+                    <select class="input" id="vstate-<%= v.id %>" name="status">
+                      <% vehicleStatuses.forEach(function (s) { %>
+                        <option value="<%= s.value %>" <%= v.status === s.value ? 'selected' : '' %>><%= s.label %></option>
+                      <% }); %>
+                    </select>
+                  </div>
+                  <div class="field">
+                    <label class="field__label" for="vloc-<%= v.id %>">Where it sits</label>
+                    <input class="input" id="vloc-<%= v.id %>" type="text" name="location" maxlength="80" value="<%= v.location || '' %>" placeholder="Woji yard">
+                  </div>
+                  <label class="checkbox-row">
+                    <input type="checkbox" name="driver_available" value="1" <%= v.driverAvailable ? 'checked' : '' %>>
+                    <span>A driver can take this car</span>
+                  </label>
+                  <div class="field">
+                    <label class="field__label" for="vnote-<%= v.id %>">Note</label>
+                    <input class="input" id="vnote-<%= v.id %>" type="text" name="notes" maxlength="300" value="<%= v.notes || '' %>">
+                  </div>
+                  <button class="btn btn--secondary btn--sm" type="submit">Save</button>
+                </form>
+              </details>
+            <% } else { %>
+              <span class="muted"><%= v.notes || '—' %></span>
+            <% } %>
+          </td>
+        </tr>
+      <% }); %>
+    </tbody>
+  </table>
+
+  <% if (canManage) { %>
+    <details class="row-details mt-3">
+      <summary>Add a unit to the pool</summary>
+      <form method="post" action="/admin/hire/vehicles" class="stack">
+        <div class="admin-grid admin-grid--3">
+          <div class="field">
+            <label class="field__label" for="nv-plate">Plate</label>
+            <input class="input" id="nv-plate" type="text" name="plate" maxlength="20" required placeholder="ABC-123-PH">
+          </div>
+          <div class="field">
+            <label class="field__label" for="nv-class">Hires as</label>
+            <select class="input" id="nv-class" name="class_slug">
+              <% classes.forEach(function (c) { %><option value="<%= c.slug %>"><%= c.name %></option><% }); %>
+            </select>
+          </div>
+          <div class="field">
+            <label class="field__label" for="nv-owner">Owner</label>
+            <select class="input" id="nv-owner" name="owner">
+              <option value="honestcars">Honest Cars</option>
+              <option value="partner">Partner-owned</option>
+            </select>
+          </div>
+          <div class="field">
+            <label class="field__label" for="nv-make">Make</label>
+            <input class="input" id="nv-make" type="text" name="make" maxlength="40" placeholder="Toyota">
+          </div>
+          <div class="field">
+            <label class="field__label" for="nv-model">Model</label>
+            <input class="input" id="nv-model" type="text" name="model" maxlength="60" placeholder="Highlander">
+          </div>
+          <div class="field">
+            <label class="field__label" for="nv-year">Year</label>
+            <input class="input" id="nv-year" type="number" name="year" min="1980" max="2030" placeholder="2019">
+          </div>
+          <div class="field">
+            <label class="field__label" for="nv-partner">Partner name</label>
+            <input class="input" id="nv-partner" type="text" name="partner_name" maxlength="120" placeholder="Rivers Fleet Ltd">
+            <span class="field__hint">Only when the car is not ours — the unit still answers to our papers rule.</span>
+          </div>
+          <div class="field">
+            <label class="field__label" for="nv-seats">Seats</label>
+            <input class="input" id="nv-seats" type="number" name="seats" min="2" max="60" placeholder="5">
+          </div>
+          <div class="field">
+            <label class="field__label" for="nv-location">Where it sits</label>
+            <input class="input" id="nv-location" type="text" name="location" maxlength="80" placeholder="Woji yard">
+          </div>
+          <div class="field">
+            <label class="field__label" for="nv-docs">Documents</label>
+            <select class="input" id="nv-docs" name="documents_state">
+              <option value="current">Current</option>
+              <option value="expiring">Expiring</option>
+              <option value="missing" selected>Missing — do not hire</option>
+            </select>
+          </div>
+          <div class="field">
+            <label class="field__label" for="nv-due">Papers run out</label>
+            <input class="input" id="nv-due" type="date" name="documents_due">
+          </div>
+          <div class="field">
+            <label class="field__label" for="nv-tracker">Tracker</label>
+            <select class="input" id="nv-tracker" name="tracker_state">
+              <option value="fitted">Fitted</option>
+              <option value="on_order">On order</option>
+              <option value="none">None</option>
+            </select>
+          </div>
+        </div>
+        <label class="checkbox-row">
+          <input type="checkbox" name="driver_available" value="1" checked>
+          <span>A driver can take this car</span>
+        </label>
+        <button class="btn btn--primary btn--sm" type="submit">Add to the pool</button>
+      </form>
+    </details>
+  <% } %>
+</section>
+
+<%# ---------------------------------------------------- incidents %>
+<section class="panel mt-3" id="incidents">
+  <div class="panel__head">
+    <h2 class="panel__title">
+      Incident log
+      <span class="muted"><%= openIncidents.length %> open · <%= closedIncidents.length %> closed</span>
+    </h2>
+    <span class="cms-hint">
+      Everything that happened to a car on hire: damage, a late return, a fine, a breakdown. Cost is what it cost us;
+      charged is what the client agreed to. The difference is what the desk argues about, so both are recorded.
+    </span>
+  </div>
+
+  <% if (!incidents.length) { %>
+    <p class="empty-line">Nothing has gone wrong on a hire yet. Long may it last.</p>
+  <% } else { %>
+    <table class="table table--stack">
+      <thead>
+        <tr>
+          <th scope="col">What</th>
+          <th scope="col">Unit</th>
+          <th scope="col">Cost / charged</th>
+          <th scope="col">State</th>
+          <th scope="col"><%= canManage ? 'Close it' : 'Record' %></th>
+        </tr>
+      </thead>
+      <tbody>
+        <% incidents.forEach(function (i) { %>
+          <tr>
+            <th scope="row">
+              <strong><%= i.kindLabel %></strong>
+              <span class="badge badge--<%= i.severity === 'minor' ? 'pending' : i.severity === 'write_off' ? 'flagged' : 'attention' %>"><%= i.severity.replace('_', ' ') %></span>
+              <br><span class="muted"><%= i.detail %></span>
+              <br><span class="muted">
+                <%= new Date(i.occurredAt || i.createdAt).toLocaleDateString('en-NG', { day: 'numeric', month: 'short', year: 'numeric' }) %>
+                <% if (i.bookingReference) { %> · <a class="tabular" href="#hire-<%= i.bookingId %>"><%= i.bookingReference %></a><% } %>
+                <% if (i.reportedByName) { %> · filed by <%= i.reportedByName %><% } %>
+              </span>
+            </th>
+            <td><%= i.plate || '<span class="muted">no unit</span>' %></td>
+            <td class="tabular">
+              <% if (i.costKobo) { %><%= naira(i.costKobo) %><% } else { %><span class="muted">—</span><% } %>
+              <% if (i.chargedKobo) { %>
+                <br><span class="muted">charged <%= naira(i.chargedKobo) %></span>
+              <% } %>
+              <% if (i.costKobo && i.gapKobo) { %>
+                <br><span class="<%= i.gapKobo > 0 ? 'text-amber' : 'muted' %>">
+                  <%= i.gapKobo > 0 ? naira(i.gapKobo) + ' on us' : naira(Math.abs(i.gapKobo)) + ' recovered' %>
+                </span>
+              <% } %>
+            </td>
+            <td>
+              <span class="badge badge--<%= i.status === 'open' ? 'flagged' : 'closed' %>"><%= i.status.replace('_', ' ') %></span>
+              <% if (i.resolution) { %><br><span class="muted"><%= i.resolution %></span><% } %>
+              <% if (i.resolvedAt) { %><br><span class="muted">closed <%= new Date(i.resolvedAt).toLocaleDateString('en-NG', { day: 'numeric', month: 'short' }) %></span><% } %>
+            </td>
+            <td>
+              <% if (canManage && i.status === 'open') { %>
+                <details class="row-details">
+                  <summary>Close it</summary>
+                  <form method="post" action="/admin/hire/incidents/<%= i.id %>/resolve" class="stack">
+                    <div class="field">
+                      <label class="field__label" for="res-<%= i.id %>">What was decided</label>
+                      <input class="input" id="res-<%= i.id %>" type="text" name="resolution" maxlength="400" placeholder="Repaired at Woji panel shop; client paid ₦40,000">
+                    </div>
+                    <div class="field">
+                      <label class="field__label" for="rec-<%= i.id %>">Charged to the client (₦)</label>
+                      <input class="input" id="rec-<%= i.id %>" type="text" name="charged" inputmode="decimal" value="<%= i.chargedKobo ? i.chargedKobo / 100 : '' %>">
+                    </div>
+                    <label class="checkbox-row">
+                      <input type="checkbox" name="written_off" value="1">
+                      <span>Written off — the car is not coming back</span>
+                    </label>
+                    <button class="btn btn--secondary btn--sm" type="submit">Close the incident</button>
+                  </form>
+                </details>
+              <% } %>
+            </td>
+          </tr>
+        <% }); %>
+      </tbody>
+    </table>
+  <% } %>
+</section>

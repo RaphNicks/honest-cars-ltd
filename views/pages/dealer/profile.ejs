@@ -1,0 +1,87 @@
+<%
+/**
+ * Profile & agreement — §7.2 “business details, lot location, digital copy of
+ * the signed agreement, tier badge”.
+ *
+ * Read-only by design: the lot record is the contract between the desk and the
+ * lot, so changes go through ops rather than a text box on the internet.
+ * Locals: lot, agreement
+ */
+%>
+<div class="admin-grid admin-grid--2">
+  <section class="panel">
+    <div class="panel__head">
+      <h2 class="panel__title"><%= lot.name %></h2>
+      <span class="badge badge--<%= lot.tier %>"><%= lot.tierLabel %></span>
+    </div>
+
+    <table class="table">
+      <caption class="visually-hidden">This lot's details on the HonestCars network</caption>
+      <tbody>
+        <tr>
+          <th scope="row">Lot name</th>
+          <td><%= lot.name %></td>
+        </tr>
+        <tr>
+          <th scope="row">Location</th>
+          <td><%= lot.lotArea %><%= lot.city ? ', ' + lot.city : '' %></td>
+        </tr>
+        <tr>
+          <th scope="row">Tier</th>
+          <td><%= lot.tierLabel %><% if (lot.verified) { %> · <span class="badge badge--certified">verified lot</span><% } %></td>
+        </tr>
+        <tr>
+          <th scope="row">Listings on the network</th>
+          <td class="tabular"><%= lot.listingsTotal %></td>
+        </tr>
+        <tr>
+          <th scope="row">Commission rate</th>
+          <td class="tabular"><%= lot.commissionPct === null ? 'per the signed agreement' : lot.commissionPct + '%' %></td>
+        </tr>
+        <tr>
+          <th scope="row">Sign-in number</th>
+          <td class="tabular"><%= user.phone %></td>
+        </tr>
+      </tbody>
+    </table>
+
+    <p class="cms-hint mt-2">
+      Something wrong here — a moved lot, a new sign-in number, a rate change? Those live in the
+      signed agreement, so they are changed by the desk, not in a form:
+      <a href="<%= helpers.whatsappLink('Please update our lot record (' + lot.name + ').', 'dealer_profile') %>"
+         target="_blank" rel="noopener">message the ops desk</a>.
+    </p>
+  </section>
+
+  <section class="panel">
+    <div class="panel__head">
+      <h2 class="panel__title">Partnership agreement</h2>
+      <% if (agreement.signed) { %><span class="cms-hint">signed <%= agreement.signed %></span><% } %>
+    </div>
+
+    <% if (!agreement.ref && !agreement.url) { %>
+      <p class="empty-line">No signed agreement is on file against this lot yet.</p>
+      <p class="mb-0 muted">
+        Ops keeps the digital copy. Once it is uploaded it appears here with its reference, so both
+        sides are reading the same document.
+      </p>
+    <% } else { %>
+      <p class="mb-1">
+        Reference <strong class="tabular"><%= agreement.ref || '—' %></strong>
+        <% if (agreement.signed) { %><br><span class="muted">Signed <%= agreement.signed %></span><% } %>
+      </p>
+      <% if (agreement.url) { %>
+        <p class="mb-1"><a class="btn btn--secondary btn--sm" href="<%= agreement.url %>" target="_blank" rel="noopener">Open the signed copy</a></p>
+      <% } else { %>
+        <p class="mb-1 muted">The signed copy is held by the ops desk — ask and they will send it.</p>
+      <% } %>
+      <h3 class="mt-3 mb-1">What the agreement commits this lot to</h3>
+      <ul class="tick-list">
+        <li class="tick-list__yes">Mileage stated as it is, not as it sells.</li>
+        <li class="tick-list__yes">Documents sighted before a listing claims them.</li>
+        <li class="tick-list__yes">Faults named in the honest note, including the ones that cost a sale.</li>
+        <li class="tick-list__yes">Buyer enquiries answered inside a day wherever possible.</li>
+      </ul>
+    <% } %>
+  </section>
+</div>

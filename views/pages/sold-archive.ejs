@@ -1,0 +1,60 @@
+<%#
+  Sold archive — §6.2 + §14.1. This page exists between day 7 and day 90 after a
+  sale: indexable, honest about the price it fetched, and it routes every
+  visitor into live stock. After day 90 the route 301s to the listing's facet.
+  Locals: listing, similar, trail
+%>
+<section class="container">
+  <%- include('../partials/breadcrumbs', { crumbs: [{ label: 'Cars for sale', href: '/cars' }, { label: 'Sold archive' }] }) %>
+
+  <div class="facet-hero">
+    <span class="badge badge--sold">Sold</span>
+    <h1 class="facet-hero__h1 mt-1"><%= listing.title %></h1>
+    <p class="facet-hero__intro">
+      This one is gone. We keep it here because the price it sold for is useful information when you
+      are pricing your own car — and because somebody else is about to be glad we checked it first.
+    </p>
+
+    <div class="archive-banner">
+      <%- helpers.icon('info', { size: 20 }) %>
+      <div>
+        <p><strong>Listed at <%= helpers.formatNaira(listing.priceKobo) %></strong>
+          <% if (listing.soldInDays) { %> and sold in <%= listing.soldInDays %> day<%= listing.soldInDays === 1 ? '' : 's' %><% } %>.
+          It was a <%= listing.year %> <%= listing.make %> <%= listing.model %> with
+          <span class="tabular"><%= helpers.formatMileage(listing.mileageKm) %></span> in <%= listing.area %>.</p>
+        <p>The full listing is archived for 90 days, then this page redirects to our live
+          <%= listing.make %> listings so nothing sends you to a dead end.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="section" aria-labelledby="similar-heading">
+  <div class="container">
+    <div class="section-head">
+      <h2 id="similar-heading">Similar cars you can buy today</h2>
+      <a class="section-head__link" href="/cars/<%= listing.make.toLowerCase().replace(/\s+/g, '-') %>">All <%= listing.make %> →</a>
+    </div>
+    <% if (similar.length) { %>
+      <div class="grid grid--3">
+        <% similar.forEach(function (car) { %>
+          <%- include('../partials/car-card', { listing: car, helpers: helpers }) %>
+        <% }); %>
+      </div>
+    <% } else { %>
+      <%- include('../partials/empty-state', { nearMatches: 0 }) %>
+    <% } %>
+  </div>
+</section>
+
+<section class="section section--surface">
+  <div class="container">
+    <div class="row row--between">
+      <div>
+        <h2 class="mb-0">Looking for something specific?</h2>
+        <p class="mb-0 note-inline">Tell us the brief. We find and inspect up to 3 options within 48–72 hours.</p>
+      </div>
+      <a class="btn btn--primary" href="/find-my-car" data-event="concierge_started" data-source="sold_archive">Find It For Me</a>
+    </div>
+  </div>
+</section>

@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 900" width="1200" height="900" role="img" aria-label="TYRES & TREAD placeholder">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#F7FAFC"/><stop offset="100%" stop-color="#E7EEF5"/>
+    </linearGradient>
+  </defs>
+  <rect width="1200" height="900" fill="url(#bg)"/>
+  <rect x="24" y="24" width="1152" height="852" fill="none" stroke="#D8E0E8" stroke-width="2" stroke-dasharray="10 8"/>
+  <g transform="translate(600 470) scale(7.82) translate(-110 -55)" opacity="0.16">
+    <path d="M24 58 L52 58 C58 40 78 30 110 30 C144 30 162 40 168 58 L196 58 C200 58 203 61 203 66 L203 74 L18 74 L18 66 C18 61 21 58 24 58 Z" fill="#0E2A47"/>
+    <circle cx="66" cy="78" r="16" fill="#0E2A47"/>
+    <circle cx="164" cy="78" r="16" fill="#0E2A47"/>
+  </g>
+  <text x="600" y="300" text-anchor="middle" font-family="Inter, -apple-system, Segoe UI, Roboto, sans-serif" font-size="46" font-weight="700" fill="#0E2A47" letter-spacing="2">TYRES & TREAD</text>
+  <text x="600" y="352" text-anchor="middle" font-family="Inter, -apple-system, Segoe UI, Roboto, sans-serif" font-size="26" font-weight="400" fill="#5B6B7C">Photo pending — media pipeline stub</text>
+  <text x="600" y="800" text-anchor="middle" font-family="Inter, -apple-system, Segoe UI, Roboto, sans-serif" font-size="24" font-weight="500" fill="#5B6B7C">HONESTCARS · PORT HARCOURT</text>
+</svg>

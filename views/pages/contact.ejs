@@ -1,0 +1,144 @@
+<%#
+  /contact — §6.10: “form + WhatsApp + address-note ‘We operate virtually in
+  PH — inspections come to you’.” WhatsApp is genuinely the fastest channel and
+  the page says so instead of pretending the form is.
+%>
+<section class="page-hero">
+  <div class="container">
+    <%- include('../partials/breadcrumbs', { crumbs: trail }) %>
+    <p class="eyebrow">Contact</p>
+    <h1>Talk to someone who is actually in Port Harcourt</h1>
+    <p class="lead">
+      WhatsApp is answered first — by the ops desk, not a bot. Phone and email work too, and the form
+      below lands in the same queue.
+    </p>
+  </div>
+</section>
+
+<section class="section">
+  <div class="container">
+    <div class="grid grid--2" style="align-items:start">
+      <div class="channels">
+        <a class="channels__row" href="<%= site.nav.whatsapp.general %>" target="_blank" rel="noopener"
+           data-event="whatsapp_click" data-source="contact_card">
+          <span class="channels__icon"><%- helpers.icon('whatsapp', { size: 20 }) %></span>
+          <span class="channels__body">
+            <strong>WhatsApp — fastest</strong>
+            <span>Send the car link or the question. Working hours: minutes. After 6pm: first thing next morning.</span>
+          </span>
+        </a>
+
+        <div class="channels__row">
+          <span class="channels__icon"><%- helpers.icon('phone', { size: 20 }) %></span>
+          <span class="channels__body">
+            <strong>Phone</strong>
+            <span><a href="tel:<%= site.business.phone %>"><%= helpers.phonePretty(site.business.phone) %></a></span>
+          </span>
+        </div>
+
+        <div class="channels__row">
+          <span class="channels__icon"><%- helpers.icon('chat', { size: 20 }) %></span>
+          <span class="channels__body">
+            <strong>Email</strong>
+            <span><a href="mailto:<%= site.business.email %>"><%= site.business.email %></a></span>
+          </span>
+        </div>
+
+        <div class="channels__row">
+          <span class="channels__icon"><%- helpers.icon('mapPin', { size: 20 }) %></span>
+          <span class="channels__body">
+            <strong>Where we are</strong>
+            <span>We operate virtually in Port Harcourt — inspections come to you. There is no walk-in showroom,
+            because we do not hold stock: the cars belong to partner lots across the city, and our inspectors
+            travel to them. Meetings happen where the car is, or at a meet-point we agree on WhatsApp.</span>
+          </span>
+        </div>
+
+        <div class="channels__row">
+          <span class="channels__body">
+            <strong>Company details</strong>
+            <span><%= site.business.cacLine %></span>
+          </span>
+        </div>
+      </div>
+
+      <form class="card card__body service-form" data-service-form data-kind="contact" data-service-slug="contact" data-draft="service-contact"
+            data-endpoint="/api/contact" method="post" action="/api/contact" novalidate>
+        <h2 class="mb-1">Send a message</h2>
+        <p class="form-hint">
+          Guest-first, no account. If it is urgent, use WhatsApp instead — this form is read in the same
+          queue but a minute later.
+        </p>
+
+        <div class="form-grid">
+          <div class="field">
+            <label class="field__label" for="contact-name">Your name</label>
+            <input class="input" id="contact-name" name="name" type="text" autocomplete="name" required>
+          </div>
+          <div class="field">
+            <label class="field__label" for="contact-phone">WhatsApp number</label>
+            <input class="input" id="contact-phone" name="phone" type="tel" inputmode="numeric" autocomplete="tel" required>
+          </div>
+        </div>
+
+        <div class="field">
+          <label class="field__label" for="contact-topic">What is this about?</label>
+          <select class="select" id="contact-topic" name="topic">
+            <option value="buying">Buying a car</option>
+            <option value="inspection">Booking an inspection</option>
+            <option value="documents">Documents and customs</option>
+            <option value="selling">Selling or swapping</option>
+            <option value="hire">Car hire</option>
+            <option value="shop">Shop order or delivery</option>
+            <option value="dealer">Dealer partnership</option>
+            <option value="problem">Something went wrong</option>
+          </select>
+        </div>
+
+        <div class="field">
+          <label class="field__label" for="contact-message">Your message</label>
+          <textarea class="textarea" id="contact-message" name="message" rows="5"
+                    placeholder="Tell us the car, the budget and the question — the more specific, the faster the answer." required></textarea>
+        </div>
+
+        <label class="checkbox-row">
+          <input type="checkbox" name="consent" required>
+          <span>HonestCars can contact me on WhatsApp about this message. No marketing spam.</span>
+        </label>
+
+        <button class="btn btn--primary btn--lg btn--block" type="submit" data-submit>Send message</button>
+        <p class="field__error hidden" data-form-error role="alert"></p>
+        <p class="field__hint mb-0">
+          Read how we handle your data in the <a href="/privacy">privacy notice</a> (NDPA-aligned).
+        </p>
+      </form>
+    </div>
+  </div>
+</section>
+
+<% if (faqs.length) { %>
+<section class="section section--surface">
+  <div class="container container--narrow">
+    <div class="section-head"><h2>Before you message</h2></div>
+    <%- include('../partials/accordion', { faqs: faqs, idPrefix: 'contact-faq' }) %>
+  </div>
+</section>
+<% } %>
+
+<section class="section">
+  <div class="container">
+    <div class="section-head"><h2>Or go straight to the thing you need</h2></div>
+    <div class="service-index service-index--two">
+      <% services.slice(0, 6).forEach(function (service, index) { %>
+        <a class="service-index__row" href="/services/<%= service.slug %>">
+          <span class="service-index__num" aria-hidden="true"><%= String(index + 1).padStart(2, '0') %></span>
+          <span class="service-index__body">
+            <strong><%= service.name %></strong>
+            <span><%= service.promise %></span>
+          </span>
+          <span class="service-index__arrow" aria-hidden="true">→</span>
+        </a>
+      <% }); %>
+    </div>
+  </div>
+</section>

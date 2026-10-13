@@ -1,0 +1,84 @@
+<%#
+  /faq — §6.10: searchable, grouped. Search is a real GET (?q=) so it works
+  without JavaScript; groups render as accordions with FAQPage schema site-wide.
+%>
+<section class="page-hero">
+  <div class="container">
+    <%- include('../partials/breadcrumbs', { crumbs: trail }) %>
+    <p class="eyebrow">Answers</p>
+    <h1>Questions people actually ask us</h1>
+    <p class="lead">
+      <%= totalFaqs %> answers across buying, inspections, documents, tracking, selling and delivery.
+      Search them, or read the group that matches where you are.
+    </p>
+
+    <form class="faq-search mt-2" method="get" action="/faq" role="search">
+      <div class="field">
+        <label class="field__label" for="faq-q">Search the answers</label>
+        <input class="input" id="faq-q" name="q" type="search" value="<%= term || '' %>"
+               placeholder="refund, mileage, tracker, customs…">
+      </div>
+      <button class="btn btn--primary" type="submit">Search</button>
+      <% if (term) { %><a class="btn btn--ghost" href="/faq">Clear</a><% } %>
+    </form>
+  </div>
+</section>
+
+<% if (term) { %>
+  <section class="section">
+    <div class="container container--narrow">
+      <div class="section-head">
+        <h2><%= results.length %> answer<%= results.length === 1 ? '' : 's' %> for “<%= term %>”</h2>
+        <a class="section-head__link" href="/faq">All questions →</a>
+      </div>
+      <% if (results.length) { %>
+        <%- include('../partials/accordion', {
+          faqs: results.map(function (row) { return { question: row.question, answer: row.answer, scope: row.scope }; }),
+          idPrefix: 'faq-search'
+        }) %>
+        <p class="field__hint">Not answered? <a href="/contact">Ask us directly</a> — or use the concierge if it is about a specific car.</p>
+      <% } else { %>
+        <div class="empty-state">
+          <h3>Nothing matched that search</h3>
+          <p>Try a shorter word, or send the question to a human on WhatsApp — we answer the ones we get most by adding them here.</p>
+          <div class="btn-row mt-2" style="justify-content:center">
+            <a class="btn btn--primary" href="<%= site.nav.whatsapp.general %>" target="_blank" rel="noopener"
+               data-event="whatsapp_click" data-source="faq_empty">Ask on WhatsApp</a>
+            <a class="btn btn--secondary" href="/faq">Browse all groups</a>
+          </div>
+        </div>
+      <% } %>
+    </div>
+  </section>
+<% } else { %>
+  <section class="section">
+    <div class="container container--narrow">
+      <% groups.forEach(function (group) { %>
+        <% if (!group.faqs.length) return; %>
+        <div class="faq-group mb-3">
+          <div class="section-head">
+            <h2 id="faq-<%= group.scope.replace(/[^a-z0-9]+/g, '-') %>"><%= group.label %></h2>
+            <p class="section-head__note mb-0"><%= group.description %></p>
+          </div>
+          <%- include('../partials/accordion', { faqs: group.faqs, idPrefix: 'faq-' + group.scope.replace(/[^a-z0-9]+/g, '-') }) %>
+        </div>
+      <% }); %>
+    </div>
+  </section>
+<% } %>
+
+<section class="section section--surface">
+  <div class="container">
+    <div class="alert-band">
+      <div>
+        <h2>Still stuck?</h2>
+        <p class="mb-0">Send the car or the question on WhatsApp. During working hours you will usually have an answer in minutes.</p>
+      </div>
+      <div class="btn-row">
+        <a class="btn btn--primary" href="<%= site.nav.whatsapp.general %>" target="_blank" rel="noopener"
+           data-event="whatsapp_click" data-source="faq_footer">Ask on WhatsApp</a>
+        <a class="btn btn--secondary" href="/contact">Contact form</a>
+      </div>
+    </div>
+  </div>
+</section>
