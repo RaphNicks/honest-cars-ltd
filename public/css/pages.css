@@ -377,6 +377,29 @@ body[data-page="/"] .banner-strip + .hero--match { margin-top: 0; }
   color: var(--white);
 }
 
+.hero--match .hero__bg {
+  position: absolute;
+  inset: 0;
+  z-index: -2;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: 70% 50%;
+  pointer-events: none;
+}
+
+.hero--match .hero__scrim {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: var(--scrim-hero), var(--scrim-hero-floor);
+  pointer-events: none;
+}
+
+@media (max-width: 899px), (prefers-reduced-motion: reduce) {
+  .hero--match .hero__bg { display: none; }
+}
+
 .hero--match .hero__layout {
   position: relative;
   display: grid;

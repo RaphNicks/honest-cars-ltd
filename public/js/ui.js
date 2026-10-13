@@ -320,6 +320,31 @@ export function initCompareHydrate() {
   window.location.replace(url.toString());
 }
 
+/* ------------------------------------ hero background video: desktop only */
+export function initHeroVideo() {
+  const video = document.querySelector('[data-hero-video]');
+  if (!video || !video.dataset.src || typeof window.matchMedia !== 'function') return;
+
+  const wide = window.matchMedia('(min-width: 900px)');
+  const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
+  const sync = () => {
+    if (wide.matches && !reducedMotion.matches) {
+      if (!video.hasAttribute('src')) {
+        video.setAttribute('src', video.dataset.src);
+        video.play().catch(() => { /* the navy field remains if autoplay is refused */ });
+      }
+    } else if (video.hasAttribute('src')) {
+      video.pause();
+      video.removeAttribute('src');
+      video.load();
+    }
+  };
+
+  sync();
+  wide.addEventListener?.('change', sync);
+  reducedMotion.addEventListener?.('change', sync);
+}
+
 /* ------------------------------------ recently viewed (VDP, no PII) */
 export function rememberViewed(listing) {
   if (!listing || !listing.id) return;

@@ -80,7 +80,9 @@ maybe('homepage renders the match hero and preserves the live feed', async () =>
   assert.match(html, /<a class="btn btn--secondary btn--lg" href="\/cars">Explore Our Cars<\/a>/);
   assert.match(html, /Honest Cars Ltd\.\s*·\s*Your next chapter starts here\./i);
   assert.match(html, /class="hero__scroll" href="#fresh-heading"[^>]*aria-label="Scroll to fresh listings"/);
-  assert.doesNotMatch(html, /data-hero-video|hero--cinematic/, 'the replaced hero no longer loads cinematic video');
+  assert.match(html, /<video class="hero__bg" data-hero-video data-src="\/video\/Car_driving_on_highway\.mp4"/);
+  assert.doesNotMatch(html, /data-hero-video[^>]*\ssrc=/, 'the video source is not eager-loaded on mobile');
+  assert.match(html, /class="hero__scrim" aria-hidden="true"/);
 
   assert.match(html, /Find your perfect ride/, 'category cards render');
   assert.match(html, /Fresh on the market/);

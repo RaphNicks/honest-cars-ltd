@@ -73,6 +73,29 @@ test('homepage match hero uses the existing navy, green and white palette', () =
   assert.match(pages, /\.hero--match \.hero__actions \.btn--secondary\s*\{[^}]*color:\s*var\(--white\)/);
 });
 
+test('homepage video is lazy-attached only on wide, motion-safe screens', () => {
+  const read = (file) => fs.readFileSync(path.join(ROOT, file), 'utf8');
+  const home = read('views/pages/home.ejs');
+  const ui = read('public/js/ui.js');
+  const main = read('public/js/main.js');
+  const pages = read('public/css/pages.css');
+
+  const videoStart = home.indexOf('<video class="hero__bg"');
+  const videoEnd = home.indexOf('</video>', videoStart);
+  const videoMarkup = home.slice(videoStart, videoEnd + '</video>'.length);
+  assert.ok(videoMarkup.includes('data-src="/video/Car_driving_on_highway.mp4"'));
+  assert.equal(videoMarkup.includes(' src='), false, 'the template does not eager-load the video');
+  assert.ok(ui.includes("window.matchMedia('(min-width: 900px)')"));
+  assert.ok(ui.includes("window.matchMedia('(prefers-reduced-motion: reduce)')"));
+  assert.ok(ui.includes('if (wide.matches && !reducedMotion.matches)'));
+  assert.ok(main.includes('initHeroVideo();'));
+
+  const mobileRuleStart = pages.indexOf('@media (max-width: 899px), (prefers-reduced-motion: reduce)');
+  const mobileRuleEnd = pages.indexOf('.hero--match .hero__layout', mobileRuleStart);
+  const mobileVideoRule = pages.slice(mobileRuleStart, mobileRuleEnd);
+  assert.ok(mobileVideoRule.includes('.hero--match .hero__bg { display: none; }'));
+});
+
 test('find-my-car explains tracking without publishing a demo ID, and lookup accepts real IDs', () => {
   const template = fs.readFileSync(path.join(ROOT, 'views/pages/find-my-car.ejs'), 'utf8');
   assert.match(template, /Track an existing request/);
