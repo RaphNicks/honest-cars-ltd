@@ -421,7 +421,7 @@ maybe('saved searches keep their query, their alerts, and can be deleted', async
   assert.equal((await db.users.savedSearches(user.id)).filter((row) => row.id === id).length, 0, 'the row is gone');
 });
 
-maybe('profile details round-trip while email changes require verification', async () => {
+maybe('profile details keep contact phone separate from sign-in and require email verification', async () => {
   const { client, normalised } = await signIn();
   const rejectedEmail = await client.request('/api/account/profile', {
     method: 'POST',
@@ -430,18 +430,18 @@ maybe('profile details round-trip while email changes require verification', asy
   assert.equal(rejectedEmail.status, 422);
   assert.match(rejectedEmail.json.error, /verification/i);
 
-  const contactPhone = nextPhone();
   const saved = await client.request('/api/account/profile', {
     method: 'POST',
-    body: { name: 'Test Buyer', contactPhone, marketingOptIn: true },
+    body: { name: 'Test Buyer', contactPhone: '08031231234', marketingOptIn: true },
   });
   assert.equal(saved.json.ok, true);
 
   const db = require('../src/db');
   const user = await db.users.findByPhone(normalised);
   assert.equal(user.name, 'Test Buyer');
-  assert.equal(user.email, null, 'unverified profile values are not an email login');
-  assert.equal(user.contactPhone, `+234${contactPhone.replace(/^0/, '')}`);
+  assert.equal(user.phone, normalised, 'the sign-in identity is unchanged');
+  assert.equal(user.contactPhone, '+2348031231234', 'contact information is stored separately');
+  assert.equal(user.email, null, 'email cannot be changed without verification');
   assert.equal(user.marketingOptIn, true);
 
   const html = await client.request('/account');

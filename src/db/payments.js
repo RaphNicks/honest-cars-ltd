@@ -693,9 +693,10 @@ async function advanceMilestone(id, { to, note = null, actorId }) {
 }
 
 /**
- * A customer's own payments: newly linked rows match by account ID; only
- * unowned legacy rows fall back to the signed-in account's verified phone.
- * Normalisation keeps 0803…, +234803… and 234803… compatible for old data.
+ * A customer's payments are owned by account ID. Only unowned legacy rows may
+ * fall back to the verified sign-in phone; a separately saved contact phone
+ * never grants access. Normalisation preserves compatibility with old phone
+ * shapes: 0803…, +234803… and 234803….
  */
 async function listForPhone(phone, { limit = 20, userId = null } = {}) {
   const shapes = phones.variants(phone);
