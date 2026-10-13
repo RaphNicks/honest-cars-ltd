@@ -159,6 +159,8 @@ maybe('sign-in page defaults to phone-free customer email and Google sign-in', a
   const html = await response.text();
   assert.match(html, /noindex, ?nofollow/i);
   assert.match(html, /name="email"/);
+  assert.match(html, /Continue with email/);
+  assert.match(html, /auth-option-divider/);
   assert.match(html, /Continue with Google/);
   assert.match(html, /You do not need a phone number to open an account/);
   assert.match(html, /name="phone"/, 'the legacy phone path remains available');

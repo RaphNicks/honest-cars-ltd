@@ -58,8 +58,39 @@
   .auth-card { padding: var(--space-5, var(--space-4)); }
 }
 
+.page-login .auth-card {
+  max-width: 36rem;
+  margin-inline: auto;
+}
+
 .auth-form { display: grid; gap: var(--space-2); }
 .auth-form .btn-row { margin-top: var(--space-1); }
+
+.auth-signin-options {
+  display: grid;
+  gap: var(--space-2);
+  margin-top: var(--space-1);
+}
+
+.auth-option-divider {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--color-text-muted);
+  font-size: var(--text-14);
+  line-height: 1;
+}
+
+.auth-option-divider::before,
+.auth-option-divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--line);
+}
+
+.auth-google-button { gap: var(--space-2); }
+.auth-google-button__icon { width: 20px; height: 20px; flex: 0 0 auto; }
 
 .input--code {
   letter-spacing: 0.35em;
