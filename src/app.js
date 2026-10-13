@@ -32,6 +32,7 @@ const { router: dealerRoutes } = require('./routes/dealer');
 const auth = require('./services/auth');
 const publish = require('./services/publish');
 const og = require('./services/og');
+const { createAdminHostMiddleware } = require('./lib/admin-host');
 
 function createApp() {
   const app = express();
@@ -83,6 +84,9 @@ function createApp() {
   app.use('/api/media/upload', express.raw({ type: ['image/jpeg', 'image/png', 'image/webp'], limit: '8mb' }));
   app.use(express.urlencoded({ extended: false, limit: '64kb' }));
   app.use(express.json({ limit: '128kb' }));
+
+  // Production staff-console paths live only on the configured admin host.
+  app.use(createAdminHostMiddleware());
 
   // --- Static assets --------------------------------------------------------
   // Prebuilt HTML lives under STATIC_DIR but is NEVER served by express.static
@@ -178,8 +182,9 @@ function createApp() {
   // /api/account endpoints must win over the marketing-page routes below.
   app.use('/api/auth', authRoutes);
   app.use('/', accountRoutes);
-  // The console: /admin is gated by §7.4 and mounted before the public pages,
-  // so the old "phase 2" stub for /admin can never shadow it.
+  // The console's internal /admin routes are gated by §7.4 and mounted before
+  // public pages. Production host middleware keeps these routes on ADMIN_URL;
+  // single-origin previews retain their local /admin path.
   app.use('/admin/cms', adminCmsRoutes);
   app.use('/admin', adminRoutes);
   // §7.2 dealer portal. Mounted before the marketing pages so /dealer is the

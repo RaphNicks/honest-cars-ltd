@@ -442,8 +442,17 @@ maybe('signed out, /dealer is the partner door and stays out of search', async (
   assert.equal(response.status, 200);
   assert.match(response.text, /Run your lot from one screen/);
   assert.match(response.text, /Sign in to the portal/);
+  assert.match(response.text, /href="\/dealer\/login\?next=%2Fdealer%2Fdashboard"/);
   assert.match(response.text, /noindex/i, 'the portal never advertises itself to search');
   assert.doesNotMatch(response.text, /undefined|NaN|<%/, 'no template artefacts');
+});
+
+maybe('dealer phone sign-in has its own route outside customer email sign-in', async () => {
+  const response = await client().request('/dealer/login');
+  assert.equal(response.status, 200);
+  assert.match(response.text, /Sign in to your lot/);
+  assert.match(response.text, /name="phone"/);
+  assert.doesNotMatch(response.text, /Staff sign in|Continue with Google/);
 });
 
 maybe('a customer account is refused, and told why', async () => {

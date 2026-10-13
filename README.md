@@ -13,9 +13,9 @@ The **public storefront is ported and running** — the design system, homepage,
 `/cars` with curated facet pages, vehicle pages, services, concierge and sell/swap
 funnels, blog, shop, trust and legal pages — plus **customer accounts** with email
 OTP or Google sign-in, optional contact phone, `/account` history, saved cars and
-saved searches. Existing phone-based customer accounts can verify and link an
-email after signing in; staff remain on phone OTP + TOTP. SMTP and Google OAuth
-credentials are configured in hosting settings, not committed to this repository.
+saved searches. Staff remain on phone OTP + TOTP at the separate admin host.
+SMTP and Google OAuth credentials are configured in hosting settings, not
+committed to this repository.
 The remaining integration work is the payment provider and other notification
 channels; see *What is built, and what comes next*.
 
@@ -257,18 +257,22 @@ them from in review to published without an exception.
 
 ### Signing in
 
-Staff keep the existing phone + code flow (`/login`), followed by TOTP for
-roles that require it; customer email/Google sign-in does not change staff
-authentication. There are no passwords in this build. The seed creates these
+Customers use `/login` for a verified email code or Google; phone is not a
+customer sign-in method. Dealer partners have a separate phone sign-in at
+`/dealer/login`. Staff use phone OTP plus TOTP where required on the dedicated
+`admin.honestcarsltd.com` host, not on the public site. Production redirects the
+public `/admin` path to the configured `ADMIN_URL`; point that host's DNS and TLS
+at this app. In the single-origin development preview, use `/admin/login` for
+staff access. There are no passwords in this build. The seed creates these
 staff accounts:
 
 | Number | Role | Opens |
 |---|---|---|
-| `+2348000000001` | admin | everything, including Staff & roles and the audit log |
-| `+2348000000002` | ops | KPI home, listings, leads, concierge, dispatch |
-| `+2348000000003` | inspector | My jobs only |
-| `+2348000000004` | finance | Orders, Money, Escrow and the KPI home — approvals, refunds, ledger |
-| `+2348000000005` | marketing | The CMS only — content, pages, FAQs, testimonials and homepage modules |
+| `+2348000000001` | admin | `admin.honestcarsltd.com` — everything, including Staff & roles and the audit log |
+| `+2348000000002` | ops | `admin.honestcarsltd.com` — KPI home, listings, leads, concierge, dispatch |
+| `+2348000000003` | inspector | `admin.honestcarsltd.com` — My jobs only |
+| `+2348000000004` | finance | `admin.honestcarsltd.com` — Orders, Money, Escrow and the KPI home |
+| `+2348000000005` | marketing | `admin.honestcarsltd.com` — CMS content and homepage modules |
 
 In development the code is printed to the server log (`[auth] OTP for … → 123456`)
 and returned as `devCode`, so the console can be driven without a phone. A role
@@ -314,8 +318,9 @@ Three seams, all honest about their limits:
   rendered three ways: the console page, a print stylesheet and a real A4 PDF
   with Inter embedded (the only way the naira sign reaches the page). The
   customer who owns the booking can open the same report — page and PDF — from
-  their dashboard. Legacy unowned bookings are matched only to the signed-in
-  phone account, never to a newly typed contact number.
+  their dashboard. New bookings are linked to the signed-in account. An unowned
+  legacy booking is available only through the account's original sign-in
+  identity, never a newly typed contact number.
 
 ### What is deliberately not here yet
 
@@ -371,8 +376,8 @@ Three checks run against a live server:
 | Content | `/blog`, `/blog/{slug}`, `/blog/rss.xml`, `/guide` |
 | Shop | `/shop`, `/shop/{slug}`, `/cart`, `/checkout`, `/order/{orderNo}` (guest checkout, tracker SKUs create a subscription row) |
 | Trust & company | `/verification`, `/how-it-works`, `/about`, `/faq`, `/contact`, `/partner` |
-| Accounts (§7.1) | `/login` (customer email OTP / Google; legacy and staff phone OTP), `/account` (dashboard), `/account/export`, `/api/auth/*`, `/api/account/*` |
-| Console (§7.3/§7.4) | `/admin` (KPIs + daily summary), `/admin/listings`, `/admin/leads`, `/admin/concierge`, `/admin/bookings`, `/admin/jobs`, `/admin/orders`, `/admin/payments`, `/admin/milestones`, `/admin/staff`, `/admin/audit` |
+| Accounts (§7.1) | `/login` (customer email OTP / Google), `/account` (dashboard), `/account/export`, `/api/auth/*`, `/api/account/*`; dealer partners use `/dealer/login` |
+| Console (§7.3/§7.4) | `admin.honestcarsltd.com/` (dashboard), `/admin/listings`, `/admin/leads`, `/admin/concierge`, `/admin/bookings`, `/admin/jobs`, `/admin/orders`, `/admin/payments`, `/admin/milestones`, `/admin/staff`, `/admin/audit` — all on the admin host |
 | CMS (§7.3/§6.9) | `/admin/cms` (workflow board), `/admin/cms/posts/{id}`, `/admin/cms/pages`, `/admin/cms/faqs`, `/admin/cms/testimonials`, `/admin/cms/modules` |
 | Legal | `/terms`, `/privacy`, `/refunds`, `/disclaimer` (placeholder wording, flagged in the DB) |
 | Machine | `/sitemap.xml`, `/robots.txt`, `/api/listings`, `/api/posts`, `/api/leads`, `/api/events`, `/api/orders`, `/api/bookings`, `/api/service-requests`, `/api/contact`, `/api/og/listing/{slug}.png`, `/api/health` |

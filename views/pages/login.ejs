@@ -1,6 +1,6 @@
 <%#
-  /login — customer email OTP or Google sign-in; legacy customers and staff may
-  use the existing phone OTP path. Staff continue through phone + TOTP.
+  /login — customer-only email OTP or Google sign-in. Staff use the separate
+  admin host; dealer sign-in has its own portal route.
   Locals: next, reason, ref, save, authErrorMessage, googleReady, otp
 %>
 <section class="page-hero">
@@ -26,11 +26,6 @@
     <% } %>
 
     <div class="auth-card" data-auth-card data-next="<%= next %>" data-ref="<%= ref %>" data-save="<%= save || '' %>">
-      <div class="btn-row" role="group" aria-label="Choose a sign-in method">
-        <button class="btn btn--secondary" type="button" data-auth-mode="email" aria-pressed="true">Email or Google</button>
-        <button class="btn btn--ghost" type="button" data-auth-mode="phone" aria-pressed="false">Existing phone account or staff</button>
-      </div>
-
       <div data-auth-panel="email">
         <form class="auth-form mt-3" data-auth-step="email" action="/api/auth/email/otp" method="post" novalidate>
           <h2 class="mb-1">Your details</h2>
@@ -93,59 +88,13 @@
         </form>
       </div>
 
-      <div data-auth-panel="phone" class="hidden" hidden>
-        <form class="auth-form mt-3" data-auth-step="phone" action="/api/auth/otp" method="post" novalidate>
-          <h2 class="mb-1">Existing phone account or staff</h2>
-          <p class="note-inline">Use the phone number already linked to your account. Staff continue with their authenticator code after this step.</p>
-          <div class="field">
-            <label class="field__label" for="login-phone">Phone number</label>
-            <input class="input" id="login-phone" name="phone" type="tel" inputmode="tel" autocomplete="tel" placeholder="0803 123 4567" required aria-describedby="login-phone-hint">
-            <p class="field__hint" id="login-phone-hint">Any format works — <span class="tabular">0803 123 4567</span> or <span class="tabular">+234 803 123 4567</span>.</p>
-          </div>
-          <label class="checkbox-row">
-            <input type="checkbox" name="consent" value="1" checked>
-            <span>I agree to Honest Cars contacting me on this number about my requests and orders.</span>
-          </label>
-          <input type="hidden" name="next" value="<%= next %>">
-          <input type="hidden" name="ref" value="<%= ref %>">
-          <div class="btn-row">
-            <button class="btn btn--primary" type="submit">Send my phone code</button>
-            <a class="btn btn--ghost" href="<%= otp.whatsappLink %>" target="_blank" rel="noopener" data-event="whatsapp_click" data-source="login">Code not arriving? WhatsApp us</a>
-          </div>
-          <p class="auth-message" data-auth-message role="status" aria-live="polite"></p>
-        </form>
-
-        <form class="auth-form hidden" data-auth-step="phone-code" action="/api/auth/verify" method="post" novalidate hidden>
-          <h2 class="mb-1">Enter your phone code</h2>
-          <p class="note-inline">We sent a <%= otp.length %>-digit code to <strong data-auth-phone>your number</strong>.</p>
-          <input type="hidden" name="phone">
-          <input type="hidden" name="next" value="<%= next %>">
-          <input type="hidden" name="ref" value="<%= ref %>">
-          <div class="field">
-            <label class="field__label" for="login-code">Login code</label>
-            <input class="input input--code tabular" id="login-code" name="code" type="text" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]*" maxlength="<%= otp.length %>" placeholder="<%= '0'.repeat(otp.length) %>" required>
-          </div>
-          <div class="btn-row">
-            <button class="btn btn--primary" type="submit">Sign in</button>
-            <button class="btn btn--ghost" type="button" data-auth-restart>Use a different number</button>
-            <button class="btn btn--secondary" type="button" data-auth-resend>Send a new code</button>
-          </div>
-          <p class="auth-message" data-auth-message role="status" aria-live="polite"></p>
-        </form>
-        <% if (otp.provider === 'console') { %>
-          <p class="auth-devnote">
-            <strong>Development:</strong> no phone OTP provider is configured, so the code appears in the development response and server log. Staff still need their authenticator code after phone verification.
-          </p>
-        <% } %>
-      </div>
-
       <% if (!mailReady && development) { %>
         <p class="auth-devnote">
           <strong>Development:</strong> SMTP is not configured. Email codes appear in the development response and server log. Set <code>SMTP_URL</code> and <code>SMTP_FROM</code> for delivery.
         </p>
       <% } else if (!mailReady) { %>
         <p class="auth-devnote">
-          Email sign-in is temporarily unavailable until email delivery is configured. Existing phone-account customers and staff can use the phone sign-in option.
+          Email sign-in is temporarily unavailable until email delivery is configured. Please try again later or contact Honest Cars.
         </p>
       <% } %>
     </div>

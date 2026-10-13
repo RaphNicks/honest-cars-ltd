@@ -3,7 +3,7 @@
 /**
  * Auth endpoints — §7.1, mounted at /api/auth.
  *
- *   POST /api/auth/otp      request a login code (WhatsApp → SMS → console)
+ *   POST /api/auth/otp      request a phone code for staff/dealer access
  *   POST /api/auth/verify   exchange the code for a session cookie
  *   POST /api/auth/logout   revoke the session and clear the cookie
  *
@@ -23,6 +23,7 @@ const validate = require('../services/validate');
 const roles = require('../services/roles');
 const mfa = require('../services/mfa');
 const { sendJson } = require('../lib/respond');
+const { phoneRoleForHost } = require('../lib/admin-host');
 
 const router = express.Router();
 
@@ -64,12 +65,13 @@ function googleCookieOptions() {
   return { httpOnly: true, sameSite: 'lax', secure: config.isProduction, path: '/api/auth/google', maxAge: customerAuth.GOOGLE_STATE_TTL_MS };
 }
 
-router.post('/otp', otpLimiter, async (req, res, next) => {
+router.post('/otp', auth.sameOriginOnly, otpLimiter, async (req, res, next) => {
   try {
     const result = await auth.requestCode({
       rawPhone: (req.body || {}).phone,
       ip: req.ip,
       userAgent: req.get('user-agent'),
+      roleRequired: phoneRoleForHost(req),
     });
 
     if (!result.ok) return sendJson(res, { ok: false, error: result.error }, { status: result.status });
@@ -90,7 +92,7 @@ router.post('/otp', otpLimiter, async (req, res, next) => {
   }
 });
 
-router.post('/verify', verifyLimiter, async (req, res, next) => {
+router.post('/verify', auth.sameOriginOnly, verifyLimiter, async (req, res, next) => {
   try {
     const body = req.body || {};
     const result = await auth.verifyCode({
@@ -98,17 +100,19 @@ router.post('/verify', verifyLimiter, async (req, res, next) => {
       code: validate.text(body.code, 12),
       // §7.1 referrals: the invitation code rides along from /login?ref=…
       referralCode: validate.text(body.ref, 16),
-      // §18.3: the sign-in box is consent to be contacted about this person's
-      // own requests and orders — service contact, never marketing — recorded
-      // only when it really came through, which is what the login page posts.
-      consent: body.consent === '1' || body.consent === 'on' || body.consent === true,
       ip: req.ip,
       userAgent: req.get('user-agent'),
+      roleRequired: phoneRoleForHost(req),
     });
 
     if (!result.ok) return sendJson(res, { ok: false, error: result.error }, { status: result.status });
 
     auth.setSessionCookie(res, result.token, { expiresAt: result.expiresAt });
+    const defaultRedirect = roles.isStaff(result.user.role)
+      ? '/admin'
+      : result.user.role === 'dealer'
+        ? '/dealer/dashboard'
+        : '/account';
 
     return sendJson(res, {
       ok: true,
@@ -121,9 +125,9 @@ router.post('/verify', verifyLimiter, async (req, res, next) => {
       // §12.2: an account with a second factor gets a session that has passed
       // the phone step and nothing else, and is told where to finish.
       mfa: result.mfaPending
-        ? { required: true, next: `/login/mfa?next=${encodeURIComponent(auth.safeNextPath(body.next) || (roles.isStaff(result.user.role) ? '/admin' : '/account'))}` }
+        ? { required: true, next: `/login/mfa?next=${encodeURIComponent(auth.safeNextPath(body.next) || defaultRedirect)}` }
         : null,
-      redirect: auth.safeNextPath(body.next) || '/account',
+      redirect: auth.safeNextPath(body.next) || defaultRedirect,
     });
   } catch (error) {
     return next(error);

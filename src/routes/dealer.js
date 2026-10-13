@@ -36,6 +36,7 @@
  */
 
 const express = require('express');
+const config = require('../config');
 const db = require('../db');
 const auth = require('../services/auth');
 const roles = require('../services/roles');
@@ -99,7 +100,7 @@ function capability() {
  */
 function requireDealer(req, res, next) {
   if (!req.user) {
-    return res.redirect(302, `/login?next=${encodeURIComponent(req.originalUrl || HOME)}`);
+    return res.redirect(302, `/dealer/login?next=${encodeURIComponent(req.originalUrl || PATHS.dashboard)}`);
   }
   if (req.user.role !== 'dealer' && !roles.can(req.user.role, 'reports.view')) {
     return forbidden(req, res);
@@ -204,6 +205,49 @@ async function page(req, res, { view, active, title, description, data = {}, sta
     },
   });
 }
+
+function dealerLoginNext(value) {
+  const safe = auth.safeNextPath(value);
+  return safe && (safe === '/dealer' || safe.startsWith('/dealer/')) ? safe : PATHS.dashboard;
+}
+
+// ---------------------------------------------------------------------------
+// Dealer phone sign-in remains separate from customer email/Google sign-in.
+// ---------------------------------------------------------------------------
+router.get('/login', async (req, res, next) => {
+  try {
+    if (req.user) {
+      if (req.user.role === 'dealer') return res.redirect(302, dealerLoginNext(req.query.next));
+      if (roles.isStaff(req.user.role)) return res.redirect(302, '/admin');
+      return res.redirect(302, '/dealer');
+    }
+    return await sendPage(req, res, {
+      routePath: `${HOME}/login`,
+      view: 'dealer/login',
+      cache: CACHE.private,
+      page: {
+        title: 'Dealer sign in',
+        metaTitle: 'Dealer portal sign in',
+        description: 'Secure sign-in for Honest Cars dealer partners.',
+        canonical: `${HOME}/login`,
+        robots: 'noindex,nofollow',
+        bodyClass: 'page-login page-dealer-login',
+        jsonLd: [],
+      },
+      data: {
+        next: dealerLoginNext(req.query.next),
+        reason: req.sessionEnded ? 'expired' : null,
+        otp: {
+          length: config.auth.otpLength,
+          provider: config.auth.provider,
+          whatsappLink: `https://wa.me/${config.business.whatsapp}?text=${encodeURIComponent('Hi HonestCars, I cannot receive the dealer sign-in code.')}`,
+        },
+      },
+    });
+  } catch (error) {
+    return next(error);
+  }
+});
 
 // ---------------------------------------------------------------------------
 // /dealer — the entry point (§7.2 stub becomes a real door)

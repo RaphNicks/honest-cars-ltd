@@ -1,7 +1,7 @@
 'use strict';
 
 /**
- * Phone-first auth — §7.1, hardened to §12.2.
+ * Phone OTP for staff and dealer portals — customer sign-in is email/Google. Hardened to §12.2.
  *
  *   • six-digit codes, HMAC-SHA256 hashed with a server pepper, single use,
  *     10-minute expiry, five attempts, rate-limited per phone and per IP
@@ -17,7 +17,6 @@
 
 const crypto = require('node:crypto');
 const config = require('../config');
-const privacy = require('./privacy');
 const mfa = require('./mfa');
 const db = require('../db');
 const phones = require('../lib/phone');
@@ -38,6 +37,14 @@ function pepper() {
 /** Delegates to src/lib/phone.js — one implementation of the rule. */
 function normalisePhone(raw) {
   return phones.normalise(raw);
+}
+
+function phoneAccountMaySignIn(user, roleRequired) {
+  if (!user || user.status !== 'active') return false;
+  if (!roleRequired) return true;
+  if (roleRequired === 'staff') return roles.isStaff(user.role);
+  if (roleRequired === 'dealer') return user.role === 'dealer';
+  return user.role === roleRequired;
 }
 
 /** +2348031234567 → +234 803 ••• 4567 — for logs and screens. */
@@ -124,7 +131,7 @@ async function sendOtp(phone, code, { provider = config.auth.provider } = {}) {
 // ---------------------------------------------------------------------------
 // OTP lifecycle
 // ---------------------------------------------------------------------------
-async function requestCode({ rawPhone, ip, userAgent }) {
+async function requestCode({ rawPhone, ip, userAgent, roleRequired = null }) {
   const phone = normalisePhone(rawPhone);
   if (!phone) return { ok: false, status: 422, error: 'That phone number does not look right — please check it.' };
 
@@ -135,6 +142,16 @@ async function requestCode({ rawPhone, ip, userAgent }) {
       status: 429,
       error: 'We have sent several codes to this number already. Please wait a few minutes and try again, or message us on WhatsApp.',
     };
+  }
+
+  // The production admin host accepts only staff, while the public dealer
+  // portal accepts only dealer accounts. Neither screen can create a phone-only
+  // customer account.
+  if (roleRequired) {
+    const existing = await db.users.findByPhone(phone);
+    if (!phoneAccountMaySignIn(existing, roleRequired)) {
+      return { ok: false, status: 404, error: 'We could not send a sign-in code to that number.' };
+    }
   }
 
   const code = generateCode();
@@ -155,7 +172,7 @@ async function requestCode({ rawPhone, ip, userAgent }) {
   await db.analytics
     .record(delivery.delivered ? 'otp_requested' : 'otp_request_failed', {
       payload: { channel: delivery.channel, reason: delivery.reason || 'delivered', user_agent: userAgent ? 'present' : 'absent' },
-      sourcePath: '/login',
+      sourcePath: '/api/auth/otp',
     })
     .catch(() => {});
 
@@ -170,7 +187,7 @@ async function requestCode({ rawPhone, ip, userAgent }) {
   };
 }
 
-async function verifyCode({ rawPhone, code, ip, userAgent, referralCode = null, consent = false }) {
+async function verifyCode({ rawPhone, code, ip, userAgent, referralCode = null, roleRequired = null }) {
   const phone = normalisePhone(rawPhone);
   if (!phone || !code) return { ok: false, status: 422, error: 'Enter the code we sent you.' };
 
@@ -188,7 +205,7 @@ async function verifyCode({ rawPhone, code, ip, userAgent, referralCode = null, 
     const attempts = await db.users.registerAttempt(active.id);
     const left = Math.max(0, active.maxAttempts - attempts);
     await db.analytics
-      .record('otp_verify_failed', { payload: { attempts_left: left }, sourcePath: '/login' })
+      .record('otp_verify_failed', { payload: { attempts_left: left }, sourcePath: '/api/auth/verify' })
       .catch(() => {});
     return {
       ok: false,
@@ -197,8 +214,18 @@ async function verifyCode({ rawPhone, code, ip, userAgent, referralCode = null, 
     };
   }
 
+  let user = null;
+  if (roleRequired) {
+    user = await db.users.findByPhone(phone);
+    if (!phoneAccountMaySignIn(user, roleRequired)) {
+      await db.users.consumeCode(active.id);
+      return { ok: false, status: 403, error: 'This number is not authorised for this sign-in.' };
+    }
+  }
+
   await db.users.consumeCode(active.id);
-  const user = await db.users.upsertByPhone({ phone, referralCode });
+  if (roleRequired) user = await db.users.touchUser(user.id);
+  else user = await db.users.upsertByPhone({ phone, referralCode });
 
   // A blocked number can prove it owns the phone; it still cannot get in.
   if (user.status !== 'active') {
@@ -219,22 +246,7 @@ async function verifyCode({ rawPhone, code, ip, userAgent, referralCode = null, 
   const expiresAt = new Date(Date.now() + config.auth.sessionDays * 86_400_000);
   await db.users.createSession({ userId: user.id, tokenHash: hashToken(token), expiresAt, ip, userAgent, mfaPending });
 
-  await db.analytics.record('otp_verify_succeeded', { payload: { new_account: !user.name }, sourcePath: '/login' }).catch(() => {});
-
-  // §18.3: the sign-in box says "I agree to HonestCars contacting me on this
-  // number about my requests and orders" — service contact, explicitly *not*
-  // marketing. It is recorded only when the box came through, and only on a
-  // sign-in that actually created or completed an account, so the log stays a
-  // record of consent rather than a log of people logging in.
-  if (consent === true) {
-    await privacy.recordConsent('login', {
-      userId: user.id,
-      phone: user.phone,
-      name: user.name,
-      granted: true,
-      path: '/login',
-    });
-  }
+  await db.analytics.record('otp_verify_succeeded', { payload: { new_account: !user.name }, sourcePath: '/api/auth/verify' }).catch(() => {});
 
   // Housekeeping at the one moment we know this person is here: expired and
   // revoked sessions are worthless rows, and this keeps the table from growing
@@ -438,7 +450,8 @@ function requireStaff(options = {}) {
   return (req, res, next) => {
     if (!req.user) {
       const target = encodeURIComponent(req.originalUrl || '/admin');
-      return res.redirect(302, `/login?next=${target}`);
+      const loginPath = config.admin.enforceHost ? '/login' : '/admin/login';
+      return res.redirect(302, `${loginPath}?next=${target}`);
     }
     if (isMfaPending(req)) return mfaChallenge(req, res);
     if (mfa.mustEnrol(req.user) && !mfaEnrolmentOpen(fullPath(req))) {
@@ -460,7 +473,8 @@ function requireAnyStaff(capabilities) {
   return (req, res, next) => {
     if (!req.user) {
       const target = encodeURIComponent(req.originalUrl || '/admin');
-      return res.redirect(302, `/login?next=${target}`);
+      const loginPath = config.admin.enforceHost ? '/login' : '/admin/login';
+      return res.redirect(302, `${loginPath}?next=${target}`);
     }
     if (!roles.isStaff(req.user.role)) return forbidden(req, res);
     if (list.length && !list.some((capability) => roles.can(req.user.role, capability))) return forbidden(req, res);

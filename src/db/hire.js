@@ -565,7 +565,7 @@ async function bookings({ status = null, vehicleId = null, from = null, to = nul
   return rows.map(shapeBooking);
 }
 
-/** Account-owned hire bookings plus unowned legacy rows matched to the sign-in phone. */
+/** New hire bookings are account-owned; only unowned legacy rows use the original sign-in phone. */
 async function bookingsForPhone(phone, { limit = 20, userId = null } = {}) {
   const shapes = phones.variants(phone);
   const where = [];

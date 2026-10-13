@@ -1,9 +1,8 @@
 /**
  * Account + sign-in — §7.1.
  *
- *   • /login: two-step OTP (phone → code), resend, "use a different number",
- *     and the post-login hand-off (including "save this car", which is why the
- *     visitor was sent here in the first place).
+ *   • /login: customer email OTP; the same phone-code widgets are reused by
+ *     the separate dealer and staff sign-in pages, including resend and restart.
  *   • Everywhere: the save / unsave toggle on cards and the VDP. Signed out it
  *     is a link into /login; signed in it posts to /api/account/saved-cars.
  *   • /account: profile form, saved-search alerts, delete confirmation,

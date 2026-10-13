@@ -26,7 +26,7 @@
     <% } %>
     <div class="btn-row">
       <% if (!accountRole) { %>
-        <a class="btn btn--primary" href="/login?next=%2Fdealer%2Fdashboard">Sign in to the portal</a>
+        <a class="btn btn--primary" href="/dealer/login?next=%2Fdealer%2Fdashboard">Sign in to the portal</a>
       <% } else if (accountRole === 'customer') { %>
         <a class="btn btn--primary" href="/account">Go to my account</a>
       <% } %>

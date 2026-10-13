@@ -130,15 +130,16 @@ To stop it: **Ctrl-C** in the terminal.
 The public pages need no account: `/`, `/cars`, a car page, `/services`,
 `/shop`, `/hire`, `/blog`, `/how-it-works`, `/find-my-car`.
 
-**Customer accounts use email; staff and existing phone accounts keep phone OTP.**
-A new customer can create an account with a name and email, receive a one-time
-code, and sign in without adding a phone. In development the code is available
-in the terminal and on screen, so SMTP is not needed to try the flow. Google
-sign-in requires OAuth credentials; see `.env.example`. An existing phone-based
-customer should first sign in by phone, then verify an email from the account
-profile to link it. A contact phone is collected only when a service needs it.
+**Customer sign-in uses email or Google.** A new customer enters their name and
+email, receives a one-time code, and can sign in without a phone. In development
+the code is shown on screen and in the terminal, so SMTP is not needed to try
+the flow. Google sign-in requires OAuth credentials; see `.env.example`. A
+contact phone is collected only when a service needs it.
 
-Staff and seeded phone accounts still use phone OTP:
+Dealer partners use the separate phone sign-in at
+<http://localhost:3000/dealer/login>. Staff sign in on the development preview
+at <http://localhost:3000/admin/login>; the customer `/login` page does not offer
+a staff option. Seeded accounts are:
 
 | Number | Who | Where it lands |
 | --- | --- | --- |
@@ -148,9 +149,11 @@ Staff and seeded phone accounts still use phone OTP:
 | `+2348000000004` | Finance | `/admin` — second factor |
 | `+2348000000006` | A dealer | `/dealer` |
 
-To try customer email sign-in, open <http://localhost:3000/login>, enter a name
-and email address, request a code, and enter the code shown by the development
-server. To use a seeded staff account, choose the phone path and enter its number.
+In production, the staff console belongs on `admin.honestcarsltd.com`, not on the
+public site's `/admin` path. Set `ADMIN_URL=https://admin.honestcarsltd.com`, point
+that DNS name and its TLS certificate at the app, and set `SITE_URL` to the
+public origin. Requests to the old public `/admin` path redirect to the admin
+host; the staff dashboard is its root page.
 
 **Admin and finance also ask for a 6-digit code from an authenticator app**
 (this is PRD §12.2). Add the seeded secret to Google Authenticator, Authy, 1Password

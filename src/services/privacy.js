@@ -90,14 +90,6 @@ const NOTICES = [
     view: ['views/pages/checkout.ejs'],
     text: 'HonestCars can contact me on WhatsApp to confirm this order and payment.',
   },
-  {
-    key: 'login',
-    purpose: 'service_contact',
-    source: 'login',
-    view: ['views/pages/login.ejs'],
-    text: 'I agree to Honest Cars contacting me on this number about my requests and orders.',
-  },
-
   // --- the permissions that are more than contact ---------------------------
   {
     key: 'financing',

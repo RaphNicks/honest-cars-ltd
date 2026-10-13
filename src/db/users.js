@@ -221,7 +221,7 @@ async function createEmailAccount({ email, name, referralCode = null, googleSubj
       [address],
     );
     if (legacyRows.length) {
-      throw identityError('LEGACY_EMAIL_REQUIRES_PHONE_LINK', 'Sign in to your existing phone account first, then verify this email from your account.');
+      throw identityError('LEGACY_EMAIL_REQUIRES_PHONE_LINK', 'This email is linked to an older account. Please contact Honest Cars for help signing in.');
     }
 
     let inserted = null;
@@ -295,7 +295,7 @@ async function linkVerifiedEmail(userId, email, { googleSubject = null } = {}) {
     if (legacyOwners.length) {
       throw identityError(
         'LEGACY_EMAIL_REQUIRES_PHONE_LINK',
-        'That email is on an existing phone account. Sign in to that account before linking it.',
+        'That email is linked to an older account. Please contact Honest Cars for help.',
       );
     }
 

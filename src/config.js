@@ -43,6 +43,26 @@ const config = {
   // Public origin — used for canonical URLs, sitemap and OG tags.
   siteUrl: (process.env.SITE_URL || 'http://localhost:3000').replace(/\/+$/, ''),
 
+  // The staff console belongs on its own host. In production `/admin` on the
+  // public host redirects here; the DNS record and TLS certificate are supplied
+  // by hosting. Local/test runs keep the path-based console unless explicitly
+  // enabled, because a single-origin preview has no second hostname.
+  admin: {
+    get url() {
+      if (process.env.ADMIN_URL) return process.env.ADMIN_URL.replace(/\/+$/, '');
+      const publicUrl = new URL(config.siteUrl);
+      const publicHost = publicUrl.hostname.replace(/^www\./i, '');
+      const adminHost = publicHost === 'localhost' ? 'admin.localhost' : `admin.${publicHost}`;
+      return `${publicUrl.protocol}//${adminHost}${publicUrl.port ? `:${publicUrl.port}` : ''}`;
+    },
+    get hostname() {
+      return new URL(config.admin.url).hostname.toLowerCase();
+    },
+    get enforceHost() {
+      return config.isProduction || bool(process.env.ENFORCE_ADMIN_HOST, false);
+    },
+  },
+
   db: {
     host: process.env.DB_HOST || '127.0.0.1',
     port: int(process.env.DB_PORT, 3306),

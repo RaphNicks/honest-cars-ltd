@@ -27,6 +27,7 @@ const customerAuth = require('../services/customer-auth');
 const emailService = require('../services/email');
 const roles = require('../services/roles');
 const validate = require('../services/validate');
+const { isAdminHost } = require('../lib/admin-host');
 const listingQuery = require('../services/listing-query');
 const reportService = require('../services/report');
 const hireService = require('../services/hire');
@@ -46,7 +47,7 @@ const DASHBOARD_PATH = '/account';
 
 const ACCOUNT_AUTH_ERRORS = {
   google_not_configured: 'Google sign-in is not configured yet. Email verification remains available.',
-  customer_only: 'Google sign-in is only available for customer accounts. Staff should use their phone and authenticator code.',
+  customer_only: 'That Google sign-in option is not available for this account. Please contact Honest Cars for help.',
   google_cancelled: 'Google linking was cancelled. No changes were made.',
   google_link_session: 'Your customer session changed before the Google account could be linked. Sign in again and retry.',
   google_account_conflict: 'That Google account and email are linked to different customer accounts. Contact Honest Cars before continuing.',
@@ -59,11 +60,11 @@ const ACCOUNT_AUTH_ERRORS = {
 };
 
 const LOGIN_AUTH_ERRORS = {
-  customer_only: 'Staff continue to sign in with their existing phone number and authenticator code.',
+  customer_only: 'That sign-in option is not available for this account. Please use your email instead.',
   google_not_configured: 'Google sign-in is not configured yet. Use an email code instead.',
   google_cancelled: 'Google sign-in was cancelled. You can use an email code instead.',
   google_link_session: 'Your customer session changed before the Google account could be linked. Sign in again and retry.',
-  legacy_email_requires_phone_link: 'This email belongs to an older phone account. Sign in with that phone number first, then verify the email from your profile.',
+  legacy_email_requires_phone_link: 'This email belongs to an older account. Please contact Honest Cars for help signing in.',
   google_account_conflict: 'That Google account and email are linked to different customer accounts. Contact Honest Cars before continuing.',
   email_in_use: 'That verified email is already linked to another account.',
   google_identity_in_use: 'That Google account is already linked to a different email or account.',
@@ -104,8 +105,31 @@ function loginLocals({ next, reason, ref: referralCode, save, authError } = {}) 
       otp: {
         length: config.auth.otpLength,
         ttlMinutes: config.auth.otpTtlMinutes,
+      },
+    },
+  };
+}
+
+function staffLoginLocals({ next, reason } = {}) {
+  return {
+    view: 'staff-login',
+    page: {
+      title: 'Staff sign in',
+      metaTitle: 'Staff sign in · Honest Cars console',
+      titleSuffix: false,
+      description: 'Secure sign-in for Honest Cars staff.',
+      canonical: config.admin.enforceHost ? `${config.admin.url}/login` : `${config.siteUrl}/admin/login`,
+      robots: 'noindex,nofollow',
+      bodyClass: 'page-login page-staff-login',
+      jsonLd: [],
+    },
+    data: {
+      next: auth.safeNextPath(next) || '/admin',
+      reason: validate.text(reason, 80) || null,
+      otp: {
+        length: config.auth.otpLength,
         provider: config.auth.provider,
-        whatsappLink: `https://wa.me/${config.business.whatsapp}?text=${encodeURIComponent('Hi HonestCars, I cannot receive the login code.')}`,
+        whatsappLink: `https://wa.me/${config.business.whatsapp}?text=${encodeURIComponent('Hi HonestCars, I cannot receive the staff sign-in code.')}`,
       },
     },
   };
@@ -116,10 +140,44 @@ function loginLocals({ next, reason, ref: referralCode, save, authError } = {}) 
 // ---------------------------------------------------------------------------
 router.get('/login', async (req, res, next) => {
   try {
-    if (req.user) return res.redirect(302, auth.safeNextPath(req.query.next) || DASHBOARD_PATH);
+    if (isAdminHost(req)) {
+      if (req.user) return res.redirect(302, auth.safeNextPath(req.query.next) || '/admin');
+      return await sendPage(req, res, {
+        ...staffLoginLocals({ next: req.query.next, reason: req.query.reason }),
+        routePath: '/login',
+        cache: CACHE.private,
+      });
+    }
+    if (req.user) {
+      const fallback = roles.isStaff(req.user.role) ? '/admin' : req.user.role === 'dealer' ? '/dealer/dashboard' : DASHBOARD_PATH;
+      return res.redirect(302, auth.safeNextPath(req.query.next) || fallback);
+    }
     return await sendPage(req, res, {
       ...loginLocals({ next: req.query.next, reason: req.query.reason, ref: req.query.ref, save: req.query.save, authError: req.query.auth_error }),
       routePath: '/login',
+      cache: CACHE.private,
+    });
+  } catch (error) {
+    return next(error);
+  }
+});
+
+// Single-origin development previews have no DNS subdomain; keep an unlinked
+// staff sign-in path there. Production moves the canonical staff login to the
+// admin host and redirects this path away from the public hostname.
+router.get('/admin/login', async (req, res, next) => {
+  try {
+    const nextPath = auth.safeNextPath(req.query.next) || '/admin';
+    if (config.admin.enforceHost && !isAdminHost(req)) {
+      return res.redirect(302, `${config.admin.url}/login?next=${encodeURIComponent(nextPath)}`);
+    }
+    if (config.admin.enforceHost && isAdminHost(req)) {
+      return res.redirect(302, `/login?next=${encodeURIComponent(nextPath)}`);
+    }
+    if (req.user && roles.isStaff(req.user.role)) return res.redirect(302, nextPath);
+    return await sendPage(req, res, {
+      ...staffLoginLocals({ next: nextPath, reason: req.query.reason }),
+      routePath: '/admin/login',
       cache: CACHE.private,
     });
   } catch (error) {

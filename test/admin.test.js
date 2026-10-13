@@ -204,11 +204,20 @@ test.after(async () => {
 // ---------------------------------------------------------------------------
 // The gate (§7.4)
 // ---------------------------------------------------------------------------
+maybe('the staff sign-in page is separate from customer sign-in in single-origin previews', async () => {
+  const anon = newClient();
+  const staffLogin = await anon.request('/admin/login');
+  assert.equal(staffLogin.status, 200);
+  assert.match(staffLogin.text, /Staff sign in/);
+  assert.match(staffLogin.text, /name="phone"/);
+  assert.doesNotMatch(staffLogin.text, /Continue with Google/);
+});
+
 maybe('the console is closed to the public and to customers', async () => {
   const anon = newClient();
   const redirect = await anon.request('/admin');
   assert.equal(redirect.status, 302);
-  assert.equal(redirect.headers.get('location'), '/login?next=%2Fadmin');
+  assert.equal(redirect.headers.get('location'), '/admin/login?next=%2Fadmin');
 
   const customer = await accounts.customer.client.request('/admin');
   assert.equal(customer.status, 403);

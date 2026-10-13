@@ -98,7 +98,7 @@ async function createCustomerSession(user, { ip = null, userAgent = null, source
     return resultError('ACCOUNT_NOT_ACTIVE', 403, 'That account cannot sign in right now. Contact Honest Cars for help.');
   }
   if (user.role !== 'customer') {
-    return resultError('CUSTOMER_ONLY', 403, 'Staff sign in using their existing phone and authenticator code.');
+    return resultError('CUSTOMER_ONLY', 403, 'This sign-in option is not available for this account. Please contact Honest Cars for help.');
   }
 
   const currentUser = await db.users.touchUser(user.id);
@@ -180,8 +180,8 @@ async function verifyEmailCode({
         'LEGACY_EMAIL_REQUIRES_PHONE_LINK',
         409,
         legacy.role === 'customer'
-          ? 'This email is on an existing account but has not been verified. Sign in with that account’s phone number, then verify the email from your profile.'
-          : 'Staff use their existing phone sign-in and authenticator code. Customer email sign-in is separate.',
+          ? 'This email is linked to an older account. Please contact Honest Cars for help signing in.'
+          : 'This email cannot be used for a customer account. Please contact Honest Cars for help.',
       );
     }
     try {
@@ -191,7 +191,7 @@ async function verifyEmailCode({
       return resultError(error.code || 'ACCOUNT_CREATE_FAILED', error.code === 'LEGACY_EMAIL_REQUIRES_PHONE_LINK' ? 409 : 422, error.message || 'We could not open an account with that email.');
     }
   } else if (user.role !== 'customer') {
-    return resultError('CUSTOMER_ONLY', 403, 'Staff sign in using their existing phone and authenticator code.');
+    return resultError('CUSTOMER_ONLY', 403, 'This sign-in option is not available for this account. Please contact Honest Cars for help.');
   }
 
   if (user.status !== 'active') {
@@ -303,7 +303,7 @@ async function signInWithGoogle(profile, options = {}) {
 
   let user = bySubject;
   if (!user && byEmail) {
-    if (byEmail.role !== 'customer') return resultError('CUSTOMER_ONLY', 403, 'Staff sign in using their existing phone and authenticator code.');
+    if (byEmail.role !== 'customer') return resultError('CUSTOMER_ONLY', 403, 'This sign-in option is not available for this account. Please contact Honest Cars for help.');
     try {
       user = await db.users.linkVerifiedEmail(byEmail.id, profile.email, { googleSubject: profile.subject });
     } catch (error) {
@@ -318,8 +318,8 @@ async function signInWithGoogle(profile, options = {}) {
         'LEGACY_EMAIL_REQUIRES_PHONE_LINK',
         409,
         legacy.role === 'customer'
-          ? 'This email is on an existing account but has not been verified. Sign in with that account’s phone number, then link Google from your profile.'
-          : 'Staff use their existing phone sign-in and authenticator code. Customer Google sign-in is separate.',
+          ? 'This email is linked to an older account. Please contact Honest Cars for help signing in.'
+          : 'This Google account cannot be used for a customer account. Please contact Honest Cars for help.',
       );
     }
     try {
@@ -329,7 +329,7 @@ async function signInWithGoogle(profile, options = {}) {
     }
   }
 
-  if (user.role !== 'customer') return resultError('CUSTOMER_ONLY', 403, 'Staff sign in using their existing phone and authenticator code.');
+  if (user.role !== 'customer') return resultError('CUSTOMER_ONLY', 403, 'This sign-in option is not available for this account. Please contact Honest Cars for help.');
   if (user.status !== 'active') return resultError('ACCOUNT_NOT_ACTIVE', 403, 'That account cannot sign in right now. Contact Honest Cars for help.');
   if (!user.name && profile.name) user = await db.users.updateProfile(user.id, { name: profile.name });
   return createCustomerSession(user, { ...options, source: 'google' });

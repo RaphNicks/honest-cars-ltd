@@ -163,8 +163,34 @@ maybe('sign-in page defaults to phone-free customer email and Google sign-in', a
   assert.match(html, /auth-option-divider/);
   assert.match(html, /Continue with Google/);
   assert.match(html, /You do not need a phone number to open an account/);
-  assert.match(html, /name="phone"/, 'the legacy phone path remains available');
-  assert.match(html, /name="consent"/);
+  assert.doesNotMatch(html, /name="phone"/, 'customer sign-in does not expose a phone-account path');
+  assert.doesNotMatch(html, /staff|existing phone account/i, 'staff access is not advertised on the customer site');
+  assert.doesNotMatch(html, /href="\/admin(?:\/|["?])/i, 'there is no public link into the staff console');
+});
+
+maybe('staff and dealer phone entry is role-bound and cannot create a customer account', async () => {
+  const db = require('../src/db');
+  const auth = require('../src/services/auth');
+  const phones = require('../src/lib/phone');
+  const customerPhone = nextPhone();
+  const customer = await db.users.upsertByPhone({ phone: phones.canonical(customerPhone), name: 'No Portal Customer' });
+  createdPhones.add(customer.phone);
+
+  const staffAttempt = await auth.requestCode({ rawPhone: customerPhone, roleRequired: 'staff' });
+  const dealerAttempt = await auth.requestCode({ rawPhone: customerPhone, roleRequired: 'dealer' });
+  assert.equal(staffAttempt.ok, false);
+  assert.equal(dealerAttempt.ok, false);
+  assert.equal(await db.users.findByPhone(customer.phone).then((user) => user.id), customer.id);
+
+  const staffPhone = nextPhone();
+  const staff = await db.users.upsertByPhone({ phone: phones.canonical(staffPhone), name: 'Portal Staff' });
+  createdPhones.add(staff.phone);
+  await db.query('UPDATE `users` SET role = \'ops\' WHERE id = ?', [staff.id]);
+  const otp = await auth.requestCode({ rawPhone: staffPhone, roleRequired: 'staff' });
+  assert.equal(otp.ok, true);
+  const verified = await auth.verifyCode({ rawPhone: staffPhone, code: otp.devCode, roleRequired: 'staff' });
+  assert.equal(verified.ok, true);
+  assert.equal(verified.user.role, 'ops');
 });
 
 maybe('email OTP opens a phone-free account and a contact phone cannot expose another account’s history', async () => {
@@ -701,5 +727,5 @@ maybe('closing an account deletes the person and anonymises the paperwork', asyn
   assert.ok(row, 'the ops record survives for finance and warranty');
   assert.equal(row.name, 'Deleted account');
   assert.match(row.phone, /^DELETED-\d+$/);
-  assert.doesNotMatch(row.phone, /234|803/);
+  assert.notEqual(row.phone, normalised, 'the stored phone is an anonymised reference, not the original contact number');
 });
