@@ -83,6 +83,11 @@ maybe('homepage renders the match hero and preserves the live feed', async () =>
   assert.match(html, /<video class="hero__bg" data-hero-video data-src="\/video\/Car_driving_on_highway\.mp4"/);
   assert.doesNotMatch(html, /data-hero-video[^>]*\ssrc=/, 'the video source is not eager-loaded on mobile');
   assert.match(html, /class="hero__scrim" aria-hidden="true"/);
+  assert.ok(html.includes('alt="Honest Cars inspector checking a car’s engine during an on-site inspection in Port Harcourt"'));
+  assert.ok(html.includes('When we inspect a car, we check its condition and documents before you buy.'));
+  assert.ok(html.includes('An inspector checks the car’s systems and documents, then records any issues found.'));
+  assert.ok(html.includes('Full inspection: key systems and documents checked, with an honest condition report.'));
+  assert.doesNotMatch(html, /Every car is inspected, documented and verified\./);
 
   assert.match(html, /Find your perfect ride/, 'category cards render');
   assert.match(html, /Fresh on the market/);
