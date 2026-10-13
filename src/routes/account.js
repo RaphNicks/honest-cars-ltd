@@ -3,7 +3,7 @@
 /**
  * Customer account — §7.1.
  *
- *   GET  /login              phone + code entry (two steps, one page)
+ *   GET  /login              customer email code / Google and legacy phone code
  *   GET  /account            dashboard: requests, hire, bookings, orders,
  *                            receipts, tracker subscriptions, saved cars,
  *                            saved searches, referrals
@@ -23,6 +23,8 @@ const express = require('express');
 const config = require('../config');
 const db = require('../db');
 const auth = require('../services/auth');
+const customerAuth = require('../services/customer-auth');
+const emailService = require('../services/email');
 const roles = require('../services/roles');
 const validate = require('../services/validate');
 const listingQuery = require('../services/listing-query');
@@ -42,14 +44,47 @@ const router = express.Router();
 
 const DASHBOARD_PATH = '/account';
 
-function loginLocals({ next, reason, ref: referralCode } = {}) {
+const ACCOUNT_AUTH_ERRORS = {
+  google_not_configured: 'Google sign-in is not configured yet. Email verification remains available.',
+  customer_only: 'Google sign-in is only available for customer accounts. Staff should use their phone and authenticator code.',
+  google_cancelled: 'Google linking was cancelled. No changes were made.',
+  google_link_session: 'Your customer session changed before the Google account could be linked. Sign in again and retry.',
+  google_account_conflict: 'That Google account and email are linked to different customer accounts. Contact Honest Cars before continuing.',
+  email_in_use: 'That verified email is already linked to another account.',
+  google_identity_in_use: 'That Google account is already linked to a different email or account.',
+  google_state_invalid: 'That Google sign-in could not be verified. Please start again.',
+  google_state_expired: 'That Google sign-in expired. Please start again.',
+  google_nonce_invalid: 'That Google sign-in could not be verified. Please start again.',
+  google_sign_in_failed: 'We could not complete Google sign-in. Please try again.',
+};
+
+const LOGIN_AUTH_ERRORS = {
+  customer_only: 'Staff continue to sign in with their existing phone number and authenticator code.',
+  google_not_configured: 'Google sign-in is not configured yet. Use an email code instead.',
+  google_cancelled: 'Google sign-in was cancelled. You can use an email code instead.',
+  google_link_session: 'Your customer session changed before the Google account could be linked. Sign in again and retry.',
+  legacy_email_requires_phone_link: 'This email belongs to an older phone account. Sign in with that phone number first, then verify the email from your profile.',
+  google_account_conflict: 'That Google account and email are linked to different customer accounts. Contact Honest Cars before continuing.',
+  email_in_use: 'That verified email is already linked to another account.',
+  google_identity_in_use: 'That Google account is already linked to a different email or account.',
+  google_state_invalid: 'That Google sign-in could not be verified. Please start again.',
+  google_state_expired: 'That Google sign-in expired. Please start again.',
+  google_nonce_invalid: 'That Google sign-in could not be verified. Please start again.',
+  google_email_unverified: 'Google did not provide a verified email address. Use an email code instead.',
+  google_name_missing: 'Google did not share your name. Use an email code and enter your name instead.',
+  google_sign_in_failed: 'We could not complete Google sign-in. Please try again or use an email code.',
+  google_token_missing: 'Google did not confirm this sign-in. Please try again.',
+  google_code_missing: 'Google did not return a sign-in code. Please try again.',
+};
+
+function loginLocals({ next, reason, ref: referralCode, save, authError } = {}) {
   return {
     view: 'login',
     page: {
       title: 'Sign in',
       metaTitle: 'Sign in',
       titleSuffix: true,
-      description: 'Sign in with your phone number — an OTP on WhatsApp, no password to remember. Requests, bookings, orders and saved cars in one place.',
+      description: 'Sign in or create your Honest Cars customer account with a verified email code or Google. Phone numbers are only needed for requests that require contact.',
       canonical: '/login',
       robots: 'noindex,nofollow',
       breadcrumbs: [{ label: 'Sign in' }],
@@ -57,9 +92,14 @@ function loginLocals({ next, reason, ref: referralCode } = {}) {
       jsonLd: [],
     },
     data: {
-      next: typeof next === 'string' && next.startsWith('/') && !next.startsWith('//') ? next.slice(0, 300) : '',
+      next: auth.safeNextPath(next) || '',
       reason: validate.text(reason, 80) || null,
       ref: validate.text(referralCode, 16).toUpperCase(),
+      save: validate.integer(save, { min: 1, fallback: 0 }) || '',
+      authErrorMessage: LOGIN_AUTH_ERRORS[validate.text(authError, 80).toLowerCase()] || (authError ? 'We could not complete that sign-in. Please try again or use an email code.' : ''),
+      googleReady: config.googleAuth.configured,
+      mailReady: config.mail.configured,
+      development: !config.isProduction,
       trail: [{ label: 'Sign in' }],
       otp: {
         length: config.auth.otpLength,
@@ -78,7 +118,7 @@ router.get('/login', async (req, res, next) => {
   try {
     if (req.user) return res.redirect(302, auth.safeNextPath(req.query.next) || DASHBOARD_PATH);
     return await sendPage(req, res, {
-      ...loginLocals({ next: req.query.next, reason: req.query.reason, ref: req.query.ref }),
+      ...loginLocals({ next: req.query.next, reason: req.query.reason, ref: req.query.ref, save: req.query.save, authError: req.query.auth_error }),
       routePath: '/login',
       cache: CACHE.private,
     });
@@ -151,18 +191,17 @@ function savedSearchChips(searches) {
   return withChips;
 }
 
-async function buildAccountLocals(user) {
+async function buildAccountLocals(user, { authError = null } = {}) {
   const dashboard = await db.users.dashboard(user);
   dashboard.savedSearches = savedSearchChips(dashboard.savedSearches);
   // FR-28: the referral card is the link *and* the reward status behind it — the
   // reward labels come from the service, so the card and the console can never
   // describe the same person differently.
   dashboard.referral = referralService.accountView(user, dashboard.referral);
-  // FR-34: a financing enquiry is the customer's own record of what we told a
-  // lender and when. It is matched on the number they gave us, like everything
-  // else on this page, and it carries no figure we did not already tell them.
+  // A financing enquiry belongs to its verified account; only legacy rows use
+  // the sign-in phone, never a newly typed contact number.
   dashboard.financing = financingService.accountView(
-    await db.financing.listForPhone(user.phone, { limit: 5 }).catch(() => []),
+    await db.financing.listForCustomer(user.id, user.phone, { limit: 5 }).catch(() => []),
   );
   // §7.1 lists hire separately, so it does not also sit in the Requests card.
   dashboard.requests = dashboard.requests.filter((request) => request.type !== 'hire');
@@ -182,14 +221,22 @@ async function buildAccountLocals(user) {
       title: user.name ? `${user.shortName}'s account` : 'Your account',
       metaTitle: 'Your account',
       titleSuffix: true,
-      description: 'Your requests, bookings, orders, saved cars and tracker subscriptions — keyed to your phone number.',
+      description: 'Your requests, bookings, orders, saved cars and tracker subscriptions, linked to your customer account.',
       canonical: DASHBOARD_PATH,
       robots: 'noindex,nofollow',
       breadcrumbs: trail,
       bodyClass: 'page-account',
       jsonLd: [],
     },
-    data: { ...dashboard, trail, user, consoleHome },
+    data: {
+      ...dashboard,
+      trail,
+      user,
+      consoleHome,
+      googleReady: config.googleAuth.configured,
+      otp: { length: config.auth.otpLength, ttlMinutes: config.auth.otpTtlMinutes },
+      accountAuthMessage: ACCOUNT_AUTH_ERRORS[validate.text(authError, 80).toLowerCase()] || '',
+    },
   };
 }
 
@@ -199,7 +246,7 @@ router.get('/account', async (req, res, next) => {
       const reason = req.sessionEnded ? '&reason=expired' : '';
       return res.redirect(302, `/login?next=${encodeURIComponent(req.originalUrl || DASHBOARD_PATH)}${reason}`);
     }
-    const locals = await buildAccountLocals(req.user);
+    const locals = await buildAccountLocals(req.user, { authError: req.query.auth_error });
     return await sendPage(req, res, {
       ...locals,
       routePath: DASHBOARD_PATH,
@@ -212,14 +259,14 @@ router.get('/account', async (req, res, next) => {
 });
 
 /**
- * A receipt, owned by the phone number that paid. Anyone can type a reference
- * into the URL bar; only the phone it belongs to gets the page.
+ * A receipt, owned by the customer account that paid; legacy receipts fall back
+ * only to that account's sign-in phone. Anyone can type a reference into the URL bar.
  */
 router.get('/account/receipts/:reference', auth.requireUser, async (req, res, next) => {
   try {
     const reference = String(req.params.reference || '').toUpperCase().slice(0, 32);
     if (!/^HC-PAY-\d{6}$/.test(reference)) return next();
-    const receipt = await db.payments.receiptForPhone(reference, req.user.phone);
+    const receipt = await db.payments.receiptForCustomer(reference, req.user.id, req.user.phone);
     if (!receipt) {
       return await sendPage(req, res, {
         view: 'error',
@@ -273,14 +320,14 @@ function bankDetails(reference) {
 /**
  * Ownership check for anything keyed on a subscription id.
  *
- * A subscription is the customer's own record, so this is the whole
- * authorisation story: the id is in the URL, and the phone number on the row
- * has to be the signed-in account's. Anyone can type an id; only its owner gets
- * past here.
+ * New subscriptions are owned by account id; legacy rows can use only the
+ * signed-in account's original phone. Anyone can type an id; only its owner gets past here.
  */
 async function ownedSubscription(user, id) {
   const subscription = await db.subscriptions.byId(id);
-  if (!subscription || !subscription.phone) return null;
+  if (!subscription) return null;
+  if (subscription.userId && Number(subscription.userId) === Number(user.id)) return subscription;
+  if (subscription.userId || !user.phone || !subscription.phone) return null;
   const shapes = phone.variants(user.phone);
   const stored = phone.canonical(subscription.phone);
   return shapes.includes(stored) ? subscription : null;
@@ -319,6 +366,7 @@ router.post('/account/subscriptions/:id/renew', auth.sameOriginOnly, auth.requir
       purpose: 'subscription',
       amountKobo: quote.amountKobo,
       subscriptionId: subscription.id,
+      userId: req.user.id,
       customerName: subscription.customerName,
       customerPhone: subscription.phone,
     });
@@ -333,14 +381,14 @@ router.post('/account/subscriptions/:id/renew', auth.sameOriginOnly, auth.requir
 
 /**
  * GET /account/renewals/:reference — what the customer keeps while the transfer
- * is in flight. Private to the phone number that owns it, noindex, no-store.
+ * is in flight. Private to the account that owns it, noindex, no-store.
  */
 router.get('/account/renewals/:reference', auth.requireUser, async (req, res, next) => {
   try {
     const reference = String(req.params.reference || '').toUpperCase().slice(0, 32);
     if (!/^HC-PAY-\d{6}$/.test(reference)) return next();
 
-    const receipt = await db.payments.receiptForPhone(reference, req.user.phone);
+    const receipt = await db.payments.receiptForCustomer(reference, req.user.id, req.user.phone);
     if (!receipt) {
       return await sendPage(req, res, {
         view: 'error',
@@ -389,18 +437,18 @@ router.get('/account/renewals/:reference', auth.requireUser, async (req, res, ne
 });
 
 /**
- * FR-22 — the customer's own hire, owned by the phone on the booking.
- *
- * Anyone can type HC-HIRE-0001 into the URL bar; only the number the hire was
- * quoted to gets the page, the same rule as receipts and renewals.
+ * The customer's own hire is owned by account id; legacy bookings fall back to
+ * the original sign-in phone. Anyone can type a reference into the URL bar; only
+ * the account it belongs to gets the page.
  */
 async function ownedHire(user, reference) {
   const booking = await db.hire.bookingByReference(reference);
   if (!booking) return null;
-  const shapes = require('../lib/phone').variants(user.phone);
-  const stored = booking.phone ? require('../lib/phone').canonical(booking.phone) : null;
-  if (!stored || !shapes.includes(stored)) return null;
-  return booking;
+  if (booking.userId && Number(booking.userId) === Number(user.id)) return booking;
+  if (booking.userId || !user.phone || !booking.phone) return null;
+  const shapes = phone.variants(user.phone);
+  const stored = phone.canonical(booking.phone);
+  return shapes.includes(stored) ? booking : null;
 }
 
 router.get('/account/hire/:reference', auth.requireUser, async (req, res, next) => {
@@ -504,10 +552,12 @@ router.get('/account/hire/:reference/invoice.pdf', auth.requireUser, async (req,
 
 /** The inspection report behind one of this customer's bookings (FR-07). */
 async function ownedReport(user, reference) {
-  const booking = await db.queryOne('SELECT id, reference, phone FROM bookings WHERE reference = ? LIMIT 1', [String(reference || '').toUpperCase().slice(0, 32)]);
+  const booking = await db.queryOne('SELECT id, reference, phone, user_id FROM bookings WHERE reference = ? LIMIT 1', [String(reference || '').toUpperCase().slice(0, 32)]);
   if (!booking) return null;
-  const shapes = require('../lib/phone').variants(user.phone);
-  const stored = booking.phone ? require('../lib/phone').canonical(booking.phone) : null;
+  if (booking.user_id && Number(booking.user_id) === Number(user.id)) return reportService.build(booking.id);
+  if (booking.user_id || !user.phone) return null;
+  const shapes = phone.variants(user.phone);
+  const stored = booking.phone ? phone.canonical(booking.phone) : null;
   if (!stored || !shapes.includes(stored)) return null;
   return reportService.build(booking.id);
 }
@@ -559,7 +609,7 @@ router.get('/account/reports/:reference.pdf', auth.requireUser, async (req, res,
   }
 });
 
-/** NDPA right of access (§12.2): everything keyed to this phone, as a download. */
+/** NDPA right of access: account-linked records plus legacy records on its sign-in phone. */
 router.get('/account/export', auth.requireUser, async (req, res, next) => {
   try {
     const payload = await db.users.exportData(req.user.id);
@@ -733,7 +783,50 @@ router.post('/api/account/saved-searches', auth.sameOriginOnly, auth.requireUser
 });
 
 // ---------------------------------------------------------------------------
-// Profile — name, email, marketing opt-in (consent captured explicitly)
+// Verified email linking — a legacy phone account must be authenticated first.
+// ---------------------------------------------------------------------------
+router.post('/api/account/email/otp', auth.sameOriginOnly, auth.requireUser, async (req, res, next) => {
+  try {
+    if (req.user.role !== 'customer') return sendJson(res, { ok: false, error: 'Email sign-in is for customer accounts only.' }, { status: 403 });
+    const result = await customerAuth.requestEmailCode({
+      rawEmail: (req.body || {}).email,
+      purpose: 'link',
+      userId: req.user.id,
+      ip: req.ip,
+    });
+    if (!result.ok) return sendJson(res, { ok: false, error: result.error, code: result.code }, { status: result.status });
+    return sendJson(res, {
+      ok: true,
+      alreadyLinked: Boolean(result.alreadyLinked),
+      maskedEmail: emailService.maskEmail(result.email),
+      delivered: result.delivered !== false,
+      expiresInMinutes: result.expiresAt ? Math.round((new Date(result.expiresAt).getTime() - Date.now()) / 60_000) : null,
+      ...(result.devCode ? { devCode: result.devCode } : {}),
+    });
+  } catch (error) {
+    return next(error);
+  }
+});
+
+router.post('/api/account/email/verify', auth.sameOriginOnly, auth.requireUser, async (req, res, next) => {
+  try {
+    if (req.user.role !== 'customer') return sendJson(res, { ok: false, error: 'Email sign-in is for customer accounts only.' }, { status: 403 });
+    const body = req.body || {};
+    const result = await customerAuth.linkEmail({
+      rawEmail: body.email,
+      code: validate.text(body.code, 12),
+      userId: req.user.id,
+    });
+    if (!result.ok) return sendJson(res, { ok: false, error: result.error, code: result.code }, { status: result.status });
+    return sendJson(res, { ok: true, user: { email: result.user.email, emailVerified: result.user.emailVerified } });
+  } catch (error) {
+    return next(error);
+  }
+});
+
+// ---------------------------------------------------------------------------
+// Profile — name, optional contact phone, marketing opt-in.
+// Email can only be changed after a verification code has been entered above.
 // ---------------------------------------------------------------------------
 router.post('/api/account/profile', auth.sameOriginOnly, auth.requireUser, async (req, res, next) => {
   try {
@@ -742,32 +835,48 @@ router.post('/api/account/profile', auth.sameOriginOnly, auth.requireUser, async
     if (body.name !== undefined && !name) {
       return sendJson(res, { ok: false, error: 'Please use at least two characters for your name.' }, { status: 422 });
     }
-
-    let email;
     if (body.email !== undefined) {
-      email = validate.text(body.email, 160).toLowerCase();
-      if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) {
-        return sendJson(res, { ok: false, error: 'That email address does not look right.' }, { status: 422 });
+      return sendJson(res, { ok: false, error: 'Email addresses can only be changed after email verification.' }, { status: 422 });
+    }
+
+    let contactPhone;
+    if (body.contactPhone !== undefined) {
+      const rawPhone = validate.text(body.contactPhone, 40);
+      contactPhone = rawPhone ? validate.phone(rawPhone) : null;
+      if (rawPhone && !contactPhone) {
+        return sendJson(res, { ok: false, error: 'That contact phone number does not look right — please check it.' }, { status: 422 });
       }
     }
 
     const wanted = body.marketingOptIn === undefined ? undefined : Boolean(body.marketingOptIn);
-    const user = await db.users.updateProfile(req.user.id, { name, email, marketingOptIn: wanted });
+    let user = await db.users.updateProfile(req.user.id, { name, marketingOptIn: wanted });
+    if (contactPhone !== undefined || body.contactPhone !== undefined) {
+      user = await db.users.updateContactPhone(req.user.id, contactPhone || null);
+    }
 
-    // §18.3: consent is an event, not a flag. When the switch actually moves we
-    // record the event — with the wording of the box the person was looking at
-    // — and withdrawing is a new row rather than an edit of the old one.
+    // Consent is an event, not a flag. Withdrawing creates a new event rather
+    // than rewriting the earlier record.
     if (wanted !== undefined && wanted !== Boolean(req.user.marketingOptIn)) {
       await privacyService.recordConsent('marketing', {
         userId: req.user.id,
-        phone: user.phone,
+        phone: user.contactPhone || user.phone,
         name: user.name,
         granted: wanted,
         path: '/account',
       });
     }
 
-    return sendJson(res, { ok: true, user: { name: user.name, email: user.email, marketingOptIn: user.marketingOptIn } });
+    return sendJson(res, {
+      ok: true,
+      user: {
+        name: user.name,
+        contactPhone: user.contactPhone,
+        email: user.email,
+        emailVerified: user.emailVerified,
+        googleLinked: user.googleLinked,
+        marketingOptIn: user.marketingOptIn,
+      },
+    });
   } catch (error) {
     return next(error);
   }

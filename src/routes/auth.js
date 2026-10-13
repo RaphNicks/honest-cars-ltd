@@ -15,6 +15,9 @@
 const express = require('express');
 const rateLimit = require('../lib/rate-limit');
 const auth = require('../services/auth');
+const customerAuth = require('../services/customer-auth');
+const emailService = require('../services/email');
+const config = require('../config');
 const db = require('../db');
 const validate = require('../services/validate');
 const roles = require('../services/roles');
@@ -38,6 +41,28 @@ const verifyLimiter = rateLimit({ windowMs: 15 * 60_000, max: 60 });
 // ceiling in services/mfa.js is the real defence; this is the second one, for
 // traffic that never gets as far as a session.
 const mfaLimiter = rateLimit({ windowMs: 5 * 60_000, max: 30 });
+const emailOtpLimiter = rateLimit({ windowMs: 15 * 60_000, max: 30 });
+const emailVerifyLimiter = rateLimit({ windowMs: 15 * 60_000, max: 60 });
+const googleLimiter = rateLimit({ windowMs: 15 * 60_000, max: 30 });
+
+function readCookie(req, name) {
+  const cookies = String(req.headers.cookie || '').split(';');
+  for (const part of cookies) {
+    const [key, ...value] = part.trim().split('=');
+    if (key === name) {
+      try {
+        return decodeURIComponent(value.join('='));
+      } catch {
+        return null;
+      }
+    }
+  }
+  return null;
+}
+
+function googleCookieOptions() {
+  return { httpOnly: true, sameSite: 'lax', secure: config.isProduction, path: '/api/auth/google', maxAge: customerAuth.GOOGLE_STATE_TTL_MS };
+}
 
 router.post('/otp', otpLimiter, async (req, res, next) => {
   try {
@@ -102,6 +127,120 @@ router.post('/verify', verifyLimiter, async (req, res, next) => {
     });
   } catch (error) {
     return next(error);
+  }
+});
+
+// Customer email OTP — entirely separate from staff phone OTP + TOTP.
+router.post('/email/otp', auth.sameOriginOnly, emailOtpLimiter, async (req, res, next) => {
+  try {
+    const body = req.body || {};
+    const result = await customerAuth.requestEmailCode({ rawEmail: body.email, ip: req.ip });
+    if (!result.ok) return sendJson(res, { ok: false, error: result.error, code: result.code }, { status: result.status });
+    return sendJson(res, {
+      ok: true,
+      alreadyLinked: Boolean(result.alreadyLinked),
+      maskedEmail: emailService.maskEmail(result.email),
+      channel: result.channel || 'email',
+      delivered: result.delivered !== false,
+      expiresInMinutes: result.expiresAt ? Math.round((new Date(result.expiresAt).getTime() - Date.now()) / 60_000) : null,
+      ...(result.devCode ? { devCode: result.devCode } : {}),
+    });
+  } catch (error) {
+    return next(error);
+  }
+});
+
+router.post('/email/verify', auth.sameOriginOnly, emailVerifyLimiter, async (req, res, next) => {
+  try {
+    const body = req.body || {};
+    const result = await customerAuth.verifyEmailCode({
+      rawEmail: body.email,
+      code: validate.text(body.code, 12),
+      name: validate.name(body.name),
+      referralCode: validate.text(body.ref, 16),
+      ip: req.ip,
+      userAgent: req.get('user-agent'),
+    });
+    if (!result.ok) return sendJson(res, { ok: false, error: result.error, code: result.code }, { status: result.status });
+
+    auth.setSessionCookie(res, result.token, { expiresAt: result.expiresAt });
+    return sendJson(res, {
+      ok: true,
+      user: { name: result.user.name, email: result.user.email, emailVerified: result.user.emailVerified },
+      newAccount: Boolean(result.newAccount),
+      redirect: auth.safeNextPath(body.next) || '/account',
+    });
+  } catch (error) {
+    return next(error);
+  }
+});
+
+// Google OpenID Connect. The state cookie is signed, short-lived, SameSite=Lax,
+// and includes PKCE + nonce material; only verified customer identities proceed.
+router.get('/google', googleLimiter, (req, res) => {
+  const intent = String(req.query.intent || '') === 'link' ? 'link' : 'sign_in';
+  if (req.user && req.user.role !== 'customer') return res.redirect(302, '/account?auth_error=customer_only#profile');
+  if (intent === 'link' && (!req.user || req.user.role !== 'customer')) {
+    return res.redirect(302, '/login?auth_error=google_link_session');
+  }
+  if (intent !== 'link' && req.user && req.user.role === 'customer') {
+    return res.redirect(302, auth.safeNextPath(req.query.next) || '/account');
+  }
+
+  const result = customerAuth.beginGoogleAuth({
+    next: auth.safeNextPath(req.query.next) || (intent === 'link' ? '/account#profile' : '/account'),
+    linkUserId: intent === 'link' ? req.user.id : null,
+    saveListingId: intent === 'link' ? null : validate.integer(req.query.save, { min: 1, fallback: 0 }),
+  });
+  if (!result.ok) {
+    const path = intent === 'link' ? '/account' : '/login';
+    return res.redirect(302, `${path}?auth_error=${encodeURIComponent(result.code.toLowerCase())}${intent === 'link' ? '#profile' : ''}`);
+  }
+  res.cookie(customerAuth.GOOGLE_STATE_COOKIE, result.cookie, googleCookieOptions());
+  return res.redirect(302, result.url);
+});
+
+router.get('/google/callback', googleLimiter, async (req, res, next) => {
+  const stateCookie = readCookie(req, customerAuth.GOOGLE_STATE_COOKIE);
+  res.clearCookie(customerAuth.GOOGLE_STATE_COOKIE, { ...googleCookieOptions(), maxAge: undefined });
+  if (req.query.error) {
+    return res.redirect(302, req.user && req.user.role === 'customer'
+      ? '/account?auth_error=google_cancelled#profile'
+      : '/login?auth_error=google_cancelled');
+  }
+
+  try {
+    const { context, profile } = await customerAuth.verifyGoogleCallback({
+      cookie: stateCookie,
+      state: req.query.state,
+      code: req.query.code,
+    });
+
+    if (context.linkUserId) {
+      if (!req.user || req.user.role !== 'customer' || Number(req.user.id) !== Number(context.linkUserId)) {
+        return res.redirect(302, '/account?auth_error=google_link_session#profile');
+      }
+      const linked = await customerAuth.linkGoogleIdentity(context.linkUserId, profile);
+      if (!linked.ok) return res.redirect(302, `/account?auth_error=${encodeURIComponent(linked.code.toLowerCase())}#profile`);
+      return res.redirect(302, auth.safeNextPath(context.next) || '/account#profile');
+    }
+
+    const result = await customerAuth.signInWithGoogle(profile, {
+      ip: req.ip,
+      userAgent: req.get('user-agent'),
+    });
+    if (!result.ok) return res.redirect(302, `/login?auth_error=${encodeURIComponent(result.code.toLowerCase())}`);
+    auth.setSessionCookie(res, result.token, { expiresAt: result.expiresAt });
+    if (context.saveListingId) {
+      await db.users.addSavedCar(result.user.id, context.saveListingId, null).catch(() => {});
+    }
+    return res.redirect(302, auth.safeNextPath(context.next) || '/account');
+  } catch (error) {
+    const code = String(error.code || 'google_sign_in_failed').toLowerCase().replace(/[^a-z0-9_-]/g, '').slice(0, 60);
+    const safeCode = encodeURIComponent(code || 'google_sign_in_failed');
+    return res.redirect(302, req.user && req.user.role === 'customer'
+      ? `/account?auth_error=${safeCode}#profile`
+      : `/login?auth_error=${safeCode}`);
   }
 });
 

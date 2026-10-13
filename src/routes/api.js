@@ -98,28 +98,25 @@ router.post('/events', rateLimit({ windowMs: 60_000, max: 60 }), async (req, res
 router.post('/leads', rateLimit({ windowMs: 60_000, max: 12 }), async (req, res, next) => {
   try {
     const body = req.body || {};
-    const name = String(body.name || '').trim();
-    const phone = String(body.phone || '').trim();
     const type = String(body.type || 'viewing');
-
-    if (!name && type !== 'deal_alert') {
-      return sendJson(res, { ok: false, error: 'Please tell us your name.' }, { status: 422 });
-    }
-    if (!/^[+()\d\s-]{7,20}$/.test(phone)) {
-      return sendJson(res, { ok: false, error: 'That phone number does not look right — please check it.' }, { status: 422 });
-    }
+    const contact = customerContact(req, body, { nameRequired: type !== 'deal_alert' });
+    if (!contact.ok) return sendJson(res, { ok: false, error: contact.error }, { status: contact.status });
+    const name = contact.name || 'Deal-alert subscriber';
+    const phone = contact.phone;
 
     const listingId = Number(body.listingId) || null;
     const created = await db.leads.createLead({
       type,
       listingId,
-      name: name || 'Deal-alert subscriber',
+      userId: contact.userId,
+      name,
       phone,
       message: body.message || null,
       preferredDay: body.preferredDay || null,
       sourcePath: String(body.sourcePath || req.get('referer') || '/').slice(0, 200),
       utm: body.utm || null,
     });
+    await saveCustomerContact(contact);
 
     // Mirror the funnel event server-side (§15.1: viewing_requested, deal_alert_signup…)
     const eventName = type === 'deal_alert' ? 'deal_alert_signup' : type === 'viewing' ? 'viewing_requested' : null;
@@ -157,6 +154,31 @@ function consentGiven(body) {
   return value === true || value === 'yes' || value === 'on' || value === '1' || value === 1;
 }
 
+function customerUser(req) {
+  return req.user && req.user.role === 'customer' ? req.user : null;
+}
+
+/** Resolve a contact-required submission without ever looking up an account by the typed phone. */
+function customerContact(req, body, { nameRequired = true } = {}) {
+  const customer = customerUser(req);
+  const name = validate.name(body.name) || validate.name(customer && customer.name);
+  if (nameRequired && !name) return { ok: false, status: 422, error: 'Please tell us your name.' };
+
+  const rawPhone = validate.text(body.phone, 40);
+  if (rawPhone && !validate.phone(rawPhone)) {
+    return { ok: false, status: 422, error: 'That phone number does not look right — please check it.' };
+  }
+  const phone = rawPhone ? validate.phone(rawPhone) : validate.phone(customer && (customer.contactPhone || customer.phone));
+  if (!phone) return { ok: false, status: 422, error: 'Please add a contact phone number so Honest Cars can follow up on this request.' };
+  return { ok: true, name, phone, userId: customer ? customer.id : null, customer };
+}
+
+async function saveCustomerContact(contact) {
+  if (contact && contact.customer && contact.phone) {
+    await db.users.updateContactPhone(contact.customer.id, contact.phone);
+  }
+}
+
 const REQUEST_KINDS = {
   concierge: { type: 'concierge', slaHours: 72, leadType: 'concierge', event: 'concierge_started' },
   documents: { type: 'documents', slaHours: 48, leadType: 'service', event: 'services_enquiry_submitted' },
@@ -175,10 +197,9 @@ router.post('/service-requests', rateLimit({ windowMs: 60_000, max: 10 }), async
     const body = req.body || {};
     const rule = REQUEST_KINDS[String(body.kind || 'concierge')] || REQUEST_KINDS.concierge;
 
-    const name = validate.name(body.name);
-    const phone = validate.phone(body.phone);
-    if (!name) return sendJson(res, { ok: false, error: 'Please tell us your name.' }, { status: 422 });
-    if (!phone) return sendJson(res, { ok: false, error: 'That phone number does not look right — please check it.' }, { status: 422 });
+    const contact = customerContact(req, body);
+    if (!contact.ok) return sendJson(res, { ok: false, error: contact.error }, { status: contact.status });
+    const { name, phone } = contact;
 
     const brief = validate.brief(body.brief);
     if (body.serviceSlug) brief.service = validate.text(body.serviceSlug, 80);
@@ -192,12 +213,14 @@ router.post('/service-requests', rateLimit({ windowMs: 60_000, max: 10 }), async
     const sourcePath = validate.text(body.sourcePath || req.get('referer') || '/', 200);
     const request = await db.requests.createRequest({
       type: rule.type,
+      userId: contact.userId,
       name,
       phone,
       brief,
       sourcePath,
       slaHours: sla ? sla.hours : validate.slaHours(body.slaHours, rule.slaHours),
     });
+    await saveCustomerContact(contact);
 
     // §18.3: the enquiry box says "HonestCars can contact me about this
     // request. No marketing spam — that is a separate, optional list." The
@@ -207,7 +230,7 @@ router.post('/service-requests', rateLimit({ windowMs: 60_000, max: 10 }), async
     // what it received.)
     if (consentGiven(body)) {
       await privacy.recordConsent(privacy.noticeKeyForIntake(body.kind, sourcePath), {
-        userId: req.user ? req.user.id : null,
+        userId: contact.userId,
         phone,
         name,
         granted: true,
@@ -225,6 +248,7 @@ router.post('/service-requests', rateLimit({ windowMs: 60_000, max: 10 }), async
         purpose: 'retainer',
         amountKobo: sla.retainerKobo,
         requestId: request.id,
+        userId: contact.userId,
         customerName: name,
         customerPhone: phone,
       });
@@ -260,6 +284,7 @@ router.post('/service-requests', rateLimit({ windowMs: 60_000, max: 10 }), async
                 sourcePath: validate.text(body.sourcePath || '/find-my-car', 200),
                 utm: body.utm || null,
                 requestId: request.id,
+                userId: contact.userId,
               },
             )
             .catch(() => null)
@@ -270,7 +295,7 @@ router.post('/service-requests', rateLimit({ windowMs: 60_000, max: 10 }), async
         // says the requirement goes in front of a lender, so that is the
         // permission being recorded — with the wording, from the page.
         await privacy.recordConsent('concierge_financing', {
-          userId: req.user ? req.user.id : null,
+          userId: contact.userId,
           phone,
           name,
           granted: true,
@@ -281,6 +306,7 @@ router.post('/service-requests', rateLimit({ windowMs: 60_000, max: 10 }), async
 
     await db.leads.createLead({
       type: rule.leadType,
+      userId: contact.userId,
       name,
       phone,
       message: `Service request ${request.trackingId} (${rule.type})`,
@@ -367,15 +393,21 @@ router.post('/financing', rateLimit({ windowMs: 60_000, max: 8 }), async (req, r
         { status: 422 },
       );
     }
+    const contact = customerContact(req, body);
+    if (!contact.ok) return sendJson(res, { ok: false, error: contact.error }, { status: contact.status });
     const financingPath = validate.text(body.sourcePath || req.get('referer') || '/financing', 200);
-    const result = await financing.capture(body, { sourcePath: financingPath, utm: body.utm || null });
+    const result = await financing.capture(
+      { ...body, name: contact.name, phone: contact.phone },
+      { sourcePath: financingPath, utm: body.utm || null, userId: contact.userId },
+    );
     if (!result.ok) return sendJson(res, { ok: false, error: result.error }, { status: result.status || 422 });
+    await saveCustomerContact(contact);
 
     // §18.3: the lender-sharing permission is the strongest consent on the
     // site — it is the one that moves a person's details to a third party — so
     // the event is recorded with the wording they agreed to.
     await privacy.recordConsent('financing', {
-      userId: req.user ? req.user.id : null,
+      userId: contact.userId,
       phone: result.lead.phone,
       name: result.lead.name,
       granted: true,
@@ -401,10 +433,9 @@ router.post('/bookings', rateLimit({ windowMs: 60_000, max: 12 }), async (req, r
   try {
     const body = req.body || {};
     const type = validate.oneOf(body.type, ['inspection', 'install', 'consultation'], 'inspection');
-    const name = validate.name(body.name);
-    const phone = validate.phone(body.phone);
-    if (!name) return sendJson(res, { ok: false, error: 'Please tell us your name.' }, { status: 422 });
-    if (!phone) return sendJson(res, { ok: false, error: 'That phone number does not look right — please check it.' }, { status: 422 });
+    const contact = customerContact(req, body);
+    if (!contact.ok) return sendJson(res, { ok: false, error: contact.error }, { status: contact.status });
+    const { name, phone } = contact;
 
     const slotAt = validate.futureDateTime(body.slotAt, { maxDays: 120 });
     if (!slotAt) return sendJson(res, { ok: false, error: 'Pick a day for this — it must be within the next few months.' }, { status: 422 });
@@ -418,12 +449,15 @@ router.post('/bookings', rateLimit({ windowMs: 60_000, max: 12 }), async (req, r
       addons: Array.isArray(body.addons) ? validate.brief({ list: body.addons }).list : null,
       name,
       phone,
+      userId: contact.userId,
       amountKobo: null, // priced by ops once the slot is confirmed
       status: 'requested',
     });
+    await saveCustomerContact(contact);
 
     await db.leads.createLead({
       type: 'service',
+      userId: contact.userId,
       name,
       phone,
       message: `Booking ${booking.reference} (${type})${body.location ? ` at ${body.location}` : ''}`,
@@ -459,10 +493,9 @@ router.post('/bookings', rateLimit({ windowMs: 60_000, max: 12 }), async (req, r
 router.post('/orders', rateLimit({ windowMs: 60_000, max: 8 }), async (req, res, next) => {
   try {
     const body = req.body || {};
-    const name = validate.name(body.name);
-    const phone = validate.phone(body.phone);
-    if (!name) return sendJson(res, { ok: false, error: 'Please tell us your name.' }, { status: 422 });
-    if (!phone) return sendJson(res, { ok: false, error: 'That phone number does not look right — please check it.' }, { status: 422 });
+    const contact = customerContact(req, body);
+    if (!contact.ok) return sendJson(res, { ok: false, error: contact.error }, { status: contact.status });
+    const { name, phone } = contact;
 
     const items = Array.isArray(body.items)
       ? body.items.slice(0, 20).map((item) => ({
@@ -479,14 +512,16 @@ router.post('/orders', rateLimit({ windowMs: 60_000, max: 8 }), async (req, res,
       items,
       deliveryArea: validate.text(body.deliveryArea, 80) || 'Pickup at a PH meet-point',
       notes: validate.text(body.notes, 400) || null,
+      userId: contact.userId,
     });
+    await saveCustomerContact(contact);
 
     // §18.3: "HonestCars can contact me on WhatsApp to confirm this order and
-    // payment." A guest has no account, so the event is keyed to the phone.
+    // payment." A signed-in customer is linked by account id, never by the
+    // contact phone they entered on this form.
     if (consentGiven(body)) {
-      const account = await db.users.findByPhone(phone).catch(() => null);
       await privacy.recordConsent('checkout', {
-        userId: account ? account.id : null,
+        userId: contact.userId,
         phone,
         name,
         granted: true,
@@ -496,6 +531,7 @@ router.post('/orders', rateLimit({ windowMs: 60_000, max: 8 }), async (req, res,
 
     await db.leads.createLead({
       type: 'service',
+      userId: contact.userId,
       name,
       phone,
       message: `Shop order ${order.orderNo} — ${order.items.map((item) => `${item.qty}× ${item.name}`).join(', ')}`,
@@ -518,6 +554,7 @@ router.post('/orders', rateLimit({ windowMs: 60_000, max: 8 }), async (req, res,
         purpose: 'order',
         amountKobo: order.totalKobo,
         orderId: order.id,
+        userId: contact.userId,
         customerName: name,
         customerPhone: phone,
       })
@@ -550,18 +587,19 @@ router.post('/orders', rateLimit({ windowMs: 60_000, max: 8 }), async (req, res,
 router.post('/contact', rateLimit({ windowMs: 60_000, max: 10 }), async (req, res, next) => {
   try {
     const body = req.body || {};
-    const name = validate.name(body.name);
-    const phone = validate.phone(body.phone);
-    if (!name) return sendJson(res, { ok: false, error: 'Please tell us your name.' }, { status: 422 });
-    if (!phone) return sendJson(res, { ok: false, error: 'That phone number does not look right — please check it.' }, { status: 422 });
+    const contact = customerContact(req, body);
+    if (!contact.ok) return sendJson(res, { ok: false, error: contact.error }, { status: contact.status });
+    const { name, phone } = contact;
 
     const lead = await db.leads.createLead({
       type: 'service',
+      userId: contact.userId,
       name,
       phone,
       message: validate.text(body.message, 2000) || 'Contact form',
       sourcePath: validate.text(body.sourcePath || '/contact', 200),
     });
+    await saveCustomerContact(contact);
 
     await db.analytics
       .record('services_enquiry_submitted', { payload: { source: 'contact' }, sourcePath: '/contact' })

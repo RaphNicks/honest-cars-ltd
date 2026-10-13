@@ -22,6 +22,7 @@
  */
 
 const { query, queryOne } = require('./pool');
+const phones = require('../lib/phone');
 
 const STATUSES = ['new', 'shared', 'contacted', 'approved', 'declined', 'withdrawn'];
 /** The statuses that mean the desk is finished with it. */
@@ -61,6 +62,7 @@ function shapeLead(row) {
   if (!row) return null;
   return {
     id: row.id,
+    userId: row.user_id || null,
     reference: row.reference,
     name: row.name,
     phone: row.phone,
@@ -111,6 +113,7 @@ async function nextReference() {
 async function createLead(input) {
   const payload = {
     reference: input.reference || (await nextReference()),
+    user_id: input.userId || null,
     name: input.name,
     phone: input.phone,
     email: input.email || null,
@@ -132,7 +135,7 @@ async function createLead(input) {
   // how SQL injection gets in — so the column list is explicit and every value
   // is a parameter.
   const COLUMNS = [
-    'reference', 'name', 'phone', 'email', 'lead_id', 'listing_id', 'request_id',
+    'reference', 'user_id', 'name', 'phone', 'email', 'lead_id', 'listing_id', 'request_id',
     'amount_kobo', 'down_kobo', 'monthly_kobo', 'tenor_months', 'employment',
     'timeline', 'plan', 'source_path', 'utm',
   ];
@@ -214,10 +217,29 @@ async function findByReference(reference) {
   return shapeLead(await queryOne(`${SELECT_LEAD} WHERE f.reference = ? LIMIT 1`, [String(reference || '').toUpperCase()]));
 }
 
-/** The customer's own enquiries, matched on the number they gave us (§7.1). */
-async function listForPhone(phone, { limit = 5 } = {}) {
-  const rows = await query(`${SELECT_LEAD} WHERE f.phone = ? ORDER BY f.created_at DESC LIMIT ?`, [phone, limit]);
+/** Customer enquiries: new rows use account id; legacy rows use sign-in phone only. */
+async function listForCustomer(userId, phone, { limit = 5 } = {}) {
+  const shapes = phones.variants(phone);
+  const where = [];
+  const params = [];
+  if (userId) {
+    where.push('f.user_id = ?');
+    params.push(userId);
+  }
+  if (shapes.length) {
+    where.push(`(f.user_id IS NULL AND f.phone IN (${shapes.map(() => '?').join(',')}))`);
+    params.push(...shapes);
+  }
+  if (!where.length) return [];
+  const rows = await query(`${SELECT_LEAD} WHERE ${where.join(' OR ')} ORDER BY f.created_at DESC LIMIT ?`, [
+    ...params,
+    Math.min(20, Math.max(1, Number(limit) || 5)),
+  ]);
   return rows.map(shapeLead);
+}
+
+async function listForPhone(phone, options = {}) {
+  return listForCustomer(null, phone, options);
 }
 
 /** The console queue. Unassigned first — that is the work. */
@@ -292,6 +314,7 @@ module.exports = {
   findById,
   findByReference,
   listForPhone,
+  listForCustomer,
   queue,
   counts,
   route,

@@ -95,7 +95,7 @@ const NOTICES = [
     purpose: 'service_contact',
     source: 'login',
     view: ['views/pages/login.ejs'],
-    text: 'I agree to HonestCars contacting me on this number about my requests and orders.',
+    text: 'I agree to Honest Cars contacting me on this number about my requests and orders.',
   },
 
   // --- the permissions that are more than contact ---------------------------
@@ -121,7 +121,7 @@ const NOTICES = [
     purpose: 'marketing',
     source: 'account',
     view: ['views/pages/account.ejs'],
-    text: 'Send me deal alerts and new-stock notes on this number or email.',
+    text: 'Send me deal alerts and new-stock notes using my contact details.',
   },
   {
     key: 'deal_alerts',

@@ -40,6 +40,7 @@ const createdRequests = new Set();
  *  account, so they are remembered by id rather than swept by number. */
 const createdLeadIds = new Set();
 const createdPhones = new Set();
+const createdEmails = new Set();
 
 /** Cookie-aware fetch: keeps hc_session between calls, manual redirects. */
 function newClient() {
@@ -120,10 +121,11 @@ test.after(async () => {
       // phone themselves, so they are removed first — otherwise a test run
       // leaves orphaned money in the demo console.
       await db.query(`DELETE FROM payments WHERE customer_phone IN (${marks})`, shapes);
-      for (const table of ['service_requests', 'bookings', 'leads', 'orders', 'subscriptions']) {
+      for (const table of ['service_requests', 'bookings', 'leads', 'orders', 'subscriptions', 'financing_leads']) {
         const column = table === 'subscriptions' ? 'customer_phone' : 'phone';
         await db.query(`DELETE FROM ${table} WHERE ${column} IN (${marks})`, shapes);
       }
+      await db.query(`DELETE FROM consent_records WHERE phone IN (${marks})`, shapes);
       await db.query(`DELETE FROM notifications WHERE recipient IN (${marks})`, shapes);
       if (createdRequests.size) {
         const requestMarks = [...createdRequests].map(() => '?').join(',');
@@ -136,6 +138,12 @@ test.after(async () => {
       await db.query(`DELETE FROM auth_codes WHERE phone IN (${marks})`, shapes);
       await db.query(`DELETE FROM \`users\` WHERE phone IN (${marks})`, shapes);
     }
+    if (createdEmails.size) {
+      const emails = [...createdEmails];
+      const marks = emails.map(() => '?').join(',');
+      await db.query(`DELETE FROM email_auth_codes WHERE email IN (${marks})`, emails);
+      await db.query(`DELETE FROM \`users\` WHERE email IN (${marks})`, emails);
+    }
     await db.pool.end();
   }
 });
@@ -144,15 +152,139 @@ test.after(async () => {
 // Sign-in
 // ---------------------------------------------------------------------------
 
-maybe('sign-in page is a real page, noindex, and offers the phone-first form', async () => {
+maybe('sign-in page defaults to phone-free customer email and Google sign-in', async () => {
   const response = await fetch(`${ctx.baseUrl}/login`);
   assert.equal(response.status, 200);
   assert.match(response.headers.get('cache-control'), /no-store/);
   const html = await response.text();
   assert.match(html, /noindex, ?nofollow/i);
-  assert.match(html, /name="phone"/);
+  assert.match(html, /name="email"/);
+  assert.match(html, /Continue with Google/);
+  assert.match(html, /You do not need a phone number to open an account/);
+  assert.match(html, /name="phone"/, 'the legacy phone path remains available');
   assert.match(html, /name="consent"/);
-  assert.match(html, /WhatsApp/);
+});
+
+maybe('email OTP opens a phone-free account and a contact phone cannot expose another account’s history', async () => {
+  const db = require('../src/db');
+  const email = `email-${process.pid}-${Date.now()}@example.net`;
+  createdEmails.add(email);
+
+  const emailClient = newClient();
+  const otp = await emailClient.request('/api/auth/email/otp', { method: 'POST', body: { email } });
+  assert.equal(otp.status, 200, otp.text);
+  assert.equal(otp.json.ok, true);
+  assert.match(otp.json.maskedEmail, /@example\.net$/);
+  assert.ok(otp.json.devCode, 'development exposes only the local test code');
+
+  const verified = await emailClient.request('/api/auth/email/verify', {
+    method: 'POST',
+    body: { email, code: otp.json.devCode, name: 'Email Customer' },
+  });
+  assert.equal(verified.status, 200, verified.text);
+  assert.equal(verified.json.ok, true);
+  const customer = await db.users.findByVerifiedEmail(email);
+  assert.equal(customer.phone, null, 'email sign-in does not create a phone identity');
+  assert.equal(customer.contactPhone, null);
+
+  const legacyPhone = nextPhone();
+  const legacy = await signIn(legacyPhone);
+  const legacyAccount = await db.users.findByPhone(legacy.normalised);
+  const legacyRequest = await db.requests.createRequest({
+    type: 'concierge',
+    name: 'Legacy Phone Owner',
+    phone: legacy.normalised,
+    brief: { budget_min: 5000000 },
+  });
+  const submitted = await emailClient.request('/api/service-requests', {
+    method: 'POST',
+    body: {
+      kind: 'concierge',
+      name: 'Email Customer',
+      phone: legacyPhone,
+      brief: { budget_min: 5000000 },
+    },
+  });
+  assert.equal(submitted.status, 200, submitted.text);
+  assert.equal(submitted.json.ok, true);
+  const ownedRequest = await db.requests.findByTracking(submitted.json.trackingId);
+  assert.equal(Number(ownedRequest.userId), Number(customer.id), 'the new record belongs to the signed-in account');
+  assert.equal((await db.requests.findByTracking(legacyRequest.trackingId)).userId, null, 'legacy history stays unlinked');
+
+  const refreshed = await db.users.findById(customer.id);
+  assert.equal(refreshed.phone, null);
+  assert.equal(refreshed.contactPhone, legacy.normalised, 'the request phone is saved as contact information');
+  assert.equal((await db.users.findByPhone(legacy.normalised)).id, legacyAccount.id, 'the typed contact number does not switch accounts');
+  assert.notEqual(Number(legacyAccount.id), Number(customer.id));
+
+  const finance = await emailClient.request('/api/financing', {
+    method: 'POST',
+    body: {
+      name: 'Email Customer',
+      phone: legacyPhone,
+      amount: '12000000',
+      down: '2000000',
+      monthly: '250000',
+      tenor: '36',
+      employment: 'salaried',
+      timeline: 'month',
+      consent: 'yes',
+    },
+  });
+  assert.equal(finance.status, 200, finance.text);
+  assert.equal(finance.json.ok, true);
+  const financeRow = await db.financing.findByReference(finance.json.reference);
+  assert.equal(Number(financeRow.userId), Number(customer.id), 'financing records use the signed-in account id');
+
+  const dashboard = await emailClient.request('/account');
+  assert.equal(dashboard.status, 200);
+  assert.match(dashboard.text, new RegExp(submitted.json.trackingId));
+  assert.match(dashboard.text, new RegExp(finance.json.reference), 'the linked financing enquiry appears on the account');
+  assert.doesNotMatch(dashboard.text, new RegExp(legacyRequest.trackingId), 'a typed contact phone cannot reveal legacy phone-keyed history');
+});
+
+maybe('an existing phone customer must verify an email from that signed-in account before it becomes a login', async () => {
+  const db = require('../src/db');
+  const phone = nextPhone();
+  const { client, normalised } = await signIn(phone);
+  const owner = await db.users.findByPhone(normalised);
+  const email = `legacy-${process.pid}-${Date.now()}@example.net`;
+  createdEmails.add(email);
+  await db.users.updateProfile(owner.id, { email });
+
+  const visitor = newClient();
+  const unverifiedOtp = await visitor.request('/api/auth/email/otp', { method: 'POST', body: { email } });
+  assert.equal(unverifiedOtp.status, 200);
+  const blocked = await visitor.request('/api/auth/email/verify', {
+    method: 'POST',
+    body: { email, code: unverifiedOtp.json.devCode, name: 'Duplicate Account' },
+  });
+  assert.equal(blocked.status, 409);
+  assert.equal(blocked.json.code, 'LEGACY_EMAIL_REQUIRES_PHONE_LINK');
+  assert.equal(await db.users.findByVerifiedEmail(email), null, 'a profile email alone is not an identity');
+
+  const linkOtp = await client.request('/api/account/email/otp', { method: 'POST', body: { email } });
+  assert.equal(linkOtp.status, 200, linkOtp.text);
+  assert.ok(linkOtp.json.devCode);
+  const linked = await client.request('/api/account/email/verify', {
+    method: 'POST',
+    body: { email, code: linkOtp.json.devCode },
+  });
+  assert.equal(linked.status, 200, linked.text);
+  assert.equal(linked.json.ok, true);
+  const sameOwner = await db.users.findByVerifiedEmail(email);
+  assert.equal(Number(sameOwner.id), Number(owner.id), 'email links to the existing phone account, not a duplicate');
+  assert.equal(sameOwner.phone, normalised);
+
+  const emailClient = newClient();
+  const signInOtp = await emailClient.request('/api/auth/email/otp', { method: 'POST', body: { email } });
+  const emailSignIn = await emailClient.request('/api/auth/email/verify', {
+    method: 'POST',
+    body: { email, code: signInOtp.json.devCode, name: 'Ignored Existing Name' },
+  });
+  assert.equal(emailSignIn.status, 200, emailSignIn.text);
+  assert.equal(emailSignIn.json.ok, true);
+  assert.equal(Number((await db.users.findByVerifiedEmail(email)).id), Number(owner.id));
 });
 
 maybe('a code arrives, is single-use, and buys a session cookie', async () => {
@@ -289,18 +421,27 @@ maybe('saved searches keep their query, their alerts, and can be deleted', async
   assert.equal((await db.users.savedSearches(user.id)).filter((row) => row.id === id).length, 0, 'the row is gone');
 });
 
-maybe('profile details round-trip and marketing consent is explicit', async () => {
+maybe('profile details round-trip while email changes require verification', async () => {
   const { client, normalised } = await signIn();
+  const rejectedEmail = await client.request('/api/account/profile', {
+    method: 'POST',
+    body: { email: 'buyer@example.com' },
+  });
+  assert.equal(rejectedEmail.status, 422);
+  assert.match(rejectedEmail.json.error, /verification/i);
+
+  const contactPhone = nextPhone();
   const saved = await client.request('/api/account/profile', {
     method: 'POST',
-    body: { name: 'Test Buyer', email: 'buyer@example.com', marketingOptIn: true },
+    body: { name: 'Test Buyer', contactPhone, marketingOptIn: true },
   });
   assert.equal(saved.json.ok, true);
 
   const db = require('../src/db');
   const user = await db.users.findByPhone(normalised);
   assert.equal(user.name, 'Test Buyer');
-  assert.equal(user.email, 'buyer@example.com');
+  assert.equal(user.email, null, 'unverified profile values are not an email login');
+  assert.equal(user.contactPhone, `+234${contactPhone.replace(/^0/, '')}`);
   assert.equal(user.marketingOptIn, true);
 
   const html = await client.request('/account');

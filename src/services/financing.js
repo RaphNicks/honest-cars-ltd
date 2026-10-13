@@ -160,7 +160,7 @@ async function reference() {
  * @param {object} body      raw request body (never trusted)
  * @param {object} [context] { sourcePath, utm, requestId }
  */
-async function capture(body = {}, { sourcePath = '/financing', utm = null, requestId = null } = {}) {
+async function capture(body = {}, { sourcePath = '/financing', utm = null, requestId = null, userId = null } = {}) {
   const name = validate.name(body.name);
   const phone = validate.phone(body.phone);
   if (!name) return { ok: false, status: 422, error: 'Please tell us your name.' };
@@ -208,6 +208,7 @@ async function capture(body = {}, { sourcePath = '/financing', utm = null, reque
     .createLead({
       type: 'financing',
       listingId: listing ? listing.id : null,
+      userId,
       name,
       phone: canonicalPhone,
       message: `Financing enquiry${listing ? ` — ${listing.title} (${listing.stockNo})` : ''}. Price ${
@@ -221,6 +222,7 @@ async function capture(body = {}, { sourcePath = '/financing', utm = null, reque
     .catch(() => null);
 
   const created = await db.financing.createLead({
+    userId,
     name,
     phone: canonicalPhone,
     email,

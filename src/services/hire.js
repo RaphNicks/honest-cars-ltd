@@ -140,11 +140,12 @@ async function quoteFromRequest(requestId, { note = null, extrasKobo = 0, actorI
     }
     await db.query(
       `UPDATE hire_bookings
-          SET class_slug = ?, pickup_at = ?, dropoff_at = ?, days = ?, with_driver = ?, airport_pickup = ?,
+          SET user_id = COALESCE(user_id, ?), class_slug = ?, pickup_at = ?, dropoff_at = ?, days = ?, with_driver = ?, airport_pickup = ?,
               day_rate_kobo = ?, driver_kobo = ?, extras_kobo = ?, deposit_kobo = ?, total_kobo = ?,
               notes = ?, quote_sent_at = UTC_TIMESTAMP(), status = 'quoted'
         WHERE id = ?`,
       [
+        request.userId || null,
         hireClass.slug, db.hire.sqlDate(startAt), db.hire.sqlDate(endAt), priced.days, driver ? 1 : 0, airport ? 1 : 0,
         priced.dayRateKobo, priced.driverKobo, priced.extrasKobo, priced.depositKobo, priced.totalKobo,
         note ? String(note).slice(0, 400) : existing.notes, existing.id,
@@ -164,12 +165,12 @@ async function quoteFromRequest(requestId, { note = null, extrasKobo = 0, actorI
       const reference = await nextReference(conn);
       const [result] = await conn.query(
         `INSERT INTO hire_bookings
-           (reference, request_id, class_slug, client_name, client_phone, company, pickup_at, dropoff_at,
+           (reference, request_id, user_id, class_slug, client_name, client_phone, company, pickup_at, dropoff_at,
             pickup_point, days, with_driver, airport_pickup, day_rate_kobo, driver_kobo, extras_kobo,
             deposit_kobo, total_kobo, status, quote_sent_at, notes, created_by)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'quoted', UTC_TIMESTAMP(), ?, ?)`,
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'quoted', UTC_TIMESTAMP(), ?, ?)`,
         [
-          reference, request.id, hireClass.slug, clientName, request.phone, company,
+          reference, request.id, request.userId || null, hireClass.slug, clientName, request.phone, company,
           db.hire.sqlDate(startAt), db.hire.sqlDate(endAt),
           airport ? 'Omagwa arrivals' : (brief.pickup_point || null),
           priced.days, driver ? 1 : 0, airport ? 1 : 0,
@@ -285,6 +286,7 @@ async function accept(bookingId, { actorId = null } = {}) {
     purpose: 'hire',
     amountKobo: moved.booking.totalKobo,
     hireBookingId: moved.booking.id,
+    userId: moved.booking.userId,
     customerName: moved.booking.clientName,
     customerPhone: moved.booking.phone,
   });

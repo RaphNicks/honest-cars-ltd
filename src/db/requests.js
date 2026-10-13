@@ -40,6 +40,7 @@ function shapeRequest(row) {
   const stageIndex = Math.max(0, STATUS_STAGES.findIndex((stage) => stage.key === row.status));
   return {
     id: row.id,
+    userId: row.user_id || null,
     trackingId: row.tracking_id,
     type: row.type,
     status: row.status,
@@ -63,6 +64,7 @@ function shapeRequest(row) {
  */
 async function createRequest({
   type,
+  userId = null,
   name,
   phone,
   brief = null,
@@ -84,10 +86,11 @@ async function createRequest({
 
     const due = new Date(Date.now() + Math.max(1, slaHours) * 3_600_000);
     const [result] = await conn.query(
-      `INSERT INTO service_requests (tracking_id, type, status, name, phone, brief, listing_id, sla_due_at, source_path, notes)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO service_requests (tracking_id, user_id, type, status, name, phone, brief, listing_id, sla_due_at, source_path, notes)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         trackingId,
+        userId,
         safeType,
         safeStatus,
         String(name || '').slice(0, 120),
@@ -147,13 +150,23 @@ async function candidatesFor(requestId) {
 }
 
 /** /account “Requests” card — phone-number-first, no password yet (§7.1). */
-async function listRequestsForPhone(phone) {
+async function listRequestsForPhone(phone, { userId = null } = {}) {
   const shapes = phones.variants(phone);
-  if (!shapes.length) return [];
+  const where = [];
+  const params = [];
+  if (userId) {
+    where.push('user_id = ?');
+    params.push(userId);
+  }
+  if (shapes.length) {
+    where.push(`(user_id IS NULL AND phone IN (${shapes.map(() => '?').join(',')}))`);
+    params.push(...shapes);
+  }
+  if (!where.length) return [];
   const rows = await query(
-    `SELECT * FROM service_requests WHERE phone IN (${shapes.map(() => '?').join(',')})
+    `SELECT * FROM service_requests WHERE ${where.join(' OR ')}
      ORDER BY created_at DESC LIMIT 20`,
-    shapes,
+    params,
   );
   return rows.map(shapeRequest);
 }
@@ -165,6 +178,7 @@ function shapeBooking(row) {
   if (!row) return null;
   return {
     id: row.id,
+    userId: row.user_id || null,
     reference: row.reference,
     type: row.type,
     serviceSlug: row.service_slug,
@@ -203,6 +217,7 @@ async function createBooking({
   phone,
   amountKobo = null,
   requestId = null,
+  userId = null,
   status = 'requested',
 }) {
   const safeType = BOOKING_TYPES.includes(type) ? type : 'consultation';
@@ -215,8 +230,8 @@ async function createBooking({
   });
 
   const result = await query(
-    `INSERT INTO bookings (reference, type, service_slug, slot_at, location, vehicle, addons, name, phone, amount_kobo, request_id, status)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    `INSERT INTO bookings (reference, type, service_slug, slot_at, location, vehicle, addons, name, phone, amount_kobo, request_id, user_id, status)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       reference,
       safeType,
@@ -229,6 +244,7 @@ async function createBooking({
       String(phone || '').slice(0, 40),
       amountKobo === null || amountKobo === undefined ? null : Number(amountKobo),
       requestId,
+      userId,
       status,
     ],
   );
@@ -243,13 +259,23 @@ async function findByReference(reference) {
   return shapeBooking(row);
 }
 
-async function listBookingsForPhone(phone) {
+async function listBookingsForPhone(phone, { userId = null } = {}) {
   const shapes = phones.variants(phone);
-  if (!shapes.length) return [];
+  const where = [];
+  const params = [];
+  if (userId) {
+    where.push('user_id = ?');
+    params.push(userId);
+  }
+  if (shapes.length) {
+    where.push(`(user_id IS NULL AND phone IN (${shapes.map(() => '?').join(',')}))`);
+    params.push(...shapes);
+  }
+  if (!where.length) return [];
   const rows = await query(
-    `SELECT * FROM bookings WHERE phone IN (${shapes.map(() => '?').join(',')})
+    `SELECT * FROM bookings WHERE ${where.join(' OR ')}
      ORDER BY created_at DESC LIMIT 20`,
-    shapes,
+    params,
   );
   return rows.map(shapeBooking);
 }

@@ -113,16 +113,15 @@ const config = {
     similarLimit: 3,
   },
 
-  // Phone-first accounts (§7.1). OTP delivery is a seam: `console` writes the
-  // code to the server log for development, `whatsapp` and `sms` are the real
-  // providers (§11 — WhatsApp first, SMS as fallback). No provider is wired yet,
-  // so the code is only ever returned to the browser outside production.
+  // Customer email OTP and legacy phone OTP. Staff remain on their existing
+  // phone + TOTP path; email credentials are customer-only.
   auth: {
     provider: process.env.AUTH_OTP_PROVIDER || 'console',
     otpTtlMinutes: int(process.env.AUTH_OTP_TTL_MINUTES, 10),
     otpLength: int(process.env.AUTH_OTP_LENGTH, 6),
     maxVerifyAttempts: int(process.env.AUTH_MAX_VERIFY_ATTEMPTS, 5),
     maxRequestsPerHour: int(process.env.AUTH_MAX_REQUESTS_PER_HOUR, 5),
+    emailMaxRequestsPerHour: int(process.env.AUTH_EMAIL_MAX_REQUESTS_PER_HOUR, 5),
     sessionDays: int(process.env.AUTH_SESSION_DAYS, 30),
     // Peppers the OTP hash and the session token. Must be set in production.
     pepper: process.env.AUTH_PEPPER || '',
@@ -130,6 +129,29 @@ const config = {
     // driven without a phone. Forced off when NODE_ENV=production.
     get showCodeInResponse() {
       return !config.isProduction && bool(process.env.AUTH_SHOW_CODE, true);
+    },
+  },
+
+  // Generic SMTP for transactional authentication email. SMTP credentials stay
+  // in the hosting environment and are never stored in the application database.
+  mail: {
+    smtpUrl: process.env.SMTP_URL || '',
+    from: process.env.SMTP_FROM || '',
+    get configured() {
+      return Boolean(this.smtpUrl && this.from);
+    },
+  },
+
+  // Customer-only Google OpenID Connect. Redirect URI must exactly match the
+  // value registered in Google's OAuth client settings.
+  googleAuth: {
+    clientId: process.env.GOOGLE_CLIENT_ID || '',
+    clientSecret: process.env.GOOGLE_CLIENT_SECRET || '',
+    get redirectUri() {
+      return process.env.GOOGLE_REDIRECT_URI || `${config.siteUrl}/api/auth/google/callback`;
+    },
+    get configured() {
+      return Boolean(this.clientId && this.clientSecret && this.redirectUri);
     },
   },
 

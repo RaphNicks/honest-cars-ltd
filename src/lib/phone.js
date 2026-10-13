@@ -1,13 +1,14 @@
 'use strict';
 
 /**
- * Phone numbers — the account key (§7.1) and the join key between the public
- * forms and the ops records they create.
+ * Nigerian phone-number normalisation for legacy sign-in and contact records.
+ * It is not a universal account key: new customer-owned records are joined by
+ * user ID, and a contact phone never grants access to someone else's history.
  *
  * People type their number in whatever shape they like:
  *   08031234567 · 8031234567 · +2348031234567 · 234 803 123 4567
- * Everything is stored normalised as +234XXXXXXXXXX, and every lookup matches
- * the shapes that might already be in the table from an earlier write.
+ * Numbers are stored as +234XXXXXXXXXX; legacy lookups accept shapes that may
+ * already exist from an earlier write.
  */
 
 /** Nigerian mobile numbers are 10 digits after the country code: 070/080/081/090… */

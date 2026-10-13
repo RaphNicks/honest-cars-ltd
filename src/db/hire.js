@@ -149,6 +149,7 @@ function shapeBooking(row) {
   if (!row) return null;
   return {
     id: row.id,
+    userId: row.user_id || null,
     reference: row.reference,
     requestId: row.request_id,
     trackingId: row.tracking_id || null,
@@ -564,15 +565,25 @@ async function bookings({ status = null, vehicleId = null, from = null, to = nul
   return rows.map(shapeBooking);
 }
 
-/** What a client's own phone number can see (§7.1: hire bookings on /account). */
-async function bookingsForPhone(phone, { limit = 20 } = {}) {
+/** Account-owned hire bookings plus unowned legacy rows matched to the sign-in phone. */
+async function bookingsForPhone(phone, { limit = 20, userId = null } = {}) {
   const shapes = phones.variants(phone);
-  if (!shapes.length) return [];
+  const where = [];
+  const params = [];
+  if (userId) {
+    where.push('b.user_id = ?');
+    params.push(userId);
+  }
+  if (shapes.length) {
+    where.push(`(b.user_id IS NULL AND b.client_phone IN (${shapes.map(() => '?').join(',')}))`);
+    params.push(...shapes);
+  }
+  if (!where.length) return [];
   const rows = await query(
     `${BOOKING_SELECT}
-      WHERE b.client_phone IN (${shapes.map(() => '?').join(',')})
+      WHERE ${where.join(' OR ')}
       ORDER BY b.pickup_at DESC LIMIT ?`,
-    [...shapes, Math.min(50, Math.max(1, limit))],
+    [...params, Math.min(50, Math.max(1, limit))],
   );
   return rows.map(shapeBooking);
 }

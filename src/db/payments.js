@@ -92,6 +92,7 @@ function shapePayment(row) {
     provider: row.provider,
     providerRef: row.provider_ref,
     purpose: row.purpose,
+    userId: row.user_id || null,
     orderId: row.order_id,
     bookingId: row.booking_id,
     requestId: row.request_id,
@@ -135,6 +136,7 @@ async function createPayment({
   dealerPurchaseId = null, // an add-on (FR-18) — delivered when it is paid
   customerName = null,
   customerPhone = null,
+  userId = null,
   createdBy = null,
   checkoutUrl = null,
   providerRef = null,
@@ -148,10 +150,10 @@ async function createPayment({
   const reference = await nextReference('HC-PAY-', 'payments', 'reference');
   const result = await query(
     `INSERT INTO payments
-       (reference, provider, provider_ref, purpose, order_id, booking_id, request_id, subscription_id, hire_booking_id,
+       (reference, provider, provider_ref, purpose, user_id, order_id, booking_id, request_id, subscription_id, hire_booking_id,
         dealer_purchase_id, customer_name, customer_phone, amount_kobo, status, checkout_url, created_by)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?)`,
-    [reference, provider, providerRef, purpose, orderId, bookingId, requestId, subscriptionId, hireBookingId,
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?)`,
+    [reference, provider, providerRef, purpose, userId, orderId, bookingId, requestId, subscriptionId, hireBookingId,
       dealerPurchaseId, customerName, customerPhone ? phones.canonical(customerPhone) : null, amount, checkoutUrl, createdBy],
   );
   await recordPaymentEvent({
@@ -532,7 +534,7 @@ async function setOrderStatus(id, status, { actorId } = {}) {
  * payment record and marks it paid in one step, so there is exactly one way
  * money gets recorded.
  */
-async function recordManualPayment({ purpose, amountKobo, orderId = null, bookingId = null, requestId = null, customerName = null, customerPhone = null, provider = 'bank_transfer', note = null, actorId }) {
+async function recordManualPayment({ purpose, amountKobo, orderId = null, bookingId = null, requestId = null, userId = null, customerName = null, customerPhone = null, provider = 'bank_transfer', note = null, actorId }) {
   const created = await createPayment({
     provider,
     purpose,
@@ -540,6 +542,7 @@ async function recordManualPayment({ purpose, amountKobo, orderId = null, bookin
     orderId,
     bookingId,
     requestId,
+    userId,
     customerName,
     customerPhone,
     createdBy: actorId,
@@ -557,6 +560,7 @@ async function recordManualPayment({ purpose, amountKobo, orderId = null, bookin
 function shapeMilestone(row) {
   return {
     id: row.id,
+    userId: row.user_id || null,
     reference: row.reference,
     kind: row.kind,
     subject: row.subject,
@@ -577,17 +581,21 @@ function shapeMilestone(row) {
   };
 }
 
-async function createMilestone({ kind = 'protected_purchase', subject, listingId = null, bookingId = null, customerName, customerPhone, amountKobo, actorId = null }) {
+async function createMilestone({ kind = 'protected_purchase', subject, listingId = null, bookingId = null, customerName, customerPhone, amountKobo, userId = null, actorId = null }) {
   if (!MILESTONE_KINDS.includes(kind)) return { ok: false, error: 'Unknown milestone kind.' };
   const amount = Number(amountKobo);
   if (!Number.isFinite(amount) || amount <= 0) return { ok: false, error: 'A milestone needs a positive amount.' };
   if (!subject) return { ok: false, error: 'Say what the money is protecting.' };
+  if (!userId && bookingId) {
+    const bookingOwner = await queryOne('SELECT user_id FROM bookings WHERE id = ? LIMIT 1', [bookingId]);
+    userId = bookingOwner && bookingOwner.user_id ? bookingOwner.user_id : null;
+  }
   const reference = await nextReference('HC-ML-', 'payment_milestones', 'reference');
   const result = await query(
     `INSERT INTO payment_milestones
-       (reference, kind, subject, listing_id, booking_id, customer_name, customer_phone, amount_kobo, created_by)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    [reference, kind, String(subject).slice(0, 200), listingId, bookingId, String(customerName).slice(0, 120),
+       (reference, user_id, kind, subject, listing_id, booking_id, customer_name, customer_phone, amount_kobo, created_by)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [reference, userId, kind, String(subject).slice(0, 200), listingId, bookingId, String(customerName).slice(0, 120),
       phones.canonical(customerPhone), amount, actorId],
   );
   await recordAudit({ actorId, action: 'milestone.created', entity: 'milestone', entityId: result.insertId, detail: { reference, kind, amountKobo: amount } });
@@ -685,53 +693,78 @@ async function advanceMilestone(id, { to, note = null, actorId }) {
 }
 
 /**
- * A customer's own money, matched by phone. Same rule as the dashboard: the
- * phone number is the identity, and the shapes are normalised so 0803…,
- * +234803… and 234803… all find the same rows.
+ * A customer's own payments: newly linked rows match by account ID; only
+ * unowned legacy rows fall back to the signed-in account's verified phone.
+ * Normalisation keeps 0803…, +234803… and 234803… compatible for old data.
  */
-async function listForPhone(phone, { limit = 20 } = {}) {
+async function listForPhone(phone, { limit = 20, userId = null } = {}) {
   const shapes = phones.variants(phone);
-  if (!shapes.length) return [];
+  const where = [];
+  const params = [];
+  if (userId) {
+    where.push('p.user_id = ?');
+    params.push(userId);
+  }
+  if (shapes.length) {
+    where.push(`(p.user_id IS NULL AND p.customer_phone IN (${shapes.map(() => '?').join(',')}))`);
+    params.push(...shapes);
+  }
+  if (!where.length) return [];
   const rows = await query(
     `SELECT p.*, o.order_no, b.reference AS booking_reference, r.tracking_id
        FROM payments p
        LEFT JOIN orders o ON o.id = p.order_id
        LEFT JOIN bookings b ON b.id = p.booking_id
        LEFT JOIN service_requests r ON r.id = p.request_id
-      WHERE p.customer_phone IN (${shapes.map(() => '?').join(',')})
+      WHERE ${where.join(' OR ')}
       ORDER BY p.created_at DESC, p.id DESC
       LIMIT ?`,
-    [...shapes, Math.min(100, Math.max(1, Number(limit) || 20))],
+    [...params, Math.min(100, Math.max(1, Number(limit) || 20))],
   );
   return rows.map(shapePayment);
 }
 
-/** Escrow a customer is part of — they watch the same ladder the console does. */
-async function milestonesForPhone(phone) {
+/** Escrow a customer is part of — new rows use account id, legacy rows phone. */
+async function milestonesForPhone(phone, { userId = null } = {}) {
   const shapes = phones.variants(phone);
-  if (!shapes.length) return [];
+  const where = [];
+  const params = [];
+  if (userId) {
+    where.push('m.user_id = ?');
+    params.push(userId);
+  }
+  if (shapes.length) {
+    where.push(`(m.user_id IS NULL AND m.customer_phone IN (${shapes.map(() => '?').join(',')}))`);
+    params.push(...shapes);
+  }
+  if (!where.length) return [];
   const rows = await query(
     `SELECT m.*, l.seo_slug, b.reference AS booking_reference
        FROM payment_milestones m
        LEFT JOIN vehicle_listings l ON l.id = m.listing_id
        LEFT JOIN bookings b ON b.id = m.booking_id
-      WHERE m.customer_phone IN (${shapes.map(() => '?').join(',')})
+      WHERE ${where.join(' OR ')}
       ORDER BY FIELD(m.stage,'funds_received','inspection_passed','documents_verified','released','cancelled'), m.created_at DESC
       LIMIT 20`,
-    shapes,
+    params,
   );
   return rows.map(shapeMilestone);
 }
 
-/** Ownership check for a receipt page: does this reference belong to that phone? */
-async function receiptForPhone(reference, phone) {
-  const shapes = phones.variants(phone);
+/** Ownership check: linked records use account id; only legacy rows use sign-in phone. */
+async function receiptForCustomer(reference, userId, phone) {
   const payment = await paymentByReference(reference);
-  if (!payment || !shapes.length) return null;
-  const row = await queryOne('SELECT customer_phone FROM payments WHERE id = ? LIMIT 1', [payment.id]);
-  const stored = row && row.customer_phone ? phones.canonical(row.customer_phone) : null;
+  if (!payment) return null;
+  if (userId && Number(payment.userId) === Number(userId)) return receipt(reference);
+  if (payment.userId) return null;
+  const shapes = phones.variants(phone);
+  const stored = payment.customerPhone ? phones.canonical(payment.customerPhone) : null;
   if (!stored || !shapes.includes(stored)) return null;
   return receipt(reference);
+}
+
+async function receiptForPhone(reference, phone) {
+  return receiptForCustomer(reference, null, phone);
 }
 
 // ---------------------------------------------------------------------------
@@ -985,6 +1018,7 @@ module.exports = {
   listForPhone,
   milestonesForPhone,
   receiptForPhone,
+  receiptForCustomer,
   ledgerSummary,
   ledgerFor,
   addLedgerEntry,

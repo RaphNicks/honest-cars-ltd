@@ -83,7 +83,7 @@ async function nextOrderNo(conn) {
  * @param {object} input
  * @param {Array<{slug: string, qty: number, installRequested?: boolean}>} input.items
  */
-async function createOrder({ name, phone, items, deliveryArea, notes = null }) {
+async function createOrder({ name, phone, items, deliveryArea, notes = null, userId = null }) {
   const wanted = (Array.isArray(items) ? items : [])
     .map((item) => ({
       slug: String(item.slug || '').slice(0, 120),
@@ -122,10 +122,11 @@ async function createOrder({ name, phone, items, deliveryArea, notes = null }) {
     const orderNo = await nextOrderNo(conn);
 
     const [result] = await conn.query(
-      `INSERT INTO orders (order_no, name, phone, delivery_area, delivery_fee_kobo, subtotal_kobo, total_kobo, status, notes)
-       VALUES (?, ?, ?, ?, ?, ?, ?, 'pending_payment', ?)`,
+      `INSERT INTO orders (order_no, user_id, name, phone, delivery_area, delivery_fee_kobo, subtotal_kobo, total_kobo, status, notes)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending_payment', ?)`,
       [
         orderNo,
+        userId,
         String(name || '').slice(0, 120),
         phones.canonical(phone, { fallback: '' }),
         String(deliveryArea || 'Pickup at a PH meet-point').slice(0, 80),
@@ -147,9 +148,9 @@ async function createOrder({ name, phone, items, deliveryArea, notes = null }) {
       if (line.product.category === 'trackers') {
         for (let i = 0; i < line.qty; i += 1) {
           await conn.query(
-            `INSERT INTO subscriptions (order_id, product_id, customer_name, customer_phone, device_state, renewal_at)
-             VALUES (?, ?, ?, ?, 'ordered', DATE_ADD(UTC_TIMESTAMP(), INTERVAL 12 MONTH))`,
-            [result.insertId, line.product.id, String(name || '').slice(0, 120), phones.canonical(phone, { fallback: '' })],
+            `INSERT INTO subscriptions (order_id, user_id, product_id, customer_name, customer_phone, device_state, renewal_at)
+             VALUES (?, ?, ?, ?, ?, 'ordered', DATE_ADD(UTC_TIMESTAMP(), INTERVAL 12 MONTH))`,
+            [result.insertId, userId, line.product.id, String(name || '').slice(0, 120), phones.canonical(phone, { fallback: '' })],
           );
         }
       }
@@ -172,15 +173,25 @@ async function findByOrderNo(orderNo) {
   return shapeOrder(row, items.map(shapeOrderItem));
 }
 
-async function listForPhone(phone) {
+async function listForPhone(phone, { userId = null } = {}) {
   const shapes = phones.variants(phone);
-  if (!shapes.length) return [];
+  const where = [];
+  const params = [];
+  if (userId) {
+    where.push('o.user_id = ?');
+    params.push(userId);
+  }
+  if (shapes.length) {
+    where.push(`(o.user_id IS NULL AND o.phone IN (${shapes.map(() => '?').join(',')}))`);
+    params.push(...shapes);
+  }
+  if (!where.length) return [];
   const rows = await query(
     `SELECT o.*, (SELECT COUNT(*) FROM order_items i WHERE i.order_id = o.id) AS item_count
        FROM orders o
-      WHERE o.phone IN (${shapes.map(() => '?').join(',')})
+      WHERE ${where.join(' OR ')}
       ORDER BY o.created_at DESC LIMIT 20`,
-    shapes,
+    params,
   );
   return rows.map((row) => shapeOrder(row));
 }
@@ -205,17 +216,27 @@ async function subscriptionsForOrder(orderNo) {
 }
 
 /** Tracker subscriptions belonging to a phone number (§7.1 “My tracked vehicles”). */
-async function subscriptionsForPhone(phone) {
+async function subscriptionsForPhone(phone, { userId = null } = {}) {
   const shapes = phones.variants(phone);
-  if (!shapes.length) return [];
+  const where = [];
+  const params = [];
+  if (userId) {
+    where.push('s.user_id = ?');
+    params.push(userId);
+  }
+  if (shapes.length) {
+    where.push(`(s.user_id IS NULL AND o.user_id IS NULL AND s.customer_phone IN (${shapes.map(() => '?').join(',')}))`);
+    params.push(...shapes);
+  }
+  if (!where.length) return [];
   const rows = await query(
     `SELECT s.*, p.name AS product_name, o.order_no
        FROM subscriptions s
        JOIN products p ON p.id = s.product_id
        JOIN orders o ON o.id = s.order_id
-      WHERE s.customer_phone IN (${shapes.map(() => '?').join(',')})
+      WHERE ${where.join(' OR ')}
       ORDER BY s.id DESC LIMIT 20`,
-    shapes,
+    params,
   );
   return rows.map((row) => ({
     id: row.id,

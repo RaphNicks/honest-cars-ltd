@@ -237,6 +237,7 @@ CREATE TABLE IF NOT EXISTS `email_auth_codes` (
   id           INT UNSIGNED NOT NULL AUTO_INCREMENT,
   email        VARCHAR(160) NOT NULL,
   purpose      ENUM('sign_in','link') NOT NULL DEFAULT 'sign_in',
+  user_id      INT UNSIGNED NULL,                  -- link codes are bound to the signed-in account
   code_hash    CHAR(64)     NOT NULL,
   attempts     TINYINT UNSIGNED NOT NULL DEFAULT 0,
   max_attempts TINYINT UNSIGNED NOT NULL DEFAULT 5,
@@ -246,7 +247,9 @@ CREATE TABLE IF NOT EXISTS `email_auth_codes` (
   created_at   TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (id),
   KEY idx_email_auth_code (email, purpose, created_at),
-  KEY idx_email_auth_expiry (expires_at)
+  KEY idx_email_auth_code_user (user_id, email, purpose, created_at),
+  KEY idx_email_auth_expiry (expires_at),
+  CONSTRAINT fk_email_auth_code_user FOREIGN KEY (user_id) REFERENCES `users` (id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS `auth_codes` (
@@ -346,6 +349,7 @@ CREATE TABLE IF NOT EXISTS leads (
   type          ENUM('viewing','concierge','sell_swap','hire','service','parts','b2b','deal_alert','financing')
                                 NOT NULL,
   listing_id    INT UNSIGNED  NULL,
+  user_id       INT UNSIGNED  NULL,                          -- authenticated customer, when present
   name          VARCHAR(120)  NOT NULL,
   phone         VARCHAR(40)   NOT NULL,
   message       TEXT          NULL,
@@ -363,7 +367,9 @@ CREATE TABLE IF NOT EXISTS leads (
   KEY idx_leads_pipeline (status, created_at),
   KEY idx_leads_listing (listing_id),
   KEY idx_leads_assignee (assigned_to, status),
+  KEY idx_leads_user (user_id, created_at),
   CONSTRAINT fk_leads_listing FOREIGN KEY (listing_id) REFERENCES vehicle_listings (id) ON DELETE SET NULL,
+  CONSTRAINT fk_leads_user FOREIGN KEY (user_id) REFERENCES `users` (id) ON DELETE SET NULL,
   CONSTRAINT fk_lead_assignee FOREIGN KEY (assigned_to) REFERENCES `users` (id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
@@ -626,6 +632,7 @@ CREATE TABLE IF NOT EXISTS products (
 CREATE TABLE IF NOT EXISTS orders (
   id                INT UNSIGNED  NOT NULL AUTO_INCREMENT,
   order_no          VARCHAR(24)   NOT NULL,             -- HC-ORD-0001
+  user_id           INT UNSIGNED  NULL,                  -- authenticated customer, when present
   name              VARCHAR(120)  NOT NULL,
   phone             VARCHAR(40)   NOT NULL,
   delivery_area     VARCHAR(80)   NOT NULL,
@@ -639,7 +646,9 @@ CREATE TABLE IF NOT EXISTS orders (
   created_at        TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (id),
   UNIQUE KEY uq_order_no (order_no),
-  KEY idx_order_status (status, created_at)
+  KEY idx_order_status (status, created_at),
+  KEY idx_orders_user (user_id, created_at),
+  CONSTRAINT fk_orders_user FOREIGN KEY (user_id) REFERENCES `users` (id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS order_items (
@@ -679,6 +688,7 @@ CREATE TABLE IF NOT EXISTS subscriptions (
   id             INT UNSIGNED NOT NULL AUTO_INCREMENT,
   kind           ENUM('tracker','dealer_retainer','intelligence') NOT NULL DEFAULT 'tracker',
   order_id       INT UNSIGNED NULL,
+  user_id        INT UNSIGNED NULL,                      -- authenticated customer, when present
   dealer_id      INT UNSIGNED NULL,
   product_id     INT UNSIGNED NULL,
   customer_name  VARCHAR(120) NULL,
@@ -696,7 +706,9 @@ CREATE TABLE IF NOT EXISTS subscriptions (
   PRIMARY KEY (id),
   KEY idx_subscription_renewal (device_state, renewal_at),
   KEY idx_subscription_kind (kind, device_state, renewal_at),
+  KEY idx_subscriptions_user (user_id, created_at),
   CONSTRAINT fk_subscription_order FOREIGN KEY (order_id) REFERENCES orders (id) ON DELETE SET NULL,
+  CONSTRAINT fk_subscriptions_user FOREIGN KEY (user_id) REFERENCES `users` (id) ON DELETE SET NULL,
   CONSTRAINT fk_subscription_product FOREIGN KEY (product_id) REFERENCES products (id) ON DELETE SET NULL,
   CONSTRAINT fk_subscription_dealer FOREIGN KEY (dealer_id) REFERENCES dealers (id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
@@ -727,6 +739,7 @@ CREATE TABLE IF NOT EXISTS subscription_reminders (
 CREATE TABLE IF NOT EXISTS service_requests (
   id            INT UNSIGNED  NOT NULL AUTO_INCREMENT,
   tracking_id   VARCHAR(16)   NOT NULL,                 -- HC-2481
+  user_id       INT UNSIGNED  NULL,                      -- authenticated customer, when present
   type          ENUM('concierge','sell','swap','documents','research','parts','consultation','tracking','hire')
                               NOT NULL,
   status        ENUM('new','searching','options_ready','viewings','closed','lost')
@@ -748,7 +761,9 @@ CREATE TABLE IF NOT EXISTS service_requests (
   UNIQUE KEY uq_request_tracking (tracking_id),
   KEY idx_request_pipeline (type, status, created_at),
   KEY idx_request_assignee (assigned_to, status),
+  KEY idx_service_requests_user (user_id, created_at),
   CONSTRAINT fk_request_listing FOREIGN KEY (listing_id) REFERENCES vehicle_listings (id) ON DELETE SET NULL,
+  CONSTRAINT fk_service_requests_user FOREIGN KEY (user_id) REFERENCES `users` (id) ON DELETE SET NULL,
   CONSTRAINT fk_request_assignee FOREIGN KEY (assigned_to) REFERENCES `users` (id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
@@ -790,6 +805,7 @@ CREATE TABLE IF NOT EXISTS hire_bookings (
   id             INT UNSIGNED NOT NULL AUTO_INCREMENT,
   reference      VARCHAR(24)  NOT NULL,
   request_id     INT UNSIGNED NULL,
+  user_id        INT UNSIGNED NULL,                      -- authenticated customer, when present
   vehicle_id     INT UNSIGNED NULL,
   class_slug     VARCHAR(40)  NOT NULL,
   client_name    VARCHAR(120) NOT NULL,
@@ -831,7 +847,9 @@ CREATE TABLE IF NOT EXISTS hire_bookings (
   KEY idx_hire_booking_status (status, pickup_at),
   KEY idx_hire_booking_phone (client_phone, created_at),
   KEY idx_hire_booking_vehicle (vehicle_id, pickup_at),
+  KEY idx_hire_bookings_user (user_id, created_at),
   CONSTRAINT fk_hire_booking_request FOREIGN KEY (request_id) REFERENCES service_requests (id) ON DELETE SET NULL,
+  CONSTRAINT fk_hire_bookings_user FOREIGN KEY (user_id) REFERENCES `users` (id) ON DELETE SET NULL,
   CONSTRAINT fk_hire_booking_vehicle FOREIGN KEY (vehicle_id) REFERENCES hire_vehicles (id) ON DELETE SET NULL,
   CONSTRAINT fk_hire_booking_actor FOREIGN KEY (created_by) REFERENCES `users` (id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
@@ -857,6 +875,7 @@ CREATE TABLE IF NOT EXISTS bookings (
   status         ENUM('requested','confirmed','dispatched','completed','cancelled')
                                 NOT NULL DEFAULT 'requested',
   request_id     INT UNSIGNED  NULL,
+  user_id        INT UNSIGNED  NULL,                     -- authenticated customer, when present
   inspector_id   INT UNSIGNED  NULL,                    -- assigned by dispatch (§7.3)
   dispatched_at  DATETIME      NULL,
   completed_at   DATETIME      NULL,
@@ -868,7 +887,9 @@ CREATE TABLE IF NOT EXISTS bookings (
   UNIQUE KEY uq_booking_reference (reference),
   KEY idx_booking_dispatch (status, slot_at),
   KEY idx_booking_inspector (inspector_id, slot_at),
+  KEY idx_bookings_user (user_id, created_at),
   CONSTRAINT fk_booking_request FOREIGN KEY (request_id) REFERENCES service_requests (id) ON DELETE SET NULL,
+  CONSTRAINT fk_bookings_user FOREIGN KEY (user_id) REFERENCES `users` (id) ON DELETE SET NULL,
   CONSTRAINT fk_booking_inspector FOREIGN KEY (inspector_id) REFERENCES `users` (id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
@@ -941,6 +962,7 @@ CREATE TABLE IF NOT EXISTS `payments` (
   provider_ref   VARCHAR(80)  NULL,                  -- PSP transaction reference
   purpose        ENUM('order','booking','retainer','subscription','milestone','other','hire','addon')
                               NOT NULL DEFAULT 'other',
+  user_id        INT UNSIGNED NULL,                     -- authenticated customer, when present
   order_id       INT UNSIGNED NULL,
   booking_id     INT UNSIGNED NULL,
   request_id     INT UNSIGNED NULL,
@@ -965,6 +987,7 @@ CREATE TABLE IF NOT EXISTS `payments` (
   PRIMARY KEY (id),
   UNIQUE KEY uq_payment_reference (reference),
   KEY idx_payment_status (status, created_at),
+  KEY idx_payments_user (user_id, created_at),
   KEY idx_payment_order (order_id),
   KEY idx_payment_booking (booking_id),
   KEY idx_payment_phone (customer_phone, created_at),
@@ -977,6 +1000,7 @@ CREATE TABLE IF NOT EXISTS `payments` (
   CONSTRAINT fk_payment_subscription FOREIGN KEY (subscription_id) REFERENCES subscriptions (id) ON DELETE SET NULL,
   CONSTRAINT fk_payment_dealer_purchase FOREIGN KEY (dealer_purchase_id) REFERENCES dealer_purchases (id) ON DELETE SET NULL,
   CONSTRAINT fk_payment_hire FOREIGN KEY (hire_booking_id) REFERENCES hire_bookings (id) ON DELETE SET NULL,
+  CONSTRAINT fk_payments_user FOREIGN KEY (user_id) REFERENCES `users` (id) ON DELETE SET NULL,
   CONSTRAINT fk_payment_actor   FOREIGN KEY (created_by) REFERENCES `users` (id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
@@ -1036,6 +1060,7 @@ CREATE TABLE IF NOT EXISTS `payment_events` (
 CREATE TABLE IF NOT EXISTS `payment_milestones` (
   id            INT UNSIGNED NOT NULL AUTO_INCREMENT,
   reference     VARCHAR(32)  NOT NULL,              -- HC-ML-0001
+  user_id       INT UNSIGNED NULL,                   -- authenticated customer, when present
   kind          ENUM('protected_purchase','parts_escrow') NOT NULL DEFAULT 'protected_purchase',
   subject       VARCHAR(200) NOT NULL,              -- what the money is protecting
   listing_id    INT UNSIGNED NULL,
@@ -1054,7 +1079,9 @@ CREATE TABLE IF NOT EXISTS `payment_milestones` (
   PRIMARY KEY (id),
   UNIQUE KEY uq_milestone_reference (reference),
   KEY idx_milestone_stage (stage, created_at),
+  KEY idx_payment_milestones_user (user_id, created_at),
   CONSTRAINT fk_milestone_listing FOREIGN KEY (listing_id) REFERENCES vehicle_listings (id) ON DELETE SET NULL,
+  CONSTRAINT fk_payment_milestones_user FOREIGN KEY (user_id) REFERENCES `users` (id) ON DELETE SET NULL,
   CONSTRAINT fk_milestone_booking FOREIGN KEY (booking_id) REFERENCES bookings (id) ON DELETE SET NULL,
   CONSTRAINT fk_milestone_releaser FOREIGN KEY (released_by) REFERENCES `users` (id) ON DELETE SET NULL,
   CONSTRAINT fk_milestone_actor FOREIGN KEY (created_by) REFERENCES `users` (id) ON DELETE SET NULL
@@ -1350,6 +1377,7 @@ CREATE TABLE IF NOT EXISTS `finance_partners` (
 CREATE TABLE IF NOT EXISTS `financing_leads` (
   id           INT UNSIGNED NOT NULL AUTO_INCREMENT,
   reference    VARCHAR(20)  NOT NULL,
+  user_id      INT UNSIGNED NULL,                      -- authenticated customer, when present
   name         VARCHAR(120) NOT NULL,
   phone        VARCHAR(40)  NOT NULL,
   email        VARCHAR(160) NULL,
@@ -1377,10 +1405,12 @@ CREATE TABLE IF NOT EXISTS `financing_leads` (
   KEY idx_financing_status (status, created_at),
   KEY idx_financing_phone (phone, created_at),
   KEY idx_financing_partner (partner_id, status),
+  KEY idx_financing_leads_user (user_id, created_at),
   CONSTRAINT fk_financing_lead    FOREIGN KEY (lead_id)    REFERENCES `leads` (id) ON DELETE SET NULL,
   CONSTRAINT fk_financing_listing FOREIGN KEY (listing_id) REFERENCES vehicle_listings (id) ON DELETE SET NULL,
   CONSTRAINT fk_financing_request FOREIGN KEY (request_id) REFERENCES service_requests (id) ON DELETE SET NULL,
   CONSTRAINT fk_financing_partner FOREIGN KEY (partner_id) REFERENCES finance_partners (id) ON DELETE SET NULL,
+  CONSTRAINT fk_financing_leads_user FOREIGN KEY (user_id) REFERENCES `users` (id) ON DELETE SET NULL,
   CONSTRAINT fk_financing_actor   FOREIGN KEY (acted_by)   REFERENCES `users` (id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 

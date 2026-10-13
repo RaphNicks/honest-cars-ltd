@@ -9,14 +9,15 @@ The Honest Cars LTD storefront, ported from the approved specification
 **vanilla HTML, CSS and JavaScript on the front end, Node.js + Express on the
 server, MySQL for data.** No React, no Tailwind, no frontend build step.
 
-The **whole public storefront is ported and running** — the design system, the
-homepage, `/cars` with the curated facet pages, the VDP and the sold-archive
-rule, the nine service pages, the concierge and sell/swap funnels, the blog, the
-shop, the trust and legal pages — plus **phone-first customer accounts (§7.1)**:
-OTP sign-in, the `/account` dashboard, saved cars and saved searches. The
-remaining PRD work is the authenticated back office (§7.3 admin console), the PSP
-integration and the notification layer; see *What is built, and what comes
-next*.
+The **public storefront is ported and running** — the design system, homepage,
+`/cars` with curated facet pages, vehicle pages, services, concierge and sell/swap
+funnels, blog, shop, trust and legal pages — plus **customer accounts** with email
+OTP or Google sign-in, optional contact phone, `/account` history, saved cars and
+saved searches. Existing phone-based customer accounts can verify and link an
+email after signing in; staff remain on phone OTP + TOTP. SMTP and Google OAuth
+credentials are configured in hosting settings, not committed to this repository.
+The remaining integration work is the payment provider and other notification
+channels; see *What is built, and what comes next*.
 
 ---
 
@@ -133,28 +134,35 @@ switches, **your details**, and **referrals** (personal link, sign-ups and
 orders credited to it). Data export and account deletion sit at the bottom.
 
 ```
-POST /api/auth/otp      { phone }                → { ok, maskedPhone, channel, delivered, devCode? }
+POST /api/auth/email/otp { email }               → send a sign-in code (SMTP; devCode in development)
+POST /api/auth/email/verify { email, code, name } → verify identity, create/sign in, set hc_session
+GET  /api/auth/google                            → Google sign-in (OAuth credentials required)
+POST /api/auth/otp      { phone }                → legacy customer and staff phone OTP
 POST /api/auth/verify   { phone, code, next }    → sets hc_session, returns the user + redirect
 POST /api/auth/logout                            → revokes the session
-GET  /account                                    -> dashboard (302 to /login?next=… when signed out)
-GET  /account/export                             → every row keyed to the number, as JSON
+GET  /account                                    → account dashboard (302 to /login when signed out)
+GET  /account/export                             → account-owned data, as JSON
 POST /api/account/saved-cars                     → add / remove, idempotent
 POST /api/account/saved-searches                 → add / toggle price-drop & new-match / delete
-POST /api/account/profile                        → name, email, marketing consent
+POST /api/account/email/otp { email }             → start email verification for a signed-in legacy account
+POST /api/account/email/verify { email, code }    → link the verified address to that account
+POST /api/account/profile                        → name, optional contact phone, marketing consent
 POST /api/account/delete                         → anonymise ops records, delete the person
 ```
 
 How it is put together:
 
-* **One number, one account.** `src/lib/phone.js` normalises `0803…`, `803…`
-  and `+234 803…` to `+234XXXXXXXXXX`. Every public form writes the normalised
-  number, and every account lookup matches the shapes that might already be in
-  the table, so a concierge request made before signing in still appears on the
-  dashboard afterwards.
-* **Codes are never stored or logged in clear.** HMAC-SHA256 with a pepper
-  (`AUTH_PEPPER`), compared with `timingSafeEqual`, single-use, 10 minutes,
-  five attempts, five per number per hour. The masked number is all that
-  reaches a log line or an analytics event.
+* **Account ownership is by customer ID.** New email and Google accounts do not
+  need a phone number to sign in. When a contact-required form collects one, it
+  stores that number separately from the sign-in identity and links the record to
+  the signed-in customer ID. `src/lib/phone.js` still normalises legacy phone
+  records; fallback matching is limited to unowned legacy rows and the account's
+  verified sign-in phone, never a number typed into a new form.
+* **OTP codes are HMAC-hashed in storage.** HMAC-SHA256 with `AUTH_PEPPER`,
+  compared with `timingSafeEqual`, single-use, short-lived and attempt-limited.
+  The development console transport prints a code for local testing; production
+  email codes are delivered by SMTP and are never returned in API responses.
+  Analytics record the channel and purpose, not the code or full email.
 * **Sessions** are 32 random bytes in an `HttpOnly; SameSite=Lax; Secure`-in-
   production `hc_session` cookie; the database stores only the SHA-256 hash,
   with expiry and revocation. Signed-in HTML is always `Cache-Control: no-store`
@@ -162,10 +170,13 @@ How it is put together:
   view.
 * **CSRF** is SameSite=Lax plus a same-origin check (`Origin` /
   `Sec-Fetch-Site`) on every state-changing account endpoint (§12.2).
-* **OTP delivery is a seam.** `AUTH_OTP_PROVIDER=console|whatsapp|sms`. With
-  `console` (the development default) the code is logged masked and — outside
-  production only — returned as `devCode` so the flow can be driven without a
-  phone. Wiring the real provider is one function in `src/services/auth.js`.
+* **Customer authentication has separate channels.** Email OTP uses the
+  `SMTP_URL` / `SMTP_FROM` mailer in `src/services/email.js`; the code is available
+  to the local development flow only. Google sign-in uses server-side OAuth with
+  state, nonce and PKCE checks. Set `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`,
+  and `GOOGLE_REDIRECT_URI` in the hosting environment. Existing staff and legacy
+  customer phone OTP remains on `AUTH_OTP_PROVIDER=console|whatsapp|sms`; staff
+  still complete TOTP where their role requires it.
 * **Deleting an account is honest.** The person, sessions, saved cars and saved
   searches go; requests, bookings and orders stay for finance and warranty with
   the name and number replaced by `Deleted account` / `DELETED-<id>`.
@@ -246,8 +257,10 @@ them from in review to published without an exception.
 
 ### Signing in
 
-Staff use the same phone + code flow as customers (`/login`); there are no
-passwords in this build. The seed creates three accounts:
+Staff keep the existing phone + code flow (`/login`), followed by TOTP for
+roles that require it; customer email/Google sign-in does not change staff
+authentication. There are no passwords in this build. The seed creates these
+staff accounts:
 
 | Number | Role | Opens |
 |---|---|---|
@@ -300,8 +313,9 @@ Three seams, all honest about their limits:
 * **The inspection report (FR-07)** is one object (`src/services/report.js`)
   rendered three ways: the console page, a print stylesheet and a real A4 PDF
   with Inter embedded (the only way the naira sign reaches the page). The
-  customer whose phone matches the booking can open the same report — page and
-  PDF — from their dashboard.
+  customer who owns the booking can open the same report — page and PDF — from
+  their dashboard. Legacy unowned bookings are matched only to the signed-in
+  phone account, never to a newly typed contact number.
 
 ### What is deliberately not here yet
 
@@ -327,7 +341,7 @@ lists them as the remaining backlog and `scripts/check-links.js` keeps them hone
 | `npm run images:check` | Fail if any photo still needs preparing (CI gate) |
 | `npm run lint:type` | Six-step type-scale audit (fails the build on a violation) |
 | `npm run lint:js` | ES-module parse check + every event name against the §15.1 plan |
-| `npm test` | 164 tests: routes, sold-archive windows, facet rules, SEO schemas, filter safety, form validation, concierge/SLA rules, shop commerce, OTP auth, referrals, the account dashboard, the console (§7.3 modules end-to-end against the real database), and the content workflow (house-rule gate, revisions, restore, revalidation) |
+| `npm test` | 579 tests: routes, sold-archive windows, facet rules, SEO schemas, filter safety, form validation, concierge/SLA rules, shop commerce, OTP and email identity, referrals, customer ownership, the account dashboard, console modules end-to-end against MySQL, and the content workflow |
 | `npm run check` | lint + test |
 | `npm run artifacts` | Build the static pages and re-run the type audit |
 
@@ -357,20 +371,20 @@ Three checks run against a live server:
 | Content | `/blog`, `/blog/{slug}`, `/blog/rss.xml`, `/guide` |
 | Shop | `/shop`, `/shop/{slug}`, `/cart`, `/checkout`, `/order/{orderNo}` (guest checkout, tracker SKUs create a subscription row) |
 | Trust & company | `/verification`, `/how-it-works`, `/about`, `/faq`, `/contact`, `/partner` |
-| Accounts (§7.1) | `/login` (OTP), `/account` (dashboard), `/account/export`, `/api/auth/*`, `/api/account/*` |
+| Accounts (§7.1) | `/login` (customer email OTP / Google; legacy and staff phone OTP), `/account` (dashboard), `/account/export`, `/api/auth/*`, `/api/account/*` |
 | Console (§7.3/§7.4) | `/admin` (KPIs + daily summary), `/admin/listings`, `/admin/leads`, `/admin/concierge`, `/admin/bookings`, `/admin/jobs`, `/admin/orders`, `/admin/payments`, `/admin/milestones`, `/admin/staff`, `/admin/audit` |
 | CMS (§7.3/§6.9) | `/admin/cms` (workflow board), `/admin/cms/posts/{id}`, `/admin/cms/pages`, `/admin/cms/faqs`, `/admin/cms/testimonials`, `/admin/cms/modules` |
 | Legal | `/terms`, `/privacy`, `/refunds`, `/disclaimer` (placeholder wording, flagged in the DB) |
 | Machine | `/sitemap.xml`, `/robots.txt`, `/api/listings`, `/api/posts`, `/api/leads`, `/api/events`, `/api/orders`, `/api/bookings`, `/api/service-requests`, `/api/contact`, `/api/og/listing/{slug}.png`, `/api/health` |
 
 **Still to come** (§7.2–§7.4 and the integration seams): the dealer portal
-interior, market-intel reports, saved searches with price-drop alerts (FR-25),
-the concierge retainer (FR-05), live OTP-SMS/email delivery, Turnstile and GA4.
-The public site already writes every record these screens read — `service_requests`, `bookings`, `orders`,
-`subscriptions`, `leads`, `analytics_events` — so what remains is UI, policy and
-provider wiring. Until a route is ported it returns a 404 that says so, shows
-the slice map and links back into live stock — `src/services/slice.js` holds
-that list, so "not built yet" never looks like a broken link.
+interior, market-intel reports, Turnstile and GA4. Customer email OTP and Google
+OAuth are implemented, but require SMTP and Google OAuth credentials in the
+hosting environment; phone SMS/WhatsApp providers and payment merchant keys also
+remain external configuration. The public site already writes the records these
+screens read — `service_requests`, `bookings`, `orders`, `subscriptions`, `leads`,
+`financing_leads` and `analytics_events` — so remaining work is UI, policy and
+provider configuration.
 
 ---
 
@@ -436,14 +450,15 @@ assets/fonts/       Inter variable TTF, used only to render OG cards
 3. **Prices, phone number and legal copy are placeholders.** The business phone
    is the business number set in `.env` (`+2349135626182`), and the CAC line is a stub — send me the real values
    (§19 open questions) and I will update `.env` and the copy.
-4. **The integrations are seams, not services.** Checkout writes a real
+4. **External credentials remain a deployment step.** Checkout writes a real
    `payments` row with a `HC-PAY-` reference; the Paystack and Flutterwave
-   adapters verify their webhooks properly, but **no merchant keys exist yet**
-   (a §18 launch prerequisite), so hosted checkout refuses honestly and the site
-   runs on bank transfer and cash. The same is true of WhatsApp, SMS and email:
-   `AUTH_OTP_PROVIDER` selects the delivery channel, the `console` provider is
-   the development default, and an unconfigured channel is recorded `skipped`
-   rather than dropped. Every record the real services will read already exists.
+   adapters verify webhooks, but merchant keys are not in this repository, so
+   checkout uses the configured bank-transfer/cash path until keys are added.
+   Customer email OTP is wired to generic SMTP (`SMTP_URL`, `SMTP_FROM`) and
+   Google sign-in to OAuth environment settings; set production credentials in
+   hosting, never in source control. WhatsApp and SMS delivery remain provider
+   seams. Unconfigured notification channels are recorded as `skipped`, not
+   reported as sent.
 5. **Referral rewards are the honest blank.** The referral *link* and the counts
    behind it are real; the reward amount and payout are a business decision, so
    the page states the counts and leaves the promise to the ops desk. *(Inspection

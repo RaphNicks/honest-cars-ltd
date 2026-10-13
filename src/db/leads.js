@@ -17,11 +17,12 @@ const LEAD_TYPES = ['viewing', 'concierge', 'sell_swap', 'hire', 'service', 'par
 async function createLead(lead) {
   const type = LEAD_TYPES.includes(lead.type) ? lead.type : 'viewing';
   const result = await query(
-    `INSERT INTO leads (type, listing_id, name, phone, message, preferred_day, source_path, utm)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+    `INSERT INTO leads (type, listing_id, user_id, name, phone, message, preferred_day, source_path, utm)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       type,
       lead.listingId || null,
+      lead.userId || null,
       String(lead.name || '').slice(0, 120),
       phones.canonical(lead.phone, { fallback: '' }),
       lead.message ? String(lead.message).slice(0, 2000) : null,

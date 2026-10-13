@@ -49,6 +49,14 @@ function hashCode(phone, code) {
   return crypto.createHmac('sha256', pepper()).update(`${phone}:${code}`).digest('hex');
 }
 
+function hashEmailCode(email, purpose, code) {
+  return crypto.createHmac('sha256', pepper()).update(`email:${purpose}:${email}:${code}`).digest('hex');
+}
+
+function signAuthState(value) {
+  return crypto.createHmac('sha256', pepper()).update(String(value)).digest('base64url');
+}
+
 function generateCode() {
   const length = Math.max(4, Math.min(8, config.auth.otpLength));
   let code = '';
@@ -512,6 +520,8 @@ module.exports = {
   normalisePhone,
   maskPhone,
   hashCode,
+  hashEmailCode,
+  signAuthState,
   hashToken,
   generateCode,
   newSessionToken,

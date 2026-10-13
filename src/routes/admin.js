@@ -925,8 +925,8 @@ router.post('/payments/manual', auth.requireStaff('payments.approve'), auth.same
 
     const orderNo = validate.text(req.body.order_no, 40) || null;
     const bookingRef = validate.text(req.body.booking_reference, 40) || null;
-    const order = orderNo ? await db.queryOne('SELECT id, order_no, name, phone, total_kobo FROM orders WHERE order_no = ? LIMIT 1', [orderNo]) : null;
-    const booking = bookingRef ? await db.queryOne('SELECT id, reference, name, phone FROM bookings WHERE reference = ? LIMIT 1', [bookingRef]) : null;
+    const order = orderNo ? await db.queryOne('SELECT id, order_no, user_id, name, phone, total_kobo FROM orders WHERE order_no = ? LIMIT 1', [orderNo]) : null;
+    const booking = bookingRef ? await db.queryOne('SELECT id, reference, user_id, name, phone FROM bookings WHERE reference = ? LIMIT 1', [bookingRef]) : null;
     if (orderNo && !order) return done(res, PATHS.payments, `There is no order ${orderNo}.`, { error: true });
     if (bookingRef && !booking) return done(res, PATHS.payments, `There is no booking ${bookingRef}.`, { error: true });
 
@@ -936,6 +936,7 @@ router.post('/payments/manual', auth.requireStaff('payments.approve'), auth.same
       provider,
       orderId: order ? order.id : null,
       bookingId: booking ? booking.id : null,
+      userId: booking ? booking.user_id : order ? order.user_id : null,
       customerName: validate.name(req.body.customer_name) || (order ? order.name : booking ? booking.name : null),
       customerPhone: validate.text(req.body.customer_phone, 20) || (order ? order.phone : booking ? booking.phone : null),
       note: validate.text(req.body.note, 160) || null,
@@ -970,8 +971,8 @@ router.post('/payments/request', auth.requireStaff('payments.approve'), auth.sam
     if (!amountKobo) return done(res, PATHS.payments, 'Enter the amount to request, e.g. ₦45,000.', { error: true });
     const bookingRef = validate.text(req.body.booking_reference, 40) || null;
     const orderNo = validate.text(req.body.order_no, 40) || null;
-    const booking = bookingRef ? await db.queryOne('SELECT id, name, phone FROM bookings WHERE reference = ? LIMIT 1', [bookingRef]) : null;
-    const order = orderNo ? await db.queryOne('SELECT id, name, phone FROM orders WHERE order_no = ? LIMIT 1', [orderNo]) : null;
+    const booking = bookingRef ? await db.queryOne('SELECT id, user_id, name, phone FROM bookings WHERE reference = ? LIMIT 1', [bookingRef]) : null;
+    const order = orderNo ? await db.queryOne('SELECT id, user_id, name, phone FROM orders WHERE order_no = ? LIMIT 1', [orderNo]) : null;
     const name = validate.name(req.body.customer_name) || (booking ? booking.name : order ? order.name : null);
     const phone = validate.text(req.body.customer_phone, 20) || (booking ? booking.phone : order ? order.phone : null);
     if (!name || !phone) return done(res, PATHS.payments, 'A payment request needs a customer name and phone.', { error: true });
@@ -982,6 +983,7 @@ router.post('/payments/request', auth.requireStaff('payments.approve'), auth.sam
       amountKobo,
       bookingId: booking ? booking.id : null,
       orderId: order ? order.id : null,
+      userId: booking ? booking.user_id : order ? order.user_id : null,
       customerName: name,
       customerPhone: phone,
       actorId: req.user.id,

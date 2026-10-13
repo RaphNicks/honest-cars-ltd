@@ -3,7 +3,7 @@
     Requests · Hire bookings · Bookings · Orders + tracker subscriptions ·
     Documents (receipts + inspection reports) · Escrow · Saved cars · Saved searches (price-drop and
     new-match switches) · Your details · Referrals
-  Every card reads a record the public site already wrote, matched by phone.
+  Records are matched to the signed-in account; legacy phone history uses only the original sign-in phone.
   Locals: user, requests, hireRequests, hires, bookings, orders, subscriptions,
           documents, savedCars, savedSearches, referral, financing, counts, trail
 %>
@@ -15,8 +15,14 @@
         <p class="eyebrow">Your account</p>
         <h1><%= user.name ? user.shortName + '’s cars and requests' : 'Your cars and requests' %></h1>
         <p class="lead mb-0">
-          Signed in as <strong class="tabular"><%= user.maskedPhone %></strong>. Everything below is keyed to that
-          number, and to nothing else.
+          <% if (user.emailVerified && user.email) { %>
+            Signed in with <strong><%= user.email %></strong>.
+          <% } else if (user.phone) { %>
+            Signed in with phone <strong class="tabular"><%= user.maskedPhone %></strong>.
+          <% } else { %>
+            Signed in to your customer account.
+          <% } %>
+          Contact details are saved separately and are only needed when a request requires them.
         </p>
       </div>
       <div class="btn-row btn-row--tight">
@@ -27,6 +33,9 @@
         <button class="btn btn--ghost btn--sm" type="button" data-sign-out>Sign out</button>
       </div>
     </div>
+    <% if (accountAuthMessage) { %>
+      <p class="auth-message auth-message--banner mt-2" data-state="error"><%= accountAuthMessage %></p>
+    <% } %>
 
     <div class="dash-counts">
       <% [['Requests', counts.requests], ['Hire', counts.hireRequests + counts.hires], ['Bookings', counts.bookings],
@@ -465,30 +474,80 @@
       <div class="dash-card" id="profile">
         <div class="dash-card__head">
           <h2 class="mb-0">Your details</h2>
-          <span class="note-inline">Keyed to <span class="tabular"><%= user.maskedPhone %></span></span>
+          <% if (user.emailVerified) { %>
+            <span class="status-pill status-pill--confirmed">Email verified</span>
+          <% } else { %>
+            <span class="note-inline">No verified email yet</span>
+          <% } %>
         </div>
 
-        <form class="stack" data-profile-form>
+        <form class="stack" data-profile-form action="/api/account/profile" method="post">
           <div class="field">
             <label class="field__label" for="profile-name">Name</label>
             <input class="input" id="profile-name" name="name" type="text" autocomplete="name"
                    value="<%= user.name || '' %>" placeholder="Ada Obi" required>
           </div>
           <div class="field">
-            <label class="field__label" for="profile-email">Email <span class="field__optional">optional</span></label>
-            <input class="input" id="profile-email" name="email" type="email" autocomplete="email"
-                   value="<%= user.email || '' %>" placeholder="you@example.com">
-            <p class="field__hint">Used for receipts and documents. We never sell it.</p>
+            <label class="field__label" for="profile-contact-phone">Contact phone <span class="field__optional">optional</span></label>
+            <input class="input" id="profile-contact-phone" name="contactPhone" type="tel" inputmode="tel" autocomplete="tel"
+                   value="<%= user.contactPhone || '' %>" placeholder="0803 123 4567">
+            <p class="field__hint">This is separate from your sign-in method. You can add it now or when you submit a request that needs a phone contact.</p>
           </div>
           <label class="checkbox-row">
             <input type="checkbox" name="marketingOptIn" <%= user.marketingOptIn ? 'checked' : '' %>>
-            <span>Send me deal alerts and new-stock notes on this number or email.</span>
+            <span>Send me deal alerts and new-stock notes using my contact details.</span>
           </label>
           <div class="btn-row">
             <button class="btn btn--primary" type="submit">Save details</button>
             <span class="auth-message" data-profile-message role="status" aria-live="polite"></span>
           </div>
         </form>
+
+        <div class="account-email-link mt-3">
+          <h3 class="mb-1">Email sign-in</h3>
+          <% if (user.emailVerified && user.email) { %>
+            <p class="note-inline">Verified email: <strong><%= user.email %></strong></p>
+          <% } else if (user.email) { %>
+            <p class="note-inline">The email saved on this older profile is not verified and cannot be used to sign in until you confirm it here.</p>
+          <% } else { %>
+            <p class="note-inline">Verify an email to sign in with one-time codes. Your phone number is not needed for email sign-in.</p>
+          <% } %>
+          <form class="stack" data-email-link-form action="/api/account/email/otp" method="post">
+            <div class="field">
+              <label class="field__label" for="profile-link-email">Email address</label>
+              <input class="input" id="profile-link-email" name="email" type="email" autocomplete="email" maxlength="160"
+                     value="<%= user.email || '' %>" placeholder="you@example.com" required>
+            </div>
+            <div class="btn-row">
+              <button class="btn btn--secondary" type="submit">Send verification code</button>
+              <span class="auth-message" data-email-link-message role="status" aria-live="polite"></span>
+            </div>
+          </form>
+          <form class="stack hidden" data-email-link-code-form action="/api/account/email/verify" method="post" hidden>
+            <p class="note-inline">Enter the code sent to <strong data-email-link-address>your email</strong>. It expires in <%= otp.ttlMinutes %> minutes.</p>
+            <input type="hidden" name="email">
+            <div class="field">
+              <label class="field__label" for="profile-link-code">Verification code</label>
+              <input class="input input--code tabular" id="profile-link-code" name="code" type="text" inputmode="numeric" autocomplete="one-time-code" maxlength="<%= otp.length %>" placeholder="<%= '0'.repeat(otp.length) %>" required>
+            </div>
+            <div class="btn-row">
+              <button class="btn btn--primary" type="submit">Verify and link email</button>
+              <button class="btn btn--ghost" type="button" data-email-link-restart>Use a different email</button>
+              <button class="btn btn--secondary" type="button" data-email-link-resend>Send a new code</button>
+              <span class="auth-message" data-email-link-code-message role="status" aria-live="polite"></span>
+            </div>
+          </form>
+        </div>
+
+        <div class="account-google-link mt-3">
+          <p class="note-inline"><strong>Google:</strong> <%= user.googleLinked ? 'Connected to this customer account.' : 'Not connected.' %></p>
+          <% if (user.googleLinked) { %>
+            <span class="badge badge--ghost">Google account linked</span>
+          <% } else { %>
+            <a class="btn btn--secondary btn--sm" href="/api/auth/google?intent=link&amp;next=%2Faccount%23profile">Link a Google account</a>
+            <% if (!googleReady) { %><p class="field__hint">Google linking will work once OAuth credentials are added to the hosting settings.</p><% } %>
+          <% } %>
+        </div>
       </div>
 
       <%# ------------------------------------------------- Financing (FR-34) %>
@@ -499,7 +558,7 @@
         </div>
         <% if (!financing || !financing.length) { %>
           <p class="mb-0">
-            No financing enquiry on this number. If you want to know what a car costs before interest,
+            No financing enquiries yet. If you want to know what a car costs before interest,
             <a href="/financing">the calculator is here</a> — we do not lend, and we do not quote rates.
           </p>
         <% } else { %>

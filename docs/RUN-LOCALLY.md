@@ -130,9 +130,15 @@ To stop it: **Ctrl-C** in the terminal.
 The public pages need no account: `/`, `/cars`, a car page, `/services`,
 `/shop`, `/hire`, `/blog`, `/how-it-works`, `/find-my-car`.
 
-**Signing in is by phone number, not a password.** In development the one-time
-code is printed in the terminal *and* shown on screen, so you never need a real
-phone. Use one of the seeded numbers:
+**Customer accounts use email; staff and existing phone accounts keep phone OTP.**
+A new customer can create an account with a name and email, receive a one-time
+code, and sign in without adding a phone. In development the code is available
+in the terminal and on screen, so SMTP is not needed to try the flow. Google
+sign-in requires OAuth credentials; see `.env.example`. An existing phone-based
+customer should first sign in by phone, then verify an email from the account
+profile to link it. A contact phone is collected only when a service needs it.
+
+Staff and seeded phone accounts still use phone OTP:
 
 | Number | Who | Where it lands |
 | --- | --- | --- |
@@ -141,10 +147,10 @@ phone. Use one of the seeded numbers:
 | `+2348000000003` | Field inspector | `/admin` |
 | `+2348000000004` | Finance | `/admin` — second factor |
 | `+2348000000006` | A dealer | `/dealer` |
-| anything else | A new customer | `/account` |
 
-To sign in: go to <http://localhost:3000/login>, enter the number, press the
-button, and type the code it shows you.
+To try customer email sign-in, open <http://localhost:3000/login>, enter a name
+and email address, request a code, and enter the code shown by the development
+server. To use a seeded staff account, choose the phone path and enter its number.
 
 **Admin and finance also ask for a 6-digit code from an authenticator app**
 (this is PRD §12.2). Add the seeded secret to Google Authenticator, Authy, 1Password
@@ -156,11 +162,14 @@ or any TOTP app — *enter setup key manually*:
 Every other role signs in with the OTP alone. If a code is rejected, wait for
 the next 30-second window; a used code is refused for its step.
 
-Payments, SMS and email are deliberately unconfigured, because there are no
-provider keys in a test install. Bank transfer is the working payment method,
-messages are printed to the terminal, and anything that could not be sent is
-recorded as **`skipped`** at `/admin/payments` — never reported as sent when it
-was not.
+A local install has no production provider credentials. Customer email OTP uses
+the development code display; for real delivery, configure `SMTP_URL` and
+`SMTP_FROM`. Google sign-in requires `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`,
+and `GOOGLE_REDIRECT_URI`. Add those values in the hosting environment for
+production — never paste secrets into source control or chat. Payments continue
+to use the local bank-transfer/cash path unless merchant keys are configured;
+SMS and WhatsApp also need their provider credentials. An unconfigured channel
+is recorded as **`skipped`** rather than reported as sent.
 
 ## 8. Everyday commands
 
@@ -233,7 +242,7 @@ with the new worker in place and it stops happening.
 | `EADDRINUSE: address already in use :::3000` | Something else is on port 3000 — usually another copy of the site. Stop it, or run `PORT=3001 npm start` (`set PORT=3001&& npm start` in Command Prompt). |
 | The page loads but with no styling | `npm start` is not the process serving it — check the terminal, and use the URL it prints. |
 | A brand-new feature is missing, or a control is half-working (an empty list, a search that finds nothing) | The server was not restarted after the pull, so the page is new and the code behind it is not. Ctrl-C, `npm start`, then Ctrl-Shift-R in the browser. The terminal says `the code changed while this process was running` when this has happened. |
-| Sign-in code never appears | It is in the terminal *and* on the page. If not, the server is running with `NODE_ENV=production`; the `.env` template sets `AUTH_SHOW_CODE=true`. |
+| Sign-in code never appears | In local development the test code is shown in the terminal and on screen. Production codes are delivered by the configured provider, never shown in API responses; for email, check `SMTP_URL` and `SMTP_FROM`. |
 | `npm install` fails on `sharp` | Node is too old, or the download was interrupted. Check `node -v` is 20+, then delete `node_modules` and run `npm install` again. |
 
 ---

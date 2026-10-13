@@ -110,6 +110,7 @@ function shape(row) {
   const state = effectiveState(row);
   return {
     id: row.id,
+    userId: row.user_id || null,
     kind: row.kind || 'tracker',
     kindLabel: KIND_LABELS[row.kind] || 'Tracker',
     orderId: row.order_id,
@@ -181,14 +182,24 @@ async function byId(id) {
 }
 
 /** Every subscription belonging to a phone number (§7.1 “My tracked vehicles”). */
-async function forPhone(phone, { limit = 20 } = {}) {
+async function forPhone(phone, { limit = 20, userId = null } = {}) {
   const shapes = phones.variants(phone);
-  if (!shapes.length) return [];
+  const where = [];
+  const params = [];
+  if (userId) {
+    where.push('s.user_id = ?');
+    params.push(userId);
+  }
+  if (shapes.length) {
+    where.push(`(s.user_id IS NULL AND o.user_id IS NULL AND s.customer_phone IN (${shapes.map(() => '?').join(',')}))`);
+    params.push(...shapes);
+  }
+  if (!where.length) return [];
   const rows = await query(
     `${SELECT}
-      WHERE s.customer_phone IN (${shapes.map(() => '?').join(',')})
+      WHERE ${where.join(' OR ')}
       ORDER BY s.renewal_at IS NULL, s.renewal_at ASC, s.id DESC LIMIT ?`,
-    [...shapes, Math.min(50, Math.max(1, limit))],
+    [...params, Math.min(50, Math.max(1, limit))],
   );
   return rows.map(shape);
 }
