@@ -67,26 +67,22 @@ test.after(async () => {
   }
 });
 
-maybe('homepage renders the hero, the trust chips and the live feed', async () => {
+maybe('homepage renders the match hero and preserves the live feed', async () => {
   const { response, html } = await getHtml(ctx.baseUrl, '/');
   assert.equal(response.status, 200);
   assert.doesNotMatch(html, /§\s*(?:\d|Appendix)|\bPRD\b|\bFR-\d+\b/, 'the public page contains no internal spec references');
-  // The hero now carries the reference's three-beat headline; the <br> and the
-  // green <em> are presentation, so the assertion tolerates tags between beats.
-  assert.match(html, /Quality Cars\.[\s\S]{0,12}Real People\.[\s\S]{0,40}Honest Deals\./);
-  // Owner direction (2026-10-12): the trust pill and the handwritten accent
-  // are gone from the hero.
-  assert.doesNotMatch(html, /Hassle-Free/, 'the trust pill was removed on owner direction');
-  assert.doesNotMatch(html, /Drive with/, 'the handwritten accent was removed on owner direction');
-  assert.match(html, /hero--cinematic/, 'the cinematic hero is in force');
-  // Owner direction (2026-10-12, revised): the video loads directly on big
-  // screens via initHeroVideo(); phones get the plain navy field and never
-  // fetch the file — so the markup carries the source as data-src only.
-  assert.match(html, /data-hero-video[^>]*data-src="\/video\/Car_driving_on_highway\.mp4"/, 'the hero video is wired for direct load on wide screens');
-  assert.doesNotMatch(html, /data-hero-video[^>]* src="/, 'no eager src: a phone must not download the video');
-  assert.doesNotMatch(html, /hero-lot/, 'no still image stands in for the video any more');
+
+  assert.match(html, /hero--match/, 'the minimal match hero is in force');
+  assert.match(html, /Find your perfect match/);
+  assert.match(html, /The Right Car\. The Right Deal\. The Right Way\./);
+  assert.match(html, /From your first search to the final keys,\s*we make finding your next car a smoother, smarter and more confident experience\./);
+  assert.match(html, /<a class="btn btn--primary btn--lg" href="\/find-my-car">[\s\S]*?Find Your Car[\s\S]*?↗/);
+  assert.match(html, /<a class="btn btn--secondary btn--lg" href="\/cars">Explore Our Cars<\/a>/);
+  assert.match(html, /Honest Cars Ltd\.\s*·\s*Your next chapter starts here\./i);
+  assert.match(html, /class="hero__scroll" href="#fresh-heading"[^>]*aria-label="Scroll to fresh listings"/);
+  assert.doesNotMatch(html, /data-hero-video|hero--cinematic/, 'the replaced hero no longer loads cinematic video');
+
   assert.match(html, /Find your perfect ride/, 'category cards render');
-  assert.match(html, /cars live now/);
   assert.match(html, /Fresh on the market/);
   assert.match(html, /How it works/);
   assert.match(html, /Three grades\. No grey areas\./);

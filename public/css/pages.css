@@ -5,7 +5,7 @@
    ========================================================================== */
 
 /* --------------------------------------------------------------------------
-   Home — hero + instant search (§6.1 module 2)
+   Base hero and shared instant-search components
    -------------------------------------------------------------------------- */
 .hero {
   padding-block: var(--space-4) var(--space-6);
@@ -22,7 +22,7 @@
   .hero__grid { grid-template-columns: 1.05fr 1fr; align-items: center; gap: var(--space-6); }
 }
 
-/* The hero headline is the one place uppercase condensed earns its keep. */
+/* The homepage match hero below overrides this default display treatment. */
 .hero__title {
   font-size: var(--text-40);
   margin-bottom: var(--space-2);
@@ -347,13 +347,9 @@
 .financing-summary .checklist { margin-top: var(--space-1); }
 
 /* ==========================================================================
-   2026 cinematic storefront refresh — homepage first (§6.1)
-   The brand stays white-and-navy; the homepage borrows a deeper cut of the
-   navy and lets photography carry the first screen. Every colour here is a
-   token; every size is on the six-step ladder.
+   Homepage match hero — keep the Honest Cars navy, green and white palette
    ========================================================================== */
 
-/* --- Editorial eyebrow above section headings --------------------------- */
 .eyebrow {
   margin: 0 0 var(--space-05);
   font-size: var(--text-12);
@@ -363,141 +359,137 @@
   color: var(--honest-green);
 }
 
-/* --- Keep the landing page's navbar on the same deep-navy surface as every
-       other page. The hero still tucks behind the bar to fill the first screen. */
+/* Keep the landing header and hero on the same deep-navy surface. */
 body[data-page="/"] .header { background: var(--navy-deep); }
+body[data-page="/"] .hero--match { margin-top: calc(-1 * var(--header-height)); }
+body[data-page="/"] .banner-strip + .hero--match { margin-top: 0; }
 
-body[data-page="/"] .hero--cinematic {
-  margin-top: calc(-1 * var(--header-height));
-}
-
-body[data-page="/"] .banner-strip + .hero--cinematic { margin-top: 0; }
-
-/* Owner direction (2026-10-12): the landing hero fills the first screen,
-   top to bottom. The tuck above already puts its top edge at the very top
-   of the viewport, so a viewport-tall box makes the film the whole first
-   screen. dvh where supported so mobile chrome doesn't clip it. */
-body[data-page="/"] .hero--cinematic {
-  min-height: 100vh;
-  min-height: 100dvh;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-}
-
-/* --- Cinematic hero ------------------------------------------------------- */
-/* The hero video is motion for bigger screens; phones get the calm navy
-   field (owner direction 2026-10-12), as do visitors who asked for less
-   motion — no still image, and no video bytes fetched on a phone. */
-@media (max-width: 899px) {
-  .hero--cinematic .hero__bg { display: none; }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .hero--cinematic .hero__bg { display: none; }
-}
-
-.hero--cinematic {
+.hero--match {
   position: relative;
   isolation: isolate;
   overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  min-height: 100dvh;
+  padding-block: calc(var(--header-height) + var(--space-2)) var(--space-1);
   background: var(--navy-deep);
   color: var(--white);
-  padding-block: var(--space-6) var(--space-6);
 }
 
-@media (min-width: 769px) {
-  .hero--cinematic { padding-block: var(--space-10) var(--space-8); }
-}
-
-@media (min-width: 1025px) {
-  .hero--cinematic { padding-block: var(--space-12) var(--space-10); }
-}
-
-.hero__bg {
-  position: absolute;
-  inset: 0;
-  z-index: -2;
+.hero--match .hero__layout {
+  position: relative;
+  display: grid;
+  grid-template-rows: minmax(0, 1fr) auto;
+  flex: 1 1 auto;
   width: 100%;
-  height: 100%;
-  object-fit: cover;
-  object-position: 78% 50%;
 }
 
-@media (min-width: 769px) {
-  .hero__bg { object-position: 70% 50%; }
+.hero--match .hero__copy {
+  align-self: center;
+  max-width: 560px;
+  padding-block: 0;
 }
 
-.hero__scrim {
-  position: absolute;
-  inset: 0;
-  z-index: -1;
-  background: var(--scrim-hero), var(--scrim-hero-floor);
+.hero__eyebrow {
+  margin: 0 0 var(--space-1);
+  color: var(--green-bright);
+  font-size: var(--text-14);
+  font-weight: var(--weight-semibold);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
 }
 
-.hero--cinematic .hero__grid { grid-template-columns: 1fr; }
-
-.hero__copy { max-width: 620px; }
-
-
-.hero--cinematic .hero__title {
+.hero--match .hero__title {
+  max-width: 22ch;
+  margin: 0 0 var(--space-2);
   color: var(--white);
-  max-width: 27ch;
+  font-family: var(--font-sans);
+  font-size: var(--text-32);
+  font-weight: var(--weight-semibold);
+  line-height: var(--leading-tight);
+  letter-spacing: -0.02em;
+  text-transform: none;
   text-wrap: balance;
 }
 
-.hero__accent { font-style: normal; color: var(--green-bright); }
-
-.hero--cinematic .hero__sub { color: var(--navy-08); }
-
-/* The search panel is the one bright object on the photograph — let it read
-   as a deliberate piece of the composition. */
-.hero--cinematic .search-bar {
-  border-color: var(--white-glass-line);
-  box-shadow: 0 24px 48px rgba(7, 28, 42, 0.45);
+@media (min-width: 769px) {
+  .hero--match .hero__title { font-size: var(--text-40); }
 }
 
-/* Trust chips: dark plaques with a green icon disc and two lines, like the
-   reference. The figures stay live; only the presentation changed. */
-.hero--cinematic .trust-chip {
+.hero--match .hero__sub {
+  max-width: 46ch;
+  margin: 0;
+  color: var(--navy-08);
+  font-size: var(--text-16);
+  line-height: var(--leading-relaxed);
+}
+
+.hero__actions {
+  display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: var(--space-1);
-  padding: var(--space-1);
-  padding-right: var(--space-2);
-  border: 0;
-  border-radius: 0;
-  background: var(--chip-glass);
-  color: var(--white);
+  margin-top: var(--space-3);
 }
 
-.trust-chip__icon {
+.hero--match .hero__actions .btn--secondary {
+  background: transparent;
+  color: var(--white);
+  border-color: var(--white-glass-line);
+}
+
+.hero--match .hero__actions .btn--secondary:hover { background: var(--white-glass); }
+
+.hero__signature {
+  align-self: end;
+  max-width: 46ch;
+  margin: 0;
+  padding-top: var(--space-1);
+  color: var(--navy-08);
+  font-size: var(--text-12);
+  font-weight: var(--weight-medium);
+  line-height: var(--leading-normal);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  opacity: 0.76;
+}
+
+.hero__scroll {
+  position: absolute;
+  z-index: 1;
+  left: 50%;
+  bottom: 0;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 36px;
-  height: 36px;
-  border-radius: 0;
-  background: var(--honest-green);
+  width: 44px;
+  height: 44px;
+  transform: translateX(-50%);
+  border: var(--border-width) solid var(--white-glass-line);
+  border-radius: var(--radius-pill);
+  background: var(--white-glass);
   color: var(--white);
-  flex: 0 0 auto;
+  transition: background-color var(--motion) var(--ease), border-color var(--motion) var(--ease);
 }
 
-.trust-chip__icon svg { width: 18px; height: 18px; color: var(--white); }
-
-.trust-chip__text { display: flex; flex-direction: column; gap: 2px; text-align: left; }
-
-.hero--cinematic .trust-chip__text strong {
-  color: var(--white);
-  font-size: var(--text-14);
-  font-weight: var(--weight-semibold);
+.hero__scroll:hover {
+  border-color: var(--white-glass-line);
+  background: var(--white-glass-line);
 }
 
-.trust-chip__text span { font-size: var(--text-12); color: var(--navy-08); }
+.hero__scroll:focus-visible { outline: 2px solid var(--green-bright); outline-offset: 3px; }
+.hero__scroll svg { width: 18px; height: 18px; }
 
-/* Handwritten accent over the photograph — decorative, desktop only. */
+@media (max-width: 720px) {
+  .hero--match .hero__signature { max-width: calc(100% - var(--space-8)); }
+  .hero--match .hero__scroll { right: 0; left: auto; transform: none; }
+}
 
-@media (min-width: 1025px) {
-  .hero__script { display: block; }
+@media (max-height: 560px) {
+  .hero--match { padding-block: calc(var(--header-height) + var(--space-1)) var(--space-05); }
+  .hero--match .hero__copy { padding-block: 0; }
+  .hero--match .hero__signature { padding-top: var(--space-05); }
 }
 
 

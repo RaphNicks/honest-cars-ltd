@@ -1,9 +1,7 @@
 <%#
-  Homepage — §6.1, section by section (2026 cinematic refresh):
+  Homepage — the focused match hero, followed by live inventory and proof:
     1.  Announcement strip (CMS, off by default)
-    2.  Cinematic hero — full-bleed golden-hour photograph, headline with a
-        green accent, the instant search (Make · Body · Max budget ₦ · Search)
-        and the three live trust chips
+    2.  Match hero — new customer-first copy, two clear actions and a scroll cue
     3.  Category cards — live body-type counts, one real listing photo each
     4.  Live inventory — “Fresh on the market”, 8 cards, tabs
     5.  Featured rail (ops-picked)
@@ -31,91 +29,25 @@
 </section>
 <% } %>
 
-<section class="hero hero--cinematic">
-  <%# Owner direction (2026-10-12, revised): the video is the hero on bigger
-      screens and loads directly; on phones the hero is the plain navy field
-      and no video bytes are fetched at all. initHeroVideo() in ui.js decides
-      by viewport; reduced-motion visitors get the calm field too. %>
-  <video class="hero__bg" data-hero-video data-src="/video/Car_driving_on_highway.mp4"
-         muted loop playsinline aria-hidden="true" tabindex="-1"></video>
-  <div class="hero__scrim" aria-hidden="true"></div>
-  <div class="container hero__grid">
+<section class="hero hero--match">
+  <div class="container hero__layout">
     <div class="hero__copy">
-      <% if (modules.hero && modules.hero.headline) { %>
-        <h1 class="hero__title"><%= modules.hero.headline %></h1>
-      <% } else { %>
-        <h1 class="hero__title">Quality Cars.<br>Real People. <em class="hero__accent">Honest Deals.</em></h1>
-      <% } %>
+      <p class="hero__eyebrow">Find your perfect match</p>
+      <h1 class="hero__title">The Right Car. The Right Deal. The Right Way.</h1>
       <p class="hero__sub">
-        <%= (modules.hero && modules.hero.subhead) || 'Every car we list is inspected, documented and negotiated for you — from first search to final papers.' %>
+        From your first search to the final keys, we make finding your next car a smoother, smarter and more confident experience.
       </p>
-
-      <%# §6.1 module 2 — instant search → /cars with filters applied %>
-      <form class="search-bar" action="/cars" method="get" role="search" aria-label="Search cars">
-        <div class="field">
-          <label class="field__label" for="hero-make">Make</label>
-          <select class="select" id="hero-make" name="make" data-make-select>
-            <option value="">Any make</option>
-            <% facets.makes.forEach(function (row) { %>
-              <option value="<%= row.value %>"><%= row.value %></option>
-            <% }); %>
-          </select>
-        </div>
-        <div class="field">
-          <label class="field__label" for="hero-body">Body type</label>
-          <select class="select" id="hero-body" name="body">
-            <option value="">Any body type</option>
-            <% facets.bodyTypes.forEach(function (row) { %>
-              <option value="<%= row.value %>"><%= helpers.BODY_TYPE_LABELS[row.value] || row.value %></option>
-            <% }); %>
-          </select>
-        </div>
-        <div class="field">
-          <label class="field__label" for="hero-max">Max budget ₦</label>
-          <input class="input" id="hero-max" name="max" type="number" inputmode="numeric" step="100000" min="0"
-                 placeholder="<%= Math.round(facets.range.maxPrice / 100) %>">
-        </div>
-        <button class="btn btn--primary" type="submit" data-event="search_used" data-source="hero">
-          <%- helpers.icon('search', { size: 20 }) %> Search
-        </button>
-      </form>
-
-      <%# Three trust chips — each only renders once its number is real; a
-          brand-new lot makes no volume claims (owner 2026-10-12). %>
-      <% if (site.counters.carsLive > 0 || site.counters.partnerDealers > 0 || site.counters.certified > 0) { %>
-      <div class="hero__chips">
-        <% if (site.counters.carsLive > 0) { %>
-        <span class="trust-chip">
-          <span class="trust-chip__icon"><%- helpers.icon('car', { size: 18 }) %></span>
-          <span class="trust-chip__text">
-            <strong><%= site.counters.carsLive %> cars live now</strong>
-            <span>Fresh listings, daily</span>
-          </span>
-        </span>
-        <% } %>
-        <% if (site.counters.partnerDealers > 0) { %>
-        <span class="trust-chip">
-          <span class="trust-chip__icon"><%- helpers.icon('store', { size: 18 }) %></span>
-          <span class="trust-chip__text">
-            <strong><%= site.counters.partnerDealers %> partner dealers</strong>
-            <%# Owner direction (2026-10-12): no coverage counts in copy — the
-                base is stated in the footer and buyers everywhere are welcome. %>
-            <span>Verified businesses</span>
-          </span>
-        </span>
-        <% } %>
-        <% if (site.counters.certified > 0) { %>
-        <span class="trust-chip">
-          <span class="trust-chip__icon"><%- helpers.icon('checkCircle', { size: 18 }) %></span>
-          <span class="trust-chip__text">
-            <strong><%= site.counters.certified %> certified listings</strong>
-            <span>Inspected &amp; verified</span>
-          </span>
-        </span>
-        <% } %>
+      <div class="hero__actions">
+        <a class="btn btn--primary btn--lg" href="/find-my-car">
+          Find Your Car <span aria-hidden="true">↗</span>
+        </a>
+        <a class="btn btn--secondary btn--lg" href="/cars">Explore Our Cars</a>
       </div>
-      <% } %>
     </div>
+    <p class="hero__signature">Honest Cars Ltd. · Your next chapter starts here.</p>
+    <a class="hero__scroll" href="#fresh-heading" aria-label="Scroll to fresh listings">
+      <%- helpers.icon('chevronDown', { size: 18 }) %>
+    </a>
   </div>
 </section>
 

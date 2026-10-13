@@ -58,6 +58,21 @@ test('the landing-page navy is used by all site navigation bars', () => {
   assert.match(rule(admin, '.admin-bar'), /background:\s*var\(--navy-deep\)/);
 });
 
+test('homepage match hero uses the existing navy, green and white palette', () => {
+  const read = (file) => fs.readFileSync(path.join(ROOT, file), 'utf8');
+  const tokens = read('public/css/tokens.css');
+  const components = read('public/css/components.css');
+  const pages = read('public/css/pages.css');
+  const home = read('views/pages/home.ejs');
+
+  assert.match(home, /hero hero--match/);
+  assert.match(pages, /\.hero--match\s*\{[^}]*background:\s*var\(--navy-deep\)/);
+  assert.match(pages, /\.hero__eyebrow\s*\{[^}]*color:\s*var\(--green-bright\)/);
+  assert.match(components, /\.btn--primary\s*\{[^}]*background:\s*var\(--color-action\)/);
+  assert.match(tokens, /--color-action:\s*var\(--honest-green\)/);
+  assert.match(pages, /\.hero--match \.hero__actions \.btn--secondary\s*\{[^}]*color:\s*var\(--white\)/);
+});
+
 test('find-my-car explains tracking without publishing a demo ID, and lookup accepts real IDs', () => {
   const template = fs.readFileSync(path.join(ROOT, 'views/pages/find-my-car.ejs'), 'utf8');
   assert.match(template, /Track an existing request/);

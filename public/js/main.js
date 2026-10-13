@@ -18,7 +18,6 @@ import {
   initCompare,
   initRecentlyViewed,
   rememberViewed,
-  initHeroVideo,
   toast,
 } from './ui.js';
 import { initFilters } from './filters.js';
@@ -39,7 +38,6 @@ function boot() {
   // §13.2 — before anything paints: hold each photo back while its placeholder
   // shows, and drop to the small file for a visitor who asked us to spend less.
   initBlurUp();
-  initHeroVideo();
   applySaveData();
   // §13.2 — a dropped connection should not cost anyone an enquiry they typed.
   initFormDrafts();
