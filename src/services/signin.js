@@ -65,9 +65,18 @@ function normaliseEmail(raw) {
   return db.users.normaliseEmail(raw);
 }
 
-function googleClient() {
+function googleClient(redirectUri = config.googleAuth.redirectUri) {
   if (!config.googleAuth.configured) return null;
-  return new OAuth2Client(config.googleAuth.clientId, config.googleAuth.clientSecret, config.googleAuth.redirectUri);
+  return new OAuth2Client(config.googleAuth.clientId, config.googleAuth.clientSecret, redirectUri);
+}
+
+/**
+ * Which callback the Google round-trip must return to. The state cookie is
+ * host-only, so the redirect URI has to be the host the sign-in started on:
+ * the admin console in production, the public site for customers and dealers.
+ */
+function googleRedirectUri(onAdminHost) {
+  return onAdminHost ? config.googleAuth.adminRedirectUri : config.googleAuth.redirectUri;
 }
 
 const UNAVAILABLE = 'We could not send a sign-in code to that email. Please contact Honest Cars for help.';
@@ -334,7 +343,7 @@ function readGoogleState(cookie, state) {
 }
 
 function beginGoogleAuth(options = {}) {
-  const client = googleClient();
+  const client = googleClient(googleRedirectUri(Boolean(options.onAdminHost)));
   if (!client) return resultError('GOOGLE_NOT_CONFIGURED', 503, 'Google sign-in is not set up yet. Use email code instead.');
   const state = createGoogleState(options);
   const challenge = crypto.createHash('sha256').update(state.payload.codeVerifier).digest('base64url');
@@ -350,10 +359,10 @@ function beginGoogleAuth(options = {}) {
   return { ok: true, url, cookie: state.cookie, context: state.payload };
 }
 
-async function verifyGoogleCallback({ cookie, state, code }) {
+async function verifyGoogleCallback({ cookie, state, code, onAdminHost = false }) {
   const context = readGoogleState(cookie, state);
   if (!code) throw Object.assign(new Error('Google did not return a sign-in code. Please try again.'), { code: 'GOOGLE_CODE_MISSING' });
-  const client = googleClient();
+  const client = googleClient(googleRedirectUri(onAdminHost));
   if (!client) throw Object.assign(new Error('Google sign-in is not set up yet. Use email code instead.'), { code: 'GOOGLE_NOT_CONFIGURED' });
 
   const { tokens } = await client.getToken({ code: String(code), codeVerifier: context.codeVerifier });

@@ -24,8 +24,8 @@ const args = new Set(process.argv.slice(2));
 const schemaOnly = args.has('--schema-only');
 const skipSeed = args.has('--no-seed') || schemaOnly;
 
-const ADMIN_USER = process.env.DB_ADMIN_USER || (process.env.DB_USER === 'root' ? 'root' : 'root');
-const ADMIN_PASSWORD = process.env.DB_ADMIN_PASSWORD ?? (process.env.DB_USER === 'root' ? config.db.password : '');
+const ADMIN_USER = process.env.DB_ADMIN_USER || config.db.user;
+const ADMIN_PASSWORD = process.env.DB_ADMIN_PASSWORD ?? config.db.password;
 
 /**
  * Apply db/migrations/*.sql in order, tolerating “already present” errors so a
@@ -135,10 +135,22 @@ async function main() {
   });
 
   const dbName = config.db.database;
-  await admin.query(
-    `CREATE DATABASE IF NOT EXISTS \`${dbName}\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci`,
-  );
-  console.log(`✓ database \`${dbName}\` ready`);
+  try {
+    await admin.query(
+      `CREATE DATABASE IF NOT EXISTS \`${dbName}\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci`,
+    );
+    console.log(`✓ database \`${dbName}\` ready`);
+  } catch (error) {
+    // Shared hosts pre-create the database and grant privileges on it alone —
+    // CREATE DATABASE is refused there even with IF NOT EXISTS. If the
+    // database is already present and usable, that is the state we need.
+    try {
+      await admin.query(`USE \`${dbName}\``);
+      console.warn(`! could not run CREATE DATABASE (${error.code || error.message}) — \`${dbName}\` exists and is usable, continuing`);
+    } catch {
+      throw error;
+    }
+  }
 
   if (config.db.user !== ADMIN_USER) {
     try {

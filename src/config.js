@@ -175,6 +175,13 @@ const config = {
     get redirectUri() {
       return process.env.GOOGLE_REDIRECT_URI || `${config.siteUrl}/api/auth/google/callback`;
     },
+    // Staff sign-in happens on the admin host (its own DNS name in production),
+    // and the Google round-trip must return to the host it started on or the
+    // signed state cookie never comes back. Register BOTH callback URIs in the
+    // Google console; this one derives from ADMIN_URL unless overridden.
+    get adminRedirectUri() {
+      return process.env.GOOGLE_ADMIN_REDIRECT_URI || `${config.admin.url}/api/auth/google/callback`;
+    },
     get configured() {
       return Boolean(this.clientId && this.clientSecret && this.redirectUri);
     },

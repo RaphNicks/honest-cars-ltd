@@ -27,6 +27,7 @@ const db = require('../db');
 const validate = require('../services/validate');
 const roles = require('../services/roles');
 const mfa = require('../services/mfa');
+const { isAdminHost } = require('../lib/admin-host');
 const { sendJson } = require('../lib/respond');
 
 const router = express.Router();
@@ -161,6 +162,7 @@ router.get('/google', googleLimiter, (req, res) => {
     next: auth.safeNextPath(req.query.next) || (intent === 'link' ? '/account#profile' : signin.defaultRedirect(audience)),
     linkUserId: intent === 'link' ? req.user.id : null,
     saveListingId: intent === 'link' ? null : validate.integer(req.query.save, { min: 1, fallback: 0 }),
+    onAdminHost: isAdminHost(req),
   });
   if (!result.ok) {
     const path = intent === 'link' ? '/account' : loginPath;
@@ -186,6 +188,7 @@ router.get('/google/callback', googleLimiter, async (req, res, next) => {
       cookie: stateCookie,
       state: req.query.state,
       code: req.query.code,
+      onAdminHost: isAdminHost(req),
     });
     audience = context.audience;
     const errorPath = loginPathFor(audience);
