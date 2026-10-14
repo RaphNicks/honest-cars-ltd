@@ -346,7 +346,7 @@ router.get('/contact', async (req, res, next) => {
 // /about — CMS page body + team + CAC details
 // ---------------------------------------------------------------------------
 const TEAM = [
-  { name: 'Raph Nicks', role: 'Founder · inspections', bio: 'Leads the inspection bench. More than 600 cars checked across Port Harcourt and Rivers State.' },
+  { name: 'Chukwudi Ofurum', role: 'Founder · inspections', bio: 'Leads the inspection bench. More than 600 cars checked across Port Harcourt and Rivers State.' },
   { name: 'Ops desk', role: 'Concierge · documents · dispatch', bio: 'Reads every brief that arrives, runs the document errands and keeps the dispatch queue moving.' },
   { name: 'Partner network', role: '11 verified lots', bio: 'Port Harcourt dealers who signed the honesty rules: real mileage, documents sighted, no buyer-side games.' },
 ];
