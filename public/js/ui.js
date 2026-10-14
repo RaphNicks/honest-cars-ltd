@@ -136,6 +136,17 @@ export function initWhatsappFloat() {
     },
     { passive: true },
   );
+
+  // While the user pinch-zooms, fixed elements drift across the zoomed
+  // viewport and look like they are breaking the page — hide the float then.
+  const viewport = window.visualViewport;
+  if (viewport) {
+    const syncZoom = () => {
+      float.dataset.zoomed = viewport.scale > 1.1 ? 'true' : 'false';
+    };
+    viewport.addEventListener('resize', syncZoom);
+    syncZoom();
+  }
 }
 
 /* ------------------------------------------------------------- gallery */

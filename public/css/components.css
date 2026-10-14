@@ -828,10 +828,16 @@ img.header__logo-mark {
   box-shadow: var(--shadow-raised);
   font-size: var(--text-14);
   font-weight: var(--weight-semibold);
+  /* Rides with the bottom nav instead of teleporting when it appears. */
+  transition: bottom var(--motion) var(--ease), background-color var(--motion) var(--ease);
 }
 
 .whatsapp-float:hover { text-decoration: none; background: var(--color-action-hover); }
 .whatsapp-float svg { width: 24px; height: 24px; }
+
+/* Pinch-zoom makes fixed elements "swim" over content; step aside while zoomed
+   (ui.js sets data-zoomed from visualViewport.scale). */
+.whatsapp-float[data-zoomed='true'] { opacity: 0; pointer-events: none; }
 
 .whatsapp-float[data-collapsed='true'] { padding-right: var(--space-1); }
 .whatsapp-float[data-collapsed='true'] .whatsapp-float__label { display: none; }

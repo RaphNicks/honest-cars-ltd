@@ -11,19 +11,35 @@ export function initHeader() {
   const bottomNav = document.getElementById('bottom-nav');
   const drawer = document.getElementById('mobile-drawer');
   const searchPanel = document.getElementById('header-search');
-  let lastY = window.scrollY;
+  // Reveal-on-scroll-up / retreat-on-scroll-down needs hysteresis: momentum
+  // scrolling fires direction flips every tick, and without a threshold the
+  // nav starts rising and instantly reverses — it never settles. Only toggle
+  // after the page has moved a real distance in one direction.
+  const NAV_HYSTERESIS = 28;
+  let anchorY = window.scrollY;
+  let navVisible = false;
 
   const onScroll = () => {
     const y = window.scrollY;
     if (header) header.dataset.scrolled = y > 8 ? 'true' : 'false';
 
     if (bottomNav) {
-      // Appears after the first scroll; retreats while scrolling down on mobile.
-      const visible = y > 160 && (y < lastY || y < 320);
+      const moved = y - anchorY;
+      let visible = navVisible;
+      if (y <= 160) {
+        visible = false; // top of page: bar stays away
+      } else if (y <= 320) {
+        visible = true; // just scrolled in: bar is up
+      } else if (moved >= NAV_HYSTERESIS) {
+        visible = false; // settled into scrolling down: retreat
+      } else if (moved <= -NAV_HYSTERESIS) {
+        visible = true; // settled into scrolling up: reveal
+      }
+      if (visible !== navVisible) anchorY = y;
+      navVisible = visible;
       bottomNav.dataset.visible = visible ? 'true' : 'false';
       document.body.dataset.bottomNav = visible ? 'true' : 'false';
     }
-    lastY = y;
   };
 
   window.addEventListener('scroll', onScroll, { passive: true });
