@@ -269,8 +269,10 @@ test('a new worker takes over, instead of waiting for every tab to close', () =>
   // pressing a button — so the check is scoped to the update path.)
   const updatePath = pwaSource.slice(pwaSource.indexOf('function watchForUpdates'), pwaSource.indexOf('function initInstallPrompt'));
   assert.doesNotMatch(updatePath, /location\.reload\(\)/, 'a page is never reloaded underneath the reader');
-  // And the toast still tells them what will happen.
-  assert.match(pwaSource, /newer version of HonestCars is ready/);
+  // Updates are silent (owner direction 2026-10-14): the worker takes over
+  // quietly — the old "newer version is ready" note must never appear.
+  assert.doesNotMatch(updatePath, /toast\(/, 'the update path shows no note at all');
+  assert.doesNotMatch(pwaSource, /newer version of HonestCars is ready/);
 });
 
 test('hydration is lazy but the panel never depends on it being possible', () => {

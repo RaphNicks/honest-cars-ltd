@@ -12,8 +12,10 @@
  *      its own criteria are met, so the footer control stays hidden until the
  *      browser says the app can actually be installed. Showing a button that
  *      does nothing would be the dishonest option.
- *   3. Say when a newer version is waiting, once, without reloading anyone's
- *      page underneath them.
+ *   3. Apply a newer version silently. The waiting worker takes over quietly
+ *      and serves the reader's next page — no notice, no toast, no reload
+ *      underneath them (owner direction 2026-10-14: the update note must
+ *      never appear).
  *
  * Offline *conduct* lives elsewhere on purpose: drafts.js already holds an
  * enquiry that failed to send and speaks up when one is waiting. This module
@@ -27,8 +29,8 @@ function canRegister() {
 }
 
 /**
- * Keep the site honest about what is new: no auto-reload, no repeated toast —
- * and no old release left in charge when there is a new one waiting.
+ * Updates take over silently: no auto-reload, no notice — and no old release
+ * left in charge when a new one is waiting.
  *
  * A worker installs, then *waits*: it does not take over until every tab that
  * the previous worker controls has closed. That is the safe default for a site
@@ -39,42 +41,26 @@ function canRegister() {
  * So when a new worker is ready we tell it to take over (it handles
  * `SKIP_WAITING`). Nothing is reloaded underneath the reader: this page keeps
  * the files it has already loaded, and the *next* navigation is served by the
- * new worker. The toast is unchanged, and now it is true in one page rather than
- * once the last tab is closed.
+ * new worker. Owner direction (2026-10-14): all of this happens without any
+ * visible note — the toast that used to announce it is gone.
  */
 function watchForUpdates(registration) {
-  const announce = (worker) => {
+  const takeOverWhenInstalled = (worker) => {
     if (!worker) return;
     worker.addEventListener('statechange', () => {
       if (worker.state !== 'installed') return;
       if (!navigator.serviceWorker.controller) return; // first ever install
-      announceOnce();
       if (registration.waiting) registration.waiting.postMessage({ type: 'SKIP_WAITING' });
     });
-  };
-
-  let announced = false;
-  const announceOnce = () => {
-    if (announced) return;
-    announced = true;
-    import('./ui.js')
-      .then(({ toast }) =>
-        toast('A newer version of HonestCars is ready. It loads on your next page.', {
-          variant: '',
-          duration: 7000,
-        }),
-      )
-      .catch(() => {});
   };
 
   // A worker can already be waiting when this page loads — the tab that
   // triggered the update is usually not the one that visits next.
   if (registration.waiting) {
-    announceOnce();
     registration.waiting.postMessage({ type: 'SKIP_WAITING' });
   }
-  announce(registration.installing);
-  registration.addEventListener('updatefound', () => announce(registration.installing));
+  takeOverWhenInstalled(registration.installing);
+  registration.addEventListener('updatefound', () => takeOverWhenInstalled(registration.installing));
 }
 
 function initInstallPrompt() {
