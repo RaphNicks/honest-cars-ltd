@@ -109,11 +109,17 @@ async function start() {
   return server;
 }
 
-if (require.main === module) {
-  start().catch((error) => {
-    console.error('Failed to start:', error);
-    process.exit(1);
-  });
-}
+  // Under Phusion Passenger the startup file can be loaded as a module by the
+  // node loader (require.main is then the loader, not this file) — so the
+  // presence of the PhusionPassenger global counts as "run me" too. Without
+  // this, start() is silently skipped and Passenger reports "could not be
+  // started" while nothing is actually wrong with the app.
+  const isMain = require.main === module || typeof PhusionPassenger !== 'undefined';
+  if (isMain) {
+    start().catch((error) => {
+      console.error('Failed to start:', error);
+      process.exit(1);
+    });
+  }
 
 module.exports = { start };
