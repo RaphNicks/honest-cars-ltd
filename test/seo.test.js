@@ -101,12 +101,12 @@ test('Article schema names the author and publisher', () => {
     excerpt: 'We put a Camry through the checklist.',
     heroImage: '/img/seed/og-default.svg',
     publishedAt: new Date('2026-09-28'),
-    author: { name: 'Raph Nicks', role: 'Head of Inspections' },
+    author: { name: 'Chukwudi Ofurum', role: 'Head of Inspections' },
     url: '/blog/2015-toyota-camry-honest-buyers-guide',
     categoryLabel: "Honest Buyer's Guide",
   });
   assert.equal(schema['@type'], 'Article');
-  assert.equal(schema.author.name, 'Raph Nicks');
+  assert.equal(schema.author.name, 'Chukwudi Ofurum');
   assert.equal(schema.publisher['@id'].endsWith('/#organization'), true);
 });
 

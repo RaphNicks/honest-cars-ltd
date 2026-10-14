@@ -484,7 +484,7 @@ const PAGES = {
       ] },
       { type: 'heading', text: 'Where the money goes' },
       { type: 'paragraph', text: 'You pay HonestCars for the service: inspection, concierge, documents, tracking, hire. On a car purchase handled through us, milestones release to the seller only when each stage is confirmed — inspection passed, documents verified, handover complete.' },
-      { type: 'quote', text: 'We do not take money from sellers to make a car look good. That single rule is the whole business.', attribution: 'Raph Nicks, Head of Inspections' },
+      { type: 'quote', text: 'We do not take money from sellers to make a car look good. That single rule is the whole business.', attribution: 'Chukwudi Ofurum, Head of Inspections' },
       { type: 'heading', text: 'Still not sure where to start?' },
       { type: 'paragraph', text: 'Send the brief and we will do the searching, inspecting and negotiating. If we find nothing that meets it, the retainer comes back to you.' },
     ],
@@ -719,7 +719,7 @@ const POST_BODIES = {
     serviceCta: 'inspection',
     metaTitle: 'The 2015 Toyota Camry: what ₦12m buys in Port Harcourt',
     metaDescription: 'Three 2015 Camrys, the same week, the same checklist. What a clean one is worth, what the tired ones hide, and what to check before you pay.',
-    authorBio: 'Raph Nicks leads HonestCars inspections in Port Harcourt. He has inspected more than 600 used cars and has talked more buyers out of bad ones than into them.',
+    authorBio: 'Chukwudi Ofurum leads HonestCars inspections in Port Harcourt. He has inspected more than 600 used cars and has talked more buyers out of bad ones than into them.',
     body: [
       { type: 'paragraph', text: 'A 2015 Camry is the [default sensible buy in Port Harcourt](/cars?make=Toyota), and that is exactly why you should be suspicious of it. Popular models attract the most repair-and-flip activity, because there is always a buyer.' },
       { type: 'paragraph', text: 'We put three 2015 Camrys through the full checklist in the same week. Here is what ₦12m bought in each case, with the numbers.' },
@@ -740,7 +740,7 @@ const POST_BODIES = {
       ] },
       { type: 'heading', text: 'What we would pay' },
       { type: 'paragraph', text: 'For a clean 2015 Camry with verified mileage, complete papers and everything working: ₦10.5m–₦12.5m depending on trim and km — compare that against [the Camrys we have actually inspected](/cars?make=Toyota&model=Camry). Below ₦10m, start asking what is wrong, because something usually is.' },
-      { type: 'quote', text: 'The cheapest Camry on the road is rarely the cheapest Camry to own.', attribution: 'Raph Nicks' },
+      { type: 'quote', text: 'The cheapest Camry on the road is rarely the cheapest Camry to own.', attribution: 'Chukwudi Ofurum' },
       { type: 'heading', text: 'Before you pay for one' },
       { type: 'paragraph', text: 'Book the [inspection](/services/inspection), not the car. Any inspection we do lands in writing, names the faults and stays attached to the listing — including the faults that cost the seller money.' },
     ],
@@ -781,7 +781,7 @@ const POST_BODIES = {
     serviceCta: 'inspection',
     metaTitle: 'How to check an odometer before you pay a deposit',
     metaDescription: 'Seven checks anyone can do in ten minutes, the two tricks that survive them all, and the ₦1.5m–₦3m you are betting when you trust the dash.',
-    authorBio: 'Raph Nicks leads HonestCars inspections in Port Harcourt and has written the checklist every inspector works to.',
+    authorBio: 'Chukwudi Ofurum leads HonestCars inspections in Port Harcourt and has written the checklist every inspector works to.',
     body: [
       { type: 'paragraph', text: 'Odometer fraud is the most common lie in the used-car market, and the easiest to catch if you know where the car keeps its own records. If you would rather not do it yourself, every [HonestCars inspection](/services/inspection) includes an OBD2 read and an odometer verdict.' },
       { type: 'heading', text: 'Seven checks you can do in ten minutes' },
@@ -888,7 +888,7 @@ const POST_BODIES = {
     serviceCta: 'inspection',
     metaTitle: 'Watch a HonestCars inspection, start to finish',
     metaDescription: 'Twelve seconds of the 45-minute checklist every car goes through before it reaches you, plus what each step is looking for.',
-    authorBio: 'Raph Nicks leads HonestCars inspections in Port Harcourt and has written the checklist every inspector works to.',
+    authorBio: 'Chukwudi Ofurum leads HonestCars inspections in Port Harcourt and has written the checklist every inspector works to.',
     body: [
       { type: 'paragraph', text: 'Every car on this site has been through the same 45-minute checklist. This is the short version — no narration, no music, just the steps, in order, on a real Port Harcourt car.' },
       { type: 'video', src: '/video/inspection-walkaround.mp4', title: 'The 45-minute inspection, in 12 seconds', caption: 'Silent clip, 12 seconds. Nothing loads until you press play.' },
@@ -909,7 +909,7 @@ const POST_BODIES = {
     serviceCta: 'inspection',
     metaTitle: 'Three tyre conditions that should end your inspection',
     metaDescription: 'Uneven wear, mismatched brands and cracked sidewalls: what each one tells you about the owner, and what replacement really costs in Port Harcourt.',
-    authorBio: 'Raph Nicks leads HonestCars inspections, where tyre condition is the fastest read on how a car has been maintained.',
+    authorBio: 'Chukwudi Ofurum leads HonestCars inspections, where tyre condition is the fastest read on how a car has been maintained.',
     body: [
       { type: 'paragraph', text: 'Tyres tell you what the service history will not: how the car was driven, whether the owner noticed problems, and how much they were willing to spend on maintenance. It is one of the first things checked in a [HonestCars inspection](/services/inspection), along with the wheel bearings and alignment.' },
       { type: 'heading', text: 'Three conditions that should end the inspection' },

@@ -974,13 +974,13 @@ DELETE FROM service_cities;
   const posts = [
     ['2015-toyota-camry-honest-buyers-guide', "The 2015 Toyota Camry: what ₦12m actually buys in Port Harcourt", 'honest_buyers_guide',
       'We put a 2015 Camry through the full checklist and wrote down everything — the good, the tired and the priced-in.',
-      '2015 Toyota Camry inspection in Port Harcourt', 'Raph Nicks', 'Head of Inspections', 9, 1],
+      '2015 Toyota Camry inspection in Port Harcourt', 'Chukwudi Ofurum', 'Head of Inspections', 9, 1],
     ['tokunbo-vs-nigerian-used-ph', 'Tokunbo vs Nigerian-used: the honest maths for Port Harcourt buyers', 'market_intel',
       'A cheaper import is not always cheaper. Here is the running-cost maths we run for buyers before they commit.',
       'Comparing tokunbo and Nigerian-used cars in Port Harcourt', 'Ada George', 'Market Analyst', 7, 0],
     ['odometer-fraud-check-yourself', 'How to check an odometer yourself before you pay a deposit', 'honest_buyers_guide',
       'Seven checks anyone can do in ten minutes, plus the two tricks dealers use to reset a mileage that still fool buyers.',
-      'Odometer close-up during a HonestCars inspection', 'Raph Nicks', 'Head of Inspections', 6, 0],
+      'Odometer close-up during a HonestCars inspection', 'Chukwudi Ofurum', 'Head of Inspections', 6, 0],
     ['customs-papers-explained', 'Customs papers, explained without the jargon', 'ownership_maintenance',
       'What "duty sighted" really means, what happens if papers are missing, and how to verify them yourself.',
       'Verifying customs documents for a car in Port Harcourt', 'Chinelo U.', 'Documentation Lead', 8, 0],
@@ -989,7 +989,7 @@ DELETE FROM service_cities;
       'Fuel economy comparison chart for Port Harcourt cars', 'Ada George', 'Market Analyst', 5, 0],
     ['tyres-you-should-walk-away-from', 'Three tyre conditions that should end your inspection', 'honest_buyers_guide',
       'Uneven wear tells you more about a car than the dealer ever will. What to look for and what it costs to fix.',
-      'Tyres and tread depth check on a used car', 'Raph Nicks', 'Head of Inspections', 4, 0],
+      'Tyres and tread depth check on a used car', 'Chukwudi Ofurum', 'Head of Inspections', 4, 0],
     // §16 asks for 8 posts and 3 embedded videos. The clips live in the four
     // posts above and this pair below; the last one is the video-first post
     // FR-24 names (category `video`).
@@ -998,14 +998,14 @@ DELETE FROM service_cities;
       'A first car parked on a Port Harcourt street', 'Ada George', 'Market Analyst', 6, 0],
     ['inspection-walkaround-video', 'Watch a HonestCars inspection, start to finish', 'video',
       'Twelve seconds of the 45-minute checklist every car goes through before it reaches you.',
-      'An inspector filming the walkaround on a silver sedan', 'Raph Nicks', 'Head of Inspections', 3, 0],
+      'An inspector filming the walkaround on a silver sedan', 'Chukwudi Ofurum', 'Head of Inspections', 3, 0],
   ];
   // FR-35 — the byline as an entity (§6.9 “author card ... E-E-A-T”). One row
   // per writer: the post keeps `author_name/role/bio` as the printed byline,
   // `author_id` is the link that makes /blog/author/{slug} possible.
   const AUTHORS = [
-    ['raph-nicks', 'Raph Nicks', 'Head of Inspections',
-      'Raph leads HonestCars inspections in Port Harcourt. He has inspected more than 600 used cars and has talked more buyers out of bad ones than into them.'],
+    ['chukwudi-ofurum', 'Chukwudi Ofurum', 'Head of Inspections',
+      'Chukwudi leads HonestCars inspections in Port Harcourt. He has inspected more than 600 used cars and has talked more buyers out of bad ones than into them.'],
     ['ada-george', 'Ada George', 'Market Analyst',
       'Ada runs market intelligence at HonestCars, building the price bands behind every listing.'],
     ['chinelo-u', 'Chinelo U.', 'Documentation Lead',
@@ -1034,14 +1034,14 @@ DELETE FROM service_cities;
 
   // post slug → the authors and tags it carries.
   const POST_BYLINE = {
-    '2015-toyota-camry-honest-buyers-guide': ['raph-nicks', ['toyota', 'buying', 'maintenance']],
+    '2015-toyota-camry-honest-buyers-guide': ['chukwudi-ofurum', ['toyota', 'buying', 'maintenance']],
     'tokunbo-vs-nigerian-used-ph': ['ada-george', ['buying', 'paperwork', 'market-report']],
-    'odometer-fraud-check-yourself': ['raph-nicks', ['mileage', 'inspection']],
+    'odometer-fraud-check-yourself': ['chukwudi-ofurum', ['mileage', 'inspection']],
     'customs-papers-explained': ['chinelo-u', ['paperwork', 'buying']],
     'ph-fuel-cost-by-model': ['ada-george', ['running-costs', 'toyota', 'honda', 'market-report']],
-    'tyres-you-should-walk-away-from': ['raph-nicks', ['tyres', 'inspection']],
+    'tyres-you-should-walk-away-from': ['chukwudi-ofurum', ['tyres', 'inspection']],
     'first-car-under-10m-port-harcourt': ['ada-george', ['first-car', 'buying', 'market-report']],
-    'inspection-walkaround-video': ['raph-nicks', ['inspection', 'video-guide']],
+    'inspection-walkaround-video': ['chukwudi-ofurum', ['inspection', 'video-guide']],
   };
 
   out.push(insert('blog_posts',
@@ -1051,7 +1051,7 @@ DELETE FROM service_cities;
     posts.map((p, i) => {
       const content = CONTENT.POST_BODIES[p[0]] || {};
       const hero = seedMedia.blogHero(p[0]) || '/img/seed/og-default.svg';
-      const byline = POST_BYLINE[p[0]] || ['raph-nicks', []];
+      const byline = POST_BYLINE[p[0]] || ['chukwudi-ofurum', []];
       return [i + 1, p[0], p[1], p[2], p[3], hero, p[4], p[5], p[6], p[7], 'published',
         new Date(Date.UTC(2026, 8, 28) - i * 4 * 86_400_000), p[8],
         JSON.stringify(p[2] === 'market_intel' ? ['Toyota', 'Honda'] : ['Toyota']),
@@ -1063,7 +1063,7 @@ DELETE FROM service_cities;
   // FR-35 — which posts carry which tags.
   const tagRows = [];
   posts.forEach((p, i) => {
-    const byline = POST_BYLINE[p[0]] || ['raph-nicks', []];
+    const byline = POST_BYLINE[p[0]] || ['chukwudi-ofurum', []];
     for (const slug of byline[1]) tagRows.push([i + 1, TAGS.findIndex((row) => row[0] === slug) + 1]);
   });
   out.push(insert('blog_post_tags', ['post_id', 'tag_id'], tagRows));

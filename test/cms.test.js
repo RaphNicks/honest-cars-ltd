@@ -101,7 +101,7 @@ test('block markup round-trips: markup → blocks → markup is stable', () => {
     '',
     '= 1,200 | cars inspected',
     '',
-    '> Honesty is the product. — Raph',
+    '> Honesty is the product. — Chukwudi Ofurum',
     '',
     '[cars]',
     '',
