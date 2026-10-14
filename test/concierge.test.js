@@ -45,6 +45,7 @@ function nextPhone() {
 
 const createdPhones = new Set();
 const createdRequests = new Set();
+const createdEmails = new Set();
 const createdPayments = new Set();
 
 function newClient() {
@@ -88,29 +89,26 @@ function newClient() {
 
 /** A signed-in staff member, for the ops side of the flow. */
 async function createAccount(role, label) {
-  const phone = nextPhone();
-  createdPhones.add(phone);
-  const { canonical } = require('../src/lib/phone');
-  await db.query('INSERT INTO `users` (phone, name, role, status) VALUES (?, ?, ?, ?)', [
-    canonical(phone),
-    `${label} (concierge test)`,
-    role,
-    'active',
-  ]);
-  const row = await db.queryOne('SELECT id FROM `users` WHERE phone = ? LIMIT 1', [canonical(phone)]);
+  const { makeAccount } = require('./helpers');
+  const account = await makeAccount({ role, name: `${label} (concierge test)` });
+  createdEmails.add(account.email);
   // §12.2: a fixture in a required role carries a second factor, or the gate
   // sends it to the enrolment screen instead of the money screens.
-  if (roles.MFA_ROLES.includes(role)) await enrolMfa(row.id);
+  const audience = role === 'customer' ? 'customer' : role === 'dealer' ? 'dealer' : 'staff';
+  if (roles.MFA_ROLES.includes(role)) await enrolMfa(account.id);
   const client = newClient();
-  const otp = await client.request('/api/auth/otp', { method: 'POST', body: { phone } });
-  assert.equal(otp.status, 200, `OTP failed for ${label}: ${otp.text}`);
-  const verify = await client.request('/api/auth/verify', { method: 'POST', body: { phone, code: otp.json.devCode } });
+  const otp = await client.request('/api/auth/email/otp', { method: 'POST', body: { email: account.email, audience } });
+  assert.equal(otp.status, 200, `code request failed for ${label}: ${otp.text}`);
+  const verify = await client.request('/api/auth/email/verify', {
+    method: 'POST',
+    body: { email: account.email, code: otp.json.devCode, audience },
+  });
   assert.equal(verify.status, 200, `sign-in failed for ${label}: ${verify.text}`);
   if (roles.MFA_ROLES.includes(role)) {
-    const finished = await completeMfa(client, { phone });
+    const finished = await completeMfa(client, { userId: account.id });
     assert.equal(finished.status, 200, `second factor failed for ${label}: ${finished.text}`);
   }
-  return { id: row.id, phone: canonical(phone), role, client };
+  return { id: account.id, email: account.email, role, client };
 }
 
 /** Submit a concierge brief the way the browser does: the SLA *key*, no price. */
@@ -175,6 +173,12 @@ test.after(async () => {
     await db.query(`DELETE FROM sessions WHERE user_id IN (SELECT id FROM \`users\` WHERE phone IN (${marks}))`, shapes);
     await db.query(`DELETE FROM auth_codes WHERE phone IN (${marks})`, shapes);
     await db.query(`DELETE FROM \`users\` WHERE phone IN (${marks})`, shapes);
+  }
+  if (createdEmails.size) {
+    const emails = [...createdEmails];
+    const emailMarks = emails.map(() => '?').join(',');
+    await db.query(`DELETE FROM email_auth_codes WHERE email IN (${emailMarks})`, emails);
+    await db.query(`DELETE FROM \`users\` WHERE email IN (${emailMarks})`, emails);
   }
   // Each test file is its own process; close the pool or the runner hangs.
   await db.pool.end();

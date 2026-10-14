@@ -17,10 +17,8 @@
         <p class="lead mb-0">
           <% if (user.emailVerified && user.email) { %>
             Signed in with <strong><%= user.email %></strong>.
-          <% } else if (user.phone) { %>
-            Signed in with phone <strong class="tabular"><%= user.maskedPhone %></strong>.
           <% } else { %>
-            Signed in to your customer account.
+            Signed in to your account.
           <% } %>
           Contact details are saved separately and are only needed when a request requires them.
         </p>
@@ -540,7 +538,7 @@
         </div>
 
         <div class="account-google-link mt-3">
-          <p class="note-inline"><strong>Google:</strong> <%= user.googleLinked ? 'Connected to this customer account.' : 'Not connected.' %></p>
+          <p class="note-inline"><strong>Google:</strong> <%= user.googleLinked ? 'Connected to this account.' : 'Not connected.' %></p>
           <% if (user.googleLinked) { %>
             <span class="badge badge--ghost">Google account linked</span>
           <% } else { %>

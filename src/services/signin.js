@@ -1,15 +1,61 @@
 'use strict';
 
+/**
+ * Sign-in credentials for every account — email OTP or Google, and nothing
+ * else. There are no passwords anywhere in this build, and phone numbers are
+ * never a sign-in credential (they are optional contact data on `users`).
+ *
+ * One credential system, three audiences:
+ *
+ *   customer — /login. Open registration: a verified email with no account
+ *              creates a customer account.
+ *   staff    — /admin/login (admin host). Provisioned accounts only; the
+ *              email must already carry a verified identity or nothing is
+ *              ever sent (no enumeration, no self-service registration).
+ *   dealer   — /dealer/login. Same closed rule as staff.
+ *
+ * The audience is chosen by the surface the form sits on and is checked at
+ * every step: a code requested at one surface can never open an account on
+ * another. Staff roles that move money still meet the TOTP challenge after
+ * this first factor (§12.2) — `mfaPending` is part of the session.
+ */
+
 const crypto = require('node:crypto');
 const { OAuth2Client } = require('google-auth-library');
 const config = require('../config');
 const db = require('../db');
 const auth = require('./auth');
 const email = require('./email');
+const mfa = require('./mfa');
+const roles = require('./roles');
 
 const GOOGLE_STATE_COOKIE = 'hc_google_state';
 const GOOGLE_STATE_TTL_MS = 10 * 60_000;
 const EMAIL_PURPOSES = ['sign_in', 'link'];
+const AUDIENCES = ['customer', 'staff', 'dealer'];
+
+/** Which sign-in surface a credential request belongs to. */
+function normaliseAudience(value) {
+  const audience = String(value || 'customer').trim().toLowerCase();
+  return AUDIENCES.includes(audience) ? audience : 'customer';
+}
+
+/** Does this account belong on this surface? Staff is the §7.4 console set. */
+function audienceMatches(user, audience) {
+  if (!user) return false;
+  const scope = normaliseAudience(audience);
+  if (scope === 'staff') return roles.isStaff(user.role);
+  if (scope === 'dealer') return user.role === 'dealer';
+  return user.role === 'customer';
+}
+
+/** Where a finished sign-in lands. Accepts an audience or the account's role. */
+function defaultRedirect(scopeOrRole) {
+  const value = String(scopeOrRole || 'customer').trim().toLowerCase();
+  if (value === 'staff' || roles.isStaff(value)) return '/admin';
+  if (value === 'dealer') return '/dealer/dashboard';
+  return '/account';
+}
 
 function resultError(code, status, message) {
   return { ok: false, code, status, error: message };
@@ -24,16 +70,22 @@ function googleClient() {
   return new OAuth2Client(config.googleAuth.clientId, config.googleAuth.clientSecret, config.googleAuth.redirectUri);
 }
 
-async function requestEmailCode({ rawEmail, purpose = 'sign_in', userId = null, ip = null }) {
+const UNAVAILABLE = 'We could not send a sign-in code to that email. Please contact Honest Cars for help.';
+const UNAVAILABLE_GOOGLE = 'We could not sign you in with Google here. Please contact Honest Cars for help.';
+const WRONG_SURFACE = 'That sign-in option is not available for this account. Please contact Honest Cars for help.';
+
+async function requestEmailCode({ rawEmail, purpose = 'sign_in', userId = null, ip = null, audience = 'customer' }) {
   const address = normaliseEmail(rawEmail);
   if (!address) return resultError('INVALID_EMAIL', 422, 'Enter a valid email address.');
   if (!EMAIL_PURPOSES.includes(purpose)) return resultError('INVALID_PURPOSE', 422, 'Choose a valid email verification action.');
+  const scope = normaliseAudience(audience);
 
   let owner = null;
   if (purpose === 'link') {
+    // Linking is an action of an already signed-in account, on any surface.
     owner = await db.users.findById(userId);
-    if (!owner || owner.role !== 'customer' || owner.status !== 'active') {
-      return resultError('CUSTOMER_SESSION_REQUIRED', 401, 'Sign in to your customer account before linking an email.');
+    if (!owner || owner.status !== 'active') {
+      return resultError('CUSTOMER_SESSION_REQUIRED', 401, 'Sign in to your account before linking an email.');
     }
     const verifiedOwner = await db.users.findByVerifiedEmail(address);
     if (verifiedOwner && Number(verifiedOwner.id) === Number(owner.id)) {
@@ -41,6 +93,15 @@ async function requestEmailCode({ rawEmail, purpose = 'sign_in', userId = null, 
     }
     if (verifiedOwner && Number(verifiedOwner.id) !== Number(owner.id)) {
       return resultError('EMAIL_IN_USE', 409, 'That verified email is already linked to another account.');
+    }
+  } else if (scope !== 'customer') {
+    // Staff and dealer sign-in is closed: the address must already carry a
+    // verified identity on an active account of the right role. Anything else
+    // gets the same flat refusal — the form cannot be used to probe who has
+    // an account here.
+    const existing = await db.users.findByVerifiedEmail(address);
+    if (!existing || existing.status !== 'active' || !audienceMatches(existing, scope)) {
+      return resultError('SIGN_IN_UNAVAILABLE', 404, UNAVAILABLE);
     }
   }
 
@@ -79,13 +140,14 @@ async function requestEmailCode({ rawEmail, purpose = 'sign_in', userId = null, 
   }
 
   await db.analytics
-    .record('email_otp_requested', { payload: { channel: delivery.channel, purpose }, sourcePath: '/login' })
+    .record('email_otp_requested', { payload: { channel: delivery.channel, purpose, audience: scope }, sourcePath: '/login' })
     .catch(() => {});
 
   return {
     ok: true,
     email: address,
     purpose,
+    audience: scope,
     channel: delivery.channel,
     delivered: delivery.delivered,
     expiresAt,
@@ -93,19 +155,27 @@ async function requestEmailCode({ rawEmail, purpose = 'sign_in', userId = null, 
   };
 }
 
-async function createCustomerSession(user, { ip = null, userAgent = null, source = 'email' } = {}) {
+/**
+ * The session, for every audience. The role check is the audience check: a
+ * customer surface never opens a staff account, and the reverse is also true.
+ * An enrolled account hands back an MFA-pending session — it has passed the
+ * first factor and nothing else (§12.2).
+ */
+async function createSession(user, { audience = 'customer', ip = null, userAgent = null, source = 'email' } = {}) {
+  const scope = normaliseAudience(audience);
   if (!user || user.status !== 'active') {
     return resultError('ACCOUNT_NOT_ACTIVE', 403, 'That account cannot sign in right now. Contact Honest Cars for help.');
   }
-  if (user.role !== 'customer') {
-    return resultError('CUSTOMER_ONLY', 403, 'This sign-in option is not available for this account. Please contact Honest Cars for help.');
+  if (!audienceMatches(user, scope)) {
+    return resultError(scope === 'customer' ? 'CUSTOMER_ONLY' : 'SIGN_IN_UNAVAILABLE', 403, scope === 'customer' ? WRONG_SURFACE : UNAVAILABLE);
   }
 
   const currentUser = await db.users.touchUser(user.id);
-  if (!currentUser || currentUser.status !== 'active' || currentUser.role !== 'customer') {
+  if (!currentUser || currentUser.status !== 'active' || !audienceMatches(currentUser, scope)) {
     return resultError('ACCOUNT_NOT_ACTIVE', 403, 'That account cannot sign in right now. Contact Honest Cars for help.');
   }
 
+  const mfaPending = mfa.mustChallenge(currentUser);
   const token = auth.newSessionToken();
   const expiresAt = new Date(Date.now() + config.auth.sessionDays * 86_400_000);
   await db.users.createSession({
@@ -114,14 +184,14 @@ async function createCustomerSession(user, { ip = null, userAgent = null, source
     expiresAt,
     ip,
     userAgent,
-    mfaPending: false,
+    mfaPending,
   });
   db.users.pruneSessions().catch(() => {});
   await db.analytics
-    .record('customer_sign_in_succeeded', { payload: { method: source }, sourcePath: '/login' })
+    .record('customer_sign_in_succeeded', { payload: { method: source, audience: scope }, sourcePath: '/login' })
     .catch(() => {});
 
-  return { ok: true, user: currentUser, token, expiresAt, mfaPending: false };
+  return { ok: true, user: currentUser, token, expiresAt, mfaPending };
 }
 
 async function verifyEmailCode({
@@ -133,12 +203,14 @@ async function verifyEmailCode({
   referralCode = null,
   ip = null,
   userAgent = null,
+  audience = 'customer',
 }) {
   const address = normaliseEmail(rawEmail);
   const cleanCode = String(code || '').replace(/\D/g, '');
   if (!address || !cleanCode) return resultError('INVALID_CODE', 422, 'Enter the email address and the code we sent you.');
   if (!EMAIL_PURPOSES.includes(purpose)) return resultError('INVALID_PURPOSE', 422, 'Choose a valid email verification action.');
   if (cleanCode.length < 4 || cleanCode.length > 8) return resultError('INVALID_CODE', 422, 'Enter the full code from your email.');
+  const scope = normaliseAudience(audience);
 
   const codeUserId = purpose === 'link' ? Number(userId) || 0 : null;
   const active = await db.users.findActiveEmailCode(address, purpose, codeUserId);
@@ -173,7 +245,14 @@ async function verifyEmailCode({
 
   let user = await db.users.findByVerifiedEmail(address);
   let newAccount = false;
-  if (!user) {
+
+  if (scope !== 'customer') {
+    // Closed surfaces: no registration, and the wrong role is the same flat
+    // refusal as no account at all.
+    if (!user || user.status !== 'active' || !audienceMatches(user, scope)) {
+      return resultError('SIGN_IN_UNAVAILABLE', 403, UNAVAILABLE);
+    }
+  } else if (!user) {
     const legacy = await db.users.findLegacyEmailOwner(address);
     if (legacy) {
       return resultError(
@@ -190,8 +269,8 @@ async function verifyEmailCode({
     } catch (error) {
       return resultError(error.code || 'ACCOUNT_CREATE_FAILED', error.code === 'LEGACY_EMAIL_REQUIRES_PHONE_LINK' ? 409 : 422, error.message || 'We could not open an account with that email.');
     }
-  } else if (user.role !== 'customer') {
-    return resultError('CUSTOMER_ONLY', 403, 'This sign-in option is not available for this account. Please contact Honest Cars for help.');
+  } else if (!audienceMatches(user, scope)) {
+    return resultError('CUSTOMER_ONLY', 403, WRONG_SURFACE);
   }
 
   if (user.status !== 'active') {
@@ -202,21 +281,27 @@ async function verifyEmailCode({
     user = await db.users.updateProfile(user.id, { name: String(name).trim().slice(0, 120) });
   }
 
-  const session = await createCustomerSession(user, { ip, userAgent, source: 'email_otp' });
+  const session = await createSession(user, { audience: scope, ip, userAgent, source: 'email_otp' });
   if (!session.ok) return session;
   session.newAccount = newAccount;
   return session;
 }
 
-function createGoogleState({ next = '/account', linkUserId = null, saveListingId = null } = {}) {
+// ---------------------------------------------------------------------------
+// Google OpenID Connect — the same three audiences, carried in the signed
+// state. The callback URI is single: one registration covers every surface.
+// ---------------------------------------------------------------------------
+function createGoogleState({ audience = 'customer', next = null, linkUserId = null, saveListingId = null } = {}) {
   const state = crypto.randomBytes(32).toString('base64url');
   const nonce = crypto.randomBytes(32).toString('base64url');
   const codeVerifier = crypto.randomBytes(32).toString('base64url');
+  const scope = normaliseAudience(audience);
   const payload = {
     state,
     nonce,
     codeVerifier,
-    next: auth.safeNextPath(next) || '/account',
+    audience: scope,
+    next: auth.safeNextPath(next) || defaultRedirect(scope),
     linkUserId: Number(linkUserId) || null,
     saveListingId: Number(saveListingId) || null,
     issuedAt: Date.now(),
@@ -244,6 +329,7 @@ function readGoogleState(cookie, state) {
   if (!state || !auth.safeEqual(String(state), String(payload.state || ''))) {
     throw Object.assign(new Error('That Google sign-in could not be verified. Start again.'), { code: 'GOOGLE_STATE_INVALID' });
   }
+  payload.audience = normaliseAudience(payload.audience);
   return payload;
 }
 
@@ -295,6 +381,7 @@ async function verifyGoogleCallback({ cookie, state, code }) {
 }
 
 async function signInWithGoogle(profile, options = {}) {
+  const scope = normaliseAudience(options.audience);
   let bySubject = await db.users.findByGoogleSubject(profile.subject);
   const byEmail = await db.users.findByVerifiedEmail(profile.email);
   if (bySubject && byEmail && Number(bySubject.id) !== Number(byEmail.id)) {
@@ -303,12 +390,20 @@ async function signInWithGoogle(profile, options = {}) {
 
   let user = bySubject;
   if (!user && byEmail) {
-    if (byEmail.role !== 'customer') return resultError('CUSTOMER_ONLY', 403, 'This sign-in option is not available for this account. Please contact Honest Cars for help.');
+    if (!audienceMatches(byEmail, scope)) {
+      return resultError(scope === 'customer' ? 'CUSTOMER_ONLY' : 'SIGN_IN_UNAVAILABLE', 403, scope === 'customer' ? WRONG_SURFACE : UNAVAILABLE_GOOGLE);
+    }
     try {
       user = await db.users.linkVerifiedEmail(byEmail.id, profile.email, { googleSubject: profile.subject });
     } catch (error) {
       return resultError(error.code || 'GOOGLE_LINK_FAILED', error.code === 'GOOGLE_IDENTITY_IN_USE' ? 409 : 422, error.message || 'We could not link that Google account.');
     }
+  }
+
+  if (!user && scope !== 'customer') {
+    // Closed surfaces never create accounts — Google must already be linked
+    // to a provisioned staff or dealer account.
+    return resultError('SIGN_IN_UNAVAILABLE', 403, UNAVAILABLE_GOOGLE);
   }
 
   if (!user) {
@@ -329,10 +424,12 @@ async function signInWithGoogle(profile, options = {}) {
     }
   }
 
-  if (user.role !== 'customer') return resultError('CUSTOMER_ONLY', 403, 'This sign-in option is not available for this account. Please contact Honest Cars for help.');
+  if (!audienceMatches(user, scope)) {
+    return resultError(scope === 'customer' ? 'CUSTOMER_ONLY' : 'SIGN_IN_UNAVAILABLE', 403, scope === 'customer' ? WRONG_SURFACE : UNAVAILABLE_GOOGLE);
+  }
   if (user.status !== 'active') return resultError('ACCOUNT_NOT_ACTIVE', 403, 'That account cannot sign in right now. Contact Honest Cars for help.');
   if (!user.name && profile.name) user = await db.users.updateProfile(user.id, { name: profile.name });
-  return createCustomerSession(user, { ...options, source: 'google' });
+  return createSession(user, { ...options, audience: scope, source: 'google' });
 }
 
 async function linkGoogleIdentity(userId, profile) {
@@ -349,11 +446,15 @@ async function linkEmail({ rawEmail, code, userId }) {
 }
 
 module.exports = {
+  AUDIENCES,
   GOOGLE_STATE_COOKIE,
   GOOGLE_STATE_TTL_MS,
+  normaliseAudience,
+  audienceMatches,
+  defaultRedirect,
   requestEmailCode,
   verifyEmailCode,
-  createCustomerSession,
+  createSession,
   createGoogleState,
   readGoogleState,
   beginGoogleAuth,

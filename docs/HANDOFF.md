@@ -1095,7 +1095,7 @@ other buildable rows).
 ## 3x. Running it on a laptop
 
 `docs/RUN-LOCALLY.md` is the guide: prerequisites (Node 20+, one MySQL),
-`docker-compose.yml` for the Docker path, the seeded sign-in numbers, the
+`docker-compose.yml` for the Docker path, the seeded sign-in emails, the
 admin/finance second factor, and a symptom→cause table. `README.md`'s quick
 start points there.
 
@@ -1214,8 +1214,10 @@ dropping it.
   `npm run lint`. Backticks inside `scripts/generate-seed.js` break its template
   literal; escape them and re-check.
 - **Tests** (`node:test`) skip themselves when MySQL is unreachable. They must not
-  read `dist/`. Mint sessions directly rather than signing in via OTP — OTP tests
-  leak `auth_codes` and `otp_*` rows nothing can clean up.
+  read `dist/`. Fixtures are accounts with a verified sign-in email
+  (`test/helpers.js` `makeAccount` / `nextEmail`); suites sign in through the
+  email-code endpoint and sweep their own `email_auth_codes` and account rows in
+  `test.after` — a test must never leave the dev database dirtier than it found it.
 - **The service worker (FR-30)** must never cache what the server marked
   `private`/`no-store`, must never answer `/api/`, `/admin`, `/dealer`,
   `/account` or checkout, and must not grow a second enquiry queue — that is

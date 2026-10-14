@@ -642,7 +642,7 @@ async function confirmFresh(dealerId, listingId) {
  */
 async function dealerAccounts() {
   const rows = await query(
-    `SELECT u.id, u.name, u.phone, u.status, d.id AS dealer_id, d.name AS lot_name, d.tier
+    `SELECT u.id, u.name, u.phone, u.email, u.status, d.id AS dealer_id, d.name AS lot_name, d.tier
        FROM \`users\` u
        LEFT JOIN dealers d ON d.user_id = u.id
       WHERE u.role = 'dealer'
@@ -652,6 +652,7 @@ async function dealerAccounts() {
     id: row.id,
     name: row.name,
     phone: row.phone,
+    signInEmail: row.email || null,
     status: row.status,
     lotId: row.dealer_id || null,
     lotName: row.lot_name || null,

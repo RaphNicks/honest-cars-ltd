@@ -42,6 +42,7 @@ function nextPhone() {
 }
 
 const createdPhones = new Set();
+const createdEmails = new Set();
 /** Row counts for every table a report reads, taken before the suite runs. */
 let identityBefore = null;
 
@@ -77,25 +78,18 @@ function newClient() {
 }
 
 async function createAccount(role, label) {
-  const phone = nextPhone();
-  createdPhones.add(phone);
-  const { canonical } = require('../src/lib/phone');
-  await db.query('INSERT INTO `users` (phone, name, role, status) VALUES (?, ?, ?, ?)', [
-    canonical(phone),
-    `${label} (reports test)`,
-    role,
-    'active',
-  ]);
-  const row = await db.queryOne('SELECT id FROM `users` WHERE phone = ? LIMIT 1', [canonical(phone)]);
+  const { makeAccount } = require('./helpers');
+  const account = await makeAccount({ role, name: `${label} (reports test)` });
+  createdEmails.add(account.email);
   const client = newClient();
-  const otp = await client.request('/api/auth/otp', { method: 'POST', body: { phone } });
-  assert.equal(otp.status, 200, `OTP failed: ${otp.text}`);
-  const verify = await client.request('/api/auth/verify', {
+  const otp = await client.request('/api/auth/email/otp', { method: 'POST', body: { email: account.email, audience: 'staff' } });
+  assert.equal(otp.status, 200, `code request failed: ${otp.text}`);
+  const verify = await client.request('/api/auth/email/verify', {
     method: 'POST',
-    body: { phone, code: JSON.parse(otp.text).devCode },
+    body: { email: account.email, code: JSON.parse(otp.text).devCode, audience: 'staff' },
   });
   assert.equal(verify.status, 200, `sign-in failed: ${verify.text}`);
-  return { id: row.id, role, client };
+  return { id: account.id, role, client };
 }
 
 /** What the database holds in the tables these reports read. */
@@ -129,6 +123,12 @@ test.after(async () => {
     await db.query(`DELETE FROM sessions WHERE user_id IN (SELECT id FROM \`users\` WHERE phone IN (${marks}))`, shapes);
     await db.query(`DELETE FROM auth_codes WHERE phone IN (${marks})`, shapes);
     await db.query(`DELETE FROM \`users\` WHERE phone IN (${marks})`, shapes);
+  }
+  if (createdEmails.size) {
+    const emails = [...createdEmails];
+    const emailMarks = emails.map(() => '?').join(',');
+    await db.query(`DELETE FROM email_auth_codes WHERE email IN (${emailMarks})`, emails);
+    await db.query(`DELETE FROM \`users\` WHERE email IN (${emailMarks})`, emails);
   }
   await db.pool.end();
 });

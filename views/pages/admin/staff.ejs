@@ -36,7 +36,7 @@
       <thead>
         <tr>
           <th scope="col">Name</th>
-          <th scope="col">Phone</th>
+          <th scope="col">Sign-in email</th>
           <th scope="col">Role</th>
           <th scope="col">Status</th>
           <th scope="col">Watchlist</th>
@@ -47,7 +47,24 @@
         <% staff.forEach(function (person) { %>
           <tr>
             <th scope="row"><%= person.name %></th>
-            <td class="tabular"><%= person.maskedPhone %></td>
+            <td>
+              <% if (person.hasSignIn) { %>
+                <span class="tabular"><%= person.signInEmail || 'linked email' %></span>
+                <% if (person.maskedPhone) { %><br><span class="muted">contact: <%= person.maskedPhone %></span><% } %>
+                <form method="post" action="/admin/staff/<%= person.id %>/email" class="inline-form">
+                  <label class="visually-hidden" for="email-<%= person.id %>">Sign-in email for <%= person.name %></label>
+                  <input class="input input--compact" id="email-<%= person.id %>" name="email" type="email" maxlength="160" placeholder="new address">
+                  <button class="btn btn--ghost btn--sm" type="submit">Change</button>
+                </form>
+              <% } else { %>
+                <span class="badge badge--attention">none — cannot sign in</span>
+                <form method="post" action="/admin/staff/<%= person.id %>/email" class="inline-form">
+                  <label class="visually-hidden" for="email-<%= person.id %>">Sign-in email for <%= person.name %></label>
+                  <input class="input input--compact" id="email-<%= person.id %>" name="email" type="email" maxlength="160" placeholder="name@example.com" required>
+                  <button class="btn btn--primary btn--sm" type="submit">Set</button>
+                </form>
+              <% } %>
+            </td>
             <td>
               <span class="badge badge--role-<%= person.role %>"><%= roleLabels[person.role] || person.role %></span>
               <br><span class="muted">may <%= capabilitiesFor(person.role).slice(0, 3).join(' · ') %><%= capabilitiesFor(person.role).length > 4 ? ' …' : '' %></span>
@@ -81,6 +98,8 @@
   <% } %>
   <p class="note-inline mb-0">
     Setting a role is audited. You cannot drop your own admin role — a second admin has to do it.
+    Staff and dealer accounts sign in with an email code or Google: the sign-in email here is the
+    address the one-time code goes to, and changing it is audited too.
   </p>
 </section>
 
@@ -105,7 +124,7 @@
             <tr>
               <th scope="row">
                 <%= account.name %>
-                <span class="listing-row__meta tabular"><%= account.phone %><%= account.status !== 'active' ? ' · ' + account.status : '' %></span>
+                <span class="listing-row__meta tabular"><%= account.signInEmail || account.phone || '' %><%= account.status !== 'active' ? ' · ' + account.status : '' %></span>
               </th>
               <td>
                 <% if (account.lotId) { %>

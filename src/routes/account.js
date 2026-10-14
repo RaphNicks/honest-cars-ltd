@@ -3,7 +3,7 @@
 /**
  * Customer account — §7.1.
  *
- *   GET  /login              customer email code / Google and legacy phone code
+ *   GET  /login              customer sign-in — email code or Google, nothing else
  *   GET  /account            dashboard: requests, hire, bookings, orders,
  *                            receipts, tracker subscriptions, saved cars,
  *                            saved searches, referrals
@@ -23,7 +23,7 @@ const express = require('express');
 const config = require('../config');
 const db = require('../db');
 const auth = require('../services/auth');
-const customerAuth = require('../services/customer-auth');
+const signin = require('../services/signin');
 const emailService = require('../services/email');
 const roles = require('../services/roles');
 const validate = require('../services/validate');
@@ -48,6 +48,7 @@ const DASHBOARD_PATH = '/account';
 const ACCOUNT_AUTH_ERRORS = {
   google_not_configured: 'Google sign-in is not configured yet. Email verification remains available.',
   customer_only: 'That Google sign-in option is not available for this account. Please contact Honest Cars for help.',
+  sign_in_unavailable: 'That sign-in option is not available for this account. Please contact Honest Cars for help.',
   google_cancelled: 'Google linking was cancelled. No changes were made.',
   google_link_session: 'Your customer session changed before the Google account could be linked. Sign in again and retry.',
   google_account_conflict: 'That Google account and email are linked to different customer accounts. Contact Honest Cars before continuing.',
@@ -61,6 +62,7 @@ const ACCOUNT_AUTH_ERRORS = {
 
 const LOGIN_AUTH_ERRORS = {
   customer_only: 'That sign-in option is not available for this account. Please use your email instead.',
+  sign_in_unavailable: 'That sign-in option is not available for this account. Please contact Honest Cars for help.',
   google_not_configured: 'Google sign-in is not configured yet. Use an email code instead.',
   google_cancelled: 'Google sign-in was cancelled. You can use an email code instead.',
   google_link_session: 'Your customer session changed before the Google account could be linked. Sign in again and retry.',
@@ -94,6 +96,7 @@ function loginLocals({ next, reason, ref: referralCode, save, authError } = {}) 
     },
     data: {
       next: auth.safeNextPath(next) || '',
+      audience: 'customer',
       reason: validate.text(reason, 80) || null,
       ref: validate.text(referralCode, 16).toUpperCase(),
       save: validate.integer(save, { min: 1, fallback: 0 }) || '',
@@ -110,7 +113,7 @@ function loginLocals({ next, reason, ref: referralCode, save, authError } = {}) 
   };
 }
 
-function staffLoginLocals({ next, reason } = {}) {
+function staffLoginLocals({ next, reason, authError = null } = {}) {
   return {
     view: 'staff-login',
     page: {
@@ -125,11 +128,15 @@ function staffLoginLocals({ next, reason } = {}) {
     },
     data: {
       next: auth.safeNextPath(next) || '/admin',
+      audience: 'staff',
       reason: validate.text(reason, 80) || null,
+      authErrorMessage: LOGIN_AUTH_ERRORS[validate.text(authError, 80).toLowerCase()] || '',
+      googleReady: config.googleAuth.configured,
+      mailReady: config.mail.configured,
+      development: !config.isProduction,
       otp: {
         length: config.auth.otpLength,
-        provider: config.auth.provider,
-        whatsappLink: `https://wa.me/${config.business.whatsapp}?text=${encodeURIComponent('Hi HonestCars, I cannot receive the staff sign-in code.')}`,
+        ttlMinutes: config.auth.otpTtlMinutes,
       },
     },
   };
@@ -143,7 +150,7 @@ router.get('/login', async (req, res, next) => {
     if (isAdminHost(req)) {
       if (req.user) return res.redirect(302, auth.safeNextPath(req.query.next) || '/admin');
       return await sendPage(req, res, {
-        ...staffLoginLocals({ next: req.query.next, reason: req.query.reason }),
+        ...staffLoginLocals({ next: req.query.next, reason: req.query.reason, authError: req.query.auth_error }),
         routePath: '/login',
         cache: CACHE.private,
       });
@@ -176,7 +183,7 @@ router.get('/admin/login', async (req, res, next) => {
     }
     if (req.user && roles.isStaff(req.user.role)) return res.redirect(302, nextPath);
     return await sendPage(req, res, {
-      ...staffLoginLocals({ next: nextPath, reason: req.query.reason }),
+      ...staffLoginLocals({ next: nextPath, reason: req.query.reason, authError: req.query.auth_error }),
       routePath: '/admin/login',
       cache: CACHE.private,
     });
@@ -215,7 +222,7 @@ router.get('/login/mfa', async (req, res, next) => {
       },
       data: {
         next: auth.safeNextPath(req.query.next) || '',
-        maskedPhone: req.user.maskedPhone || null,
+        maskedEmail: req.user.email ? emailService.maskEmail(req.user.email) : null,
         attemptsLeft: Math.max(0, (db.mfa.MAX_ATTEMPTS || 5) - (req.session.mfaAttempts || 0)),
         issuer: mfaService.ISSUER,
         contactWhatsapp: `https://wa.me/${config.business.whatsapp}?text=${encodeURIComponent('Hi HonestCars, I am stuck at the two-step sign-in.')}`,
@@ -841,12 +848,12 @@ router.post('/api/account/saved-searches', auth.sameOriginOnly, auth.requireUser
 });
 
 // ---------------------------------------------------------------------------
-// Verified email linking — a legacy phone account must be authenticated first.
+// Verified email linking — for any signed-in account, staff and dealers
+// included. The code proves the address before it becomes a sign-in credential.
 // ---------------------------------------------------------------------------
 router.post('/api/account/email/otp', auth.sameOriginOnly, auth.requireUser, async (req, res, next) => {
   try {
-    if (req.user.role !== 'customer') return sendJson(res, { ok: false, error: 'Email sign-in is for customer accounts only.' }, { status: 403 });
-    const result = await customerAuth.requestEmailCode({
+    const result = await signin.requestEmailCode({
       rawEmail: (req.body || {}).email,
       purpose: 'link',
       userId: req.user.id,
@@ -868,9 +875,8 @@ router.post('/api/account/email/otp', auth.sameOriginOnly, auth.requireUser, asy
 
 router.post('/api/account/email/verify', auth.sameOriginOnly, auth.requireUser, async (req, res, next) => {
   try {
-    if (req.user.role !== 'customer') return sendJson(res, { ok: false, error: 'Email sign-in is for customer accounts only.' }, { status: 403 });
     const body = req.body || {};
-    const result = await customerAuth.linkEmail({
+    const result = await signin.linkEmail({
       rawEmail: body.email,
       code: validate.text(body.code, 12),
       userId: req.user.id,

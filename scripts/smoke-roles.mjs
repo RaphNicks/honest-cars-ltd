@@ -12,8 +12,10 @@
  * must redirect to /login.
  *
  * It only reads: no listing is published, no payment is confirmed, no role is
- * changed. Signs-in use the development OTP (`devCode`), so this only works
- * while AUTH_SHOW_CODE is on — which it is in development, and only there.
+ * changed. Sign-ins use the development email code (`devCode`), so this only
+ * works while AUTH_SHOW_CODE is on — which it is in development, and only
+ * there. Every account signs in with an email code or Google: there is no
+ * phone sign-in anywhere in this build.
  *
  * Exit code is non-zero if a role sees something the matrix does not grant, or
  * is refused something it should hold, so it can be wired into CI as-is.
@@ -31,12 +33,13 @@ const totp = require('../src/lib/totp');
  *
  * These are the *seeded* secrets, written in db/seed.sql for a demo database
  * that has to be sign-in-able by a script. A real install has none of this: a
- * person enrols their own phone at /admin/security and nobody else holds the
- * key. The script completes the challenge exactly the way the browser does.
+ * person enrols their own authenticator at /admin/security and nobody else
+ * holds the key. The script completes the challenge exactly the way the
+ * browser does.
  */
 const MFA_SECRETS = {
-  '+2348000000001': 'JBSWY3DPEHPK3PXP',
-  '+2348000000004': 'KRSXG5CTMVRXEZLU',
+  'admin@honestcars.test': 'JBSWY3DPEHPK3PXP',
+  'finance@honestcars.test': 'KRSXG5CTMVRXEZLU',
 };
 
 const BASE = (process.argv[2] || process.env.SMOKE_BASE || 'http://127.0.0.1:3000').replace(/\/$/, '');
@@ -64,11 +67,11 @@ const PAGES_ADMIN = [
  * this list. (Admin was missing the CMS paths for exactly that reason.)
  */
 const ROLES = [
-  { phone: '+2348000000001', role: 'admin', must: PAGES_ADMIN },
-  { phone: '+2348000000002', role: 'ops', must: ['/admin', '/admin/listings', '/admin/leads', '/admin/concierge', '/admin/bookings', '/admin/alerts', '/admin/intel', '/admin/reports', '/admin/marketing', '/admin/hire', '/admin/dealers', '/admin/dealers/2', '/admin/settings', '/admin/referrals', '/admin/financing', '/admin/privacy', '/admin/security'] },
-  { phone: '+2348000000003', role: 'inspector', must: ['/admin/jobs', '/admin/security'] },
-  { phone: '+2348000000004', role: 'finance', must: ['/admin', '/admin/orders', '/admin/payments', '/admin/milestones', '/admin/reports', '/admin/subscriptions', '/admin/hire', '/admin/dealers', '/admin/dealers/2', '/admin/referrals', '/admin/financing', '/admin/security'] },
-  { phone: '+2348000000005', role: 'marketing', must: ['/admin', '/admin/cms', '/admin/cms/calendar', '/admin/cms/pages', '/admin/cms/faqs', '/admin/cms/testimonials', '/admin/cms/modules', '/admin/intel', '/admin/reports', '/admin/marketing', '/admin/security'] },
+  { email: 'admin@honestcars.test', role: 'admin', must: PAGES_ADMIN },
+  { email: 'ops@honestcars.test', role: 'ops', must: ['/admin', '/admin/listings', '/admin/leads', '/admin/concierge', '/admin/bookings', '/admin/alerts', '/admin/intel', '/admin/reports', '/admin/marketing', '/admin/hire', '/admin/dealers', '/admin/dealers/2', '/admin/settings', '/admin/referrals', '/admin/financing', '/admin/privacy', '/admin/security'] },
+  { email: 'inspector@honestcars.test', role: 'inspector', must: ['/admin/jobs', '/admin/security'] },
+  { email: 'finance@honestcars.test', role: 'finance', must: ['/admin', '/admin/orders', '/admin/payments', '/admin/milestones', '/admin/reports', '/admin/subscriptions', '/admin/hire', '/admin/dealers', '/admin/dealers/2', '/admin/referrals', '/admin/financing', '/admin/security'] },
+  { email: 'marketing@honestcars.test', role: 'marketing', must: ['/admin', '/admin/cms', '/admin/cms/calendar', '/admin/cms/pages', '/admin/cms/faqs', '/admin/cms/testimonials', '/admin/cms/modules', '/admin/intel', '/admin/reports', '/admin/marketing', '/admin/security'] },
 ];
 
 /** Pages probed for every role; the verdict comes from `must`. */
@@ -79,14 +82,14 @@ const ROLES = [
 const MUST_NOT = [
   // Marketing runs the channel report but does not see the ledgers, and finance
   // reads the money without seeing where the traffic came from (§7.4).
-  { phone: '+2348000000005', role: 'marketing', blocked: ['/admin/payments', '/admin/milestones', '/admin/staff', '/admin/audit', '/admin/subscriptions', '/admin/hire', '/admin/dealers', '/admin/referrals', '/admin/privacy'] },
-  { phone: '+2348000000004', role: 'finance', blocked: ['/admin/marketing', '/admin/privacy'] },
+  { email: 'marketing@honestcars.test', role: 'marketing', blocked: ['/admin/payments', '/admin/milestones', '/admin/staff', '/admin/audit', '/admin/subscriptions', '/admin/hire', '/admin/dealers', '/admin/referrals', '/admin/privacy'] },
+  { email: 'finance@honestcars.test', role: 'finance', blocked: ['/admin/marketing', '/admin/privacy'] },
   // Renewals are a money queue with a customer attached: ops runs the listings
   // and the leads, and does not need to see what anyone pays us (§7.4).
-  { phone: '+2348000000002', role: 'ops', blocked: ['/admin/subscriptions'] },
+  { email: 'ops@honestcars.test', role: 'ops', blocked: ['/admin/subscriptions'] },
   // §18.3's request log is admin/ops only — it is a list of people who asked us
   // to delete their data, so the inspector and the money desk are refused it.
-  { phone: '+2348000000003', role: 'inspector', blocked: ['/admin/privacy'] },
+  { email: 'inspector@honestcars.test', role: 'inspector', blocked: ['/admin/privacy'] },
 ];
 
 const PAGES = [
@@ -113,8 +116,11 @@ const DEALER_PAGES = [
   '/dealer/leads', '/dealer/performance', '/dealer/billing', '/dealer/profile',
   '/dealer/addons', '/dealer/imports',
 ];
-const DEALER_PHONE = '+2348000000006';
-const CUSTOMER_PHONE = '+2348031234567';
+const DEALER_EMAIL = 'abaroad@honestcars.test';
+// A customer account of the smoke's own: open registration, exactly the path a
+// real visitor takes. Seeded demo customers are phone-era rows with no sign-in
+// identity, which is deliberate (see migration 034).
+const CUSTOMER_EMAIL = 'role-smoke-customer@example.net';
 
 const GREEN = '\u001b[32m';
 const RED = '\u001b[31m';
@@ -150,56 +156,62 @@ function newClient() {
   };
 }
 
-async function signIn(phone) {
+async function signIn(email, { audience = 'staff', name = 'Role Smoke' } = {}) {
   const client = newClient();
-  const otp = await client.request('/api/auth/otp', { method: 'POST', body: { phone } });
+  const otp = await client.request('/api/auth/email/otp', { method: 'POST', body: { email, audience } });
   if (!otp.json || !otp.json.devCode) {
-    // Two independent limits can 429 a sign-in: the per-number hourly cap
-    // (rows in auth_codes, which we cleared above) and the in-process limiter
-    // on the request IP. The second one only resets with the server, so say
-    // which it is instead of leaving a bare 429.
+    // Two independent limits can 429 a sign-in: the per-address hourly cap
+    // (rows in email_auth_codes, which we cleared above) and the in-process
+    // limiter on the request IP. The second one only resets with the server, so
+    // say which it is instead of leaving a bare 429.
     const hint = otp.status === 429
-      ? 'the in-process rate limiter has tripped — restart the dev server (or wait 15 minutes); the per-number codes were already cleared for this run'
-      : 'is AUTH_SHOW_CODE on, and is the site running?';
-    throw new Error(`No devCode for ${phone} (HTTP ${otp.status}) — ${hint}`);
+      ? 'the in-process rate limiter has tripped — restart the dev server (or wait 15 minutes); the per-address codes were already cleared for this run'
+      : 'is AUTH_SHOW_CODE on, is the site running, and does this account have a sign-in email?';
+    throw new Error(`No devCode for ${email} (HTTP ${otp.status}) — ${hint}`);
   }
-  const verify = await client.request('/api/auth/verify', { method: 'POST', body: { phone, code: otp.json.devCode } });
-  if (verify.status !== 200) throw new Error(`Sign-in failed for ${phone}: ${verify.status} ${verify.text.slice(0, 120)}`);
-  const secret = MFA_SECRETS[phone];
+  const verify = await client.request('/api/auth/email/verify', {
+    method: 'POST',
+    body: { email, code: otp.json.devCode, audience, name },
+  });
+  if (verify.status !== 200) throw new Error(`Sign-in failed for ${email}: ${verify.status} ${verify.text.slice(0, 120)}`);
+  const secret = MFA_SECRETS[email];
   if (secret) {
     const challenge = await client.request('/api/auth/mfa', { method: 'POST', body: { code: totp.code(secret) } });
     if (challenge.status !== 200) {
-      throw new Error(`Second factor failed for ${phone}: ${challenge.status} ${challenge.text.slice(0, 140)}`);
+      throw new Error(`Second factor failed for ${email}: ${challenge.status} ${challenge.text.slice(0, 140)}`);
     }
   }
   return client;
 }
 
 /**
- * One signed-in client per number for the whole run.
+ * One signed-in client per account for the whole run.
  *
- * §12.2 makes a second sign-in inside the same 30-second window a *correct*
- * refusal — the code was spent by the first one — so a script that signs the
- * same account in twice would fail on the app behaving properly. A person does
- * what the error message says and waits for the next code; a script keeps the
+ * The per-address code cap makes a second sign-in inside the same hour a
+ * *correct* refusal once the codes are spent — so a script that signs the same
+ * account in twice would fail on the app behaving properly. A person does what
+ * the error message says and waits for the next code; a script keeps the
  * session it has.
  */
 const signedIn = new Map();
-async function clientFor(phone) {
-  if (!signedIn.has(phone)) signedIn.set(phone, await signIn(phone));
-  return signedIn.get(phone);
+async function clientFor(email, options = {}) {
+  if (!signedIn.has(email)) signedIn.set(email, await signIn(email, options));
+  return signedIn.get(email);
 }
 
 /**
  * Sign in *without* the second factor, so the gate can be seen doing its job.
  * Returns the half-signed-in client and its verdict on a console path.
  */
-async function signInHalfWay(phone) {
+async function signInHalfWay(email, { audience = 'staff', name = 'Role Smoke' } = {}) {
   const client = newClient();
-  const otp = await client.request('/api/auth/otp', { method: 'POST', body: { phone } });
-  if (!otp.json || !otp.json.devCode) throw new Error(`No devCode for ${phone} (HTTP ${otp.status})`);
-  const verify = await client.request('/api/auth/verify', { method: 'POST', body: { phone, code: otp.json.devCode } });
-  if (verify.status !== 200) throw new Error(`Sign-in failed for ${phone}: ${verify.status}`);
+  const otp = await client.request('/api/auth/email/otp', { method: 'POST', body: { email, audience } });
+  if (!otp.json || !otp.json.devCode) throw new Error(`No devCode for ${email} (HTTP ${otp.status})`);
+  const verify = await client.request('/api/auth/email/verify', {
+    method: 'POST',
+    body: { email, code: otp.json.devCode, audience, name },
+  });
+  if (verify.status !== 200) throw new Error(`Sign-in failed for ${email}: ${verify.status}`);
   return { client, verify };
 }
 
@@ -214,9 +226,10 @@ function report(role, path, status, expected) {
   console.log(`  ${mark} ${label}  ${path.padEnd(24)} ${DIM}${note}${OFF}`);
 }
 
-// The 5-codes-per-number-per-hour policy counts codes already sent, so a repeat
-// run would 429 mid-sign-in. Clear this run's own numbers' spent codes first.
-await clearDevCodes([...ROLES.map((entry) => entry.phone), DEALER_PHONE, CUSTOMER_PHONE], {
+// The 5-codes-per-address-per-hour policy counts codes already sent, so a
+// repeat run would 429 mid-sign-in. Clear this run's own accounts' spent codes
+// first.
+await clearDevCodes([...ROLES.map((entry) => entry.email), DEALER_EMAIL, CUSTOMER_EMAIL], {
   label: 'role',
   resetMfa: true,
 });
@@ -235,8 +248,8 @@ console.log(`${anonBad ? `${RED}✗${OFF}` : `${GREEN}✓${OFF}`} anonymous   ${
 
 // 2. Each seeded role.
 for (const staff of ROLES) {
-  const client = await clientFor(staff.phone);
-  console.log(`\n${staff.role.padEnd(10)} ${DIM}${staff.phone}${OFF}`);
+  const client = await clientFor(staff.email);
+  console.log(`\n${staff.role.padEnd(10)} ${DIM}${staff.email}${OFF}`);
   for (const path of PAGES) {
     const response = await client.request(path);
     report(staff.role, path, response.status, staff.must.includes(path));
@@ -245,7 +258,7 @@ for (const staff of ROLES) {
 
 // 3. Roles whose remit excludes a screen must be refused it.
 for (const entry of MUST_NOT) {
-  const client = await clientFor(entry.phone);
+  const client = await clientFor(entry.email);
   let leaks = 0;
   for (const path of entry.blocked) {
     const response = await client.request(path);
@@ -258,8 +271,8 @@ for (const entry of MUST_NOT) {
 
 // 4. The dealer portal (§7.2): open to its own lot, closed to the console, and
 //    the console closed to it in turn.
-const dealer = await clientFor(DEALER_PHONE);
-console.log(`\n${'dealer'.padEnd(10)} ${DIM}${DEALER_PHONE}${OFF}`);
+const dealer = await clientFor(DEALER_EMAIL, { audience: 'dealer', name: 'Role Smoke Dealer' });
+console.log(`\n${'dealer'.padEnd(10)} ${DIM}${DEALER_EMAIL}${OFF}`);
 let dealerBad = 0;
 for (const path of DEALER_PAGES) {
   const response = await dealer.request(path);
@@ -274,11 +287,11 @@ for (const path of PAGES) {
 failures += dealerBad;
 
 // 4b. §12.2 — the second factor is a wall, not a suggestion. A session that has
-//     passed the phone step and not the factor opens nothing but the challenge,
+//     passed the email step and not the factor opens nothing but the challenge,
 //     and the challenge itself is a form on a page.
-for (const phone of Object.keys(MFA_SECRETS)) {
-  const { client, verify } = await signInHalfWay(phone);
-  const label = `half-signed-in ${phone}`;
+for (const email of Object.keys(MFA_SECRETS)) {
+  const { client, verify } = await signInHalfWay(email);
+  const label = `half-signed-in ${email}`;
   const checks = [
     ['/admin', 302],
     ['/api/account/saved-cars', 401],
@@ -306,9 +319,12 @@ for (const phone of Object.keys(MFA_SECRETS)) {
 
 // 5. A customer must never see a console page, and never the dealer portal.
 const customer = newClient();
-const otp = await customer.request('/api/auth/otp', { method: 'POST', body: { phone: CUSTOMER_PHONE } });
+const otp = await customer.request('/api/auth/email/otp', { method: 'POST', body: { email: CUSTOMER_EMAIL } });
 if (otp.json && otp.json.devCode) {
-  await customer.request('/api/auth/verify', { method: 'POST', body: { phone: CUSTOMER_PHONE, code: otp.json.devCode } });
+  await customer.request('/api/auth/email/verify', {
+    method: 'POST',
+    body: { email: CUSTOMER_EMAIL, code: otp.json.devCode, name: 'Role Smoke Customer' },
+  });
   let leaks = 0;
   for (const path of PAGES) {
     const response = await customer.request(path);

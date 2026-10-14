@@ -11,8 +11,8 @@
  * The suite makes its own staff accounts (unique numbers, roles granted by
  * direct SQL — that step is the operator's, not the thing under test) and its
  * own scratch listings, then removes everything in test.after. It never signs
- * in as the seeded +2348000000001 account: the per-phone OTP cap is 5 an
- * hour, and five runs of the suite would lock the demo admin out.
+ * in as a seeded demo account: the per-email code cap is 5 an hour, and five
+ * runs of the suite would lock the demo admin out.
  */
 
 const test = require('node:test');
@@ -42,6 +42,7 @@ function nextPhone() {
 const createdPhones = new Set();
 const createdListings = [];
 const accounts = {};
+const createdEmails = new Set();
 /**
  * The freshness sweep is deliberately global: it flags every idle live listing
  * in the database. That includes seeded stock, so the suite records what was
@@ -95,34 +96,28 @@ function newClient() {
   };
 }
 
-/** Create a throwaway account with a staff role and sign it in. */
+/** Create a throwaway account and sign it in — email code or Google is all there is. */
 async function createAccount(role, label) {
-  const phone = nextPhone();
-  createdPhones.add(phone);
-  const { canonical } = require('../src/lib/phone');
-  await db.query('INSERT INTO `users` (phone, name, role, status) VALUES (?, ?, ?, ?)', [
-    canonical(phone),
-    `${label} (console test)`,
-    role,
-    'active',
-  ]);
-  const row = await db.queryOne('SELECT id FROM `users` WHERE phone = ? LIMIT 1', [canonical(phone)]);
+  const { makeAccount } = require('./helpers');
+  const account = await makeAccount({ role, name: `${label} (console test)` });
+  createdEmails.add(account.email);
   // §12.2: `admin` and `finance` cannot use the console without a second
   // factor, so the fixture has one — the state a real member of staff is in.
-  if (roles.MFA_ROLES.includes(role)) await enrolMfa(row.id);
+  if (roles.MFA_ROLES.includes(role)) await enrolMfa(account.id);
+  const audience = role === 'customer' ? 'customer' : role === 'dealer' ? 'dealer' : 'staff';
   const client = newClient();
-  const otp = await client.request('/api/auth/otp', { method: 'POST', body: { phone } });
-  assert.equal(otp.status, 200, `OTP request failed for ${label}: ${otp.text}`);
-  const verify = await client.request('/api/auth/verify', {
+  const otp = await client.request('/api/auth/email/otp', { method: 'POST', body: { email: account.email, audience } });
+  assert.equal(otp.status, 200, `code request failed for ${label}: ${otp.text}`);
+  const verify = await client.request('/api/auth/email/verify', {
     method: 'POST',
-    body: { phone, code: otp.json.devCode },
+    body: { email: account.email, code: otp.json.devCode, audience },
   });
   assert.equal(verify.status, 200, `sign-in failed for ${label}: ${verify.text}`);
   if (roles.MFA_ROLES.includes(role)) {
-    const finished = await completeMfa(client, { phone });
+    const finished = await completeMfa(client, { userId: account.id });
     assert.equal(finished.status, 200, `second factor failed for ${label}: ${finished.text}`);
   }
-  return { id: row.id, phone, role, client };
+  return { id: account.id, email: account.email, role, client };
 }
 
 /** A listing the tests can push around without disturbing the storefront. */
@@ -193,6 +188,13 @@ test.after(async () => {
       await db.query(`UPDATE admin_audit SET actor_id = NULL WHERE actor_id IN (SELECT id FROM \`users\` WHERE phone IN (${marks}))`, shapes);
       await db.query(`DELETE FROM \`users\` WHERE phone IN (${marks})`, shapes);
     }
+    if (createdEmails.size) {
+      const emails = [...createdEmails];
+      const emailMarks = emails.map(() => '?').join(',');
+      await db.query(`DELETE FROM email_auth_codes WHERE email IN (${emailMarks})`, emails);
+      await db.query(`UPDATE admin_audit SET actor_id = NULL WHERE actor_id IN (SELECT id FROM \`users\` WHERE email IN (${emailMarks}))`, emails);
+      await db.query(`DELETE FROM \`users\` WHERE email IN (${emailMarks})`, emails);
+    }
     // The fixtures above are gone; drop the audit rows that named them so
     // /admin/audit shows history about rows that exist (see test/helpers.js).
     await sweepOrphanAudit(db.query);
@@ -209,8 +211,10 @@ maybe('the staff sign-in page is separate from customer sign-in in single-origin
   const staffLogin = await anon.request('/admin/login');
   assert.equal(staffLogin.status, 200);
   assert.match(staffLogin.text, /Staff sign in/);
-  assert.match(staffLogin.text, /name="phone"/);
-  assert.doesNotMatch(staffLogin.text, /Continue with Google/);
+  assert.match(staffLogin.text, /data-auth-audience="staff"/, 'the page tells the sign-in script which surface this is');
+  assert.match(staffLogin.text, /name="email"/);
+  assert.doesNotMatch(staffLogin.text, /name="phone"/);
+  assert.match(staffLogin.text, /Continue with Google/, 'staff sign in is email code or Google, like every account');
 });
 
 maybe('the console is closed to the public and to customers', async () => {
@@ -781,19 +785,13 @@ maybe('the capability matrix on screen is the one the routes enforce', async () 
 });
 
 maybe('a role change takes effect on the next request, and is audited', async () => {
-  const phone = nextPhone();
-  createdPhones.add(phone);
-  const { canonical } = require('../src/lib/phone');
-  await db.query('INSERT INTO `users` (phone, name, role, status) VALUES (?, ?, ?, ?)', [
-    canonical(phone),
-    'Promotion probe',
-    'customer',
-    'active',
-  ]);
-  const row = await db.queryOne('SELECT id FROM `users` WHERE phone = ?', [canonical(phone)]);
+  const { makeAccount } = require('./helpers');
+  const probe = await makeAccount({ role: 'customer', name: 'Promotion probe' });
+  createdEmails.add(probe.email);
+  const row = { id: probe.id };
   const client = newClient();
-  const otp = await client.request('/api/auth/otp', { method: 'POST', body: { phone } });
-  await client.request('/api/auth/verify', { method: 'POST', body: { phone, code: otp.json.devCode } });
+  const otp = await client.request('/api/auth/email/otp', { method: 'POST', body: { email: probe.email } });
+  await client.request('/api/auth/email/verify', { method: 'POST', body: { email: probe.email, code: otp.json.devCode } });
 
   assert.equal((await client.request('/admin')).status, 403, 'a customer is not staff yet');
 
@@ -810,6 +808,24 @@ maybe('a role change takes effect on the next request, and is audited', async ()
   const demoted = await accounts.admin.client.post(`/admin/staff/${row.id}/role`, { role: 'customer' });
   assert.equal(demoted.status, 303);
   assert.equal((await client.request('/admin')).status, 403, 'the session loses the console at once');
+});
+
+maybe('a role is not granted to an account that cannot sign in', async () => {
+  // Staff and dealer sign in with an email code or Google. An account that has
+  // neither is not staff material, no matter what the form asks for.
+  const phone = nextPhone();
+  createdPhones.add(phone);
+  const { canonical } = require('../src/lib/phone');
+  const created = await db.query('INSERT INTO `users` (phone, name, role, status) VALUES (?, ?, ?, ?)', [
+    canonical(phone),
+    'Identity-less probe',
+    'customer',
+    'active',
+  ]);
+  const attempted = await accounts.admin.client.post(`/admin/staff/${created.insertId}/role`, { role: 'ops' });
+  assert.equal(attempted.status, 303);
+  assert.match(decodeURIComponent(attempted.headers.get('location')), /no verified sign-in email/i);
+  assert.equal((await db.queryOne('SELECT role FROM `users` WHERE id = ?', [created.insertId])).role, 'customer', 'the role is unchanged');
 });
 
 maybe('an admin cannot demote themselves out of the last seat', async () => {

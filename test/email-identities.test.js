@@ -55,18 +55,18 @@ test.after(async () => {
 });
 
 test('Google sign-in state is signed, time-limited and bound to the callback state', () => {
-  const customerAuth = require('../src/services/customer-auth');
-  const created = customerAuth.createGoogleState({ next: '/account#profile', linkUserId: 42 });
-  const verified = customerAuth.readGoogleState(created.cookie, created.payload.state);
+  const signin = require('../src/services/signin');
+  const created = signin.createGoogleState({ next: '/account#profile', linkUserId: 42 });
+  const verified = signin.readGoogleState(created.cookie, created.payload.state);
   assert.equal(verified.next, '/account#profile');
   assert.equal(verified.linkUserId, 42);
   assert.throws(
-    () => customerAuth.readGoogleState(created.cookie, 'attacker-state'),
+    () => signin.readGoogleState(created.cookie, 'attacker-state'),
     (error) => error.code === 'GOOGLE_STATE_INVALID',
   );
 
-  const unsafe = customerAuth.createGoogleState({ next: 'https://attacker.example' });
-  assert.equal(customerAuth.readGoogleState(unsafe.cookie, unsafe.payload.state).next, '/account');
+  const unsafe = signin.createGoogleState({ next: 'https://attacker.example' });
+  assert.equal(signin.readGoogleState(unsafe.cookie, unsafe.payload.state).next, '/account');
 });
 
 test('email addresses are normalized and invalid values are rejected', () => {

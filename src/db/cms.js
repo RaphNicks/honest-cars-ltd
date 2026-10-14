@@ -421,7 +421,7 @@ async function movePost(id, to, { actorId, note = null, publishAt = null } = {})
     // The caller rebuilds the static pages when this is true.
     revalidate: published,
     message: published
-      ? `“${post.title}” is published — the site is being rebuilt so it is live immediately.`
+      ? `“${post.title}” is published.`
       : `“${post.title}” is now ${STATUS_LABELS[to]}.`,
   };
 }

@@ -133,20 +133,24 @@ const config = {
     similarLimit: 3,
   },
 
-  // Customer email OTP and legacy phone OTP. Staff remain on their existing
-  // phone + TOTP path; email credentials are customer-only.
+  // Sign-in is email OTP or Google for every account — customer, staff and
+  // dealer. Staff also carry TOTP where their role requires it.
   auth: {
-    provider: process.env.AUTH_OTP_PROVIDER || 'console',
     otpTtlMinutes: int(process.env.AUTH_OTP_TTL_MINUTES, 10),
     otpLength: int(process.env.AUTH_OTP_LENGTH, 6),
     maxVerifyAttempts: int(process.env.AUTH_MAX_VERIFY_ATTEMPTS, 5),
-    maxRequestsPerHour: int(process.env.AUTH_MAX_REQUESTS_PER_HOUR, 5),
     emailMaxRequestsPerHour: int(process.env.AUTH_EMAIL_MAX_REQUESTS_PER_HOUR, 5),
+    // Blunt per-IP ceilings for the email endpoints (§12.2). The per-email cap
+    // above is the control that actually matters; these only stop bulk
+    // enumeration from one host. Automated test runs raise them via the
+    // environment so a suite can exercise the flows it needs to.
+    emailOtpIpMax: int(process.env.AUTH_EMAIL_OTP_IP_MAX, 30),
+    emailVerifyIpMax: int(process.env.AUTH_EMAIL_VERIFY_IP_MAX, 60),
     sessionDays: int(process.env.AUTH_SESSION_DAYS, 30),
     // Peppers the OTP hash and the session token. Must be set in production.
     pepper: process.env.AUTH_PEPPER || '',
     // Development only: echo the code in the API response so the flow can be
-    // driven without a phone. Forced off when NODE_ENV=production.
+    // driven without SMTP. Forced off when NODE_ENV=production.
     get showCodeInResponse() {
       return !config.isProduction && bool(process.env.AUTH_SHOW_CODE, true);
     },

@@ -17,19 +17,22 @@ import { clearDevCodes } from './lib/dev-codes.mjs';
 const BASE = process.argv[2] || process.env.SMOKE_BASE_URL || 'http://127.0.0.1:3000';
 
 const STAFF = {
-  marketing: '+2348000000005',  // Content Desk (§7.4 → cms.manage)
-  admin: '+2348000000001',
+  marketing: 'marketing@honestcars.test',  // Content Desk (§7.4 → cms.manage)
+  admin: 'admin@honestcars.test',
 };
 
 // §12.2 — the admin account carries a second factor, and this script signs in
 // the way a person does. The key is the seeded one; see db/seed.sql.
-const MFA_SECRETS = { '+2348000000001': 'JBSWY3DPEHPK3PXP' };
-const OPS_PHONE = '+2348000000002';
-const CUSTOMER_PHONE = '+2348031234567';
+const MFA_SECRETS = { 'admin@honestcars.test': 'JBSWY3DPEHPK3PXP' };
+const OPS_EMAIL = 'ops@honestcars.test';
+// A customer account of the smoke's own: open registration, exactly the path a
+// real visitor takes. Seeded demo customers are phone-era rows with no sign-in
+// identity, which is deliberate (see migration 034).
+const CUSTOMER_EMAIL = 'cms-smoke-customer@example.net';
 
-// Repeat runs would otherwise 429 on the 5-codes-per-number-per-hour policy and
-// look like a broken CMS. Clear this run's own spent codes first.
-await clearDevCodes([...Object.values(STAFF), OPS_PHONE, CUSTOMER_PHONE], { label: 'CMS', resetMfa: true });
+// Repeat runs would otherwise 429 on the 5-codes-per-address-per-hour policy
+// and look like a broken CMS. Clear this run's own spent codes first.
+await clearDevCodes([...Object.values(STAFF), OPS_EMAIL, CUSTOMER_EMAIL], { label: 'CMS', resetMfa: true });
 
 let failures = 0;
 let checks = 0;
@@ -75,28 +78,28 @@ async function request(path, { method = 'GET', form = null, cookies = null, redi
   return response;
 }
 
-async function signIn(phone, cookies) {
-  const otp = await request('/api/auth/otp', { method: 'POST', form: { phone }, cookies });
+async function signIn(email, cookies, { audience = 'staff', name = 'CMS Smoke' } = {}) {
+  const otp = await request('/api/auth/email/otp', { method: 'POST', form: { email, audience }, cookies });
   const payload = await otp.json();
   const code = payload.devCode;
   if (!code) {
-    // Most often the OTP rate limit, which is the app doing its job — say so
+    // Most often the code rate limit, which is the app doing its job — say so
     // rather than letting every later check fail as a mysterious 302.
-    // Two independent limits can 429 a sign-in: the per-number hourly cap
-    // (rows in auth_codes, which we cleared above) and the in-process limiter
-    // on the request IP. The second one only resets with the server, so say
-    // which it is instead of leaving a bare 429.
+    // Two independent limits can 429 a sign-in: the per-address hourly cap
+    // (rows in email_auth_codes, which we cleared above) and the in-process
+    // limiter on the request IP. The second one only resets with the server, so
+    // say which it is instead of leaving a bare 429.
     const hint = otp.status === 429
-      ? 'the in-process rate limiter has tripped — restart the dev server (or wait 15 minutes); the per-number codes were already cleared for this run'
-      : 'is AUTH_SHOW_CODE on, and is the site running?';
-    throw new Error(`No devCode for ${phone} (HTTP ${otp.status}) — ${hint}`);
+      ? 'the in-process rate limiter has tripped — restart the dev server (or wait 15 minutes); the per-address codes were already cleared for this run'
+      : 'is AUTH_SHOW_CODE on, is the site running, and does this account have a sign-in email?';
+    throw new Error(`No devCode for ${email} (HTTP ${otp.status}) — ${hint}`);
   }
-  await request('/api/auth/verify', { method: 'POST', form: { phone, code }, cookies });
-  const secret = MFA_SECRETS[phone];
+  await request('/api/auth/email/verify', { method: 'POST', form: { email, code, audience, name }, cookies });
+  const secret = MFA_SECRETS[email];
   if (secret) {
     const totp = createRequire(import.meta.url)('../src/lib/totp');
     const challenge = await request('/api/auth/mfa', { method: 'POST', form: { code: totp.code(secret) }, cookies });
-    if (challenge.status !== 200) throw new Error(`Second factor failed for ${phone}: ${challenge.status}`);
+    if (challenge.status !== 200) throw new Error(`Second factor failed for ${email}: ${challenge.status}`);
   }
 }
 
@@ -113,9 +116,13 @@ async function main() {
   assert([302, 403].includes(anonRes.status), 'signed-out visitor cannot open the CMS', `HTTP ${anonRes.status}`);
 
   const customer = jar();
-  const otp = await request('/api/auth/otp', { method: 'POST', form: { phone: CUSTOMER_PHONE }, cookies: customer });
+  const otp = await request('/api/auth/email/otp', { method: 'POST', form: { email: CUSTOMER_EMAIL }, cookies: customer });
   const customerCode = (await otp.json()).devCode;
-  await request('/api/auth/verify', { method: 'POST', form: { phone: CUSTOMER_PHONE, code: customerCode }, cookies: customer });
+  await request('/api/auth/email/verify', {
+    method: 'POST',
+    form: { email: CUSTOMER_EMAIL, code: customerCode, name: 'CMS Smoke Customer' },
+    cookies: customer,
+  });
   const customerRes = await request('/admin/cms', { cookies: customer });
   assert(customerRes.status === 403, 'signed-in customer gets the honest 403', `HTTP ${customerRes.status}`);
 
@@ -128,7 +135,7 @@ async function main() {
   assert(hubHtml.includes('In review') && hubHtml.includes('Scheduled'), 'all four workflow columns are present');
 
   const ops = jar();
-  await signIn(OPS_PHONE, ops);
+  await signIn(OPS_EMAIL, ops);
   const opsRes = await request('/admin/cms', { cookies: ops });
   assert(opsRes.status === 403, 'ops role cannot open the CMS (role matrix holds)', `HTTP ${opsRes.status}`);
 
@@ -222,7 +229,15 @@ async function main() {
   const publishedTo = decodeURIComponent((published.headers.get('location') || '').split('ok=')[1] || '');
   assert(published.status === 303, 'publish redirects back to the editor', `HTTP ${published.status}`);
   assert(publishedTo.includes('published'), 'the console says it is published', publishedTo.slice(0, 100));
-  assert(/Rebuilt \d+ page/.test(publishedTo), 'and reports how many pages were rebuilt', (publishedTo.match(/Rebuilt[^.]*/) || [''])[0]);
+  // The console must say what happened to the public pages — the rebuild count
+  // when a static build exists, or the honest note when pages render per
+  // request. `dist/` is gitignored, so a fresh checkout has no build and the
+  // note is the truth there; either report passes, a silent nothing does not.
+  assert(
+    /Rebuilt \d+ page|no static build present/.test(publishedTo),
+    'and reports what happened to the public pages',
+    publishedTo.slice(0, 160),
+  );
 
   const live = await request(`/blog/${slug}`);
   const liveHtml = bodyOf(await live.text());

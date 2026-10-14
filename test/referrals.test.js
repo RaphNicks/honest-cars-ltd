@@ -45,6 +45,7 @@ function nextPhone() {
 }
 
 const users = [];
+const emails = [];
 const orders = [];
 const rewards = [];
 const notifications = [];
@@ -92,16 +93,25 @@ const { canonical } = require('../src/lib/phone');
 
 /** A customer account, optionally brought in by somebody else's code. */
 async function makeUser({ name, referredBy = null, role = 'customer', code = null } = {}) {
+  const { nextEmail } = require('./helpers');
   const raw = nextPhone();
   const phone = canonical(raw);
+  const email = nextEmail('ref');
+  emails.push(email);
   const referralCode = code || `HCT${String((run + seq * 37) % 100000).padStart(4, '0')}`.slice(0, 16);
   const userId = await db.query(
     'INSERT INTO `users` (phone, name, role, status, referral_code, referred_by) VALUES (?, ?, ?, ?, ?, ?)',
     [phone, name, role, 'active', referralCode, referredBy],
   );
   users.push(Number(userId.insertId));
+  // The sign-in identity — every account signs in with an email code or Google.
+  // The phone stays as contact information, which is what the order fixtures use.
+  await db.query(
+    'INSERT INTO user_email_identities (user_id, email, google_subject, verified_at) VALUES (?, ?, NULL, UTC_TIMESTAMP())',
+    [userId.insertId, email],
+  );
   const row = await db.queryOne('SELECT * FROM `users` WHERE id = ? LIMIT 1', [userId.insertId]);
-  return { ...row, id: Number(row.id), phone, referralCode, client: newClient() };
+  return { ...row, id: Number(row.id), phone, email, referralCode, client: newClient() };
 }
 
 /** A paid order, which is what makes a referral count. */
@@ -125,22 +135,29 @@ async function signInAsRole(role, label) {
   // §12.2: `admin` and `finance` carry a second factor, so a fixture with one of
   // those roles is enrolled before it signs in — exactly as a real account is.
   if (roles.MFA_ROLES.includes(role)) await enrolMfa(staff.id);
-  const verify = await signIn(staff.client, staff.phone);
+  const audience = role === 'customer' ? 'customer' : role === 'dealer' ? 'dealer' : 'staff';
+  const verify = await signIn(staff.client, staff.email, { audience });
   assert.equal(verify.status, 200, `sign-in failed for ${role}: ${verify.text}`);
   if (roles.MFA_ROLES.includes(role)) {
-    const finished = await completeMfa(staff.client, { phone: staff.phone });
+    const finished = await completeMfa(staff.client, { userId: staff.id });
     assert.equal(finished.status, 200, `second factor failed for ${role}: ${finished.text}`);
   }
   return staff.client;
 }
 
 /** Sign in over HTTP — the same path a real invitee takes. */
-async function signIn(client, rawPhone, { ref: referralCode = null } = {}) {
-  const otp = await client.request('/api/auth/otp', { method: 'POST', body: { phone: rawPhone } });
-  assert.equal(otp.status, 200, `OTP failed: ${otp.text}`);
-  const verify = await client.request('/api/auth/verify', {
+async function signIn(client, email, { ref: referralCode = null, name = 'Referral Tester', audience = 'customer' } = {}) {
+  const otp = await client.request('/api/auth/email/otp', { method: 'POST', body: { email, audience } });
+  assert.equal(otp.status, 200, `code request failed: ${otp.text}`);
+  const verify = await client.request('/api/auth/email/verify', {
     method: 'POST',
-    body: { phone: rawPhone, code: otp.json.devCode, ...(referralCode ? { ref: referralCode } : {}) },
+    body: {
+      email,
+      code: otp.json.devCode,
+      name,
+      audience,
+      ...(referralCode ? { ref: referralCode } : {}),
+    },
   });
   return verify;
 }
@@ -184,6 +201,9 @@ test.after(async () => {
   for (const id of rewards) await db.query('DELETE FROM referral_rewards WHERE id = ?', [id]).catch(() => {});
   // Deleting a `users` row cascades to the reward rows that name it, both ways.
   for (const id of users) await db.query('DELETE FROM `users` WHERE id = ?', [id]).catch(() => {});
+  if (emails.length) {
+    await db.query(`DELETE FROM email_auth_codes WHERE email IN (${emails.map(() => '?').join(',')})`, emails).catch(() => {});
+  }
   // Notifications the flow wrote about our fixtures: by referenced user, and by
   // reward — never a blanket delete, which could remove a real send.
   if (users.length || rewards.length) {
@@ -205,14 +225,16 @@ test.after(async () => {
 // ---------------------------------------------------------------------------
 
 maybe('a first sign-in through a link attaches the account to the code, once', async () => {
+  const { nextEmail } = require('./helpers');
   const referrer = await makeUser({ name: 'Referrer One' });
-  const inviteePhone = nextPhone();
+  const inviteeEmail = nextEmail('invitee');
+  emails.push(inviteeEmail);
   const client = newClient();
 
-  const verify = await signIn(client, inviteePhone, { ref: referrer.referralCode });
+  const verify = await signIn(client, inviteeEmail, { ref: referrer.referralCode, name: 'Invitee One' });
   assert.equal(verify.status, 200, verify.text);
 
-  const invitee = await db.users.findByPhone(canonical(inviteePhone));
+  const invitee = await db.users.findByVerifiedEmail(inviteeEmail);
   users.push(invitee.id);
   assert.equal(invitee.referredBy, referrer.id, 'the inviter is recorded');
   assert.equal(invitee.referralQualifiedAt, null, 'attribution is not qualification');
@@ -220,13 +242,13 @@ maybe('a first sign-in through a link attaches the account to the code, once', a
   // A second sign-in with a *different* code must not rewrite history.
   const other = await makeUser({ name: 'Referrer Two' });
   const again = newClient();
-  const second = await signIn(again, inviteePhone, { ref: other.referralCode });
+  const second = await signIn(again, inviteeEmail, { ref: other.referralCode });
   assert.equal(second.status, 200);
-  const unchanged = await db.users.findByPhone(canonical(inviteePhone));
+  const unchanged = await db.users.findByVerifiedEmail(inviteeEmail);
   assert.equal(unchanged.referredBy, referrer.id, 'a referral is recorded once, at creation');
 
   // And nobody can bring themselves in.
-  const self = await signIn(newClient(), referrer.phone, { ref: referrer.referralCode });
+  const self = await signIn(newClient(), referrer.email, { ref: referrer.referralCode, name: referrer.name });
   assert.equal(self.status, 200);
   const referrerAfter = await db.users.findById(referrer.id);
   assert.equal(referrerAfter.referredBy, null, 'never self-referral');
@@ -485,7 +507,7 @@ maybe('a customer sees the link, the people, and the honest state of each one', 
   rewards.push(sweep.qualified.find((row) => row.userId === buying.id).rewardId);
 
   const client = newClient();
-  const verify = await signIn(client, referrer.phone);
+  const verify = await signIn(client, referrer.email, { name: referrer.name });
   assert.equal(verify.status, 200, verify.text);
 
   const account = await client.request('/account');

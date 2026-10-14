@@ -11,9 +11,11 @@ server, MySQL for data.** No React, no Tailwind, no frontend build step.
 
 The **public storefront is ported and running** — the design system, homepage,
 `/cars` with curated facet pages, vehicle pages, services, concierge and sell/swap
-funnels, blog, shop, trust and legal pages — plus **customer accounts** with email
-OTP or Google sign-in, optional contact phone, `/account` history, saved cars and
-saved searches. Staff remain on phone OTP + TOTP at the separate admin host.
+funnels, blog, shop, trust and legal pages — plus **accounts for every role** with
+email OTP or Google sign-in (no passwords, no phone sign-in), optional contact
+phone, `/account` history, saved cars and saved searches. Staff and dealer
+partners sign in the same way — plus TOTP for staff where the role requires it —
+at their own surfaces.
 SMTP and Google OAuth credentials are configured in hosting settings, not
 committed to this repository.
 The remaining integration work is the payment provider and other notification
@@ -124,9 +126,10 @@ Implemented once in `src/db/listings.js` and asserted in `test/routes.test.js`:
 
 ## Customer accounts and sign-in (PRD §7.1)
 
-Phone-number-first, no passwords. `/login` is two steps on one page — number
-(plus an explicit consent tick, §12.2 NDPA) then the six-digit code — and
-`/account` is the dashboard, one card per §7.1 line item: **requests** (with
+Email-first, no passwords and no phone sign-in — for customers, staff and
+dealers alike. `/login` is two steps on one page — a verified email address
+then the six-digit code sent to it, or "Continue with Google" — and `/account`
+is the dashboard, one card per §7.1 line item: **requests** (with
 stage and SLA), **hire bookings**, **bookings**, **orders** and tracker
 subscriptions, **documents** (receipts now, report PDFs when dispatch lands),
 **saved cars**, **saved searches** with separate price-drop and new-match
@@ -137,8 +140,6 @@ orders credited to it). Data export and account deletion sit at the bottom.
 POST /api/auth/email/otp { email }               → send a sign-in code (SMTP; devCode in development)
 POST /api/auth/email/verify { email, code, name } → verify identity, create/sign in, set hc_session
 GET  /api/auth/google                            → Google sign-in (OAuth credentials required)
-POST /api/auth/otp      { phone }                → legacy customer and staff phone OTP
-POST /api/auth/verify   { phone, code, next }    → sets hc_session, returns the user + redirect
 POST /api/auth/logout                            → revokes the session
 GET  /account                                    → account dashboard (302 to /login when signed out)
 GET  /account/export                             → account-owned data, as JSON
@@ -152,12 +153,13 @@ POST /api/account/delete                         → anonymise ops records, dele
 
 How it is put together:
 
-* **Account ownership is by customer ID.** New email and Google accounts do not
-  need a phone number to sign in. When a contact-required form collects one, it
-  stores that number separately from the sign-in identity and links the record to
-  the signed-in customer ID. `src/lib/phone.js` still normalises legacy phone
-  records; fallback matching is limited to unowned legacy rows and the account's
-  verified sign-in phone, never a number typed into a new form.
+* **Account ownership is by customer ID.** Every account signs in with a
+  verified email or Google; no account signs in with a phone number. When a
+  contact-required form collects one, it stores that number separately from the
+  sign-in identity and links the record to the signed-in customer ID.
+  `src/lib/phone.js` still normalises legacy phone-era records; fallback
+  matching is limited to unowned legacy rows and the account's stored contact
+  number, never a number typed into a new form.
 * **OTP codes are HMAC-hashed in storage.** HMAC-SHA256 with `AUTH_PEPPER`,
   compared with `timingSafeEqual`, single-use, short-lived and attempt-limited.
   The development console transport prints a code for local testing; production
@@ -170,13 +172,16 @@ How it is put together:
   view.
 * **CSRF** is SameSite=Lax plus a same-origin check (`Origin` /
   `Sec-Fetch-Site`) on every state-changing account endpoint (§12.2).
-* **Customer authentication has separate channels.** Email OTP uses the
-  `SMTP_URL` / `SMTP_FROM` mailer in `src/services/email.js`; the code is available
-  to the local development flow only. Google sign-in uses server-side OAuth with
-  state, nonce and PKCE checks. Set `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`,
-  and `GOOGLE_REDIRECT_URI` in the hosting environment. Existing staff and legacy
-  customer phone OTP remains on `AUTH_OTP_PROVIDER=console|whatsapp|sms`; staff
-  still complete TOTP where their role requires it.
+* **Sign-in is email OTP or Google, for every account.** Email OTP uses the
+  `SMTP_URL` / `SMTP_FROM` mailer in `src/services/email.js`; the code is
+  available to the local development flow only, and production without SMTP
+  fails closed (503, nothing delivered, nothing stored as a credential). Google
+  sign-in uses server-side OAuth with state, nonce and PKCE checks — set
+  `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, and `GOOGLE_REDIRECT_URI` in the
+  hosting environment. Customer sign-in is open registration; staff and dealer
+  surfaces only accept accounts that already hold a verified sign-in email
+  (provisioned through `/admin/staff`), and refuse everything else with one
+  generic message. Staff still complete TOTP where their role requires it.
 * **Deleting an account is honest.** The person, sessions, saved cars and saved
   searches go; requests, bookings and orders stay for finance and warranty with
   the name and number replaced by `Deleted account` / `DELETED-<id>`.
@@ -257,39 +262,43 @@ them from in review to published without an exception.
 
 ### Signing in
 
-Customers use `/login` for a verified email code or Google; phone is not a
-customer sign-in method. Dealer partners have a separate phone sign-in at
-`/dealer/login`. Staff use phone OTP plus TOTP where required on the dedicated
-`admin.honestcarsltd.com` host, not on the public site. Production redirects the
-public `/admin` path to the configured `ADMIN_URL`; point that host's DNS and TLS
-at this app. In the single-origin development preview, use `/admin/login` for
-staff access. There are no passwords in this build. The seed creates these
-demo staff accounts (local seed data only):
+Every account — customer, dealer partner and staff — signs in with a verified
+email code or Google. There are no passwords and no phone sign-in in this
+build. Customers use `/login`, which registers on first use. Dealer partners
+use `/dealer/login` and staff use the dedicated `admin.honestcarsltd.com` host,
+not the public site; those two surfaces only accept accounts that already hold
+a verified sign-in email — provisioned from **Staff & roles** — and refuse
+everything else with one generic message. Staff complete TOTP where their role
+requires it. Production redirects the public `/admin` path to the configured
+`ADMIN_URL`; point that host's DNS and TLS at this app. In the single-origin
+development preview, use `/admin/login` for staff access. The seed creates
+these demo staff accounts (local seed data only):
 
-| Number | Role | Opens |
+| Sign-in email | Role | Opens |
 |---|---|---|
-| `+2348000000001` | admin | `admin.honestcarsltd.com` — everything, including Staff & roles and the audit log |
-| `+2348000000002` | ops | `admin.honestcarsltd.com` — KPI home, listings, leads, concierge, dispatch |
-| `+2348000000003` | inspector | `admin.honestcarsltd.com` — My jobs only |
-| `+2348000000004` | finance | `admin.honestcarsltd.com` — Orders, Money, Escrow and the KPI home |
-| `+2348000000005` | marketing | `admin.honestcarsltd.com` — CMS content and homepage modules |
+| `admin@honestcars.test` | admin | `admin.honestcarsltd.com` — everything, including Staff & roles and the audit log |
+| `ops@honestcars.test` | ops | `admin.honestcarsltd.com` — KPI home, listings, leads, concierge, dispatch |
+| `inspector@honestcars.test` | inspector | `admin.honestcarsltd.com` — My jobs only |
+| `finance@honestcars.test` | finance | `admin.honestcarsltd.com` — Orders, Money, Escrow and the KPI home |
+| `marketing@honestcars.test` | marketing | `admin.honestcarsltd.com` — CMS content and homepage modules |
 
-These seeded numbers and their demo TOTP secrets are public test data; never use
-one as a production administrator. For a clean production database, apply the
-schema without the demo seed (`node scripts/db-setup.js --no-seed`), set
+These seeded addresses and their demo TOTP secrets are public test data; never
+use one as a production administrator. For a clean production database, apply
+the schema without the demo seed (`node scripts/db-setup.js --no-seed`), set
 `NODE_ENV=production` and a strong `AUTH_PEPPER`, then run `npm run admin:bootstrap`
-in the host shell. It prompts for the first admin’s real name and mobile number,
-refuses if an active admin already exists, and does not install a demo MFA secret.
-After phone delivery is live, sign in on `ADMIN_URL` and enroll TOTP at
-`/admin/security`.
+in the host shell. It prompts for the first admin’s real name and sign-in email
+(an optional contact number is stored as contact information only), refuses if
+an active admin already exists, and does not install a demo MFA secret. Sign in
+on `ADMIN_URL` and enrol TOTP at `/admin/security`.
 
-In development the code is printed to the server log (`[auth] OTP for … → 123456`)
-and returned as `devCode`, so the console can be driven without a phone. Production
-phone delivery is not wired yet: SMS/WhatsApp are stubs, and the console fallback
-is disabled there, so staff/dealer OTP returns 503 until a real provider adapter
-is implemented and configured. A role you do not hold returns an honest 403
-page naming your role — never a blank response or redirect loop. The whole
-console is `noindex, nofollow` and `Cache-Control: private, no-store`.
+In development the code is printed to the server log
+(`[auth] email OTP for … → 123456`) and returned as `devCode`, so the console
+can be driven without a mailbox. Production requires the SMTP mailer: without
+it, code sign-in fails closed with 503 (`SMTP_NOT_CONFIGURED`) and nothing is
+left stored as a credential — Google sign-in is the alternative. A role you do
+not hold returns an honest 403 page naming your role — never a blank response
+or redirect loop. The whole console is `noindex, nofollow` and
+`Cache-Control: private, no-store`.
 
 ### The demo day in the seed
 

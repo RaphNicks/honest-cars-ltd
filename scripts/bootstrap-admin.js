@@ -5,8 +5,9 @@
  *
  * This is deliberately separate from public sign-up and refuses to run once
  * an active admin exists. It creates no password, OTP, or TOTP secret; the
- * administrator proves phone ownership at sign-in and enrolls TOTP in the
- * console. See README.md before using it on a live database.
+ * administrator proves ownership of the sign-in email at sign-in (the one-time
+ * code, or Google once linked) and enrolls TOTP in the console. See README.md
+ * before using it on a live database.
  */
 
 const readline = require('node:readline/promises');
@@ -18,11 +19,13 @@ const validate = require('../src/services/validate');
 
 const BOOTSTRAP_LOCK = 'honestcars:first-admin-bootstrap';
 
-async function createFirstAdmin({ pool, name: rawName, phone: rawPhone }) {
+async function createFirstAdmin({ pool, name: rawName, email: rawEmail, phone: rawPhone = null }) {
   const name = validate.name(rawName);
-  const phone = phones.normalise(rawPhone);
+  const email = db.users.normaliseEmail(rawEmail);
+  const phone = rawPhone ? phones.normalise(rawPhone) : null;
   if (!name) throw new Error('Enter an administrator name at least two characters long.');
-  if (!phone) throw new Error('Enter a valid Nigerian mobile number.');
+  if (!email) throw new Error('Enter a valid administrator email address.');
+  if (rawPhone && !phone) throw new Error('Enter a valid Nigerian mobile number, or leave the contact number blank.');
 
   const conn = await pool.getConnection();
   let locked = false;
@@ -46,26 +49,41 @@ async function createFirstAdmin({ pool, name: rawName, phone: rawPhone }) {
       return { ok: false, error: 'An active admin already exists. Use the console to manage staff instead.' };
     }
 
-    const [existing] = await conn.query('SELECT id FROM `users` WHERE phone = ? LIMIT 1 FOR UPDATE', [phone]);
-    if (existing.length) {
+    // The address is the credential: it must not already be anyone's.
+    const [profileOwners] = await conn.query('SELECT id FROM `users` WHERE email = ? LIMIT 1', [email]);
+    const [identityOwners] = await conn.query('SELECT id FROM user_email_identities WHERE email = ? LIMIT 1', [email]);
+    if (profileOwners.length || identityOwners.length) {
       await conn.rollback();
       inTransaction = false;
-      return { ok: false, error: 'That phone number already belongs to an account. No account was changed.' };
+      return { ok: false, error: 'That email address already belongs to an account. No account was changed.' };
+    }
+
+    if (phone) {
+      const [existing] = await conn.query('SELECT id FROM `users` WHERE phone = ? LIMIT 1 FOR UPDATE', [phone]);
+      if (existing.length) {
+        await conn.rollback();
+        inTransaction = false;
+        return { ok: false, error: 'That phone number already belongs to an account. No account was changed.' };
+      }
     }
 
     const [inserted] = await conn.query(
-      "INSERT INTO `users` (phone, name, role, status) VALUES (?, ?, 'admin', 'active')",
-      [phone, name],
+      "INSERT INTO `users` (phone, name, email, role, status) VALUES (?, ?, ?, 'admin', 'active')",
+      [phone, name, email],
     );
     const userId = Number(inserted.insertId);
     await conn.query(
+      'INSERT INTO user_email_identities (user_id, email, google_subject, verified_at) VALUES (?, ?, NULL, UTC_TIMESTAMP())',
+      [userId, email],
+    );
+    await conn.query(
       'INSERT INTO admin_audit (actor_id, action, entity, entity_id, detail) VALUES (NULL, ?, ?, ?, ?)',
-      ['user.bootstrap', 'user', userId, JSON.stringify({ role: 'admin', source: 'first-admin-cli' })],
+      ['user.bootstrap', 'user', userId, JSON.stringify({ role: 'admin', email, source: 'first-admin-cli' })],
     );
 
     await conn.commit();
     inTransaction = false;
-    return { ok: true, userId, name, phone };
+    return { ok: true, userId, name, email, phone };
   } catch (error) {
     if (inTransaction) await conn.rollback().catch(() => {});
     throw error;
@@ -88,21 +106,26 @@ async function main() {
     const name = validate.name(await prompts.question('Administrator full name: '));
     if (!name) throw new Error('Enter a name at least two characters long.');
 
-    const rawPhone = await prompts.question('Administrator mobile number (for example, 0803 123 4567): ');
-    const phone = phones.normalise(rawPhone);
-    if (!phone) throw new Error('Enter a valid Nigerian mobile number.');
+    const email = db.users.normaliseEmail(await prompts.question('Administrator email (sign-in address): '));
+    if (!email) throw new Error('Enter a valid email address.');
 
-    console.log(`\nThis will create the first active admin for ${name} (${phones.mask(phone)}).`);
+    const rawPhone = await prompts.question('Administrator contact number (optional — never used to sign in): ');
+    const phone = rawPhone.trim() ? phones.normalise(rawPhone) : null;
+    if (rawPhone.trim() && !phone) throw new Error('Enter a valid Nigerian mobile number, or press Enter to skip.');
+
+    console.log(`\nThis will create the first active admin for ${name} (${email}).`);
     console.log('The account has no password or pre-seeded authenticator secret.');
     const confirmation = await prompts.question('Type CREATE FIRST ADMIN to continue: ');
     if (confirmation.trim() !== 'CREATE FIRST ADMIN') throw new Error('Setup cancelled; no account was created.');
 
-    const result = await createFirstAdmin({ pool: db.pool, name, phone });
+    const result = await createFirstAdmin({ pool: db.pool, name, email, phone });
     if (!result.ok) throw new Error(result.error);
 
-    console.log(`\nFirst admin account created (ID ${result.userId}, phone ${phones.mask(result.phone)}).`);
-    console.log(`Sign in at ${config.admin.url}/login, then enroll an authenticator at /admin/security.`);
-    console.log('Phone OTP delivery is still a stub in this build; production login will remain unavailable until a real provider adapter is installed.');
+    console.log(`\nFirst admin account created (ID ${result.userId}, sign-in email ${result.email}).`);
+    console.log(`Sign in at ${config.admin.url}/login with the one-time code sent to that address${config.googleAuth.configured ? ', or with Google' : ''}, then enroll an authenticator at /admin/security.`);
+    if (!config.mail.configured) {
+      console.log('Email delivery is not configured on this host yet: set SMTP_URL and SMTP_FROM so sign-in codes can be sent.');
+    }
   } finally {
     prompts.close();
     await db.pool.end().catch(() => {});

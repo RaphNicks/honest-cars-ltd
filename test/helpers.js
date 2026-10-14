@@ -13,6 +13,11 @@ const path = require('node:path');
 // per request, exactly as it is on a fresh checkout. Set before anything
 // requires src/config.
 process.env.STATIC_DIR = process.env.TEST_STATIC_DIR || '.test-static';
+// A suite signs in many times from one address (the test runner's loopback
+// IP). The per-IP ceiling is a production anti-enumeration guard, not the
+// per-email cap that actually governs codes — lift it for test runs only.
+process.env.AUTH_EMAIL_OTP_IP_MAX = process.env.AUTH_EMAIL_OTP_IP_MAX || '500';
+process.env.AUTH_EMAIL_VERIFY_IP_MAX = process.env.AUTH_EMAIL_VERIFY_IP_MAX || '500';
 
 const ROOT = path.join(__dirname, '..');
 
@@ -138,28 +143,68 @@ async function enrolMfa(userId, { confirm = true } = {}) {
 /**
  * Finish a sign-in that stopped at the second factor.
  *
- * Call it right after `/api/auth/verify`: it reads the account's secret from the
- * database (a test harness has the database; a person has their phone) and posts
- * the code the way the challenge page does. Returns the fetch response, so a
- * caller can assert on it.
+ * Call it right after the first factor: it reads the account's secret from the
+ * database (a test harness has the database; a person has their phone) and
+ * posts the code the way the challenge page does. Returns the fetch response,
+ * so a caller can assert on it. The account is found by `userId`, `email` or a
+ * legacy `phone` — whichever the fixture holds.
  *
  * Codes are single-use — `mfa_last_step` refuses a replay — so two sign-ins in
  * the same 30-second window need different steps. `offset` picks which one.
  */
-async function completeMfa(client, { request, phone = null, next = '', offset = 0, code = null } = {}) {
+async function completeMfa(client, { request, userId = null, email = null, phone = null, next = '', offset = 0, code = null } = {}) {
   const db = require('../src/db');
   const totp = require('../src/lib/totp');
   const phones = require('../src/lib/phone');
-  // The caller may hold the number in whatever form the fixture used; accounts
-  // are stored canonical, so look it up the way the app does.
-  const canonical = phone ? phones.canonical(phone, { fallback: phone }) : null;
-  const user = canonical ? await db.users.findByPhone(canonical) : null;
-  if (!user) throw new Error(`completeMfa could not find ${phone}`);
+  let user = null;
+  if (userId) user = await db.users.findById(userId);
+  if (!user && email) user = await db.users.findByVerifiedEmail(email);
+  if (!user && phone) {
+    // The caller may hold the number in whatever form the fixture used; accounts
+    // are stored canonical, so look it up the way the app does.
+    const canonical = phones.canonical(phone, { fallback: phone });
+    user = await db.users.findByPhone(canonical);
+  }
+  if (!user) throw new Error(`completeMfa could not find ${email || phone || userId}`);
   const row = await db.mfa.secretFor(user.id);
-  if (!row) throw new Error(`no second factor for ${phone} — call enrolMfa first`);
+  if (!row) throw new Error(`no second factor for ${email || phone || userId} — call enrolMfa first`);
   const value = code || totp.code(row.secret, { time: Date.now() + offset * totp.STEP_SECONDS * 1000 });
   const post = request || ((path, options) => client.request(path, options));
   return post('/api/auth/mfa', { method: 'POST', body: { code: value, next } });
+}
+
+// ---------------------------------------------------------------------------
+// Accounts and sign-in fixtures — every account signs in with a verified email
+// (one-time code) or Google. There is no phone sign-in to fall back on, so a
+// suite that needs an account gives it an email identity up front.
+// ---------------------------------------------------------------------------
+
+let emailSeq = 0;
+
+/** A throwaway address, unique per call, for fixtures and sign-ins. */
+function nextEmail(tag = 'test') {
+  emailSeq += 1;
+  return `${tag}-${process.pid}-${Date.now() % 100000}-${emailSeq}@example.net`;
+}
+
+/**
+ * A ready-made account of any role, with a verified sign-in email already on
+ * it. Staff and dealer fixtures use this because those surfaces only sign in
+ * accounts that already hold an identity — exactly like production.
+ */
+async function makeAccount({ role = 'customer', name = 'Test Fixture', email = null, phone = null } = {}) {
+  const db = require('../src/db');
+  const address = email || nextEmail(role);
+  const result = await db.query(
+    'INSERT INTO `users` (phone, name, email, role, status) VALUES (?, ?, ?, ?, ?)',
+    [phone || null, name, address, role, 'active'],
+  );
+  const userId = Number(result.insertId);
+  await db.query(
+    'INSERT INTO user_email_identities (user_id, email, google_subject, verified_at) VALUES (?, ?, NULL, UTC_TIMESTAMP())',
+    [userId, address],
+  );
+  return { id: userId, email: address, role, name, phone: phone || null };
 }
 
 module.exports = {
@@ -171,4 +216,6 @@ module.exports = {
   sweepOrphanAudit,
   enrolMfa,
   completeMfa,
+  nextEmail,
+  makeAccount,
 };

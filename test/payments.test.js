@@ -50,6 +50,7 @@ function nextPhone() {
 }
 
 const createdPhones = new Set();
+const createdEmails = new Set();
 const createdPayments = [];
 const createdMilestones = [];
 const createdLedger = [];
@@ -100,29 +101,26 @@ function newClient() {
 }
 
 async function createAccount(role, label) {
-  const phone = nextPhone();
-  createdPhones.add(phone);
-  const { canonical } = require('../src/lib/phone');
-  await db.query('INSERT INTO `users` (phone, name, role, status) VALUES (?, ?, ?, ?)', [
-    canonical(phone),
-    `${label} (payments test)`,
-    role,
-    'active',
-  ]);
-  const row = await db.queryOne('SELECT id FROM `users` WHERE phone = ? LIMIT 1', [canonical(phone)]);
+  const { makeAccount } = require('./helpers');
+  const account = await makeAccount({ role, name: `${label} (payments test)` });
+  createdEmails.add(account.email);
   // §12.2: a fixture holding `admin` or `finance` has a second factor, the way
   // a real account in those roles has to.
-  if (roles.MFA_ROLES.includes(role)) await enrolMfa(row.id);
+  const audience = role === 'customer' ? 'customer' : role === 'dealer' ? 'dealer' : 'staff';
+  if (roles.MFA_ROLES.includes(role)) await enrolMfa(account.id);
   const client = newClient();
-  const otp = await client.request('/api/auth/otp', { method: 'POST', body: { phone } });
-  assert.equal(otp.status, 200, `OTP request failed for ${label}: ${otp.text}`);
-  const verify = await client.request('/api/auth/verify', { method: 'POST', body: { phone, code: otp.json.devCode } });
+  const otp = await client.request('/api/auth/email/otp', { method: 'POST', body: { email: account.email, audience } });
+  assert.equal(otp.status, 200, `code request failed for ${label}: ${otp.text}`);
+  const verify = await client.request('/api/auth/email/verify', {
+    method: 'POST',
+    body: { email: account.email, code: otp.json.devCode, audience },
+  });
   assert.equal(verify.status, 200, `sign-in failed for ${label}: ${verify.text}`);
   if (roles.MFA_ROLES.includes(role)) {
-    const finished = await completeMfa(client, { phone });
+    const finished = await completeMfa(client, { userId: account.id });
     assert.equal(finished.status, 200, `second factor failed for ${label}: ${finished.text}`);
   }
-  return { id: row.id, phone: canonical(phone), local: phone, role, client };
+  return { id: account.id, email: account.email, role, client };
 }
 
 /** A paid-for booking row the escrow and report tests can hang off. */
@@ -223,6 +221,13 @@ test.after(async () => {
       await db.query(`DELETE FROM notifications WHERE recipient IN (${marks})`, shapes);
       await db.query(`UPDATE admin_audit SET actor_id = NULL WHERE actor_id IN (SELECT id FROM \`users\` WHERE phone IN (${marks}))`, shapes);
       await db.query(`DELETE FROM \`users\` WHERE phone IN (${marks})`, shapes);
+    }
+    if (createdEmails.size) {
+      const emails = [...createdEmails];
+      const emailMarks = emails.map(() => '?').join(',');
+      await db.query(`DELETE FROM email_auth_codes WHERE email IN (${emailMarks})`, emails);
+      await db.query(`UPDATE admin_audit SET actor_id = NULL WHERE actor_id IN (SELECT id FROM \`users\` WHERE email IN (${emailMarks}))`, emails);
+      await db.query(`DELETE FROM \`users\` WHERE email IN (${emailMarks})`, emails);
     }
     await db.pool.end();
   }
@@ -690,24 +695,43 @@ maybe('the report is one document for the page and the PDF, and only the right p
 maybe('the inspection report reaches the customer it belongs to', async () => {
   const booking = await scratchBooking({ withChecklist: true });
   const { canonical } = require('../src/lib/phone');
-  await db.query('UPDATE bookings SET phone = ? WHERE id = ?', [canonical(booking.phone), booking.id]);
+  const { makeAccount } = require('./helpers');
+  const customerPhone = canonical(booking.phone);
+  await db.query('UPDATE bookings SET phone = ? WHERE id = ?', [customerPhone, booking.id]);
 
+  // The customer signs in with their email — accounts have no phone sign-in —
+  // and this phone-era booking row is matched the legacy way, by contact
+  // number, the same link the dashboard draws.
+  const account = await makeAccount({ role: 'customer', name: 'Payments Test Buyer', phone: customerPhone });
+  createdEmails.add(account.email);
+  createdPhones.add(customerPhone);
   const client = newClient();
-  const otp = await client.request('/api/auth/otp', { method: 'POST', body: { phone: booking.phone } });
-  const verify = await client.request('/api/auth/verify', { method: 'POST', body: { phone: booking.phone, code: otp.json.devCode } });
+  const otp = await client.request('/api/auth/email/otp', { method: 'POST', body: { email: account.email } });
+  assert.equal(otp.status, 200, `code request failed: ${otp.text}`);
+  const verify = await client.request('/api/auth/email/verify', {
+    method: 'POST',
+    body: { email: account.email, code: otp.json.devCode },
+  });
   assert.equal(verify.status, 200);
+
+  // And a booking linked by user_id — the modern way — is equally theirs.
+  const linked = await scratchBooking({ withChecklist: true });
+  await db.query('UPDATE bookings SET user_id = ? WHERE id = ?', [account.id, linked.id]);
 
   const dashboard = await client.request('/account');
   assert.equal(dashboard.status, 200);
-  assert.match(dashboard.text, new RegExp(`/account/reports/${booking.reference}`), 'the report is filed under Documents');
+  assert.match(dashboard.text, new RegExp(`/account/reports/${booking.reference}`), 'the phone-keyed report is filed under Documents');
+  assert.match(dashboard.text, new RegExp(`/account/reports/${linked.reference}`), 'and the account-linked one');
 
-  const page = await client.request(`/account/reports/${booking.reference}`);
-  assert.equal(page.status, 200);
-  assert.match(page.text, /Download the PDF/);
+  for (const reference of [booking.reference, linked.reference]) {
+    const page = await client.request(`/account/reports/${reference}`);
+    assert.equal(page.status, 200);
+    assert.match(page.text, /Download the PDF/);
 
-  const pdf = await client.request(`/account/reports/${booking.reference}.pdf`);
-  assert.equal(pdf.status, 200);
-  assert.equal(pdf.buffer.slice(0, 4).toString(), '%PDF');
+    const pdf = await client.request(`/account/reports/${reference}.pdf`);
+    assert.equal(pdf.status, 200);
+    assert.equal(pdf.buffer.slice(0, 4).toString(), '%PDF');
+  }
 });
 
 // ---------------------------------------------------------------------------

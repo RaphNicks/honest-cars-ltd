@@ -925,12 +925,18 @@ async function inspectorJobs(inspectorId, { date = null } = {}) {
 // ---------------------------------------------------------------------------
 async function staffList() {
   const rows = await query(
-    "SELECT id, name, phone, role, status, watchlisted, last_seen_at, created_at FROM `users` WHERE role <> 'customer' ORDER BY FIELD(role,'admin','ops','inspector','finance','marketing','dealer'), name",
+    `SELECT u.id, u.name, u.phone, u.email, u.role, u.status, u.watchlisted, u.last_seen_at, u.created_at,
+            (SELECT COUNT(*) FROM user_email_identities e WHERE e.user_id = u.id) AS identities
+       FROM \`users\` u
+      WHERE u.role <> 'customer'
+      ORDER BY FIELD(u.role,'admin','ops','inspector','finance','marketing','dealer'), u.name`,
   );
   return rows.map((row) => ({
     id: row.id,
     name: row.name || 'Unnamed',
     maskedPhone: phones.mask(row.phone),
+    signInEmail: row.email || null,
+    hasSignIn: Number(row.identities) > 0,
     role: row.role,
     status: row.status,
     watchlisted: Boolean(row.watchlisted),
@@ -939,15 +945,64 @@ async function staffList() {
   }));
 }
 
+/**
+ * Promotion guard: a staff or dealer role signs in with a verified email, so
+ * the account must hold one before the role exists. Without this, ops can
+ * create an account that can never sign in.
+ */
+async function requireSignInIdentity(userId) {
+  const row = await queryOne(
+    'SELECT id FROM user_email_identities WHERE user_id = ? LIMIT 1',
+    [userId],
+  );
+  return Boolean(row);
+}
+
 async function setRole(userId, role, { actorId }) {
   const allowed = ['customer', 'dealer', 'ops', 'inspector', 'marketing', 'finance', 'admin'];
   if (!allowed.includes(role)) return { ok: false, error: 'Unknown role.' };
   const before = await queryOne('SELECT id, role, name FROM `users` WHERE id = ? LIMIT 1', [userId]);
   if (!before) return { ok: false, error: 'That account does not exist.' };
+  if (role !== 'customer' && !(await requireSignInIdentity(userId))) {
+    return {
+      ok: false,
+      error: 'That account has no verified sign-in email yet. Set its sign-in email first — staff and dealer accounts sign in with an email code or Google.',
+    };
+  }
 
   await query('UPDATE `users` SET role = ? WHERE id = ?', [role, userId]);
   await recordAudit({ actorId, action: 'user.role', entity: 'user', entityId: userId, detail: { from: before.role, to: role } });
   return { ok: true, role };
+}
+
+/**
+ * Set or change the sign-in email of any account — the ops action that opens
+ * (or re-opens) an account when no verified identity exists. The address is
+ * trusted because ops types it on an authenticated console screen; it is still
+ * checked against every other identity before it lands, and the change is
+ * audited like any other sensitive act.
+ */
+async function setSignInEmail(userId, rawEmail, { actorId }) {
+  const users = require('./users');
+  const account = await users.findById(userId);
+  if (!account) return { ok: false, error: 'That account does not exist.' };
+  if (account.status === 'deleted') return { ok: false, error: 'That account is deleted.' };
+  const address = users.normaliseEmail(rawEmail);
+  if (!address) return { ok: false, error: 'Enter a valid email address.' };
+
+  try {
+    const updated = await users.linkVerifiedEmail(userId, address);
+    await recordAudit({
+      actorId,
+      action: 'user.signin_email',
+      entity: 'user',
+      entityId: userId,
+      detail: { email: address, role: updated.role },
+    });
+    return { ok: true, email: address, user: updated };
+  } catch (error) {
+    return { ok: false, error: error.message || 'We could not set that sign-in email.' };
+  }
 }
 
 async function setWatchlist(userId, watchlisted, { actorId }) {
@@ -1007,6 +1062,7 @@ module.exports = {
   inspectorJobs,
   staffList,
   setRole,
+  setSignInEmail,
   setWatchlist,
   customerCount,
   nairaToKobo,

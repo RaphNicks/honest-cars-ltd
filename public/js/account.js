@@ -1,8 +1,9 @@
 /**
  * Account + sign-in — §7.1.
  *
- *   • /login: customer email OTP; the same phone-code widgets are reused by
- *     the separate dealer and staff sign-in pages, including resend and restart.
+ *   • /login, /admin/login, /dealer/login: one sign-in widget for every
+ *     surface — email OTP or Google, scoped by data-auth-audience (customer,
+ *     staff, dealer), including resend, restart and the TOTP hand-off.
  *   • Everywhere: the save / unsave toggle on cards and the VDP. Signed out it
  *     is a link into /login; signed in it posts to /api/account/saved-cars.
  *   • /account: profile form, saved-search alerts, delete confirmation,
@@ -40,34 +41,28 @@ function setMessage(el, text, state) {
 }
 
 // ---------------------------------------------------------------------------
-// Sign-in
+// ---------------------------------------------------------------------------
+// Sign-in — one widget for every surface (customer, staff, dealer). Email OTP
+// or Google, scoped by the card's data-auth-audience. Phone sign-in is gone:
+// there is no phone step here to show.
 // ---------------------------------------------------------------------------
 export function initLogin(root = document) {
   const card = root.querySelector('[data-auth-card]');
   if (!card) return;
 
-  const emailPanel = card.querySelector('[data-auth-panel="email"]');
-  const phonePanel = card.querySelector('[data-auth-panel="phone"]');
   const emailStep = card.querySelector('[data-auth-step="email"]');
   const emailCodeStep = card.querySelector('[data-auth-step="email-code"]');
-  const phoneStep = card.querySelector('[data-auth-step="phone"]');
-  const phoneCodeStep = card.querySelector('[data-auth-step="phone-code"]');
   const emailInput = card.querySelector('#login-email');
   const nameInput = card.querySelector('#login-name');
   const emailCodeInput = card.querySelector('#login-email-code');
-  const phoneInput = card.querySelector('#login-phone');
-  const phoneCodeInput = card.querySelector('#login-code');
-  const phoneConsent = phoneStep ? phoneStep.querySelector('input[name="consent"]') : null;
-  const phoneLabel = card.querySelector('[data-auth-phone]');
   const emailLabel = card.querySelector('[data-auth-email]');
 
   const next = card.dataset.next || '';
   const referral = card.dataset.ref || '';
+  const audience = card.dataset.authAudience || 'customer';
   const params = new URLSearchParams(window.location.search);
   const pendingSave = params.get('save');
-  let phone = '';
   let email = '';
-  let mode = 'email';
 
   const setVisible = (element, visible) => {
     if (!element) return;
@@ -75,35 +70,20 @@ export function initLogin(root = document) {
     element.hidden = !visible;
   };
 
-  const showMode = (selected, { focus = true } = {}) => {
-    mode = selected === 'phone' ? 'phone' : 'email';
-    setVisible(emailPanel, mode === 'email');
-    setVisible(phonePanel, mode === 'phone');
+  const showEmailStep = ({ focus = true } = {}) => {
     setVisible(emailStep, true);
     setVisible(emailCodeStep, false);
-    setVisible(phoneStep, true);
-    setVisible(phoneCodeStep, false);
-    card.querySelectorAll('[data-auth-mode]').forEach((button) => {
-      const active = button.dataset.authMode === mode;
-      button.setAttribute('aria-pressed', active ? 'true' : 'false');
-    });
-    if (!focus) return;
-    if (mode === 'email' && emailInput) emailInput.focus();
-    if (mode === 'phone' && phoneInput) phoneInput.focus();
+    if (focus && emailInput) emailInput.focus();
   };
 
-  const showCodeStep = (selected) => {
-    const usePhone = selected === 'phone';
-    setVisible(emailStep, !usePhone);
-    setVisible(emailCodeStep, !usePhone);
-    setVisible(phoneStep, usePhone);
-    setVisible(phoneCodeStep, usePhone);
-    if (usePhone && phoneCodeInput) phoneCodeInput.focus();
-    if (!usePhone && emailCodeInput) emailCodeInput.focus();
+  const showCodeStep = () => {
+    setVisible(emailStep, false);
+    setVisible(emailCodeStep, true);
+    if (emailCodeInput) emailCodeInput.focus();
   };
 
   const finishLogin = async (result, message) => {
-    setMessage(message, 'Signed in. Taking you through…', 'ok');
+    setMessage(message, 'Signed in. Taking you through\u2026', 'ok');
     if (pendingSave) {
       await postJson('/api/account/saved-cars', {
         listingId: Number(pendingSave),
@@ -125,7 +105,7 @@ export function initLogin(root = document) {
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(typedEmail)) {
       return setMessage(currentMessage, 'Please enter a valid email address.', 'error');
     }
-    if (typedName.length < 2) {
+    if (nameInput && typedName.length < 2) {
       return setMessage(currentMessage, 'Please enter your name so we can set up your account.', 'error');
     }
 
@@ -133,7 +113,7 @@ export function initLogin(root = document) {
       ? emailCodeStep.querySelector('[data-auth-resend]')
       : emailStep.querySelector('button[type="submit"]');
     if (button) button.disabled = true;
-    const result = await postJson('/api/auth/email/otp', { email: typedEmail });
+    const result = await postJson('/api/auth/email/otp', { email: typedEmail, audience });
     if (button) button.disabled = false;
     if (!result.ok) return setMessage(currentMessage, result.error || 'We could not send a code just now.', 'error');
 
@@ -147,9 +127,9 @@ export function initLogin(root = document) {
         : result.delivered
           ? `A sign-in code is on its way to ${result.maskedEmail || 'your email'}.`
           : `Your code is ready for ${result.maskedEmail || 'your email'}.${result.devCode ? ` Development code: ${result.devCode}` : ' Check your email.'}`,
-      result.alreadyLinked ? 'ok' : 'ok',
+      'ok',
     );
-    if (!resend && !result.alreadyLinked) showCodeStep('email');
+    if (!resend && !result.alreadyLinked) showCodeStep();
     return undefined;
   };
 
@@ -168,65 +148,13 @@ export function initLogin(root = document) {
       name: String(nameInput ? nameInput.value : '').trim(),
       ref: referral,
       next,
-    });
-    if (button) button.disabled = false;
-    if (!result.ok) return setMessage(message, result.error || 'That code did not work.', 'error');
-    await finishLogin(result, message);
-    return undefined;
-  };
-
-  const requestPhoneCode = async (event) => {
-    if (event) event.preventDefault();
-    const message = phoneStep.querySelector('[data-auth-message]');
-    setMessage(message, '');
-
-    if (phoneConsent && !phoneConsent.checked) {
-      return setMessage(message, 'Please tick the box so we know you agreed to be contacted on this number.', 'error');
-    }
-    const value = String(phoneInput ? phoneInput.value : '').trim();
-    if (value.length < 7) return setMessage(message, 'Please enter a valid phone number.', 'error');
-
-    const button = phoneStep.querySelector('button[type="submit"]');
-    if (button) button.disabled = true;
-    const result = await postJson('/api/auth/otp', { phone: value });
-    if (button) button.disabled = false;
-    if (!result.ok) return setMessage(message, result.error || 'We could not send a code just now.', 'error');
-
-    phone = result.phone;
-    if (phoneLabel) phoneLabel.textContent = result.maskedPhone;
-    track('booking_started', { type: 'phone_otp', source: 'login' });
-    setMessage(
-      phoneCodeStep.querySelector('[data-auth-message]'),
-      result.delivered
-        ? `Code sent on WhatsApp to ${result.maskedPhone}.`
-        : `Code ready for ${result.maskedPhone}.${result.devCode ? ` Development code: ${result.devCode}` : ' Check WhatsApp.'}`,
-      'ok',
-    );
-    showCodeStep('phone');
-    return undefined;
-  };
-
-  const verifyPhoneCode = async (event) => {
-    if (event) event.preventDefault();
-    const message = phoneCodeStep.querySelector('[data-auth-message]');
-    setMessage(message, '');
-    const code = String(phoneCodeInput ? phoneCodeInput.value : '').replace(/\D/g, '');
-    if (code.length < 4) return setMessage(message, 'Enter the code we sent you.', 'error');
-
-    const button = phoneCodeStep.querySelector('button[type="submit"]');
-    if (button) button.disabled = true;
-    const result = await postJson('/api/auth/verify', {
-      phone,
-      code,
-      next,
-      ref: referral,
-      consent: phoneConsent && phoneConsent.checked ? '1' : '',
+      audience,
     });
     if (button) button.disabled = false;
     if (!result.ok) return setMessage(message, result.error || 'That code did not work.', 'error');
 
     if (result.mfa && result.mfa.required) {
-      setMessage(message, 'One more step — enter your authenticator code.', 'ok');
+      setMessage(message, 'One more step \u2014 enter your authenticator code.', 'ok');
       if (pendingSave) {
         await postJson('/api/account/saved-cars', { listingId: Number(pendingSave), action: 'add', source: 'login' });
       }
@@ -237,36 +165,14 @@ export function initLogin(root = document) {
     return undefined;
   };
 
-  card.querySelectorAll('[data-auth-mode]').forEach((button) => {
-    button.addEventListener('click', () => showMode(button.dataset.authMode));
-  });
   if (emailStep) emailStep.addEventListener('submit', requestEmailCode);
   if (emailCodeStep) emailCodeStep.addEventListener('submit', verifyEmailCode);
-  if (phoneStep) phoneStep.addEventListener('submit', requestPhoneCode);
-  if (phoneCodeStep) phoneCodeStep.addEventListener('submit', verifyPhoneCode);
 
   const restartEmail = emailCodeStep && emailCodeStep.querySelector('[data-auth-restart]');
-  if (restartEmail) restartEmail.addEventListener('click', () => showMode('email'));
-  const restartPhone = phoneCodeStep && phoneCodeStep.querySelector('[data-auth-restart]');
-  if (restartPhone) restartPhone.addEventListener('click', () => showMode('phone'));
+  if (restartEmail) restartEmail.addEventListener('click', () => showEmailStep());
 
   const resendEmail = emailCodeStep && emailCodeStep.querySelector('[data-auth-resend]');
   if (resendEmail) resendEmail.addEventListener('click', (event) => requestEmailCode(event, { resend: true }));
-  const resendPhone = phoneCodeStep && phoneCodeStep.querySelector('[data-auth-resend]');
-  if (resendPhone) {
-    resendPhone.addEventListener('click', async () => {
-      resendPhone.disabled = true;
-      const result = await postJson('/api/auth/otp', { phone });
-      resendPhone.disabled = false;
-      setMessage(
-        phoneCodeStep.querySelector('[data-auth-message]'),
-        result.ok
-          ? `New code sent to ${result.maskedPhone}.${result.devCode ? ` Development code: ${result.devCode}` : ''}`
-          : result.error || 'We could not send another code yet — give it a minute.',
-        result.ok ? 'ok' : 'error',
-      );
-    });
-  }
 
   if (emailCodeInput) {
     emailCodeInput.addEventListener('input', () => {
@@ -274,14 +180,8 @@ export function initLogin(root = document) {
       if (emailCodeInput.value.length >= (Number(emailCodeInput.maxLength) || 6)) verifyEmailCode();
     });
   }
-  if (phoneCodeInput) {
-    phoneCodeInput.addEventListener('input', () => {
-      phoneCodeInput.value = phoneCodeInput.value.replace(/\D/g, '');
-      if (phoneCodeInput.value.length >= (Number(phoneCodeInput.maxLength) || 6)) verifyPhoneCode();
-    });
-  }
 
-  showMode('email', { focus: false });
+  showEmailStep({ focus: false });
 }
 
 // ---------------------------------------------------------------------------

@@ -1,9 +1,19 @@
-<%# Staff-only OTP entry. This view is selected only on the configured admin host. %>
+<%#
+  Staff sign-in — email code or Google, nothing else. This view is selected on
+  the configured admin host (or /admin/login in a single-origin preview).
+  Sign-in is shared machinery (src/services/signin.js) scoped to the `staff`
+  audience: the address must already carry a verified identity on a staff
+  account. TOTP, where the role requires it, is the step after this one.
+  Locals: next, reason, authErrorMessage, googleReady, mailReady, development, otp, audience
+%>
 <section class="page-hero">
   <div class="container container--narrow">
     <p class="eyebrow">Staff access</p>
     <h1>Staff sign in</h1>
-    <p class="lead">Use the phone number linked to your staff account. If your role requires it, we will ask for your authenticator code next.</p>
+    <p class="lead">
+      Use the email linked to your staff account — we will send a one-time code to it — or continue with Google.
+      If your role requires it, we will ask for your authenticator code next.
+    </p>
   </div>
 </section>
 
@@ -12,43 +22,68 @@
     <% if (reason === 'expired') { %>
       <p class="auth-message auth-message--banner" data-state="error">Your session ended, so please sign in again.</p>
     <% } %>
+    <% if (authErrorMessage) { %>
+      <p class="auth-message auth-message--banner" data-state="error"><%= authErrorMessage %></p>
+    <% } %>
 
-    <div class="auth-card" data-auth-card data-next="<%= next %>" data-ref="" data-save="">
-      <form class="auth-form" data-auth-step="phone" action="/api/auth/otp" method="post" novalidate>
-        <h2 class="mb-1">Your staff phone number</h2>
-        <p class="note-inline">This console is for authorised Honest Cars staff. Use the number already registered to your account.</p>
-        <div class="field">
-          <label class="field__label" for="login-phone">Phone number</label>
-          <input class="input" id="login-phone" name="phone" type="tel" inputmode="tel" autocomplete="tel" placeholder="0803 123 4567" required aria-describedby="login-phone-hint">
-          <p class="field__hint" id="login-phone-hint">Enter your registered number, for example <span class="tabular">0803 123 4567</span>.</p>
-        </div>
-        <input type="hidden" name="next" value="<%= next %>">
-        <div class="btn-row">
-          <button class="btn btn--primary" type="submit">Send staff sign-in code</button>
-          <a class="btn btn--ghost" href="<%= otp.whatsappLink %>" target="_blank" rel="noopener" data-event="whatsapp_click" data-source="staff_login">Need help? WhatsApp the desk</a>
-        </div>
-        <p class="auth-message" data-auth-message role="status" aria-live="polite"></p>
-      </form>
+    <div class="auth-card" data-auth-card data-next="<%= next %>" data-ref="" data-save="" data-auth-audience="<%= audience %>">
+      <div data-auth-panel="email">
+        <form class="auth-form" data-auth-step="email" action="/api/auth/email/otp" method="post" novalidate>
+          <h2 class="mb-1">Your staff email</h2>
+          <p class="note-inline">This console is for authorised Honest Cars staff. Use the email already registered to your account — new accounts cannot be created here.</p>
+          <div class="field">
+            <label class="field__label" for="login-email">Email address</label>
+            <input class="input" id="login-email" name="email" type="email" inputmode="email" autocomplete="email" maxlength="160" placeholder="you@honestcarsltd.com" required aria-describedby="login-email-hint">
+            <p class="field__hint" id="login-email-hint">We will send a one-time code to this address. It expires in <%= otp.ttlMinutes %> minutes.</p>
+          </div>
+          <input type="hidden" name="audience" value="<%= audience %>">
+          <input type="hidden" name="next" value="<%= next %>">
+          <div class="auth-signin-options" role="group" aria-label="Choose a staff sign-in method">
+            <button class="btn btn--primary btn--block" type="submit">Send sign-in code</button>
+            <div class="auth-option-divider" aria-hidden="true"><span>or</span></div>
+            <a class="btn btn--secondary btn--block auth-google-button" href="/api/auth/google?audience=<%= audience %>&amp;next=<%= encodeURIComponent(next || '/admin') %>">
+              <svg class="auth-google-button__icon" viewBox="0 0 48 48" aria-hidden="true" focusable="false">
+                <path fill="#4285F4" d="M43.6 20.5h-1.4V20H24v8h11.3A12 12 0 0 1 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.8 1.2 8 3.1l5.7-5.7C34.9 6 29.8 4 24 4 13 4 4 13 4 24s9 20 20 20 20-9 20-20c0-1.3-.1-2.5-.4-3.5z"/>
+                <path fill="#34A853" d="M24 44c5.5 0 10.3-1.8 13.9-4.9l-7.1-5.5C28.9 35.1 26.6 36 24 36c-5.2 0-9.6-3.3-11.2-8l-7.4 5.7C9 39.8 16 44 24 44z"/>
+                <path fill="#FBBC05" d="M12.8 28a12.2 12.2 0 0 1 0-8l-7.4-5.7C3.9 17.3 3 20.5 3 24s.9 6.7 2.4 9.7l7.4-5.7z"/>
+                <path fill="#EA4335" d="M24 12c3.1 0 5.8 1.2 8 3.1l5.7-5.7C34.2 6.1 29.5 4 24 4 16 4 9 8.2 5.4 14.3l7.4 5.7c1.6-4.7 6-8 11.2-8z"/>
+              </svg>
+              <span>Continue with Google</span>
+            </a>
+          </div>
+          <% if (!googleReady) { %>
+            <p class="field__hint">Google sign-in will work once its OAuth credentials are added to the hosting settings.</p>
+          <% } %>
+          <p class="auth-message" data-auth-message role="status" aria-live="polite"></p>
+        </form>
 
-      <form class="auth-form hidden" data-auth-step="phone-code" action="/api/auth/verify" method="post" novalidate hidden>
-        <h2 class="mb-1">Enter your sign-in code</h2>
-        <p class="note-inline">We sent a one-time code to <strong data-auth-phone>your number</strong>.</p>
-        <input type="hidden" name="phone">
-        <input type="hidden" name="next" value="<%= next %>">
-        <div class="field">
-          <label class="field__label" for="login-code">Sign-in code</label>
-          <input class="input input--code tabular" id="login-code" name="code" type="text" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]*" maxlength="<%= otp.length %>" placeholder="<%= '0'.repeat(otp.length) %>" required>
-        </div>
-        <div class="btn-row">
-          <button class="btn btn--primary" type="submit">Continue</button>
-          <button class="btn btn--ghost" type="button" data-auth-restart>Use a different number</button>
-          <button class="btn btn--secondary" type="button" data-auth-resend>Send a new code</button>
-        </div>
-        <p class="auth-message" data-auth-message role="status" aria-live="polite"></p>
-      </form>
+        <form class="auth-form hidden" data-auth-step="email-code" action="/api/auth/email/verify" method="post" novalidate hidden>
+          <h2 class="mb-1">Check your email</h2>
+          <p class="note-inline">We sent a one-time code to <strong data-auth-email>your email</strong>. It expires in <%= otp.ttlMinutes %> minutes.</p>
+          <input type="hidden" name="email">
+          <input type="hidden" name="audience" value="<%= audience %>">
+          <input type="hidden" name="next" value="<%= next %>">
+          <div class="field">
+            <label class="field__label" for="login-email-code">Email code</label>
+            <input class="input input--code tabular" id="login-email-code" name="code" type="text" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]*" maxlength="<%= otp.length %>" placeholder="<%= '0'.repeat(otp.length) %>" required>
+          </div>
+          <div class="btn-row">
+            <button class="btn btn--primary" type="submit">Sign in</button>
+            <button class="btn btn--ghost" type="button" data-auth-restart>Use a different email</button>
+            <button class="btn btn--secondary" type="button" data-auth-resend>Send a new code</button>
+          </div>
+          <p class="auth-message" data-auth-message role="status" aria-live="polite"></p>
+        </form>
+      </div>
 
-      <% if (otp.provider === 'console') { %>
-        <p class="auth-devnote"><strong>Development:</strong> the local test code appears in the response and server log. Production sign-in codes must use the configured staff OTP provider.</p>
+      <% if (!mailReady && development) { %>
+        <p class="auth-devnote">
+          <strong>Development:</strong> SMTP is not configured. Email codes appear in the development response and server log. Set <code>SMTP_URL</code> and <code>SMTP_FROM</code> for delivery.
+        </p>
+      <% } else if (!mailReady) { %>
+        <p class="auth-devnote">
+          Email sign-in is temporarily unavailable until email delivery is configured. Please contact Honest Cars.
+        </p>
       <% } %>
     </div>
   </div>

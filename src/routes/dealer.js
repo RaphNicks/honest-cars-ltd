@@ -212,7 +212,8 @@ function dealerLoginNext(value) {
 }
 
 // ---------------------------------------------------------------------------
-// Dealer phone sign-in remains separate from customer email/Google sign-in.
+// Dealer sign-in is email code or Google — the same credentials as everywhere
+// else, scoped to the `dealer` audience on its own portal surface.
 // ---------------------------------------------------------------------------
 router.get('/login', async (req, res, next) => {
   try {
@@ -236,11 +237,15 @@ router.get('/login', async (req, res, next) => {
       },
       data: {
         next: dealerLoginNext(req.query.next),
+        audience: 'dealer',
         reason: req.sessionEnded ? 'expired' : null,
+        authErrorMessage: '',
+        googleReady: config.googleAuth.configured,
+        mailReady: config.mail.configured,
+        development: !config.isProduction,
         otp: {
           length: config.auth.otpLength,
-          provider: config.auth.provider,
-          whatsappLink: `https://wa.me/${config.business.whatsapp}?text=${encodeURIComponent('Hi HonestCars, I cannot receive the dealer sign-in code.')}`,
+          ttlMinutes: config.auth.otpTtlMinutes,
         },
       },
     });

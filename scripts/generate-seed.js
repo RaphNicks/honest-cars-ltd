@@ -1119,17 +1119,34 @@ ON DUPLICATE KEY UPDATE \`key\` = \`key\`;`);
   // now, so the console looks alive whenever the seed is loaded.
   // -------------------------------------------------------------------------
   out.push(`
--- Staff accounts for the pilot (§7.4). Sign in at /login with the number,
--- then open /admin. Nothing here is a password: access is by OTP.
-INSERT INTO \`users\` (phone, name, role, referral_code, status) VALUES
-  ('+2348000000001', 'Admin — Honest Cars', 'admin',     'HCADMN', 'active'),
-  ('+2348000000002', 'Ops Desk',            'ops',       'HCSTFF', 'active'),
-  ('+2348000000003', 'Field Inspector',     'inspector', 'HCINSP', 'active'),
-  ('+2348000000004', 'Finance Desk',        'finance',   'HCFINC', 'active'),
-  ('+2348000000005', 'Content Desk',        'marketing', 'HCMKTG', 'active'),
-  ('+2348000000006', 'Woji Car Mart',       'dealer',    'HCWOJI', 'active'),
-  ('+2348000000007', 'Aba Road Autos',      'dealer',    'HCABAR', 'active')
-ON DUPLICATE KEY UPDATE role = VALUES(role), name = VALUES(name), status = 'active';
+-- Staff accounts for the pilot (§7.4). Sign in with the email code (or Google),
+-- then open /admin. Nothing here is a password: the .test addresses are demo
+-- sign-in identities for local use only.
+INSERT INTO \`users\` (phone, name, email, role, referral_code, status) VALUES
+  ('+2348000000001', 'Admin — Honest Cars', 'admin@honestcars.test',     'admin',     'HCADMN', 'active'),
+  ('+2348000000002', 'Ops Desk',            'ops@honestcars.test',       'ops',       'HCSTFF', 'active'),
+  ('+2348000000003', 'Field Inspector',     'inspector@honestcars.test', 'inspector', 'HCINSP', 'active'),
+  ('+2348000000004', 'Finance Desk',        'finance@honestcars.test',   'finance',   'HCFINC', 'active'),
+  ('+2348000000005', 'Content Desk',        'marketing@honestcars.test', 'marketing', 'HCMKTG', 'active'),
+  ('+2348000000006', 'Woji Car Mart',       'woji@honestcars.test',      'dealer',    'HCWOJI', 'active'),
+  ('+2348000000007', 'Aba Road Autos',      'abaroad@honestcars.test',   'dealer',    'HCABAR', 'active')
+ON DUPLICATE KEY UPDATE role = VALUES(role), name = VALUES(name), email = VALUES(email), status = 'active';
+
+-- Their verified sign-in identities. Every account signs in with an email code
+-- or Google; these rows are what makes the demo accounts reachable.
+INSERT INTO user_email_identities (user_id, email, google_subject, verified_at)
+SELECT u.id, demo.email, NULL, UTC_TIMESTAMP()
+  FROM \`users\` u
+  JOIN (
+    SELECT '+2348000000001' AS phone, 'admin@honestcars.test' AS email
+    UNION ALL SELECT '+2348000000002', 'ops@honestcars.test'
+    UNION ALL SELECT '+2348000000003', 'inspector@honestcars.test'
+    UNION ALL SELECT '+2348000000004', 'finance@honestcars.test'
+    UNION ALL SELECT '+2348000000005', 'marketing@honestcars.test'
+    UNION ALL SELECT '+2348000000006', 'woji@honestcars.test'
+    UNION ALL SELECT '+2348000000007', 'abaroad@honestcars.test'
+  ) demo ON demo.phone = u.phone
+ON DUPLICATE KEY UPDATE user_id = VALUES(user_id);
 
 -- The console's own lot (owner 2026-10-12): staff list house stock through
 -- /admin/listings/new. Owned by the admin account so the demo purge, which

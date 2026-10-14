@@ -10,10 +10,10 @@
  *      lot cannot read or write another lot's stock.
  *
  * The HTTP half signs in like a person: it creates its own account through the
- * OTP endpoint (a fresh number every run — the per-phone limit is real), then
- * promotes it to `dealer` and links a lot, which is exactly what ops does on
- * /admin/staff. Everything it creates is removed in test.after, so the dev
- * database is left as it was found.
+ * email-code endpoint (a fresh address every run — the per-email limit is
+ * real), then promotes it to `dealer` and links a lot, which is exactly what
+ * ops does on /admin/staff. Everything it creates is removed in test.after, so
+ * the dev database is left as it was found.
  */
 
 const test = require('node:test');
@@ -79,22 +79,25 @@ function client() {
 }
 
 /**
- * Sign in with a fresh number and hand back the session plus the account row it
- * created, ready to be promoted to `dealer` and linked to a lot.
+ * Sign in with a fresh email address and hand back the session plus the account
+ * row it created, ready to be promoted to `dealer` and linked to a lot.
  */
 async function signIn() {
   const db = require('../src/db');
   const web = client();
-  const phone = nextPhone();
-  const otp = await web.request('/api/auth/otp', { method: 'POST', body: { phone } });
+  const email = `dealer-${process.pid}-${(seq += 1)}-${Date.now() % 100000}@example.net`;
+  const otp = await web.request('/api/auth/email/otp', { method: 'POST', body: { email } });
   assert.equal(otp.status, 200, otp.text);
-  const verify = await web.request('/api/auth/verify', { method: 'POST', body: { phone, code: otp.json.devCode } });
+  const verify = await web.request('/api/auth/email/verify', {
+    method: 'POST',
+    body: { email, code: otp.json.devCode, name: 'Dealer Tester' },
+  });
   assert.equal(verify.status, 200, verify.text);
 
-  const account = await db.queryOne('SELECT id, phone, role FROM `users` WHERE phone = ? LIMIT 1', [otp.json.phone]);
+  const account = await db.queryOne('SELECT id, email, role FROM `users` WHERE email = ? LIMIT 1', [email]);
   assert.ok(account, 'signing in created the account');
   if (!created.userIds.includes(account.id)) created.userIds.push(account.id);
-  return { web, phone, normalised: otp.json.phone, account };
+  return { web, email, account };
 }
 
 /** Promote the fresh account to a dealer and link a lot — what ops does on /admin/staff. */
@@ -448,12 +451,15 @@ maybe('signed out, /dealer is the partner door and stays out of search', async (
   assert.doesNotMatch(response.text, /undefined|NaN|<%/, 'no template artefacts');
 });
 
-maybe('dealer phone sign-in has its own route outside customer email sign-in', async () => {
+maybe('dealer sign-in has its own route outside customer sign-in', async () => {
   const response = await client().request('/dealer/login');
   assert.equal(response.status, 200);
   assert.match(response.text, /Sign in to your lot/);
-  assert.match(response.text, /name="phone"/);
-  assert.doesNotMatch(response.text, /Staff sign in|Continue with Google/);
+  assert.match(response.text, /data-auth-audience="dealer"/, 'the page tells the sign-in script which surface this is');
+  assert.match(response.text, /name="email"/, 'dealer sign-in is a code to the sign-in email');
+  assert.doesNotMatch(response.text, /name="phone"/);
+  assert.match(response.text, /Continue with Google/, 'dealer sign-in is email code or Google, like every account');
+  assert.doesNotMatch(response.text, /Staff sign in/);
 });
 
 maybe('a customer account is refused, and told why', async () => {

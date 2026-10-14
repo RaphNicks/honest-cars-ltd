@@ -7,15 +7,18 @@
  * trade it for a session, save a car and a search, close the account. Skips
  * itself when MySQL is unreachable, like the other DB-backed suites.
  *
- * Every sign-in uses its own number: the per-phone OTP limit is 5 an hour, so
- * sharing one across the suite would fail for the wrong reason. Numbers are
- * typed in the local shape on purpose — normalisation is part of the contract.
+ * Sign-in is email OTP (or Google) for every account — there is no phone
+ * sign-in anywhere in this build. Every sign-in uses its own address: the
+ * per-email code limit is 5 an hour, so sharing one across the suite would
+ * fail for the wrong reason. Phone numbers still appear as *contact*
+ * information on forms, and as the key on legacy records — those contracts are
+ * tested here too, with legacy accounts built directly in the database.
  */
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
 
-const { dbAvailable, startTestServer } = require('./helpers');
+const { dbAvailable, startTestServer, nextEmail, makeAccount } = require('./helpers');
 
 let available = false;
 let ctx;
@@ -26,7 +29,7 @@ const maybe = (name, fn) =>
     return fn(t);
   });
 
-/** A fresh number for every sign-in: 11 digits, local shape (0803…). */
+/** A fresh contact number for every form that asks for one: 11 digits, local shape (0803…). */
 const run = (Number(process.pid) * 7919 + (Date.now() % 100000)) % 1000000;
 let seq = 0;
 function nextPhone() {
@@ -43,8 +46,8 @@ const createdPhones = new Set();
 const createdEmails = new Set();
 
 /** Cookie-aware fetch: keeps hc_session between calls, manual redirects. */
-function newClient() {
-  let cookie = '';
+function newClient({ sessionToken = '' } = {}) {
+  let cookie = sessionToken ? `hc_session=${sessionToken}` : '';
   let rawCookies = [];
   return {
     get cookie() {
@@ -83,22 +86,48 @@ function newClient() {
   };
 }
 
-/** Request a code, trade it for a session, return the ready-to-use client. */
-async function signIn(phone = nextPhone()) {
+/** Request an email code, trade it for a session, return the ready-to-use client. */
+async function signIn({ email = nextEmail('auth'), name = 'Test Buyer', ref = null, audience = 'customer' } = {}) {
   const client = newClient();
-  const otp = await client.request('/api/auth/otp', { method: 'POST', body: { phone } });
+  const otp = await client.request('/api/auth/email/otp', { method: 'POST', body: { email, audience } });
   assert.equal(otp.status, 200, otp.text);
   assert.equal(otp.json.ok, true);
-  assert.equal(otp.json.phone, `+234${phone.replace(/^0/, '')}`, 'stored normalised as +234…');
-  assert.match(otp.json.maskedPhone, /•••/, 'the response masks the number');
+  assert.match(otp.json.maskedEmail, /@/, 'the response masks the address');
+  assert.ok(otp.json.devCode, 'development exposes only the local test code');
+  createdEmails.add(email);
 
-  const verify = await client.request('/api/auth/verify', { method: 'POST', body: { phone, code: otp.json.devCode } });
+  const verify = await client.request('/api/auth/email/verify', {
+    method: 'POST',
+    body: { email, code: otp.json.devCode, name, ...(ref ? { ref } : {}), audience },
+  });
   assert.equal(verify.status, 200, verify.text);
   assert.equal(verify.json.ok, true);
 
-  const normalised = `+234${phone.replace(/^0/, '')}`;
+  return { client, code: otp.json.devCode, email, verify };
+}
+
+/**
+ * A legacy phone-era account: the row still carries its sign-in phone and
+ * phone-keyed history, but nobody can sign in with that number any more. The
+ * session is minted the way the app mints one, because the suite is testing
+ * what such an *account* can see — not the retired sign-in path.
+ */
+async function legacyPhoneAccount(name = 'Legacy Phone Owner') {
+  const db = require('../src/db');
+  const auth = require('../src/services/auth');
+  const phones = require('../src/lib/phone');
+  const phone = nextPhone();
+  const normalised = phones.canonical(phone);
+  const user = await db.users.upsertByPhone({ phone: normalised, name });
   createdPhones.add(normalised);
-  return { client, code: otp.json.devCode, phone, normalised };
+  const token = auth.newSessionToken();
+  await db.users.createSession({
+    userId: user.id,
+    tokenHash: auth.hashToken(token),
+    expiresAt: new Date(Date.now() + 86_400_000),
+    mfaPending: false,
+  });
+  return { client: newClient({ sessionToken: token }), phone, normalised, user };
 }
 
 test.before(async () => {
@@ -152,7 +181,7 @@ test.after(async () => {
 // Sign-in
 // ---------------------------------------------------------------------------
 
-maybe('sign-in page defaults to phone-free customer email and Google sign-in', async () => {
+maybe('sign-in page offers customer email and Google sign-in, and no phone path', async () => {
   const response = await fetch(`${ctx.baseUrl}/login`);
   assert.equal(response.status, 200);
   assert.match(response.headers.get('cache-control'), /no-store/);
@@ -168,148 +197,92 @@ maybe('sign-in page defaults to phone-free customer email and Google sign-in', a
   assert.doesNotMatch(html, /href="\/admin(?:\/|["?])/i, 'there is no public link into the staff console');
 });
 
-maybe('staff and dealer phone entry is role-bound and cannot create a customer account', async () => {
+maybe('staff and dealer sign-in is closed to provisioned accounts and cannot create one', async () => {
   const db = require('../src/db');
-  const auth = require('../src/services/auth');
-  const phones = require('../src/lib/phone');
-  const customerPhone = nextPhone();
-  const customer = await db.users.upsertByPhone({ phone: phones.canonical(customerPhone), name: 'No Portal Customer' });
-  createdPhones.add(customer.phone);
+  const unknown = nextEmail('unknown');
+  createdEmails.add(unknown);
 
-  const staffAttempt = await auth.requestCode({ rawPhone: customerPhone, roleRequired: 'staff' });
-  const dealerAttempt = await auth.requestCode({ rawPhone: customerPhone, roleRequired: 'dealer' });
-  assert.equal(staffAttempt.ok, false);
-  assert.equal(dealerAttempt.ok, false);
-  assert.equal(await db.users.findByPhone(customer.phone).then((user) => user.id), customer.id);
+  for (const audience of ['staff', 'dealer']) {
+    const client = newClient();
+    const attempt = await client.request('/api/auth/email/otp', { method: 'POST', body: { email: unknown, audience } });
+    assert.equal(attempt.status, 404, `${audience} surfaces do not hand out codes for unknown addresses`);
+    assert.equal(attempt.json.code, 'SIGN_IN_UNAVAILABLE');
+  }
+  assert.equal(await db.users.findByVerifiedEmail(unknown), null, 'no account was created');
 
-  const staffPhone = nextPhone();
-  const staff = await db.users.upsertByPhone({ phone: phones.canonical(staffPhone), name: 'Portal Staff' });
-  createdPhones.add(staff.phone);
-  await db.query('UPDATE `users` SET role = \'ops\' WHERE id = ?', [staff.id]);
-  const otp = await auth.requestCode({ rawPhone: staffPhone, roleRequired: 'staff' });
-  assert.equal(otp.ok, true);
-  const verified = await auth.verifyCode({ rawPhone: staffPhone, code: otp.devCode, roleRequired: 'staff' });
-  assert.equal(verified.ok, true);
-  assert.equal(verified.user.role, 'ops');
-});
-
-maybe('production phone sign-in fails closed without a real delivery provider', async () => {
-  const db = require('../src/db');
-  const auth = require('../src/services/auth');
-  const config = require('../src/config');
-  const phones = require('../src/lib/phone');
-  const phone = nextPhone();
-  const account = await db.users.upsertByPhone({ phone: phones.canonical(phone), name: 'Delivery Test Staff' });
-  createdPhones.add(account.phone);
-  await db.query("UPDATE `users` SET role = 'ops' WHERE id = ?", [account.id]);
-
-  const recentBefore = await db.users.countRecentCodes(account.phone, { withinMinutes: 60 });
-  const productionBefore = config.isProduction;
-  const providerBefore = config.auth.provider;
-  config.isProduction = true;
-  config.auth.provider = 'console';
-  let delivery;
-  let result;
-  try {
-    delivery = await auth.sendOtp(account.phone, '123456', { provider: 'console' });
-    result = await auth.requestCode({ rawPhone: phone, roleRequired: 'staff' });
-  } finally {
-    config.isProduction = productionBefore;
-    config.auth.provider = providerBefore;
+  // A customer account cannot use the closed surfaces either.
+  const customer = await signIn();
+  createdEmails.add(customer.email);
+  for (const audience of ['staff', 'dealer']) {
+    const client = newClient();
+    const attempt = await client.request('/api/auth/email/otp', { method: 'POST', body: { email: customer.email, audience } });
+    assert.equal(attempt.status, 404, `${audience} surfaces refuse customer addresses`);
   }
 
-  assert.equal(delivery.delivered, false);
-  assert.equal(delivery.devCode, undefined, 'production never reveals a console code');
-  assert.equal(delivery.reason, 'console_provider_disabled_in_production');
+  // A provisioned account of the right role signs in and lands on its home.
+  const ops = await makeAccount({ role: 'ops', name: 'Portal Staff' });
+  createdEmails.add(ops.email);
+  const staffClient = newClient();
+  const staffOtp = await staffClient.request('/api/auth/email/otp', { method: 'POST', body: { email: ops.email, audience: 'staff' } });
+  assert.equal(staffOtp.status, 200, staffOtp.text);
+  const staffVerify = await staffClient.request('/api/auth/email/verify', {
+    method: 'POST',
+    body: { email: ops.email, code: staffOtp.json.devCode, audience: 'staff' },
+  });
+  assert.equal(staffVerify.status, 200, staffVerify.text);
+  assert.equal(staffVerify.json.redirect, '/admin');
+
+  const dealer = await makeAccount({ role: 'dealer', name: 'Portal Dealer' });
+  createdEmails.add(dealer.email);
+  const dealerClient = newClient();
+  const dealerOtp = await dealerClient.request('/api/auth/email/otp', { method: 'POST', body: { email: dealer.email, audience: 'dealer' } });
+  assert.equal(dealerOtp.status, 200, dealerOtp.text);
+  const dealerVerify = await dealerClient.request('/api/auth/email/verify', {
+    method: 'POST',
+    body: { email: dealer.email, code: dealerOtp.json.devCode, audience: 'dealer' },
+  });
+  assert.equal(dealerVerify.status, 200, dealerVerify.text);
+  assert.equal(dealerVerify.json.redirect, '/dealer/dashboard');
+});
+
+maybe('production email sign-in fails closed without a configured mailer', async () => {
+  const db = require('../src/db');
+  const signin = require('../src/services/signin');
+  const config = require('../src/config');
+  const ops = await makeAccount({ role: 'ops', name: 'Delivery Test Staff' });
+  createdEmails.add(ops.email);
+
+  const [before] = await db.query(
+    'SELECT COUNT(*) AS n FROM email_auth_codes WHERE email = ? AND purpose = ? AND consumed_at IS NULL',
+    [ops.email, 'sign_in'],
+  );
+  const productionBefore = config.isProduction;
+  const pepperBefore = config.auth.pepper;
+  config.isProduction = true;
+  config.auth.pepper = 'a-production-pepper-for-the-test-only-000000';
+  let result;
+  try {
+    result = await signin.requestEmailCode({ rawEmail: ops.email, audience: 'staff' });
+  } finally {
+    config.isProduction = productionBefore;
+    config.auth.pepper = pepperBefore;
+  }
+
   assert.equal(result.ok, false);
   assert.equal(result.status, 503);
-  assert.equal(await db.users.countRecentCodes(account.phone, { withinMinutes: 60 }), recentBefore, 'an undelivered code is not stored');
+  assert.equal(result.code, 'SMTP_NOT_CONFIGURED');
+  assert.equal(result.devCode, undefined, 'production never reveals a console code');
+  const [after] = await db.query(
+    'SELECT COUNT(*) AS n FROM email_auth_codes WHERE email = ? AND purpose = ? AND consumed_at IS NULL',
+    [ops.email, 'sign_in'],
+  );
+  assert.equal(Number(after.n), Number(before.n), 'an undelivered code is killed, not left stored for the taking');
 });
 
-maybe('email OTP opens a phone-free account and a contact phone cannot expose another account’s history', async () => {
+maybe('an existing phone-era customer must verify an email from that signed-in account before it becomes a login', async () => {
   const db = require('../src/db');
-  const email = `email-${process.pid}-${Date.now()}@example.net`;
-  createdEmails.add(email);
-
-  const emailClient = newClient();
-  const otp = await emailClient.request('/api/auth/email/otp', { method: 'POST', body: { email } });
-  assert.equal(otp.status, 200, otp.text);
-  assert.equal(otp.json.ok, true);
-  assert.match(otp.json.maskedEmail, /@example\.net$/);
-  assert.ok(otp.json.devCode, 'development exposes only the local test code');
-
-  const verified = await emailClient.request('/api/auth/email/verify', {
-    method: 'POST',
-    body: { email, code: otp.json.devCode, name: 'Email Customer' },
-  });
-  assert.equal(verified.status, 200, verified.text);
-  assert.equal(verified.json.ok, true);
-  const customer = await db.users.findByVerifiedEmail(email);
-  assert.equal(customer.phone, null, 'email sign-in does not create a phone identity');
-  assert.equal(customer.contactPhone, null);
-
-  const legacyPhone = nextPhone();
-  const legacy = await signIn(legacyPhone);
-  const legacyAccount = await db.users.findByPhone(legacy.normalised);
-  const legacyRequest = await db.requests.createRequest({
-    type: 'concierge',
-    name: 'Legacy Phone Owner',
-    phone: legacy.normalised,
-    brief: { budget_min: 5000000 },
-  });
-  const submitted = await emailClient.request('/api/service-requests', {
-    method: 'POST',
-    body: {
-      kind: 'concierge',
-      name: 'Email Customer',
-      phone: legacyPhone,
-      brief: { budget_min: 5000000 },
-    },
-  });
-  assert.equal(submitted.status, 200, submitted.text);
-  assert.equal(submitted.json.ok, true);
-  const ownedRequest = await db.requests.findByTracking(submitted.json.trackingId);
-  assert.equal(Number(ownedRequest.userId), Number(customer.id), 'the new record belongs to the signed-in account');
-  assert.equal((await db.requests.findByTracking(legacyRequest.trackingId)).userId, null, 'legacy history stays unlinked');
-
-  const refreshed = await db.users.findById(customer.id);
-  assert.equal(refreshed.phone, null);
-  assert.equal(refreshed.contactPhone, legacy.normalised, 'the request phone is saved as contact information');
-  assert.equal((await db.users.findByPhone(legacy.normalised)).id, legacyAccount.id, 'the typed contact number does not switch accounts');
-  assert.notEqual(Number(legacyAccount.id), Number(customer.id));
-
-  const finance = await emailClient.request('/api/financing', {
-    method: 'POST',
-    body: {
-      name: 'Email Customer',
-      phone: legacyPhone,
-      amount: '12000000',
-      down: '2000000',
-      monthly: '250000',
-      tenor: '36',
-      employment: 'salaried',
-      timeline: 'month',
-      consent: 'yes',
-    },
-  });
-  assert.equal(finance.status, 200, finance.text);
-  assert.equal(finance.json.ok, true);
-  const financeRow = await db.financing.findByReference(finance.json.reference);
-  assert.equal(Number(financeRow.userId), Number(customer.id), 'financing records use the signed-in account id');
-
-  const dashboard = await emailClient.request('/account');
-  assert.equal(dashboard.status, 200);
-  assert.match(dashboard.text, new RegExp(submitted.json.trackingId));
-  assert.match(dashboard.text, new RegExp(finance.json.reference), 'the linked financing enquiry appears on the account');
-  assert.doesNotMatch(dashboard.text, new RegExp(legacyRequest.trackingId), 'a typed contact phone cannot reveal legacy phone-keyed history');
-});
-
-maybe('an existing phone customer must verify an email from that signed-in account before it becomes a login', async () => {
-  const db = require('../src/db');
-  const phone = nextPhone();
-  const { client, normalised } = await signIn(phone);
-  const owner = await db.users.findByPhone(normalised);
-  const email = `legacy-${process.pid}-${Date.now()}@example.net`;
+  const { client, normalised, user: owner } = await legacyPhoneAccount();
+  const email = nextEmail('legacy');
   createdEmails.add(email);
   await db.users.updateProfile(owner.id, { email });
 
@@ -334,7 +307,7 @@ maybe('an existing phone customer must verify an email from that signed-in accou
   assert.equal(linked.status, 200, linked.text);
   assert.equal(linked.json.ok, true);
   const sameOwner = await db.users.findByVerifiedEmail(email);
-  assert.equal(Number(sameOwner.id), Number(owner.id), 'email links to the existing phone account, not a duplicate');
+  assert.equal(Number(sameOwner.id), Number(owner.id), 'email links to the existing phone-era account, not a duplicate');
   assert.equal(sameOwner.phone, normalised);
 
   const emailClient = newClient();
@@ -349,7 +322,7 @@ maybe('an existing phone customer must verify an email from that signed-in accou
 });
 
 maybe('a code arrives, is single-use, and buys a session cookie', async () => {
-  const { client, code, phone } = await signIn();
+  const { client, code, email } = await signIn();
 
   const cookie = client.rawCookies.join('\n');
   assert.match(cookie, /hc_session=[^;]+/);
@@ -359,41 +332,46 @@ maybe('a code arrives, is single-use, and buys a session cookie', async () => {
 
   const dashboard = await client.request('/account');
   assert.equal(dashboard.status, 200);
-  assert.match(dashboard.text, /Your cars and requests/);
+  assert.match(dashboard.text, /cars and requests/);
   assert.match(dashboard.headers.get('cache-control'), /no-store/, 'a signed-in page is never publicly cached');
 
-  const reuse = await client.request('/api/auth/verify', { method: 'POST', body: { phone, code } });
+  const reuse = await client.request('/api/auth/email/verify', { method: 'POST', body: { email, code } });
   assert.equal(reuse.json.ok, false);
   assert.equal(reuse.status, 410, 'a used code is gone, not merely wrong');
   assert.match(reuse.json.error, /expired/i);
 });
 
 maybe('a wrong code is refused without burning the real one', async () => {
-  const phone = nextPhone();
+  const email = nextEmail('auth');
+  createdEmails.add(email);
   const client = newClient();
-  const otp = await client.request('/api/auth/otp', { method: 'POST', body: { phone } });
-  const wrong = await client.request('/api/auth/verify', {
+  const otp = await client.request('/api/auth/email/otp', { method: 'POST', body: { email } });
+  const wrong = await client.request('/api/auth/email/verify', {
     method: 'POST',
-    body: { phone, code: otp.json.devCode === '000000' ? '111111' : '000000' },
+    body: { email, code: otp.json.devCode === '000000' ? '111111' : '000000', name: 'Test Buyer' },
   });
   assert.equal(wrong.json.ok, false);
 
-  const right = await client.request('/api/auth/verify', { method: 'POST', body: { phone, code: otp.json.devCode } });
+  const right = await client.request('/api/auth/email/verify', {
+    method: 'POST',
+    body: { email, code: otp.json.devCode, name: 'Test Buyer' },
+  });
   assert.equal(right.json.ok, true, 'the correct code still works after a wrong guess');
-  createdPhones.add(`+234${phone.replace(/^0/, '')}`);
 });
 
-maybe('accounts are keyed on the number, whatever shape it was typed in', async () => {
-  const { normalised } = await signIn();
+maybe('legacy phone-era accounts are keyed on the number, whatever shape it was typed in', async () => {
   const db = require('../src/db');
-  const local = `0${normalised.slice(4)}`;
+  const phones = require('../src/lib/phone');
+  const phone = nextPhone();
+  createdPhones.add(phones.canonical(phone));
+  const first = await db.users.upsertByPhone({ phone: phones.canonical(phone), name: 'Shape Test' });
+  const local = `0${first.phone.slice(4)}`;
 
-  const [{ id: first }] = await db.query('SELECT id FROM `users` WHERE phone = ?', [normalised]);
-  for (const shape of [local, normalised.slice(1), normalised, `${normalised.slice(1, 4)} ${normalised.slice(4)}`]) {
-    assert.equal(require('../src/lib/phone').normalise(shape), normalised, `normalises ${shape}`);
+  for (const shape of [local, first.phone.slice(1), first.phone, `${first.phone.slice(1, 4)} ${first.phone.slice(4)}`]) {
+    assert.equal(phones.normalise(shape), first.phone, `normalises ${shape}`);
   }
-  const again = await db.users.upsertByPhone({ phone: normalised });
-  assert.equal(again.id, first, 'no duplicate account for the same number');
+  const again = await db.users.upsertByPhone({ phone: first.phone });
+  assert.equal(again.id, first.id, 'no duplicate account for the same number');
 });
 
 maybe('unauthenticated account APIs answer 401, not a page', async () => {
@@ -454,7 +432,7 @@ maybe('the save button is the right control for the visitor', async () => {
 });
 
 maybe('saved searches keep their query, their alerts, and can be deleted', async () => {
-  const { client, normalised } = await signIn();
+  const { client, email } = await signIn();
   const created = await client.request('/api/account/saved-searches', {
     method: 'POST',
     body: { action: 'add', query: 'make=toyota&max_price=15000000', label: 'Toyota under ₦15m' },
@@ -478,12 +456,12 @@ maybe('saved searches keep their query, their alerts, and can be deleted', async
   const deleted = await client.request('/api/account/saved-searches', { method: 'POST', body: { action: 'delete', id } });
   assert.equal(deleted.json.ok, true);
   const db = require('../src/db');
-  const user = await db.users.findByPhone(normalised);
+  const user = await db.users.findByVerifiedEmail(email);
   assert.equal((await db.users.savedSearches(user.id)).filter((row) => row.id === id).length, 0, 'the row is gone');
 });
 
 maybe('profile details keep contact phone separate from sign-in and require email verification', async () => {
-  const { client, normalised } = await signIn();
+  const { client, email } = await signIn();
   const rejectedEmail = await client.request('/api/account/profile', {
     method: 'POST',
     body: { email: 'buyer@example.com' },
@@ -498,22 +476,22 @@ maybe('profile details keep contact phone separate from sign-in and require emai
   assert.equal(saved.json.ok, true);
 
   const db = require('../src/db');
-  const user = await db.users.findByPhone(normalised);
+  const user = await db.users.findByVerifiedEmail(email);
   assert.equal(user.name, 'Test Buyer');
-  assert.equal(user.phone, normalised, 'the sign-in identity is unchanged');
+  assert.equal(user.phone, null, 'the sign-in identity is the verified email, never a phone');
   assert.equal(user.contactPhone, '+2348031231234', 'contact information is stored separately');
-  assert.equal(user.email, null, 'email cannot be changed without verification');
+  assert.equal(user.email, email, 'email cannot be changed without verification — the verified address stands');
   assert.equal(user.marketingOptIn, true);
 
   const html = await client.request('/account');
   assert.match(html.text, /Test Buyer/);
 });
 
-maybe('data export returns everything keyed to the number and no analytics', async () => {
-  const { client, normalised } = await signIn();
+maybe('data export returns everything keyed to the account and no analytics', async () => {
+  const { client, email } = await signIn();
   const response = await client.request('/account/export');
   assert.equal(response.status, 200);
-  assert.equal(response.json.account.phone, normalised);
+  assert.equal(response.json.account.email, email);
   for (const key of ['requests', 'bookings', 'orders', 'subscriptions', 'savedCars', 'savedSearches']) {
     assert.ok(key in response.json, `export includes ${key}`);
   }
@@ -521,10 +499,11 @@ maybe('data export returns everything keyed to the number and no analytics', asy
 });
 
 maybe('records written by the public forms surface in the dashboard (§7.1)', async () => {
-  const { client, phone } = await signIn();
+  const { client } = await signIn();
+  const contactPhone = nextPhone();
   const created = await client.request('/api/service-requests', {
     method: 'POST',
-    body: { type: 'concierge', name: 'Test Buyer', phone, brief: { budget: '8-12m', must_haves: 'SUV, low mileage' } },
+    body: { type: 'concierge', name: 'Test Buyer', phone: contactPhone, brief: { budget: '8-12m', must_haves: 'SUV, low mileage' } },
   });
   assert.equal(created.json.ok, true);
   const dashboard = await client.request('/account');
@@ -536,9 +515,9 @@ maybe('records written by the public forms surface in the dashboard (§7.1)', as
 // ---------------------------------------------------------------------------
 
 maybe('every account gets a referral code and a shareable link', async () => {
-  const { client, normalised } = await signIn();
+  const { client, email } = await signIn();
   const db = require('../src/db');
-  const user = await db.users.findByPhone(normalised);
+  const user = await db.users.findByVerifiedEmail(email);
   assert.match(user.referralCode, /^[2-9A-HJ-NP-Z]{6}$/, 'a readable, unambiguous code');
 
   const page = await client.request('/account');
@@ -549,25 +528,24 @@ maybe('every account gets a referral code and a shareable link', async () => {
 maybe('an invitation code is recorded once, on the new account, and never on itself', async () => {
   const inviter = await signIn();
   const db = require('../src/db');
-  const inviterUser = await db.users.findByPhone(inviter.normalised);
+  const inviterUser = await db.users.findByVerifiedEmail(inviter.email);
 
   // A new person arrives through the link.
   const guest = await signIn();
-  const guestUser = await db.users.findByPhone(guest.normalised);
+  const guestUser = await db.users.findByVerifiedEmail(guest.email);
   assert.equal(guestUser.referredBy, null, 'no code sent yet → no referrer');
 
+  const invitedEmail = nextEmail('invited');
+  createdEmails.add(invitedEmail);
   const invited = newClient();
-  const phone = nextPhone();
-  const otp = await invited.request('/api/auth/otp', { method: 'POST', body: { phone } });
-  const verify = await invited.request('/api/auth/verify', {
+  const otp = await invited.request('/api/auth/email/otp', { method: 'POST', body: { email: invitedEmail } });
+  const verify = await invited.request('/api/auth/email/verify', {
     method: 'POST',
-    body: { phone, code: otp.json.devCode, ref: inviterUser.referralCode },
+    body: { email: invitedEmail, code: otp.json.devCode, name: 'Invited Guest', ref: inviterUser.referralCode },
   });
   assert.equal(verify.json.ok, true);
-  const normalised = `+234${phone.replace(/^0/, '')}`;
-  createdPhones.add(normalised);
 
-  const invitedUser = await db.users.findByPhone(normalised);
+  const invitedUser = await db.users.findByVerifiedEmail(invitedEmail);
   assert.equal(invitedUser.referredBy, inviterUser.id, 'the inviter is recorded');
 
   // The inviter's own dashboard counts them, and cannot refer themselves.
@@ -575,19 +553,20 @@ maybe('an invitation code is recorded once, on the new account, and never on its
   assert.equal(stats.joined, 1);
   assert.equal(await db.users.findReferrer(inviterUser.referralCode, inviterUser.id), null, 'never self-referral');
 
-  const { client: fresh } = await signIn(inviter.phone);
+  const { client: fresh } = await signIn({ email: inviter.email });
   const page = await fresh.request('/account');
   assert.match(page.text, /1<\/strong> signed up/);
 });
 
 maybe('hire gets its own card and is not double-counted in requests', async () => {
-  const { client, phone } = await signIn();
+  const { client } = await signIn();
+  const contactPhone = nextPhone();
   const created = await client.request('/api/service-requests', {
     method: 'POST',
     body: {
       kind: 'hire',
       name: 'Hire Tester',
-      phone,
+      phone: contactPhone,
       brief: { vehicle_class: 'SUV (Prado / Highlander)', date_from: '2026-11-01', date_to: '2026-11-04', with_driver: 'yes', location: 'GRA' },
     },
   });
@@ -607,12 +586,13 @@ maybe('hire gets its own card and is not double-counted in requests', async () =
 });
 
 maybe('shop receipts land in Documents', async () => {
-  const { client, phone } = await signIn();
+  const { client } = await signIn();
+  const contactPhone = nextPhone();
   const order = await client.request('/api/orders', {
     method: 'POST',
     body: {
       name: 'Receipt Tester',
-      phone,
+      phone: contactPhone,
       deliveryArea: 'Port Harcourt — GRA',
       items: [{ slug: 'obd2-scanner-basic', qty: 1 }],
     },
@@ -679,9 +659,9 @@ maybe('price-drop and new-match are separate switches, and the master derives fr
 // ---------------------------------------------------------------------------
 
 maybe('a blocked account loses its session on the next request', async () => {
-  const { client, normalised } = await signIn();
+  const { client, email } = await signIn();
   const db = require('../src/db');
-  const user = await db.users.findByPhone(normalised);
+  const user = await db.users.findByVerifiedEmail(email);
 
   await db.query('UPDATE `users` SET status = ? WHERE id = ?', ['blocked', user.id]);
   const blocked = await client.request('/account');
@@ -705,15 +685,15 @@ maybe('a dead cookie sends the visitor back to /login and says why', async () =>
   assert.match(response.headers.get('location'), /reason=expired/);
 });
 
-maybe('a blocked number can prove it owns the phone but still cannot sign in', async () => {
-  const phone = nextPhone();
-  const { client, normalised } = await signIn(phone);
+maybe('a blocked account can prove its email but still cannot sign in', async () => {
+  const { client, email } = await signIn();
   const db = require('../src/db');
-  const user = await db.users.findByPhone(normalised);
+  const user = await db.users.findByVerifiedEmail(email);
   await db.query('UPDATE `users` SET status = ? WHERE id = ?', ['blocked', user.id]);
 
-  const otp = await client.request('/api/auth/otp', { method: 'POST', body: { phone } });
-  const verify = await client.request('/api/auth/verify', { method: 'POST', body: { phone, code: otp.json.devCode } });
+  const otp = await client.request('/api/auth/email/otp', { method: 'POST', body: { email } });
+  assert.equal(otp.status, 200, otp.text);
+  const verify = await client.request('/api/auth/email/verify', { method: 'POST', body: { email, code: otp.json.devCode, name: 'Test Buyer' } });
   assert.equal(verify.status, 403);
   assert.match(verify.json.error, /cannot sign in/i);
 
@@ -734,18 +714,19 @@ maybe('signing out revokes the session', async () => {
 });
 
 maybe('closing an account deletes the person and anonymises the paperwork', async () => {
-  const phone = nextPhone();
-  const { client, normalised } = await signIn(phone);
+  const { client, email } = await signIn();
   const db = require('../src/db');
+  const contactPhone = nextPhone();
+  const contactShapes = require('../src/lib/phone').variants(contactPhone);
   const request = await client.request('/api/service-requests', {
     method: 'POST',
-    body: { type: 'concierge', name: 'Delete Me', phone, brief: { budget: '5-8m' } },
+    body: { type: 'concierge', name: 'Delete Me', phone: contactPhone, brief: { budget: '5-8m' } },
   });
   // Closing the account rewrites these rows' phones to DELETED-…, so the
   // phone-keyed sweep in test.after can no longer match them. Remember both by
   // identity — the request by tracking id, the lead it opened by id.
   createdRequests.add(request.json.trackingId);
-  const lead = await db.queryOne('SELECT id FROM leads WHERE phone = ? ORDER BY id DESC LIMIT 1', [normalised]);
+  const lead = await db.queryOne(`SELECT id FROM leads WHERE phone IN (${contactShapes.map(() => '?').join(',')}) ORDER BY id DESC LIMIT 1`, contactShapes);
   if (lead) createdLeadIds.add(lead.id);
 
   const withoutConfirm = await client.request('/api/account/delete', { method: 'POST', body: { confirm: 'yes' } });
@@ -754,11 +735,11 @@ maybe('closing an account deletes the person and anonymises the paperwork', asyn
   const gone = await client.request('/api/account/delete', { method: 'POST', body: { confirm: 'delete' } });
   assert.equal(gone.json.ok, true);
 
-  assert.equal(await db.users.findByPhone(normalised), null, 'the user row is gone');
+  assert.equal(await db.users.findByVerifiedEmail(email), null, 'the user row is gone');
 
   const [row] = await db.query('SELECT name, phone FROM service_requests WHERE tracking_id = ?', [request.json.trackingId]);
   assert.ok(row, 'the ops record survives for finance and warranty');
   assert.equal(row.name, 'Deleted account');
   assert.match(row.phone, /^DELETED-\d+$/);
-  assert.notEqual(row.phone, normalised, 'the stored phone is an anonymised reference, not the original contact number');
+  assert.notEqual(row.phone, contactPhone, 'the stored phone is an anonymised reference, not the original contact number');
 });

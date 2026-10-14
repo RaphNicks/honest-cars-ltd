@@ -25,7 +25,7 @@
       <p class="auth-message auth-message--banner" data-state="error"><%= authErrorMessage %></p>
     <% } %>
 
-    <div class="auth-card" data-auth-card data-next="<%= next %>" data-ref="<%= ref %>" data-save="<%= save || '' %>">
+    <div class="auth-card" data-auth-card data-next="<%= next %>" data-ref="<%= ref %>" data-save="<%= save || '' %>" data-auth-audience="<%= audience || 'customer' %>">
       <div data-auth-panel="email">
         <form class="auth-form mt-3" data-auth-step="email" action="/api/auth/email/otp" method="post" novalidate>
           <h2 class="mb-1">Your details</h2>
@@ -49,6 +49,7 @@
 
           <input type="hidden" name="ref" value="<%= ref %>">
           <input type="hidden" name="next" value="<%= next %>">
+          <input type="hidden" name="audience" value="<%= audience || 'customer' %>">
           <div class="auth-signin-options" role="group" aria-label="Choose a customer sign-in method">
             <button class="btn btn--primary btn--block" type="submit">Continue with email</button>
             <div class="auth-option-divider" aria-hidden="true"><span>or</span></div>
@@ -75,6 +76,7 @@
           <input type="hidden" name="name">
           <input type="hidden" name="ref" value="<%= ref %>">
           <input type="hidden" name="next" value="<%= next %>">
+          <input type="hidden" name="audience" value="<%= audience || 'customer' %>">
           <div class="field">
             <label class="field__label" for="login-email-code">Email code</label>
             <input class="input input--code tabular" id="login-email-code" name="code" type="text" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]*" maxlength="<%= otp.length %>" placeholder="<%= '0'.repeat(otp.length) %>" required>

@@ -1,29 +1,27 @@
 'use strict';
 
 /**
- * Phone OTP for staff and dealer portals — customer sign-in is email/Google. Hardened to §12.2.
+ * Sessions, access gates and code primitives — §12.2. Sign-in credentials
+ * themselves live in `src/services/signin.js` (email OTP or Google, every
+ * audience); this module holds the machinery around them:
  *
- *   • six-digit codes, HMAC-SHA256 hashed with a server pepper, single use,
- *     10-minute expiry, five attempts, rate-limited per phone and per IP
  *   • server-side sessions: a 32-byte token lives in an httpOnly, SameSite=Lax
  *     cookie; the database stores only its SHA-256 hash, so a stolen cookie can
  *     be revoked from the row
- *   • OTP delivery is a seam, not a hard dependency. `console` provider logs the
- *     code (development); `whatsapp` and `sms` are the real providers from §11 —
- *     WhatsApp first, SMS as the fallback channel.
+ *   • code hashing: HMAC-SHA256 with a server pepper, compared in constant time
+ *   • the §12.2 gates: staff roles, the TOTP challenge, same-origin checks
  *
- * No PII is logged: phones are masked before they touch a log line.
+ * No PII is logged. Phone numbers on `users` are contact data only — they are
+ * never a sign-in credential anywhere in this build.
  */
 
 const crypto = require('node:crypto');
 const config = require('../config');
 const mfa = require('./mfa');
 const db = require('../db');
-const phones = require('../lib/phone');
 const roles = require('./roles');
 
 const SESSION_COOKIE = 'hc_session';
-const OTP_CHANNELS = ['whatsapp', 'sms', 'console'];
 
 /** Production must set AUTH_PEPPER — a blank pepper silently weakens the hashes. */
 function pepper() {
@@ -32,28 +30,6 @@ function pepper() {
     throw new Error('AUTH_PEPPER is required in production (see .env.example)');
   }
   return 'honestcars-development-pepper';
-}
-
-/** Delegates to src/lib/phone.js — one implementation of the rule. */
-function normalisePhone(raw) {
-  return phones.normalise(raw);
-}
-
-function phoneAccountMaySignIn(user, roleRequired) {
-  if (!user || user.status !== 'active') return false;
-  if (!roleRequired) return true;
-  if (roleRequired === 'staff') return roles.isStaff(user.role);
-  if (roleRequired === 'dealer') return user.role === 'dealer';
-  return user.role === roleRequired;
-}
-
-/** +2348031234567 → +234 803 ••• 4567 — for logs and screens. */
-function maskPhone(phone) {
-  return db.users.maskPhone(phone);
-}
-
-function hashCode(phone, code) {
-  return crypto.createHmac('sha256', pepper()).update(`${phone}:${code}`).digest('hex');
 }
 
 function hashEmailCode(email, purpose, code) {
@@ -84,191 +60,6 @@ function safeEqual(a, b) {
   const right = Buffer.from(String(b));
   if (left.length !== right.length) return false;
   return crypto.timingSafeEqual(left, right);
-}
-
-// ---------------------------------------------------------------------------
-// OTP delivery (§11 — WhatsApp first, SMS fallback, console in development)
-// ---------------------------------------------------------------------------
-function channelFor(provider) {
-  if (OTP_CHANNELS.includes(provider)) return provider;
-  return 'console';
-}
-
-/**
- * Send a login code. Providers are stubs behind one switch: swap the body of
- * each case for the real API call and nothing else in the app changes.
- *
- * @returns {Promise<{channel: string, delivered: boolean, devCode?: string}>}
- */
-async function sendOtp(phone, code, { provider = config.auth.provider } = {}) {
-  const channel = channelFor(provider);
-  const text = `Your HonestCars code is ${code}. It expires in ${config.auth.otpTtlMinutes} minutes. Never share it — we will never ask for it.`;
-
-  switch (channel) {
-    case 'whatsapp':
-      // TODO(§11): WhatsApp Cloud API template send. Until the business account
-      // and template are approved this is a no-op that reports honestly.
-      return { channel, delivered: false, reason: 'whatsapp_provider_not_configured' };
-
-    case 'sms':
-      // TODO(§11): Termii/Twilio SMS send.
-      return { channel, delivered: false, reason: 'sms_provider_not_configured' };
-
-    default: {
-      // The console is a development-only fixture. Never put a production code
-      // in logs; production must have a working SMS/WhatsApp delivery adapter.
-      if (config.isProduction) {
-        return { channel: 'console', delivered: false, reason: 'console_provider_disabled_in_production' };
-      }
-      console.log(`[auth] OTP for ${maskPhone(phone)} → ${code}  (console provider, ${config.env})`);
-      void text;
-      return {
-        channel: 'console',
-        delivered: false,
-        devCode: config.auth.showCodeInResponse ? code : undefined,
-      };
-    }
-  }
-}
-
-// ---------------------------------------------------------------------------
-// OTP lifecycle
-// ---------------------------------------------------------------------------
-async function requestCode({ rawPhone, ip, userAgent, roleRequired = null }) {
-  const phone = normalisePhone(rawPhone);
-  if (!phone) return { ok: false, status: 422, error: 'That phone number does not look right — please check it.' };
-
-  const recent = await db.users.countRecentCodes(phone, { withinMinutes: 60 });
-  if (recent >= config.auth.maxRequestsPerHour) {
-    return {
-      ok: false,
-      status: 429,
-      error: 'We have sent several codes to this number already. Please wait a few minutes and try again, or message us on WhatsApp.',
-    };
-  }
-
-  // The production admin host accepts only staff, while the public dealer
-  // portal accepts only dealer accounts. Neither screen can create a phone-only
-  // customer account.
-  if (roleRequired) {
-    const existing = await db.users.findByPhone(phone);
-    if (!phoneAccountMaySignIn(existing, roleRequired)) {
-      return { ok: false, status: 404, error: 'We could not send a sign-in code to that number.' };
-    }
-  }
-
-  const code = generateCode();
-  const expiresAt = new Date(Date.now() + config.auth.otpTtlMinutes * 60_000);
-  const provider = config.auth.provider;
-  const delivery = await sendOtp(phone, code, { provider });
-
-  if (config.isProduction && !delivery.delivered) {
-    await db.analytics.record('otp_request_failed', {
-      payload: { channel: delivery.channel, reason: delivery.reason || 'provider_not_delivered' },
-      sourcePath: '/api/auth/otp',
-    }).catch(() => {});
-    return {
-      ok: false,
-      status: 503,
-      error: 'Phone sign-in is temporarily unavailable. Please contact Honest Cars for help.',
-    };
-  }
-
-  await db.users.createCode({
-    phone,
-    codeHash: hashCode(phone, code),
-    channel: delivery.channel,
-    expiresAt,
-    ip: ip || null,
-    maxAttempts: config.auth.maxVerifyAttempts,
-  });
-
-  // Analytics (§15.1): OTP requested / failed, no PII in the payload.
-  await db.analytics
-    .record(delivery.delivered ? 'otp_requested' : 'otp_request_failed', {
-      payload: { channel: delivery.channel, reason: delivery.reason || 'delivered', user_agent: userAgent ? 'present' : 'absent' },
-      sourcePath: '/api/auth/otp',
-    })
-    .catch(() => {});
-
-  return {
-    ok: true,
-    phone,
-    maskedPhone: maskPhone(phone),
-    channel: delivery.channel,
-    delivered: delivery.delivered,
-    expiresAt,
-    devCode: delivery.devCode,
-  };
-}
-
-async function verifyCode({ rawPhone, code, ip, userAgent, referralCode = null, roleRequired = null }) {
-  const phone = normalisePhone(rawPhone);
-  if (!phone || !code) return { ok: false, status: 422, error: 'Enter the code we sent you.' };
-
-  const active = await db.users.findActiveCode(phone);
-  if (!active) {
-    return { ok: false, status: 410, error: 'That code has expired. Send a new one.' };
-  }
-  if (active.attempts >= active.maxAttempts) {
-    await db.users.consumeCode(active.id);
-    return { ok: false, status: 429, error: 'Too many tries on that code. Send a new one.' };
-  }
-
-  const expected = hashCode(phone, String(code).replace(/\D/g, ''));
-  if (!safeEqual(expected, active.codeHash)) {
-    const attempts = await db.users.registerAttempt(active.id);
-    const left = Math.max(0, active.maxAttempts - attempts);
-    await db.analytics
-      .record('otp_verify_failed', { payload: { attempts_left: left }, sourcePath: '/api/auth/verify' })
-      .catch(() => {});
-    return {
-      ok: false,
-      status: 401,
-      error: left ? `That code is not right. ${left} ${left === 1 ? 'try' : 'tries'} left.` : 'Too many tries on that code. Send a new one.',
-    };
-  }
-
-  let user = null;
-  if (roleRequired) {
-    user = await db.users.findByPhone(phone);
-    if (!phoneAccountMaySignIn(user, roleRequired)) {
-      await db.users.consumeCode(active.id);
-      return { ok: false, status: 403, error: 'This number is not authorised for this sign-in.' };
-    }
-  }
-
-  await db.users.consumeCode(active.id);
-  if (roleRequired) user = await db.users.touchUser(user.id);
-  else user = await db.users.upsertByPhone({ phone, referralCode });
-
-  // A blocked number can prove it owns the phone; it still cannot get in.
-  if (user.status !== 'active') {
-    await db.users.revokeAllForUser(user.id);
-    return {
-      ok: false,
-      status: 403,
-      error: 'That number cannot sign in right now. Message us on WhatsApp and a human will sort it out.',
-    };
-  }
-
-  // §12.2: an account with a confirmed second factor gets a session that has
-  // passed the first one only. It can reach the challenge screen and nothing
-  // else — no page, no API, no console module reads it as authenticated.
-  const mfaPending = mfa.mustChallenge(user);
-
-  const token = newSessionToken();
-  const expiresAt = new Date(Date.now() + config.auth.sessionDays * 86_400_000);
-  await db.users.createSession({ userId: user.id, tokenHash: hashToken(token), expiresAt, ip, userAgent, mfaPending });
-
-  await db.analytics.record('otp_verify_succeeded', { payload: { new_account: !user.name }, sourcePath: '/api/auth/verify' }).catch(() => {});
-
-  // Housekeeping at the one moment we know this person is here: expired and
-  // revoked sessions are worthless rows, and this keeps the table from growing
-  // forever without a scheduler (§12.2).
-  db.users.pruneSessions().catch(() => {});
-
-  return { ok: true, user, token, expiresAt, mfaPending };
 }
 
 // ---------------------------------------------------------------------------
@@ -400,8 +191,18 @@ function mfaGate(req, res, next) {
   if (!req.user) return next();
   const path = req.path;
 
-  // The doors. `/login` itself is open so someone can abandon and start again.
-  const OPEN = ['/login', '/login/mfa', '/api/auth/mfa', '/api/auth/logout', '/api/auth/otp', '/api/auth/verify'];
+  // The doors. `/login` itself is open so someone can abandon and start again —
+  // and starting again means either first factor: the email code or Google.
+  const OPEN = [
+    '/login',
+    '/login/mfa',
+    '/api/auth/mfa',
+    '/api/auth/logout',
+    '/api/auth/email/otp',
+    '/api/auth/email/verify',
+    '/api/auth/google',
+    '/api/auth/google/callback',
+  ];
   if (OPEN.includes(path)) return next();
   if (/^\/(css|js|fonts|img|video|icons)\//.test(path) || path === '/manifest.webmanifest' || path === '/sw.js' || path === '/favicon.png') {
     return next();
@@ -545,19 +346,12 @@ module.exports = {
   requireStaff,
   requireAnyStaff,
   SESSION_COOKIE,
-  OTP_CHANNELS,
-  normalisePhone,
-  maskPhone,
-  hashCode,
   hashEmailCode,
   signAuthState,
   hashToken,
   generateCode,
   newSessionToken,
   safeEqual,
-  sendOtp,
-  requestCode,
-  verifyCode,
   attachUser,
   mfaGate,
   mfaEnrolmentOpen,

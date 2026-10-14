@@ -1259,6 +1259,24 @@ router.post('/staff/:id/watchlist', auth.requireStaff('users.manage'), auth.same
   }
 });
 
+/**
+ * The sign-in email of any account. This is how an account with no verified
+ * identity gets its credential back — ops types the address the person
+ * actually owns, the change is audited, and from then on sign-in is the usual
+ * email code or Google.
+ */
+router.post('/staff/:id/email', auth.requireStaff('users.manage'), auth.sameOriginOnly, async (req, res, next) => {
+  try {
+    const id = validate.integer(req.params.id, { min: 1, fallback: 0 });
+    const result = await admin.setSignInEmail(id, (req.body || {}).email, { actorId: req.user.id });
+    return result.ok
+      ? done(res, PATHS.staff, `Sign-in email set to ${result.email}. That account signs in with the one-time code sent there, or Google.`)
+      : done(res, PATHS.staff, result.error, { error: true });
+  } catch (error) {
+    return next(error);
+  }
+});
+
 // ---------------------------------------------------------------------------
 // Deal alerts — FR-25. The two switches on /account ("price drops", "new
 // matches") have a sending side, and this is where ops can see what it is

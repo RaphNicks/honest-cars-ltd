@@ -19,13 +19,15 @@ SET time_zone = '+00:00';
 -- add a constraint against a table that does not exist yet.
 -- ---------------------------------------------------------------------------
 -- ---------------------------------------------------------------------------
--- users · auth_codes · sessions — customer accounts and staff authentication
+-- users · email_auth_codes · sessions — accounts and sign-in
 --
--- New customer identities use a verified email; Google can be linked to that
--- same verified identity. Existing phone identities remain available for staff
--- and for customers linking older accounts. `contact_phone` is optional contact
--- information, never a sign-in credential. Phone-keyed legacy history is not
--- exposed to an email-only account merely because a number was typed into a form.
+-- Every account signs in with a verified email (one-time code) or Google:
+-- `user_email_identities` holds those credentials, for customers and for
+-- provisioned staff/dealer accounts alike. `contact_phone` is optional contact
+-- information, never a sign-in credential, and `users.phone` is legacy contact
+-- data from the retired phone sign-in — also never a credential. Phone-keyed
+-- legacy history is not exposed to an email-only account merely because a
+-- number was typed into a form.
 -- ---------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS `users` (
   id               INT UNSIGNED  NOT NULL AUTO_INCREMENT,

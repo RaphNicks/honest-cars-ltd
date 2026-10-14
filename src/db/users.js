@@ -1,11 +1,13 @@
 'use strict';
 
 /**
- * Accounts — verified customer email identities with legacy phone sign-in.
- * A login phone remains on `users.phone`; a contact number is stored separately
- * in `users.contact_phone` and never grants access to phone-keyed history. Email
- * credentials are kept in `user_email_identities`, separate from legacy profile
- * emails that have not been verified.
+ * Accounts — verified email identities for every role. A customer opens an
+ * account with a verified email or Google; staff and dealer accounts are
+ * provisioned and carry the same kind of verified identity. Phone numbers on
+ * `users.phone` are legacy contact data only — they never sign anyone in —
+ * and `users.contact_phone` is a separate contact number that grants nothing.
+ * Email credentials live in `user_email_identities`, separate from legacy
+ * profile emails that have not been verified.
  *
  * Nothing in here sees a raw OTP or a raw session token: the service layer
  * hashes both before they reach this module, and the database only ever stores
@@ -276,7 +278,6 @@ async function linkVerifiedEmail(userId, email, { googleSubject = null } = {}) {
     );
     const account = users[0];
     if (!account) throw identityError('ACCOUNT_NOT_FOUND', 'That account no longer exists.');
-    if (account.role !== 'customer') throw identityError('CUSTOMER_ONLY', 'This sign-in method is for customer accounts.');
     if (account.status !== 'active') throw identityError('ACCOUNT_NOT_ACTIVE', 'That account cannot be linked right now.');
 
     const [emailRows] = await conn.query(

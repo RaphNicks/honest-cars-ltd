@@ -78,26 +78,21 @@ function newClient() {
 }
 
 async function makeUser(role, label = 'Fixture') {
-  const phone = nextPhone();
-  await db.query('INSERT INTO `users` (phone, name, role, status) VALUES (?, ?, ?, ?)', [
-    phone,
-    `${label} (mfa test)`,
-    role,
-    'active',
-  ]);
-  const user = await db.queryOne('SELECT id, phone FROM `users` WHERE phone = ? LIMIT 1', [phone]);
-  made.users.push(user.id);
-  return { id: user.id, phone, role };
+  const { makeAccount } = require('./helpers');
+  const account = await makeAccount({ role, name: `${label} (mfa test)` });
+  made.users.push(account.id);
+  return { id: account.id, email: account.email, role };
 }
 
-/** Sign in with the phone step only, and report what the server said. */
+/** Sign in through the email-code step only, and report what the server said. */
 async function signIn(user) {
+  const audience = user.role === 'customer' ? 'customer' : user.role === 'dealer' ? 'dealer' : 'staff';
   const client = newClient();
-  const otp = await client.request('/api/auth/otp', { method: 'POST', body: { phone: user.phone } });
-  assert.equal(otp.status, 200, `OTP failed: ${otp.text}`);
-  const verify = await client.request('/api/auth/verify', {
+  const otp = await client.request('/api/auth/email/otp', { method: 'POST', body: { email: user.email, audience } });
+  assert.equal(otp.status, 200, `code request failed: ${otp.text}`);
+  const verify = await client.request('/api/auth/email/verify', {
     method: 'POST',
-    body: { phone: user.phone, code: otp.json.devCode },
+    body: { email: user.email, code: otp.json.devCode, audience },
     headers: { Origin: ctx.baseUrl },
   });
   assert.equal(verify.status, 200, `sign-in failed: ${verify.text}`);
@@ -122,6 +117,7 @@ test.after(async () => {
     await db.query(`DELETE FROM sessions WHERE id IN (${made.sessions.map(() => '?').join(',')})`, made.sessions);
   }
   if (made.users.length) {
+    await db.query(`DELETE FROM email_auth_codes WHERE user_id IN (${made.users.map(() => '?').join(',')}) OR email IN (SELECT email FROM user_email_identities WHERE user_id IN (${made.users.map(() => '?').join(',')}))`, [...made.users, ...made.users]);
     await db.query(`DELETE FROM \`users\` WHERE id IN (${made.users.map(() => '?').join(',')})`, made.users);
   }
   await db.pool.end();

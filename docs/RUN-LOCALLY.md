@@ -130,24 +130,27 @@ To stop it: **Ctrl-C** in the terminal.
 The public pages need no account: `/`, `/cars`, a car page, `/services`,
 `/shop`, `/hire`, `/blog`, `/how-it-works`, `/find-my-car`.
 
-**Customer sign-in uses email or Google.** A new customer enters their name and
-email, receives a one-time code, and can sign in without a phone. In development
-the code is shown on screen and in the terminal, so SMTP is not needed to try
-the flow. Google sign-in requires OAuth credentials; see `.env.example`. A
-contact phone is collected only when a service needs it.
+**Every account signs in with email or Google** — customers, dealer partners
+and staff alike. There is no phone sign-in and no passwords anywhere in this
+build. A new customer enters their name and email, receives a one-time code,
+and is in. In development the code is shown on screen and in the terminal, so
+SMTP is not needed to try the flow. Google sign-in requires OAuth credentials;
+see `.env.example`. A contact phone is collected only when a service needs it.
 
-Dealer partners use the separate phone sign-in at
+Dealer partners use the separate sign-in at
 <http://localhost:3000/dealer/login>. Staff sign in on the development preview
 at <http://localhost:3000/admin/login>; the customer `/login` page does not offer
-a staff option. Seeded accounts are:
+a staff option. Staff and dealer sign-in only accepts accounts that already
+hold a verified sign-in email — the seeded demo accounts below, or one set from
+**Staff & roles**. Seeded accounts are:
 
-| Number | Who | Where it lands |
+| Sign-in email | Who | Where it lands |
 | --- | --- | --- |
-| `+2348000000001` | Admin | `/admin` — asks for a second factor, see below |
-| `+2348000000002` | Ops desk | `/admin` |
-| `+2348000000003` | Field inspector | `/admin` |
-| `+2348000000004` | Finance | `/admin` — second factor |
-| `+2348000000006` | A dealer | `/dealer` |
+| `admin@honestcars.test` | Admin | `/admin` — asks for a second factor, see below |
+| `ops@honestcars.test` | Ops desk | `/admin` |
+| `inspector@honestcars.test` | Field inspector | `/admin` |
+| `finance@honestcars.test` | Finance | `/admin` — second factor |
+| `abaroad@honestcars.test` | A dealer | `/dealer` |
 
 In production, the staff console belongs on `admin.honestcarsltd.com`, not on the
 public site's `/admin` path. Set `ADMIN_URL=https://admin.honestcarsltd.com`, point
@@ -155,14 +158,14 @@ that DNS name and its TLS certificate at the app, and set `SITE_URL` to the
 public origin. Requests to the old public `/admin` path redirect to the admin
 host; the staff dashboard is its root page.
 
-The seeded staff numbers and TOTP keys below are public demo data; never use
+The seeded staff emails and TOTP keys below are public demo data; never use
 them as production credentials. For a clean production database, run
 `node scripts/db-setup.js --no-seed`, set `NODE_ENV=production` and a strong
 `AUTH_PEPPER`, then run `npm run admin:bootstrap` on the host. It prompts for
-the first admin's real name and mobile number, refuses if an active admin exists,
-and records the bootstrap without pre-seeding an authenticator secret. Once a
-real phone OTP adapter is installed, sign in at `ADMIN_URL/login` and enroll
-TOTP at `/admin/security`.
+the first admin's real name and sign-in email (an optional contact number is
+stored as contact information only), refuses if an active admin exists, and
+records the bootstrap without pre-seeding an authenticator secret. Sign in at
+`ADMIN_URL/login` and enrol TOTP at `/admin/security`.
 
 **Admin and finance also ask for a 6-digit code from an authenticator app**
 (this is PRD §12.2). Add the seeded secret to Google Authenticator, Authy, 1Password
@@ -171,8 +174,8 @@ or any TOTP app — *enter setup key manually*:
 - admin — `JBSWY3DPEHPK3PXP`
 - finance — `KRSXG5CTMVRXEZLU`
 
-Every other role signs in with the OTP alone. If a code is rejected, wait for
-the next 30-second window; a used code is refused for its step.
+Every other role signs in with the email code alone. If a code is rejected, wait
+for the next 30-second window; a used code is refused for its step.
 
 A local install has no production provider credentials. Customer email OTP uses
 the development code display; for real delivery, configure `SMTP_URL` and
