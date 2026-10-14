@@ -103,3 +103,41 @@ test('mutating requests to the old public /admin path are not forwarded across h
   assert.equal(res.statusCode, 404);
   assert.equal(res.body, 'Not found.');
 });
+
+test('host-split can be switched off: /admin stays a path on the main site', () => {
+  const pathMode = createAdminHostMiddleware({
+    enabled: false,
+    adminUrl: 'https://admin.honestcarsltd.com',
+    adminHostname: 'admin.honestcarsltd.com',
+  });
+  const req = request({ path: '/admin', originalUrl: '/admin' });
+  const res = response();
+  let nextCalled = false;
+  pathMode(req, res, () => { nextCalled = true; });
+
+  assert.equal(nextCalled, true);
+  assert.equal(res.location, undefined);
+
+  const req2 = request({ path: '/admin/settings', originalUrl: '/admin/settings' });
+  const res2 = response();
+  let next2 = false;
+  pathMode(req2, res2, () => { next2 = true; });
+  assert.equal(next2, true);
+  assert.equal(res2.location, undefined);
+});
+
+test('ENFORCE_ADMIN_HOST env switch overrides the production default', () => {
+  const config = require('../src/config');
+  const previous = process.env.ENFORCE_ADMIN_HOST;
+  try {
+    process.env.ENFORCE_ADMIN_HOST = 'false';
+    assert.equal(config.admin.enforceHost, false);
+    process.env.ENFORCE_ADMIN_HOST = 'true';
+    assert.equal(config.admin.enforceHost, true);
+    delete process.env.ENFORCE_ADMIN_HOST;
+    assert.equal(config.admin.enforceHost, config.isProduction);
+  } finally {
+    if (previous === undefined) delete process.env.ENFORCE_ADMIN_HOST;
+    else process.env.ENFORCE_ADMIN_HOST = previous;
+  }
+});

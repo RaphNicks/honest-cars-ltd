@@ -47,10 +47,14 @@ const config = {
   // Public origin — used for canonical URLs, sitemap and OG tags.
   siteUrl: (process.env.SITE_URL || 'http://localhost:3000').replace(/\/+$/, ''),
 
-  // The staff console belongs on its own host. In production `/admin` on the
-  // public host redirects here; the DNS record and TLS certificate are supplied
-  // by hosting. Local/test runs keep the path-based console unless explicitly
-  // enabled, because a single-origin preview has no second hostname.
+  // Staff console hosting. Two supported layouts:
+  //   · Split-host (default in production): `/admin` on the public host
+  //     redirects to ADMIN_URL (or `admin.<site-host>`); the DNS record and
+  //     TLS certificate are supplied by hosting.
+  //   · Single-origin path mode: the console lives at `<SITE_URL>/admin/`.
+  //     Set ENFORCE_ADMIN_HOST=false to choose this in production.
+  // Local/test runs default to the path-based console, because a single-origin
+  // preview has no second hostname.
   admin: {
     get url() {
       if (process.env.ADMIN_URL) return process.env.ADMIN_URL.replace(/\/+$/, '');
@@ -63,7 +67,7 @@ const config = {
       return new URL(config.admin.url).hostname.toLowerCase();
     },
     get enforceHost() {
-      return config.isProduction || bool(process.env.ENFORCE_ADMIN_HOST, false);
+      return bool(process.env.ENFORCE_ADMIN_HOST, config.isProduction);
     },
   },
 
