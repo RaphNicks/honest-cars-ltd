@@ -3,7 +3,7 @@
  *  · ≤64px sticky header, soft shadow only after scroll
  *  · mobile drawer (full height, accordion Services) with focus handling
  *  · Services mega-menu (desktop, keyboard accessible)
- *  · collapse-on-scroll, reveal-on-scroll-up for the bottom nav
+ *  · persistent bottom bar after the first scroll (§5.2)
  */
 
 export function initHeader() {
@@ -11,32 +11,17 @@ export function initHeader() {
   const bottomNav = document.getElementById('bottom-nav');
   const drawer = document.getElementById('mobile-drawer');
   const searchPanel = document.getElementById('header-search');
-  // Reveal-on-scroll-up / retreat-on-scroll-down needs hysteresis: momentum
-  // scrolling fires direction flips every tick, and without a threshold the
-  // nav starts rising and instantly reverses — it never settles. Only toggle
-  // after the page has moved a real distance in one direction.
-  const NAV_HYSTERESIS = 28;
-  let anchorY = window.scrollY;
-  let navVisible = false;
 
   const onScroll = () => {
     const y = window.scrollY;
     if (header) header.dataset.scrolled = y > 8 ? 'true' : 'false';
 
     if (bottomNav) {
-      const moved = y - anchorY;
-      let visible = navVisible;
-      if (y <= 160) {
-        visible = false; // top of page: bar stays away
-      } else if (y <= 320) {
-        visible = true; // just scrolled in: bar is up
-      } else if (moved >= NAV_HYSTERESIS) {
-        visible = false; // settled into scrolling down: retreat
-      } else if (moved <= -NAV_HYSTERESIS) {
-        visible = true; // settled into scrolling up: reveal
-      }
-      if (visible !== navVisible) anchorY = y;
-      navVisible = visible;
+      // §5.2: persistent once the reader is past the top of the page. The old
+      // hide-on-scroll-down / reveal-on-scroll-up dance made the bar feel
+      // broken (it spent most of a normal read hidden, and momentum scrolling
+      // kept knocking it away) — it is simply always up after the first scroll.
+      const visible = y > 160;
       bottomNav.dataset.visible = visible ? 'true' : 'false';
       document.body.dataset.bottomNav = visible ? 'true' : 'false';
     }
