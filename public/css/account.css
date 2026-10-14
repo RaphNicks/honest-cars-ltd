@@ -34,6 +34,10 @@
 
 /* --- Header / drawer sign-in chrome -------------------------------------- */
 .header__signin {
+  /* The account icon already links to sign-in; this text link only joins the
+     row when the header container has room for it (below). */
+  display: none;
+  flex: none;
   font-size: var(--text-14);
   font-weight: 500;
   color: var(--white);
@@ -43,6 +47,10 @@
 }
 
 .header__signin:hover { text-decoration: underline; }
+
+@container header (min-width: 560px) {
+  .header__signin { display: inline-flex; align-items: center; }
+}
 .header__search-toggle--on { color: var(--green-bright); }
 
 /* --- Sign-in page -------------------------------------------------------- */
