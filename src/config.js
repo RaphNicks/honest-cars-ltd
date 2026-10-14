@@ -166,8 +166,9 @@ const config = {
     },
   },
 
-  // Customer-only Google OpenID Connect. Redirect URI must exactly match the
-  // value registered in Google's OAuth client settings.
+  // Google OpenID Connect — a sign-in option for every account (customer, staff
+  // and dealer). Redirect URI must exactly match the value registered in
+  // Google's OAuth client settings.
   googleAuth: {
     clientId: process.env.GOOGLE_CLIENT_ID || '',
     clientSecret: process.env.GOOGLE_CLIENT_SECRET || '',
