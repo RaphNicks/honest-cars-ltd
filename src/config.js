@@ -15,7 +15,11 @@
  * controls, is the registry in `src/lib/settings-schema.js`.
  */
 
-require('dotenv').config();
+// The .env lives at the repository root and is loaded from HERE, not from the
+// process working directory: Passenger (and other supervisors) start the app
+// with an arbitrary cwd, and a cwd-relative .env silently falls back to the
+// default DB credentials — which then fails the healthcheck at boot.
+require('dotenv').config({ path: require('node:path').join(__dirname, '..', '.env') });
 
 // The console's /admin/settings screen (§5.1) stores overrides in the database,
 // hydrated into this module at boot by `src/services/settings.js`. Reading a
@@ -261,10 +265,12 @@ const config = {
     serveStaticPages: bool(process.env.SERVE_STATIC_PAGES, true),
     staticDir: process.env.STATIC_DIR || 'dist',
     // Absolute — res.sendFile() requires it, and the build script and the
-    // server must agree on the same directory regardless of cwd.
+    // server must agree on the same directory regardless of cwd. Relative
+    // STATIC_DIR values resolve against the repository root, not the process
+    // working directory (Passenger starts the app with an arbitrary cwd).
     get staticPath() {
       const path = require('node:path');
-      return path.resolve(process.cwd(), this.staticDir);
+      return path.resolve(path.join(__dirname, '..'), this.staticDir);
     },
   },
 };
