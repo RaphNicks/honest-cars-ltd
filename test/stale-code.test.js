@@ -239,9 +239,15 @@ test('scripts and styles are network-first, so a deploy cannot be outrun by the 
   assert.match(branch, /isShellAsset\)\s*\{[\s\S]*?staleWhileRevalidate\(request/, 'fonts and icons keep the cheaper bargain');
 
   // Network-first has to be able to fall back to what install precached, or a
-  // page opened offline loses its styles and its modules.
-  assert.match(source, /async function networkFirst\(request, \{ cacheName, cap, fallbackUrl, readFrom = \[\] \}\)/);
+  // page opened offline loses its styles and its modules. But for code the
+  // fallback is for a *failed* network, never a slow one: `ceilingMs: 0` makes
+  // scripts and styles wait for the network instead of resurrecting the
+  // previous release after a deadline (which is exactly how a shipped fix
+  // "worked on some pages only").
+  assert.match(source, /async function networkFirst\(request, \{ cacheName, cap, fallbackUrl, readFrom = \[\], ceilingMs = 6000 \}\)/);
   assert.match(source, /readFrom: \[SHELL\]/, 'reads check the precached shell');
+  const codeBranch = branch.slice(branch.indexOf('isScriptOrStyle'), branch.indexOf('isShellAsset'));
+  assert.match(codeBranch, /ceilingMs: 0/, 'code waits for the network; the cache is for offline, not for slow');
   assert.match(source, /request\.mode === 'navigate'/, 'navigations keep their own strategy');
   assert.match(source, /self\.addEventListener\('fetch'/, 'and the worker still handles fetches');
 });

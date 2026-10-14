@@ -36,7 +36,7 @@
 
 /* eslint-env serviceworker */
 
-const VERSION = 'hc-v10'; // v6: pwa.js now asks a waiting worker to take over, so a new shell is never left waiting on 'close every tab'
+const VERSION = 'hc-v11'; // v11: code (js/css) now waits for the network — a slow connection must never resurrect the previous release's modules; v6: pwa.js now asks a waiting worker to take over, so a new shell is never left waiting on 'close every tab'
 const SHELL = `${VERSION}-shell`;
 const PAGES = `${VERSION}-pages`;
 const RUNTIME = `${VERSION}-runtime`; // shell assets discovered later (other font weights)
@@ -143,18 +143,23 @@ function storable(response) {
 }
 
 /** Network first, with a ceiling: a slow connection should get the last copy
-    rather than a spinner, but a working network always wins. */
-async function networkFirst(request, { cacheName, cap, fallbackUrl, readFrom = [] }) {
+    rather than a spinner, but a working network always wins. `ceilingMs: 0`
+    waits for the network without a deadline — used for code, where the
+    "last copy" may be the previous release and would silently undo a fix. */
+async function networkFirst(request, { cacheName, cap, fallbackUrl, readFrom = [], ceilingMs = 6000 }) {
   const cache = await caches.open(cacheName);
   // `readFrom` matters for the same reason it does below: the core files live in
   // SHELL because install put them there, and the network-first branch needs to
   // find them there before it gives up.
   const cached = (await readFromAny(request, readFrom)) || (await cache.match(request, { ignoreSearch: true }));
   try {
-    const response = await Promise.race([
-      fetch(request),
-      new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 6000)),
-    ]);
+    const fetcher = fetch(request);
+    const response = ceilingMs > 0
+      ? await Promise.race([
+          fetcher,
+          new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), ceilingMs)),
+        ])
+      : await fetcher;
     if (storable(response)) {
       await cache.put(request, response.clone());
       await trim(cacheName, cap);
@@ -228,14 +233,20 @@ self.addEventListener('fetch', (event) => {
 
   const isScriptOrStyle = /^\/(css|js)\//.test(url.pathname);
   if (isScriptOrStyle) {
-    // Scripts and styles: network-first, falling back to the cache — so the page
-    // in front of the reader is never assembled from two releases, and a page
-    // opened offline still renders with its styles and its modules. Writes go to
-    // RUNTIME, never to SHELL, so the precached shell cannot be evicted by
-    // whatever else the visitor loads; reads check SHELL first, because that is
-    // where install put the core files.
+    // Scripts and styles: network-first with NO time ceiling — the cache is a
+    // fallback for a *failed* network (offline), never for a slow one. The old
+    // time-boxed fallback let a flaky connection resurrect the previous
+    // release's modules page by page, so a shipped fix "worked on some pages
+    // only". Writes go to RUNTIME, never to SHELL, so the precached shell
+    // cannot be evicted by whatever else the visitor loads; reads check SHELL
+    // first, because that is where install put the core files.
     event.respondWith(
-      networkFirst(request, { cacheName: RUNTIME, cap: RUNTIME_CAP, readFrom: [SHELL] }),
+      networkFirst(request, {
+        cacheName: RUNTIME,
+        cap: RUNTIME_CAP,
+        readFrom: [SHELL],
+        ceilingMs: 0,
+      }),
     );
     return;
   }
