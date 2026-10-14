@@ -64,10 +64,24 @@ async function start() {
     console.warn('    Run `npm run build:static` to use the prebuilt pages; until then every page renders per request.');
   }
 
-  const server = app.listen(config.port, config.host, () => {
-    console.log(`✓ honestcarsltd listening on http://${config.host}:${config.port} (${config.env})`);
-    console.log(`  static pages: ${config.features.serveStaticPages ? config.features.staticDir : 'disabled (always dynamic)'}`);
-  });
+  // Under Phusion Passenger (shared hosting, e.g. CloudLinux/DA), the app must
+  // listen on Passenger's private channel — `listen('passenger')` — instead of
+  // a TCP port. Passenger injects the PhusionPassenger global and proxies to
+  // that channel; an app that binds its own port runs happily in complete
+  // obscurity while Passenger reports "web application could not be started".
+  // Everywhere else (npm start, node src/server.js, containers) the ordinary
+  // host:port listen stands.
+  const onListening = () => {
+    console.log(
+      typeof PhusionPassenger !== 'undefined'
+        ? '✓ honestcarsltd listening on the Passenger channel'
+        : `✓ honestcarsltd listening on http://${config.host}:${config.port}`,
+    );
+    console.log(`  ${config.env} · static pages: ${config.features.serveStaticPages ? config.features.staticDir : 'disabled (always dynamic)'}`);
+  };
+  const server = typeof PhusionPassenger !== 'undefined'
+    ? app.listen('passenger', onListening)
+    : app.listen(config.port, config.host, onListening);
 
   // A pull while this process is running leaves the views new and the modules
   // old: Express re-reads `.ejs` from disk on every render, but `require()`
