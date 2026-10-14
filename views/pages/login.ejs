@@ -90,13 +90,9 @@
         </form>
       </div>
 
-      <% if (!mailReady && development) { %>
+      <% if (!mailReady) { %>
         <p class="auth-devnote">
-          <strong>Development:</strong> SMTP is not configured. Email codes appear in the development response and server log. Set <code>SMTP_URL</code> and <code>SMTP_FROM</code> for delivery.
-        </p>
-      <% } else if (!mailReady) { %>
-        <p class="auth-devnote">
-          Email sign-in is temporarily unavailable until email delivery is configured. Please try again later or contact Honest Cars.
+          Email sign-in is temporarily unavailable. Please try again later or contact Honest Cars.
         </p>
       <% } %>
     </div>

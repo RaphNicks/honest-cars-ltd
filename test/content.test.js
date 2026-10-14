@@ -216,11 +216,6 @@ test('delivery areas are priced in kobo and cover the checkout areas', () => {
   }
 });
 
-test('the demo concierge record exists so the status page can be reviewed', () => {
-  assert.match(content.DEMO_REQUEST.trackingId, /^HC-\d{4}$/);
-  assert.ok(content.DEMO_REQUEST.slaHours <= 72);
-});
-
 // ---------------------------------------------------------------------------
 // Slice bookkeeping
 // ---------------------------------------------------------------------------

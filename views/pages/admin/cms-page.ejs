@@ -76,7 +76,7 @@
       <label class="cms-check mt-2">
         <input type="checkbox" name="legal_review" value="1" <%= record.legalReview ? 'checked' : '' %>
                <%= maybeClearCounsel ? '' : 'disabled' %>>
-        <span>A waiting on counsel review — shows the public “placeholder” callout</span>
+        <span>Awaiting counsel review — keeps this page on the counsel sign-off list</span>
       </label>
       <% if (!maybeClearCounsel) { %>
         <p class="cms-hint">Only an admin can clear the counsel-review flag. Clearing it confirms the review is complete; it does not edit the page.</p>
@@ -100,7 +100,7 @@
             </li>
           <% }); %>
         </ul>
-        <p class="cms-hint">Page revisions are an audit trail. Restoring one is a feature for a later pass — the wording is counsel’s to change.</p>
+        <p class="cms-hint">Page revisions are an audit trail. The wording is counsel’s to change.</p>
       <% } %>
     </section>
   </aside>

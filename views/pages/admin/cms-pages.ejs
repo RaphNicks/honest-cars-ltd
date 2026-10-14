@@ -60,8 +60,8 @@
   <section class="panel" style="margin-top: var(--space-3);">
     <h2 class="panel__title">Waiting on counsel</h2>
     <p class="muted">
-      These pages carry a visible “pending legal review” callout on the public site until an
-      admin clears the flag: <%= awaitingCounsel.map(function (row) { return '/' + row.slug; }).join(', ') %>.
+      These pages are marked as awaiting counsel sign-off. An admin clears the flag
+      once the approved wording is in place: <%= awaitingCounsel.map(function (row) { return '/' + row.slug; }).join(', ') %>.
     </p>
   </section>
 <% } %>

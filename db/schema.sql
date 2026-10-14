@@ -578,7 +578,7 @@ CREATE TABLE IF NOT EXISTS pages (
   meta_description  VARCHAR(320)  NOT NULL,
   body              JSON          NULL,                   -- same block list as blog bodies
   indexable         TINYINT(1)    NOT NULL DEFAULT 1,
-  legal_review      TINYINT(1)    NOT NULL DEFAULT 0,     -- 1 = placeholder awaiting counsel
+  legal_review      TINYINT(1)    NOT NULL DEFAULT 0,     -- 1 = awaiting counsel sign-off (admin bookkeeping)
   updated_at        TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (id),
   UNIQUE KEY uq_pages_slug (slug)

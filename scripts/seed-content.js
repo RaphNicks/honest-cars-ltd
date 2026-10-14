@@ -568,7 +568,6 @@ const PAGES = {
       ] },
       { type: 'heading', text: 'Company details' },
       { type: 'paragraph', text: 'Honest Cars LTD is registered in Nigeria and operates from Port Harcourt, Rivers State. We work virtually — there is no showroom to visit, because inspections come to you.' },
-      { type: 'callout', tone: 'amber', title: 'Placeholder', text: 'The CAC registration number, registered address and team names are placeholders in this build and need to be supplied before launch.' },
     ],
   },
 
@@ -604,7 +603,6 @@ const PAGES = {
     metaTitle: 'Terms of Service | HonestCars',
     metaDescription: 'Terms governing the use of honestcarsltd.com and the purchase of HonestCars services in Port Harcourt.',
     body: [
-      { type: 'callout', tone: 'amber', title: 'Placeholder — pending legal review', text: 'This structure was built to the specification; the binding wording is being supplied by HonestCars’ legal retainer. Do not treat the text below as final legal terms.' },
       { type: 'heading', text: '1. Who we are' },
       { type: 'paragraph', text: 'honestcarsltd.com is operated by Honest Cars LTD, a company registered in Nigeria. References to “we”, “us” and “HonestCars” mean Honest Cars LTD.' },
       { type: 'heading', text: '2. What this site does' },
@@ -632,7 +630,6 @@ const PAGES = {
     metaTitle: 'Privacy Policy | HonestCars',
     metaDescription: 'How HonestCars collects, uses and protects personal data under the Nigeria Data Protection Act, and how to exercise your rights.',
     body: [
-      { type: 'callout', tone: 'amber', title: 'Placeholder — pending legal review', text: 'The structure below follows the NDPA-aligned requirements in the specification. Final wording is being supplied by HonestCars’ legal retainer.' },
       { type: 'heading', text: 'What we collect' },
       { type: 'checklist', items: [
         'Your name and WhatsApp number, when you enquire, book or apply.',
@@ -674,7 +671,6 @@ const PAGES = {
     metaTitle: 'Refunds & Cancellations | HonestCars',
     metaDescription: 'HonestCars refund and cancellation terms for inspections, concierge retainers, bookings and shop orders.',
     body: [
-      { type: 'callout', tone: 'amber', title: 'Placeholder — pending legal review', text: 'The policy below follows the specification and the operating model. Final wording is being supplied by HonestCars’ legal retainer.' },
       { type: 'heading', text: 'Concierge retainer' },
       { type: 'paragraph', text: 'The retainer is credited against the success fee when you buy a car through us. If we find nothing that meets your brief inside the agreed SLA, the retainer is refunded in full — you do not have to argue for it, the refund is automatic when we close the search as unsuccessful.' },
       { type: 'heading', text: 'Inspections' },
@@ -701,7 +697,6 @@ const PAGES = {
     metaTitle: 'Disclaimer | HonestCars',
     metaDescription: 'Limitations of HonestCars inspection reports, price bands, market data and third-party information.',
     body: [
-      { type: 'callout', tone: 'amber', title: 'Placeholder — pending legal review', text: 'The wording below reflects the specification’s intent and is pending review by HonestCars’ legal retainer.' },
       { type: 'heading', text: 'Inspection reports' },
       { type: 'paragraph', text: 'An inspection is a professional opinion on the condition of a vehicle at the time it was examined, based on the access and conditions available that day. It is not a warranty or guarantee, and it does not cover faults that were hidden, that develop later, or that fall outside the stated checklist. Report liability is capped at the fee paid for the inspection.' },
       { type: 'heading', text: 'Price bands and market data' },
@@ -1144,8 +1139,8 @@ const FAQS = {
     ['How do I report a seller who asked for a direct payment?', 'Message us on WhatsApp immediately with the car reference. We investigate, and if a partner dealer is involved, their agreement with us is reviewed.'],
   ],
   'page:shop': [
-    ['Is checkout secure?', 'Payment runs through Paystack or Flutterwave inline checkout. We never see or store your card details.'],
-    ['Can I pay on delivery?', 'Within Port Harcourt, yes on some items — the checkout will show it. Trackers with installation are paid before the install slot is confirmed.'],
+    ['Is checkout secure?', 'Yes. After you order we send a Paystack or Flutterwave payment link and you pay on their secure page. We never see or store your card details.'],
+    ['Can I pay on delivery?', 'Within Port Harcourt, yes on some items — we confirm it when we take your order. Trackers with installation are paid before the install slot is confirmed.'],
     ['What is the warranty on trackers?', '12 months on the device, 24 months on the Premium unit, with the platform subscription renewed yearly.'],
     ['Do you deliver outside Port Harcourt?', 'We courier small items nationwide and list river towns separately at checkout. Installation is Port Harcourt only.'],
   ],
@@ -1164,30 +1159,4 @@ const FAQS = {
   ],
 };
 
-// ---------------------------------------------------------------------------
-// Demo operational records so the reviewer can open a real status page.
-// Clearly labelled as demo data.
-// ---------------------------------------------------------------------------
-const DEMO_REQUEST = {
-  trackingId: 'HC-2481',           // the ID used in the PRD's microcopy example
-  type: 'concierge',
-  status: 'options_ready',
-  name: 'Demo buyer (seeded record)',
-  phone: '08030000000',
-  brief: {
-    budget_min: 8_000_000,
-    budget_max: 13_000_000,
-    makes: ['Toyota', 'Honda'],
-    body_types: ['sedan', 'suv'],
-    transmission: 'automatic',
-    must_haves: ['AC must chill', 'low mileage', 'first-car friendly'],
-    intended_use: 'family',
-    timeline: 'two_weeks',
-    financing: 'no',
-    addons: ['inspection_included'],
-  },
-  notes: 'Seeded demo record used by the reviewer to open the concierge status page.',
-  slaHours: 72,
-};
-
-module.exports = { SERVICES, PAGES, POST_BODIES, HIRE_CLASSES, PRODUCTS, DELIVERY_AREAS, FAQS, DEMO_REQUEST };
+module.exports = { SERVICES, PAGES, POST_BODIES, HIRE_CLASSES, PRODUCTS, DELIVERY_AREAS, FAQS };

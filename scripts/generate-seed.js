@@ -959,13 +959,6 @@ DELETE FROM service_cities;
       prod.options || [], seedMedia.photo('shop', prod.slug) || prod.image, prod.position, 1,
     ])));
 
-  // Demo operational record so the concierge status page can be reviewed.
-  const demo = CONTENT.DEMO_REQUEST;
-  out.push(insert('service_requests',
-    ['tracking_id', 'type', 'status', 'name', 'phone', 'brief', 'sla_due_at', 'source_path', 'notes'],
-    [[demo.trackingId, demo.type, demo.status, demo.name, demo.phone, demo.brief,
-      new Date(Date.UTC(2026, 9, 1) + demo.slaHours * 3_600_000), '/find-my-car', demo.notes]]));
-
   const testimonials = [
     ['Chidi O.', 'Woji', 'They told me the Camry I liked had a resprayed boot lid before I paid for the inspection. No other lot would have said that. I bought it anyway, with my eyes open.', 'inspection', 5],
     ['Mrs. Amadi', 'GRA Phase 2', 'I sent my brief on WhatsApp at night and had three inspected options by Thursday. The swap was handled end to end — I only showed up to sign.', 'concierge', 5],
@@ -1257,21 +1250,6 @@ INSERT INTO service_requests (tracking_id, type, status, name, phone, brief, sla
     (SELECT id FROM \`users\` WHERE phone = '+2348000000002' LIMIT 1), DATE_SUB(UTC_TIMESTAMP(), INTERVAL 2 DAY),
     DATE_SUB(UTC_TIMESTAMP(), INTERVAL 5 HOUR));
 
--- The cars attached to the demo request: exactly what the buyer's comparison reads.
-INSERT INTO request_candidates (request_id, listing_id, note, rank_no, added_by) VALUES
-  ((SELECT id FROM service_requests WHERE tracking_id = 'HC-2481' LIMIT 1),
-   (SELECT id FROM vehicle_listings WHERE stock_no = '${stockAt(32)}' LIMIT 1),
-   'Cleanest papers of the three; two panels resprayed and priced in.', 1,
-   (SELECT id FROM \`users\` WHERE phone = '+2348000000002' LIMIT 1)),
-  ((SELECT id FROM service_requests WHERE tracking_id = 'HC-2481' LIMIT 1),
-   (SELECT id FROM vehicle_listings WHERE stock_no = '${stockAt(68)}' LIMIT 1),
-   'The SUV alternative: same budget, more room, and the papers are clean.', 2,
-   (SELECT id FROM \`users\` WHERE phone = '+2348000000002' LIMIT 1)),
-  ((SELECT id FROM service_requests WHERE tracking_id = 'HC-2481' LIMIT 1),
-   (SELECT id FROM vehicle_listings WHERE stock_no = '${stockAt(66)}' LIMIT 1),
-   'Newest of the three and still under the budget ceiling — worth the drive to see.', 3,
-   (SELECT id FROM \`users\` WHERE phone = '+2348000000002' LIMIT 1));
-
 -- Dispatch sheet (§7.3): one job unassigned, one dispatched to our inspector
 -- for 2pm today, one install booked, one consultation already filed.
 INSERT INTO bookings (reference, type, service_slug, slot_at, location, vehicle, name, phone,
@@ -1338,12 +1316,8 @@ INSERT INTO payments (reference, provider, provider_ref, purpose, order_id, book
    'Uche Nnamdi', '+2348031110009', 4500000, 'refunded', DATE_SUB(UTC_TIMESTAMP(), INTERVAL 6 DAY),
    DATE_SUB(UTC_TIMESTAMP(), INTERVAL 2 DAY), 4500000,
    'Car was sold before we arrived — inspection fee returned in full.',
-   (SELECT id FROM \`users\` WHERE phone = '+2348000000001' LIMIT 1), DATE_SUB(UTC_TIMESTAMP(), INTERVAL 6 DAY)),
-  ('HC-PAY-000005', 'bank_transfer', 'SEED-BT-0005', 'retainer', NULL, NULL,
-   (SELECT id FROM service_requests WHERE tracking_id = 'HC-2481' LIMIT 1),
-   'Demo buyer (seeded record)', '+2348030000000', 5000000, 'paid',
-   DATE_SUB(UTC_TIMESTAMP(), INTERVAL 4 DAY), NULL, 0, NULL,
-   (SELECT id FROM \`users\` WHERE phone = '+2348000000001' LIMIT 1), DATE_SUB(UTC_TIMESTAMP(), INTERVAL 4 DAY));
+   (SELECT id FROM \`users\` WHERE phone = '+2348000000001' LIMIT 1), DATE_SUB(UTC_TIMESTAMP(), INTERVAL 6 DAY));
+
 
 INSERT INTO payment_events (payment_id, provider, event_id, type, signature_ok, payload, created_at) VALUES
   ((SELECT id FROM payments WHERE reference = 'HC-PAY-000001' LIMIT 1), 'manual', 'created:HC-PAY-000001', 'payment.created', NULL,
@@ -1361,11 +1335,8 @@ INSERT INTO payment_events (payment_id, provider, event_id, type, signature_ok, 
   ((SELECT id FROM payments WHERE reference = 'HC-PAY-000004' LIMIT 1), 'bank_transfer', 'manual:HC-PAY-000004', 'bank_transfer.paid', NULL,
    '{"note":"Transfer matched"}', DATE_SUB(UTC_TIMESTAMP(), INTERVAL 6 DAY)),
   ((SELECT id FROM payments WHERE reference = 'HC-PAY-000004' LIMIT 1), 'bank_transfer', 'refund:HC-PAY-000004', 'payment.refunded', NULL,
-   '{"amountKobo":4500000,"reason":"Car was sold before we arrived"}', DATE_SUB(UTC_TIMESTAMP(), INTERVAL 2 DAY)),
-  ((SELECT id FROM payments WHERE reference = 'HC-PAY-000005' LIMIT 1), 'bank_transfer', 'created:HC-PAY-000005', 'payment.created', NULL,
-   '{"purpose":"retainer","amountKobo":5000000,"provider":"bank_transfer"}', DATE_SUB(UTC_TIMESTAMP(), INTERVAL 4 DAY)),
-  ((SELECT id FROM payments WHERE reference = 'HC-PAY-000005' LIMIT 1), 'bank_transfer', 'manual:HC-PAY-000005', 'bank_transfer.paid', NULL,
-   '{"note":"Concierge retainer for HC-2481, receipted to the buyer"}', DATE_SUB(UTC_TIMESTAMP(), INTERVAL 4 DAY));
+   '{"amountKobo":4500000,"reason":"Car was sold before we arrived"}', DATE_SUB(UTC_TIMESTAMP(), INTERVAL 2 DAY));
+
 
 -- Escrow: one protected purchase waiting on documents, one already inspected,
 -- one parts escrow that has only just received funds — the whole ladder.
@@ -1699,16 +1670,10 @@ INSERT INTO leads (type, listing_id, name, phone, message, preferred_day, source
     DATE_SUB(UTC_TIMESTAMP(), INTERVAL 6 DAY), DATE_SUB(UTC_TIMESTAMP(), INTERVAL 5 DAY),
     'AC not working — buyer walked away, told ops to fix before relisting.',
     DATE_SUB(UTC_TIMESTAMP(), INTERVAL 6 DAY)),
-  -- The two customers who actually paid (§15.2): every payer has an enquiry
+  -- The customers who actually paid (§15.2): every payer has an enquiry
   -- behind them, and the dashboard credits the channel that produced it. A
   -- payment with no lead at all reads as "(unattributed)" — honest, but it is
   -- not how this business works, so the demo shows the real shape.
-  ('concierge', NULL, 'Demo buyer (seeded record)', '+2348030000000',
-    'Wants a family SUV, budget ₦25m, prefers something with service history.',
-    NULL, '/find-my-car', 'closed',
-    (SELECT id FROM \`users\` WHERE phone = '+2348000000002' LIMIT 1),
-    DATE_SUB(UTC_TIMESTAMP(), INTERVAL 21 DAY), DATE_SUB(UTC_TIMESTAMP(), INTERVAL 19 DAY),
-    NULL, DATE_SUB(UTC_TIMESTAMP(), INTERVAL 21 DAY)),
   ('viewing', (SELECT id FROM vehicle_listings WHERE stock_no = '${stockAt(29)}' LIMIT 1),
     'Ada Okafor', '+2348031234567', 'Do you have a tracker for this one? I want it installed before delivery.',
     NULL, '/cars/2015-toyota-corolla-hc-ph-0029', 'closed',
@@ -1865,10 +1830,8 @@ UPDATE leads
          ELSE NULL
        END;
 
--- ...and the two paying customers explicitly, so the demo shows a full chain
+-- ...and a paying customer explicitly, so the demo shows a full chain
 -- rather than the pattern landing them in the NULL bucket by accident.
-UPDATE leads SET utm = JSON_OBJECT('source', 'instagram', 'medium', 'social', 'campaign', 'ph-suv-september')
- WHERE phone = '+2348030000000';
 UPDATE leads SET utm = JSON_OBJECT('source', 'google', 'medium', 'cpc', 'campaign', 'ph-inspection-search')
  WHERE phone = '+2348031234567';
 

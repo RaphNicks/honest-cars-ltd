@@ -395,7 +395,7 @@
                   <a class="saved-car__title" href="<%= listing.url %>"><%= listing.title %></a>
                   <span class="saved-car__price tabular"><%= helpers.formatNaira(listing.priceKobo) %></span>
                   <span class="account-item__meta">
-                    <%= listing.mileageKm ? helpers.formatMileage(listing.mileageKm) : 'Mileage TBC' %> ·
+                    <%= listing.mileageKm ? helpers.formatMileage(listing.mileageKm) : 'Mileage not recorded' %> ·
                     <%= listing.area %> · saved <%= helpers.relativeDays(listing.savedAt) %>
                   </span>
                   <%# FR-25: the price watched, and a drop since you saved it %>

@@ -64,7 +64,7 @@
       <% } else { %>
         <%# A clip named in the post but not in the manifest: say so rather than
             render a play button that leads nowhere. %>
-        <p class="field__hint">Video “<%= block.src %>” is not in this build — run <code>npm run videos</code>.</p>
+        <p class="field__hint">This video is not available.</p>
       <% } %>
 
     <% } else if (block.type === 'youtube') { %>

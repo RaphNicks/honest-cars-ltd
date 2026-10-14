@@ -588,12 +588,27 @@ maybe('the pipeline board renders every stage with its SLA clock', async () => {
 });
 
 maybe('a request opens into its brief and its attached cars', async () => {
-  const board = await db.queryOne("SELECT id, tracking_id FROM service_requests WHERE tracking_id = 'HC-2481'");
-  const response = await accounts.admin.client.request(`/admin/concierge?open=${board.id}`);
+  const request = await db.queryOne("SELECT id FROM service_requests WHERE tracking_id = 'HC-2487'");
+  const id = await scratchListing({ status: 'live' });
+  const auditWatermark = (await db.queryOne('SELECT COALESCE(MAX(id), 0) AS id FROM admin_audit')).id;
+
+  const attached = await accounts.admin.client.post(`/admin/concierge/${request.id}/candidates`, {
+    listing_id: String(id),
+    note: 'Cleanest papers of the three — two panels resprayed and priced in.',
+  });
+  assert.equal(attached.status, 303);
+
+  const response = await accounts.admin.client.request(`/admin/concierge?open=${request.id}`);
   assert.equal(response.status, 200);
   assert.match(response.text, /The brief/);
   assert.match(response.text, /Attached cars/);
-  assert.match(response.text, /Cleanest papers of the three|service book is complete/);
+  assert.match(response.text, /Cleanest papers of the three/);
+
+  await accounts.admin.client.post(`/admin/concierge/${request.id}/candidates/${id}/remove`, {});
+  await db.query(
+    'DELETE FROM admin_audit WHERE entity = ? AND entity_id = ? AND action IN (?, ?) AND id > ?',
+    ['request', request.id, 'request.candidate_add', 'request.candidate_remove', auditWatermark],
+  );
 });
 
 maybe('cars can be attached to a request and removed again', async () => {
