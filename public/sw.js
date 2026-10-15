@@ -36,7 +36,7 @@
 
 /* eslint-env serviceworker */
 
-const VERSION = 'hc-v11'; // v11: code (js/css) now waits for the network — a slow connection must never resurrect the previous release's modules; v6: pwa.js now asks a waiting worker to take over, so a new shell is never left waiting on 'close every tab'
+const VERSION = 'hc-v12'; // v12: partial (206) media chunks are never cached and cache writes can't break delivery — the hero video used to play only on a hard refresh; v11: code (js/css) now waits for the network — a slow connection must never resurrect the previous release's modules; v6: pwa.js now asks a waiting worker to take over, so a new shell is never left waiting on 'close every tab'
 const SHELL = `${VERSION}-shell`;
 const PAGES = `${VERSION}-pages`;
 const RUNTIME = `${VERSION}-runtime`; // shell assets discovered later (other font weights)
@@ -137,7 +137,11 @@ async function trim(cacheName, cap) {
 
 /** Cache a response only when the server did not forbid it. */
 function storable(response) {
-  if (!response || !response.ok || response.type === 'opaque') return false;
+  // A partial chunk (206, how media streams) must never be cached: `cache.put`
+  // rejects a partial response, and that rejection used to take delivery down
+  // with it — the hero video only played on a hard refresh (which bypasses
+  // this worker entirely).
+  if (!response || !response.ok || response.status === 206 || response.type === 'opaque') return false;
   const cacheControl = response.headers.get('Cache-Control') || '';
   return !/no-store|private/i.test(cacheControl);
 }
@@ -161,8 +165,12 @@ async function networkFirst(request, { cacheName, cap, fallbackUrl, readFrom = [
         ])
       : await fetcher;
     if (storable(response)) {
-      await cache.put(request, response.clone());
-      await trim(cacheName, cap);
+      try {
+        await cache.put(request, response.clone());
+        await trim(cacheName, cap);
+      } catch {
+        /* caching is best-effort — it must never break delivery */
+      }
     }
     return response;
   } catch {
@@ -198,10 +206,14 @@ async function staleWhileRevalidate(request, { cacheName, cap, readFrom = [] }) 
   const cached = (await readFromAny(request, readFrom)) || (await cache.match(request));
   const network = fetch(request)
     .then(async (response) => {
-      if (storable(response)) {
+    if (storable(response)) {
+      try {
         await cache.put(request, response.clone());
         await trim(cacheName, cap);
+      } catch {
+        /* caching is best-effort — it must never break delivery */
       }
+    }
       return response;
     })
     .catch(() => null);
