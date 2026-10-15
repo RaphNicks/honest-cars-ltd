@@ -113,16 +113,11 @@ async function currentSetup(user) {
     formatted: totp.formatSecret(secret),
     account: user.phone,
     uri: totp.otpauthUrl({ secret, account: user.phone, issuer: ISSUER }),
-    // Live reference so a person comparing their app to this server can do it in
-    // one look: the code this key produces right now, and this server's own clock.
-    // A mismatch between the two tells you exactly which side is wrong — a key in
-    // the app that is not this key, or a server clock that has drifted — instead
-    // of "incorrect code" with nothing to go on.
-    currentCode: totp.code(secret),
-    // Corrected time (wall clock plus the offset) — what TOTP actually uses — so
-    // the on-page "server time" matches the code and, once the box is fixed or
-    // the offset is set, reads level with the visitor's own clock.
-    serverTime: new Date(totp.nowMs()).toISOString(),
+    // The box's raw system clock, for the on-page comparison against the
+    // visitor's own clock. Shown uncorrected on purpose: it is a "is the host
+    // clock fixed yet?" reading, not the (possibly offset-corrected) time TOTP
+    // actually verifies against.
+    serverTime: new Date().toISOString(),
   };
 }
 
