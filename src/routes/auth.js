@@ -280,16 +280,25 @@ router.post('/mfa', mfaLimiter, async (req, res, next) => {
   }
 });
 
-router.post('/logout', async (req, res, next) => {
+// Signing out is both a navigation and an API call. A typed URL or a plain
+// form post (the console's sign-out form runs without JavaScript on the
+// sign-in gate pages) must leave with a redirect — never a page of raw JSON.
+// In-app callers still get the JSON envelope.
+async function finishLogout(req, res, next) {
   try {
     await auth.logout(req, res);
     await db.analytics
       .record('sign_out', { payload: { source: validate.text((req.body || {}).source, 40) || 'account' }, sourcePath: '/account' })
       .catch(() => {});
+    const navigating = req.method === 'GET' || (req.get('accept') || '').includes('text/html');
+    if (navigating) return res.redirect(303, '/');
     return sendJson(res, { ok: true, redirect: '/' });
   } catch (error) {
     return next(error);
   }
-});
+}
+
+router.get('/logout', finishLogout);
+router.post('/logout', finishLogout);
 
 module.exports = { router };

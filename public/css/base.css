@@ -33,7 +33,9 @@ html {
   scroll-behavior: smooth;
   scroll-padding-top: calc(var(--header-height) + var(--space-2));
   /* Hard stop: no element on any screen can push the page sideways.
-     (body keeps overflow-x:hidden below as the legacy fallback.) */
+     It must live on html ALONE — overflow on body would turn the body into
+     its own scroll box and silently disable position: sticky (the console
+     sidebar and the site header would ride with page scroll). */
   overflow-x: clip;
 }
 
@@ -51,7 +53,6 @@ body {
   line-height: var(--leading-normal);
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
-  overflow-x: hidden;
 }
 
 img, svg, video, canvas {
