@@ -155,6 +155,12 @@ const config = {
     emailOtpIpMax: int(process.env.AUTH_EMAIL_OTP_IP_MAX, 30),
     emailVerifyIpMax: int(process.env.AUTH_EMAIL_VERIFY_IP_MAX, 60),
     sessionDays: int(process.env.AUTH_SESSION_DAYS, 30),
+    // The box's system clock can be skewed by a host NTP problem that a customer
+    // account cannot fix (no `sudo`). Non-zero, TOTP reads the wall clock plus
+    // this many seconds, so codes are computed and checked against true time.
+    // 0 (default) trusts the system clock. Set it to the gap the enrolment
+    // screen prints, then back to 0 once the host corrects the clock.
+    totpClockOffsetSeconds: int(process.env.TOTP_CLOCK_OFFSET_SECONDS, 0),
     // Peppers the OTP hash and the session token. Must be set in production.
     pepper: process.env.AUTH_PEPPER || '',
     // Development only: echo the code in the API response so the flow can be

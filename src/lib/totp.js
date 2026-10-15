@@ -33,6 +33,19 @@ const SECRET_BYTES = 20;
 /** How many steps either side of "now" a code is accepted for. One step = 30s. */
 const DEFAULT_WINDOW = 1;
 
+// The box's system clock can be skewed by a host NTP problem we cannot fix from
+// a customer account. `setClockOffset()` shifts every "now" this file reads by
+// that many seconds, so codes are computed and checked against true time. 0
+// (the default) trusts the system clock.
+let clockOffsetMs = 0;
+function setClockOffset(seconds) {
+  clockOffsetMs = Math.round(Number(seconds) || 0) * 1000;
+}
+/** The wall clock as this file reads it — system time plus the offset. */
+function nowMs() {
+  return Date.now() + clockOffsetMs;
+}
+
 // ---------------------------------------------------------------------------
 // base32 (RFC 4648, no padding) — what every authenticator app speaks
 // ---------------------------------------------------------------------------
@@ -90,7 +103,7 @@ function generateSecret(bytes = SECRET_BYTES) {
 }
 
 /** Which time-step a moment belongs to. Exposed because replay is decided on it. */
-function stepAt(time = Date.now(), step = STEP_SECONDS) {
+function stepAt(time = nowMs(), step = STEP_SECONDS) {
   return Math.floor(Number(time) / 1000 / step);
 }
 
@@ -115,7 +128,7 @@ function codeForStep(secret, step, { digits = DIGITS } = {}) {
   return String(binary % 10 ** digits).padStart(digits, '0');
 }
 
-function code(secret, { time = Date.now(), digits = DIGITS, step = STEP_SECONDS } = {}) {
+function code(secret, { time = nowMs(), digits = DIGITS, step = STEP_SECONDS } = {}) {
   return codeForStep(secret, stepAt(time, step), { digits });
 }
 
@@ -130,7 +143,7 @@ function code(secret, { time = Date.now(), digits = DIGITS, step = STEP_SECONDS 
  * a licence to widen the window: each extra step is another 30 seconds a
  * shoulder-surfed code stays usable.
  */
-function verify(secret, token, { time = Date.now(), window = DEFAULT_WINDOW, step = STEP_SECONDS, digits = DIGITS } = {}) {
+function verify(secret, token, { time = nowMs(), window = DEFAULT_WINDOW, step = STEP_SECONDS, digits = DIGITS } = {}) {
   const submitted = String(token || '').replace(/\D/g, '');
   if (submitted.length !== digits) return null;
   const now = stepAt(time, step);
@@ -177,6 +190,8 @@ module.exports = {
   base32Encode,
   base32Decode,
   generateSecret,
+  setClockOffset,
+  nowMs,
   stepAt,
   codeForStep,
   code,

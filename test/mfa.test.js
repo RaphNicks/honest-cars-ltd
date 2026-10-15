@@ -142,6 +142,31 @@ maybe('the six-digit code is RFC 6238 to the digit', () => {
   }
 });
 
+maybe('a clock offset shifts the TOTP clock to correct a skewed box', () => {
+  // The box clock can be ~a minute slow (a host NTP problem a customer account
+  // cannot fix). The offset is added to every "now" this file reads.
+  totp.setClockOffset(66);
+  try {
+    const before = Date.now();
+    const corrected = totp.nowMs();
+    const after = Date.now();
+    assert.ok(
+      corrected >= before + 66_000 && corrected <= after + 66_000,
+      'nowMs() is the wall clock plus the offset',
+    );
+
+    // And code() and verify() read the same shifted clock, so a code a phone
+    // produces for true time still verifies once the offset cancels the skew.
+    const secret = totp.generateSecret();
+    assert.ok(
+      totp.verify(secret, totp.code(secret)) !== null,
+      'a code generated at the corrected now verifies at the corrected now',
+    );
+  } finally {
+    totp.setClockOffset(0);
+  }
+});
+
 maybe('the base32 codec round-trips, and a secret is written the way a person types it', () => {
   const bytes = Buffer.from('12345678901234567890', 'ascii');
   assert.equal(totp.base32Encode(bytes), RFC_SECRET);

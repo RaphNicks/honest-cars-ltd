@@ -35,6 +35,12 @@ const roles = require('./roles');
 const totp = require('../lib/totp');
 const validate = require('./validate');
 const phones = require('../lib/phone');
+const config = require('../config');
+
+// Apply the TOTP clock offset (default 0) once, at load. When a host's system
+// clock is skewed and a customer account cannot fix it, this shifts every code
+// this service computes or checks onto true time — see config.auth.
+totp.setClockOffset(config.auth.totpClockOffsetSeconds);
 
 /** The issuer name an authenticator app shows. */
 const ISSUER = 'HonestCars';
@@ -113,7 +119,10 @@ async function currentSetup(user) {
     // the app that is not this key, or a server clock that has drifted — instead
     // of "incorrect code" with nothing to go on.
     currentCode: totp.code(secret),
-    serverTime: new Date().toISOString(),
+    // Corrected time (wall clock plus the offset) — what TOTP actually uses — so
+    // the on-page "server time" matches the code and, once the box is fixed or
+    // the offset is set, reads level with the visitor's own clock.
+    serverTime: new Date(totp.nowMs()).toISOString(),
   };
 }
 
