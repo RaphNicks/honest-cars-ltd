@@ -77,9 +77,9 @@ function audit(file) {
     if (/^var\(--font-sans\)$/.test(value)) continue;
     if (/^var\(--font-display\)$/.test(value)) continue;
     // the @font-face declarations themselves
-    if (/^['"](Libre Caslon Condensed)['"]$/.test(value)) continue;
+    if (/^['"](Libre Caslon Condensed|IBM Plex Sans)['"]$/.test(value)) continue;
     if (value.startsWith('inherit')) continue;
-    errors.push(`${name} font-family "${value}" — Libre Caslon Condensed is the only family (§3.3, owner direction 2026-10-15)`);
+    errors.push(`${name} font-family "${value}" — Libre Caslon Condensed + IBM Plex Sans are the only families (§3.3, owner direction 2026-10-15)`);
   }
 
   const weightRe = /font-weight\s*:\s*([0-9]{3}|var\(--weight-[a-z]+\))/g;
@@ -104,7 +104,7 @@ function main() {
     process.exit(1);
   }
 
-  console.log(`✓ type-scale audit passed — ${files.length} stylesheets, ladder ${LADDER.join('/')}px, one family (Libre Caslon Condensed), weights ${ALLOWED_WEIGHTS.join('/')}`);
+  console.log(`✓ type-scale audit passed — ${files.length} stylesheets, ladder ${LADDER.join('/')}px, two families (Libre Caslon Condensed display + IBM Plex Sans body), weights ${ALLOWED_WEIGHTS.join('/')}`);
 }
 
 main();
