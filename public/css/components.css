@@ -440,6 +440,10 @@
   align-items: center;
   gap: var(--space-1);
   font-size: var(--text-20);
+  /* The wordmark is the brand and shows at EVERY size (owner direction
+     2026-10-14). On the tightest bars it yields space by shrinking slightly,
+     never by disappearing — endpoints are type-scale ladder steps. */
+  font-size: clamp(16px, 4.8cqi, 20px);
   font-weight: var(--weight-bold);
   color: var(--honest-navy);
   letter-spacing: -0.02em;
@@ -521,13 +525,16 @@ img.header__logo-mark {
    Container queries measure the real space in the header row, so every
    screen gets exactly the controls it can afford — the row can never
    overflow, at any width. The ladder:
-     · tightest:  brand mark + Search · Account · Menu
-     · 380px+:    the wordmark returns
+     · tightest:  the HonestCars wordmark always shows (owner direction) —
+                  the controls tighten to make room, the brand never hides
      · 560px+:    the "Sign in" text link joins (account icon already covers it)
      · 640px+:    the "Find My Car" button joins
      · 1025px+:   full desktop nav (viewport rule above). */
 @container header (max-width: 379px) {
-  .header__logo > span { display: none; }
+  /* Tightest bars: everything else gives the wordmark its room. */
+  .header__logo { gap: var(--space-05); }
+  img.header__logo-mark { width: 28px; height: 28px; }
+  .header__actions { gap: var(--space-05); }
 }
 
 @container header (min-width: 640px) {
