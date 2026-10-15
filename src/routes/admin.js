@@ -65,6 +65,7 @@ const HOME = '/admin';
 const PATHS = {
   listings: `${HOME}/listings`,
   newListing: `${HOME}/listings/new`,
+  actions: `${HOME}/actions`,
   leads: `${HOME}/leads`,
   concierge: `${HOME}/concierge`,
   bookings: `${HOME}/bookings`,
@@ -91,6 +92,7 @@ const PATHS = {
 /** Navigation, filtered by what this role may actually open (§7.4). */
 const NAV = [
   { href: HOME, label: 'Today', icon: 'chart', capability: 'reports.view' },
+  { href: PATHS.actions, label: 'Actions', icon: 'inbox', capability: 'reports.view' },
   { href: PATHS.listings, label: 'Listings', icon: 'car', capability: 'listings.moderate' },
   { href: PATHS.newListing, label: 'Add a car', icon: 'plus', capability: 'listings.moderate' },
   { href: PATHS.leads, label: 'Leads', icon: 'inbox', capability: 'leads.manage' },
@@ -177,8 +179,35 @@ function checklistFrom(body, grade) {
   return { checklist: any ? boxes : null };
 }
 
-function page(req, res, { view, active, title, description, data = {}, status = 200 }) {
+/**
+ * The "Actions" nav item carries a live count of everything the current user
+ * can act on — posts in review, listings in review, payments to confirm. One
+ * small COUNT query, run only for roles that can act on at least one section.
+ * Never throws: a count failure means "no badge", never a broken page.
+ */
+async function withActionsCount(user, nav) {
+  const can = (cap) => roles.can(user.role, cap);
+  if (!can('cms.manage') && !can('listings.moderate') && !can('payments.approve')) return nav;
+  let total = 0;
+  try {
+    const row = await db.queryOne(
+      `SELECT
+         (SELECT COUNT(*) FROM blog_posts WHERE status = 'in_review') AS posts,
+         (SELECT COUNT(*) FROM vehicle_listings WHERE status = 'in_review') AS listings,
+         (SELECT COUNT(*) FROM payments WHERE status = 'pending') AS payments`,
+    );
+    if (can('cms.manage')) total += Number(row.posts) || 0;
+    if (can('listings.moderate')) total += Number(row.listings) || 0;
+    if (can('payments.approve')) total += Number(row.payments) || 0;
+  } catch {
+    return nav;
+  }
+  return nav.map((item) => (item.href === PATHS.actions ? { ...item, count: total } : item));
+}
+
+async function page(req, res, { view, active, title, description, data = {}, status = 200 }) {
   const locals = baseLocals(req.user, { active, title, description });
+  locals.data.admin.nav = await withActionsCount(req.user, locals.data.admin.nav);
   const { ok, error } = feedback(req);
   return sendPage(req, res, {
     ...locals,
@@ -227,6 +256,59 @@ router.get('/', auth.requireStaff('reports.view'), async (req, res, next) => {
         staleDays: admin.STALE_DAYS,
         refreshGraceDays: admin.REFRESH_GRACE_DAYS,
       },
+    });
+  } catch (error) {
+    return next(error);
+  }
+});
+
+// ---------------------------------------------------------------------------
+// Actions — everything pending on you, in one screen
+// ---------------------------------------------------------------------------
+router.get('/actions', auth.requireStaff('reports.view'), async (req, res, next) => {
+  try {
+    const user = req.user;
+    const canPosts = roles.can(user.role, 'cms.manage');
+    const canListings = roles.can(user.role, 'listings.moderate');
+    const canPayments = roles.can(user.role, 'payments.approve');
+
+    const [posts, listings, payments] = await Promise.all([
+      canPosts
+        ? db.cms.overview().then((o) => o.posts.filter((p) => p.status === 'in_review').slice(0, 50))
+        : Promise.resolve([]),
+      canListings
+        ? admin.moderationList({ status: 'in_review', limit: 50 }).then((r) => r.rows)
+        : Promise.resolve([]),
+      canPayments
+        ? db.payments.listPayments({ status: 'pending', limit: 50 }).then((r) => r.rows)
+        : Promise.resolve([]),
+    ]);
+
+    const sections = [
+      {
+        key: 'posts', show: canPosts, items: posts,
+        heading: 'Blog posts in review', empty: 'Nothing waiting on review.',
+        help: 'Publish to put it live, or send it back to draft with a note.',
+      },
+      {
+        key: 'listings', show: canListings, items: listings,
+        heading: 'Listings awaiting moderation', empty: 'No listings waiting on moderation.',
+        help: 'Approve to publish it, or send it back to the dealer as a draft.',
+      },
+      {
+        key: 'payments', show: canPayments, items: payments,
+        heading: 'Payments to confirm', empty: 'No payments waiting to confirm.',
+        help: 'Confirm once the money has actually landed.',
+      },
+    ];
+    const total = sections.reduce((n, s) => n + (s.show ? s.items.length : 0), 0);
+
+    return await page(req, res, {
+      view: 'admin/actions',
+      active: PATHS.actions,
+      title: 'Actions',
+      description: 'Everything waiting on you to approve, send back, or confirm — in one place.',
+      data: { sections, total },
     });
   } catch (error) {
     return next(error);

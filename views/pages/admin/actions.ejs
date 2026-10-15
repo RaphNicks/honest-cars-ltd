@@ -1,0 +1,154 @@
+<%#
+  /admin/actions — everything waiting on you, in one screen.
+
+  Three stacks of work that needs a decision:
+    • Blog posts in review      → publish or send back        (cms.manage)
+    • Listings awaiting review  → approve or send back        (listings.moderate)
+    • Payments to confirm       → confirm the money landed    (payments.approve)
+
+  A section is rendered only for the capabilities the signed-in user holds, so a
+  marketing person sees just the posts, ops just the listings, finance just the
+  money — and the super admin sees all three. Each button posts to the very same
+  endpoint the module page uses, so the rules (meta checks, grading, audit trail,
+  static rebuild) are identical — you only start here instead of hunting for it.
+
+  Locals: sections (array of { key, show, heading, empty, help, items }), total
+%>
+<% const visible = sections.filter(function (s) { return s.show; }); %>
+
+<% if (!visible.length) { %>
+  <section class="panel" aria-labelledby="actions-none">
+    <h2 class="panel__title" id="actions-none">Nothing is waiting</h2>
+    <p class="empty-line">
+      Your role has nothing pending on it right now — no posts, listings or payments
+      need a decision.
+    </p>
+  </section>
+<% } else { %>
+  <p class="note-inline">
+    <strong class="tabular"><%= total %></strong>
+    <%= total === 1 ? 'item is' : 'items are' %> waiting on you.
+    Each button below does the same job as the module page — you just start here
+    instead of hunting for it.
+  </p>
+
+  <% visible.forEach(function (section) { %>
+    <section class="panel" aria-labelledby="actions-<%= section.key %>">
+      <div class="panel__head">
+        <h2 class="panel__title" id="actions-<%= section.key %>"><%= section.heading %></h2>
+        <span class="chip"><%= section.items.length %></span>
+      </div>
+      <p class="note-inline"><%= section.help %></p>
+
+      <% if (!section.items.length) { %>
+        <p class="empty-line"><%= section.empty %></p>
+
+      <% } else if (section.key === 'posts') { %>
+        <table class="table">
+          <thead>
+            <tr>
+              <th scope="col">Post</th>
+              <th scope="col">Updated</th>
+              <th scope="col">By</th>
+              <th scope="col">Decision</th>
+            </tr>
+          </thead>
+          <tbody>
+            <% section.items.forEach(function (p) { %>
+              <tr>
+                <td>
+                  <a href="/admin/cms/posts/<%= p.id %>/edit"><%= p.title %></a>
+                  <% if (p.reviewNote) { %><div class="muted"><%= p.reviewNote %></div><% } %>
+                </td>
+                <td class="tabular"><%= helpers.relativeDays(p.updatedAt) %></td>
+                <td><%= p.updatedByName || '—' %></td>
+                <td>
+                  <form method="post" action="/admin/cms/posts/<%= p.id %>/status" class="inline-form">
+                    <input type="hidden" name="status" value="published">
+                    <button class="btn btn--primary btn--sm" type="submit">Publish</button>
+                  </form>
+                  <form method="post" action="/admin/cms/posts/<%= p.id %>/status" class="inline-form">
+                    <input type="hidden" name="status" value="draft">
+                    <button class="btn btn--secondary btn--sm" type="submit">Send back</button>
+                  </form>
+                </td>
+              </tr>
+            <% }); %>
+          </tbody>
+        </table>
+
+      <% } else if (section.key === 'listings') { %>
+        <table class="table">
+          <thead>
+            <tr>
+              <th scope="col">Car</th>
+              <th scope="col">Stock</th>
+              <th scope="col">Price</th>
+              <th scope="col">Dealer</th>
+              <th scope="col">Idle</th>
+              <th scope="col">Decision</th>
+            </tr>
+          </thead>
+          <tbody>
+            <% section.items.forEach(function (l) { %>
+              <tr>
+                <td>
+                  <a href="<%= l.url %>" target="_blank" rel="noopener"><%= l.year %> <%= l.make %> <%= l.model %></a>
+                </td>
+                <td class="tabular"><%= l.stockNo %></td>
+                <td class="tabular"><%= helpers.formatNaira(l.priceKobo) %></td>
+                <td><%= l.dealer || '—' %></td>
+                <td class="tabular"><%= l.idleDays %>d</td>
+                <td>
+                  <form method="post" action="/admin/listings/<%= l.id %>/publish" class="inline-form">
+                    <button class="btn btn--primary btn--sm" type="submit">Approve</button>
+                  </form>
+                  <form method="post" action="/admin/listings/<%= l.id %>/status" class="inline-form">
+                    <input type="hidden" name="status" value="draft">
+                    <button class="btn btn--secondary btn--sm" type="submit">Send back</button>
+                  </form>
+                </td>
+              </tr>
+            <% }); %>
+          </tbody>
+        </table>
+        <p class="note-inline mb-0">
+          “Approve” publishes with the grade the listing already has. To set or change a
+          grade first, <a href="/admin/listings">open the moderation queue</a>.
+        </p>
+
+      <% } else if (section.key === 'payments') { %>
+        <table class="table">
+          <thead>
+            <tr>
+              <th scope="col">Reference</th>
+              <th scope="col">Amount</th>
+              <th scope="col">Customer</th>
+              <th scope="col">Recorded</th>
+              <th scope="col">Decision</th>
+            </tr>
+          </thead>
+          <tbody>
+            <% section.items.forEach(function (pay) { %>
+              <tr>
+                <td class="tabular"><%= pay.reference %></td>
+                <td class="tabular"><%= helpers.formatNaira(pay.amountKobo) %></td>
+                <td><%= pay.customerName || '—' %></td>
+                <td class="tabular"><%= helpers.relativeDays(pay.createdAt) %></td>
+                <td>
+                  <form method="post" action="/admin/payments/<%= pay.id %>/confirm" class="inline-form">
+                    <button class="btn btn--primary btn--sm" type="submit">Confirm received</button>
+                  </form>
+                </td>
+              </tr>
+            <% }); %>
+          </tbody>
+        </table>
+        <p class="note-inline mb-0">
+          Confirm only once the money has actually landed — this marks it paid and
+          queues the receipt for the customer.
+        </p>
+      <% } %>
+    </section>
+  <% }); %>
+<% } %>

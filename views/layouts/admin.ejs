@@ -35,6 +35,7 @@
           <a class="admin-bar__link<%= admin.active === item.href ? ' is-current' : '' %>"
              href="<%= item.href %>" <%= admin.active === item.href ? 'aria-current="page"' : '' %>>
             <%- helpers.icon(item.icon, { size: 18 }) %><span><%= item.label %></span>
+            <% if (item.count) { %><span class="admin-bar__badge" title="<%= item.count %> waiting"><%= item.count %></span><% } %>
           </a>
         <% }); %>
       </nav>
