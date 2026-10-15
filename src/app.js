@@ -114,7 +114,13 @@ function createApp() {
           res.set('Cache-Control', 'public, max-age=2592000, stale-while-revalidate=86400');
         }
         if (/\.(css|js)$/.test(filePath)) {
-          res.set('Cache-Control', 'public, max-age=3600, stale-while-revalidate=86400');
+          // Code changes under the SAME name on every deploy, and the service
+          // worker's fetch() honours the HTTP cache: a long max-age let a prior
+          // stylesheet (a previous font) be re-served for up to a day, "fixed"
+          // on the server but stale on the browser. no-cache revalidates every
+          // time (ETag → 304 keeps it cheap) so a deploy can never be outrun;
+          // the worker's own versioned shell cache still makes repeat loads fast.
+          res.set('Cache-Control', 'no-cache, must-revalidate');
         }
       },
       index: false,
