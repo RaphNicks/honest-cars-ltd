@@ -103,9 +103,14 @@
 
       <div class="admin-grid admin-grid--2 mt-2">
         <div class="field">
-          <label class="field__label" for="f-hero">Hero image path</label>
+          <label class="field__label" for="f-hero-file">Hero image</label>
+          <input type="file" id="f-hero-file" accept="image/jpeg,image/png,image/webp">
+          <p class="cms-hint">Pick a photo from your device, or type a link below — JPEG, PNG or WebP, up to 8 MB.</p>
           <input class="input" id="f-hero" name="hero_image" type="text" maxlength="400"
-                 value="<%= post ? post.heroImage : '/img/seed/hero-lot.svg' %>">
+                 value="<%= post ? post.heroImage : '/img/seed/hero-lot.svg' %>"
+                 placeholder="/img/… or /uploads/photos/…">
+          <img id="f-hero-preview" class="hero-preview" alt="Hero image preview" hidden>
+          <span id="f-hero-status" class="cms-hint" role="status" aria-live="polite"></span>
         </div>
         <div class="field">
           <label class="field__label" for="f-hero-alt">Hero alt text</label>

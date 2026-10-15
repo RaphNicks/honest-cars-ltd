@@ -738,6 +738,7 @@ body.admin {
   .cms-layout { grid-template-columns: minmax(0, 1fr) 380px; align-items: start; }
 }
 .cms-body { min-height: 520px; font-size: var(--text-14); line-height: 1.7; }
+.hero-preview { display: block; max-width: 100%; max-height: 220px; margin: var(--space-2, 12px) 0 var(--space-1, 8px); border: 1px solid var(--line, var(--color-border)); border-radius: 8px; object-fit: cover; }
 .cms-rules { list-style: none; padding: 0; margin: 0; font-size: var(--text-14); }
 .cms-rules li { padding: 6px 0; border-bottom: 1px solid var(--line, var(--color-border)); }
 .cms-rules li:last-child { border-bottom: 0; }

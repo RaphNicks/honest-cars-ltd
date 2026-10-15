@@ -126,7 +126,7 @@ test('the precache list covers the whole shell and every entry ships', () => {
   // alone is 33 kB that no visitor should pay for at install time. They still
   // reach the runtime cache if an admin opens one, and the exclusion is listed
   // here so a renamed file cannot hide behind it.
-  const CONSOLE_ONLY = new Set(['/css/admin.css', '/js/admin.js', '/js/dealer.js', '/js/shot-upload.js']);
+  const CONSOLE_ONLY = new Set(['/css/admin.css', '/js/admin.js', '/js/dealer.js', '/js/shot-upload.js', '/js/cms-hero-upload.js']);
 
   const css = fs.readdirSync(path.join(PUBLIC, 'css')).filter((f) => f.endsWith('.css'));
   for (const file of css) {
