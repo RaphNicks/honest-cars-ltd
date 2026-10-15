@@ -87,6 +87,30 @@ async function beginEnrolment(user) {
 }
 
 /**
+ * The secret to SHOW on the ?setup=1 screen. This reuses the account's current
+ * pending secret instead of minting a fresh one on every page load. A QR that
+ * silently re-rolls when the page reloads is a live bug: the person scans the
+ * old secret, the page reloads, the database now holds a new secret, and every
+ * code the phone produces (for the old secret) is rejected. Reusing the pending
+ * secret keeps the scanned code valid until it is confirmed; an explicit
+ * "start again" (POST /begin) is the only thing that rolls a new secret.
+ */
+async function currentSetup(user) {
+  const state = await db.mfa.state(user.id);
+  const pending = state && state.pending ? await db.mfa.secretFor(user.id) : null;
+  const reuse = Boolean(pending && pending.secret);
+  const secret = reuse ? pending.secret : totp.generateSecret();
+  if (!reuse) await db.mfa.beginEnrolment(user.id, secret);
+  return {
+    ok: true,
+    secret,
+    formatted: totp.formatSecret(secret),
+    account: user.phone,
+    uri: totp.otpauthUrl({ secret, account: user.phone, issuer: ISSUER }),
+  };
+}
+
+/**
  * Step two: prove a code from the pending secret. On success the caller also
  * revokes the account's other sessions — a factor that is switched on while
  * three logged-in devices stay logged in protects nothing.
@@ -251,6 +275,7 @@ module.exports = {
   view,
   coverage,
   beginEnrolment,
+  currentSetup,
   confirmEnrolment,
   disable,
   regenerateRecoveryCodes,

@@ -2970,7 +2970,9 @@ router.get('/security', auth.requireStaff('staff.security'), async (req, res, ne
         ...view,
         coverage: roles.can(req.user.role, 'users.manage') ? await mfaService.coverage() : null,
         roleLabels: roles.ROLE_LABELS,
-        setup: req.query.setup === '1' ? await mfaService.beginEnrolment(req.user) : null,
+        // Reuse the pending secret on every load (see mfa.currentSetup) — the
+        // secret on the screen must not re-roll underneath a person mid-setup.
+        setup: req.query.setup === '1' ? await mfaService.currentSetup(req.user) : null,
         issuer: mfaService.ISSUER,
       },
     });

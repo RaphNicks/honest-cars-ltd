@@ -333,6 +333,28 @@ maybe('the setup screen shows a key to type, and never a QR code', async () => {
   assert.ok(!/<img[^>]+(qr|chart)/i.test(page.text), 'no QR image anywhere');
 });
 
+maybe('reloading the setup screen reuses the pending secret (no re-roll)', async () => {
+  const user = await makeUser('admin', 'Stable setup');
+  const { client } = await signIn(user);
+  // A fresh begin mints a secret; the ?setup=1 screen must keep showing it —
+  // re-rolling it on every load is exactly why a just-scanned code got rejected.
+  assert.equal((await client.form('/admin/security/begin', {})).status, 303);
+
+  const first = (await db.mfa.secretFor(user.id)).secret;
+  const a = await client.request('/admin/security?setup=1');
+  const b = await client.request('/admin/security?setup=1');
+  const second = (await db.mfa.secretFor(user.id)).secret;
+
+  assert.equal(a.status, 200);
+  assert.equal(b.status, 200);
+  assert.equal(second, first, 'reloading ?setup=1 must not re-roll the pending secret');
+
+  // And a code from that secret still confirms — the point of the fix.
+  const result = await mfa.confirmEnrolment(user, totp.code(first));
+  assert.equal(result.ok, true, result.error);
+  assert.equal((await db.mfa.state(user.id)).enrolled, true);
+});
+
 // ---------------------------------------------------------------------------
 // 4. Recovery codes
 // ---------------------------------------------------------------------------
