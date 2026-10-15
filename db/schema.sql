@@ -102,6 +102,41 @@ CREATE TABLE IF NOT EXISTS dealers (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ---------------------------------------------------------------------------
+-- dealer_applications — the self-serve "become a partner" pipeline (035).
+-- `new` = an account applying to open a lot; `update` = a partner proposing a
+-- change to their existing lot (dealer_id). The console reviews and approves.
+-- See db/migrations/035-dealer-applications.sql.
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS `dealer_applications` (
+  id             INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  user_id        INT UNSIGNED NOT NULL,
+  type           ENUM('new','update') NOT NULL DEFAULT 'new',
+  dealer_id      INT UNSIGNED NULL,
+  lot_name       VARCHAR(160) NOT NULL,
+  city           VARCHAR(80)  NOT NULL DEFAULT 'Port Harcourt',
+  lot_area       VARCHAR(80)  NOT NULL,
+  tier           ENUM('pilot','standard','premium') NOT NULL DEFAULT 'standard',
+  commission_pct DECIMAL(4,2) NULL,
+  contact_name   VARCHAR(120) NULL,
+  phone          VARCHAR(40)  NULL,
+  email          VARCHAR(160) NULL,
+  website        VARCHAR(300) NULL,
+  notes          VARCHAR(400) NULL,
+  status         ENUM('pending','approved','declined') NOT NULL DEFAULT 'pending',
+  reviewed_by    INT UNSIGNED NULL,
+  reviewed_at    DATETIME NULL,
+  decline_reason VARCHAR(400) NULL,
+  created_at     TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at     TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  KEY idx_applications_status (status, created_at),
+  KEY idx_applications_user (user_id, created_at),
+  CONSTRAINT fk_application_user     FOREIGN KEY (user_id)     REFERENCES `users` (id) ON DELETE CASCADE,
+  CONSTRAINT fk_application_dealer   FOREIGN KEY (dealer_id)   REFERENCES `dealers` (id) ON DELETE CASCADE,
+  CONSTRAINT fk_application_reviewer FOREIGN KEY (reviewed_by) REFERENCES `users` (id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ---------------------------------------------------------------------------
 -- price_bands — market price intelligence per make/model/year/condition.
 -- Drives the price-position indicator and the valuation band (§3.5, §7.3).
 -- ---------------------------------------------------------------------------

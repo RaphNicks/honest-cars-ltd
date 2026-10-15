@@ -19,6 +19,14 @@ const { parseJson } = require('./shape');
 
 const LIVE = "('live','reserved')";
 
+/**
+ * Partner tiers and the commission rate each defaults to when an application
+ * is approved. The approver always sees and can override the rate, so these are
+ * just the starting numbers: higher tier = more curation = a higher rate.
+ */
+const TIERS = ['pilot', 'standard', 'premium'];
+const DEFAULT_COMMISSION_BY_TIER = { pilot: 3, standard: 5, premium: 8 };
+
 /** Statuses a dealer may move a listing between, and who does the moving. */
 const DEALER_STATUS_RULES = {
   draft: { in_review: 'in_review', label: 'Submit for review' },
@@ -687,10 +695,185 @@ async function unlinkUser(dealerId) {
   return { ok: true };
 }
 
+// ---------------------------------------------------------------------------
+// Partner onboarding — lots and the "become a partner" application pipeline
+// ---------------------------------------------------------------------------
+
+function lotTier(value) {
+  return TIERS.includes(value) ? value : 'standard';
+}
+
+/** A unique slug for a lot, derived from its name ("woji-auto-park", +2, …). */
+async function uniqueLotSlug(name) {
+  const root = slugify(String(name || '').trim()) || 'lot';
+  let slug = root;
+  for (let i = 2; ; i += 1) {
+    const clash = await queryOne('SELECT id FROM dealers WHERE slug = ? LIMIT 1', [slug]);
+    if (!clash) return slug;
+    slug = `${root}-${i}`;
+  }
+}
+
+/**
+ * Create a partner lot. Used when ops adds one by hand and when a "become a
+ * partner" application is approved. `userId`, when given, is the account the
+ * lot is linked to (one account runs one lot).
+ */
+async function createLot(input, { actorId = null } = {}) {
+  const name = String(input.name || '').trim();
+  if (!name) return { ok: false, error: 'A lot needs a name.' };
+  const slug = await uniqueLotSlug(name);
+  const tier = lotTier(input.tier);
+  const commission =
+    input.commissionPct === null || input.commissionPct === undefined || input.commissionPct === ''
+      ? null
+      : Number(input.commissionPct);
+  const result = await query(
+    `INSERT INTO dealers
+       (name, slug, lot_area, city, tier, verified, user_id, agreement_signed, agreement_ref, agreement_url, commission_pct)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [
+      name,
+      slug,
+      String(input.lotArea || '').trim() || name,
+      String(input.city || 'Port Harcourt').trim() || 'Port Harcourt',
+      tier,
+      input.verified ? 1 : 0,
+      input.userId || null,
+      input.agreementSigned || null,
+      input.agreementRef || null,
+      input.agreementUrl || null,
+      commission,
+    ],
+  );
+  return { ok: true, id: result.insertId, slug, tier, commissionPct: commission };
+}
+
+/**
+ * Edit a lot's details. Undefined fields are left untouched, so a partial form
+ * never blanks out what it does not touch. Returns the updated lot.
+ */
+async function updateLot(id, input = {}) {
+  const before = await byId(id);
+  if (!before) return { ok: false, error: 'That lot does not exist.' };
+  const name = String(input.name ?? before.name).trim() || before.name;
+  const lotArea = String(input.lotArea ?? before.lotArea).trim() || before.lotArea;
+  const city = String(input.city ?? before.city).trim() || before.city;
+  const tier = lotTier(input.tier === undefined ? before.tier : input.tier);
+  const verified = input.verified === undefined ? before.verified : Boolean(input.verified);
+  const agreementSigned =
+    input.agreementSigned === undefined ? before.agreementSigned || null : input.agreementSigned || null;
+  const agreementRef = input.agreementRef === undefined ? before.agreementRef || null : input.agreementRef || null;
+  const agreementUrl = input.agreementUrl === undefined ? before.agreementUrl || null : input.agreementUrl || null;
+  const commission =
+    input.commissionPct === undefined
+      ? before.commissionPct
+      : input.commissionPct === null || input.commissionPct === ''
+        ? null
+        : Number(input.commissionPct);
+  await query(
+    `UPDATE dealers
+        SET name = ?, lot_area = ?, city = ?, tier = ?, verified = ?,
+            agreement_signed = ?, agreement_ref = ?, agreement_url = ?, commission_pct = ?
+      WHERE id = ?`,
+    [name, lotArea, city, tier, verified ? 1 : 0, agreementSigned, agreementRef, agreementUrl, commission, id],
+  );
+  return { ok: true, id, lot: await byId(id) };
+}
+
+const APPLICATION_TYPES = ['new', 'update'];
+const APPLICATION_STATUSES = ['pending', 'approved', 'declined'];
+
+const APPLICATION_SELECT = `
+  SELECT a.*, u.name AS account_name, u.phone AS account_phone, u.email AS account_email,
+         d.name AS current_lot_name
+    FROM dealer_applications a
+    LEFT JOIN \`users\` u ON u.id = a.user_id
+    LEFT JOIN dealers d ON d.id = a.dealer_id`;
+
+/** File a "become a partner" (new) or "my lot" (update) application. */
+async function createApplication(input, { actorId = null } = {}) {
+  const type = APPLICATION_TYPES.includes(input.type) ? input.type : 'new';
+  const lotName = String(input.lotName || '').trim();
+  if (!input.userId) return { ok: false, error: 'An application needs an account.' };
+  if (!lotName) return { ok: false, error: 'A lot needs a name.' };
+  const result = await query(
+    `INSERT INTO dealer_applications
+       (user_id, type, dealer_id, lot_name, city, lot_area, tier, contact_name, phone, email, website, notes, status)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending')`,
+    [
+      input.userId,
+      type,
+      type === 'update' ? input.dealerId || null : null,
+      lotName,
+      String(input.city || 'Port Harcourt').trim() || 'Port Harcourt',
+      String(input.lotArea || '').trim() || lotName,
+      lotTier(input.tier),
+      input.contactName || null,
+      input.phone || null,
+      input.email || null,
+      input.website || null,
+      input.notes || null,
+    ],
+  );
+  return { ok: true, id: result.insertId, type };
+}
+
+async function applicationById(id) {
+  const row = await queryOne(`${APPLICATION_SELECT} WHERE a.id = ? LIMIT 1`, [id]);
+  return row || null;
+}
+
+async function listApplications({ status = null, type = null, limit = 100 } = {}) {
+  const where = [];
+  const params = [];
+  if (status && APPLICATION_STATUSES.includes(status)) { where.push('a.status = ?'); params.push(status); }
+  if (type && APPLICATION_TYPES.includes(type)) { where.push('a.type = ?'); params.push(type); }
+  const whereSql = where.length ? `WHERE ${where.join(' AND ')}` : '';
+  const lim = Math.max(1, Math.min(200, Number(limit) || 100));
+  return query(
+    `${APPLICATION_SELECT} ${whereSql}
+     ORDER BY FIELD(a.status, 'pending', 'approved', 'declined'), a.created_at DESC
+     LIMIT ?`,
+    [...params, lim],
+  );
+}
+
+/** How many are still pending — feeds the console's Applications nav badge. */
+async function pendingApplicationCount() {
+  const row = await queryOne('SELECT COUNT(*) AS n FROM dealer_applications WHERE status = ?', ['pending']);
+  return Number(row && row.n) || 0;
+}
+
+/** Record the decision on an application (approved/declined), with who and why. */
+async function markApplication(id, status, { actorId = null, declineReason = null, commissionPct = null } = {}) {
+  if (!APPLICATION_STATUSES.includes(status)) return { ok: false, error: 'Unknown application status.' };
+  const row = await queryOne('SELECT id FROM dealer_applications WHERE id = ?', [id]);
+  if (!row) return { ok: false, error: 'That application does not exist.' };
+  await query(
+    `UPDATE dealer_applications
+        SET status = ?, reviewed_by = ?, reviewed_at = ?, decline_reason = ?, commission_pct = ?
+      WHERE id = ?`,
+    [status, actorId, new Date().toISOString(), declineReason, commissionPct, id],
+  );
+  return { ok: true, id, status };
+}
+
 module.exports = {
   LIVE,
   DEALER_STATUS_RULES,
   DEALER_LEAD_STATUSES,
+  TIERS,
+  DEFAULT_COMMISSION_BY_TIER,
+  APPLICATION_TYPES,
+  APPLICATION_STATUSES,
+  createLot,
+  updateLot,
+  createApplication,
+  applicationById,
+  listApplications,
+  pendingApplicationCount,
+  markApplication,
   shapeDealer,
   shapeDealerListing,
   forUser,
