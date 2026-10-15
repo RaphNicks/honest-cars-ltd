@@ -1,0 +1,100 @@
+<%#
+  /dealer/lot — a partner proposes changes to the lot they run (§7.2).
+
+  Read the way the profile reads, but editable in one important sense: the form
+  does not write to the live lot. It files an "update" application that the desk
+  reviews and approves (or declines) in the console, then emails the outcome.
+  Commission and the signed agreement are still changed by the desk only.
+
+  Locals: lot, pendingUpdate, tierOptions   (+ user, ok, error via the layout)
+%>
+
+<% if (pendingUpdate) { %>
+  <section class="panel">
+    <div class="panel__head">
+      <h2 class="panel__title">A change is waiting for review</h2>
+      <span class="badge badge--attention">Pending</span>
+    </div>
+    <p class="mb-1">
+      You proposed: <strong><%= pendingUpdate.lot_name %></strong> ·
+      <%= pendingUpdate.city %> · <%= pendingUpdate.lot_area %>
+      <% if (pendingUpdate.tier) { %> · <%= pendingUpdate.tier %><% } %>.
+    </p>
+    <p class="muted mb-0">
+      We will apply it — or tell you why not — and email you either way. Once it's handled you can
+      propose another change.
+    </p>
+  </section>
+<% } %>
+
+<section class="panel<%= pendingUpdate ? ' mt-3' : '' %>">
+  <div class="panel__head">
+    <h2 class="panel__title">Change my lot</h2>
+    <span class="cms-hint">Reviewed by the desk, not applied instantly</span>
+  </div>
+
+  <p class="muted">
+    Change your lot name, tier, area or contact details. Nothing here goes live the moment you send
+    it — the Honest Cars desk reviews it first and emails you the outcome. Your commission and the
+    signed agreement are changed by the desk, not in this form.
+  </p>
+
+  <form method="post" action="/dealer/lot" class="mt-2">
+    <div class="field">
+      <label class="field__label" for="lot-name">Lot name</label>
+      <input class="input" id="lot-name" name="lotName" type="text" maxlength="160" required value="<%= lot.name %>">
+    </div>
+
+    <div class="admin-grid admin-grid--2">
+      <div class="field">
+        <label class="field__label" for="lot-tier">Tier</label>
+        <select class="select" id="lot-tier" name="tier">
+          <% tierOptions.forEach(function (t) { %>
+            <option value="<%= t.value %>"<%= t.value === lot.tier ? ' selected' : '' %>><%= t.label %></option>
+          <% }); %>
+        </select>
+      </div>
+      <div class="field">
+        <label class="field__label" for="lot-city">City</label>
+        <input class="input" id="lot-city" name="city" type="text" maxlength="80" value="<%= lot.city %>">
+      </div>
+    </div>
+
+    <div class="field">
+      <label class="field__label" for="lot-area">Lot area</label>
+      <input class="input" id="lot-area" name="lotArea" type="text" maxlength="80" value="<%= lot.lotArea %>">
+      <span class="field__hint">The neighbourhood buyers and the desk will see.</span>
+    </div>
+
+    <div class="admin-grid admin-grid--2">
+      <div class="field">
+        <label class="field__label" for="lot-contact">Contact name</label>
+        <input class="input" id="lot-contact" name="contactName" type="text" maxlength="120" value="<%= user.name %>">
+      </div>
+      <div class="field">
+        <label class="field__label" for="lot-phone">Phone / WhatsApp</label>
+        <input class="input" id="lot-phone" name="phone" type="tel" inputmode="tel" maxlength="40" value="<%= user.phone %>">
+      </div>
+    </div>
+
+    <div class="admin-grid admin-grid--2">
+      <div class="field">
+        <label class="field__label" for="lot-email">Email</label>
+        <input class="input" id="lot-email" name="email" type="email" maxlength="160" value="<%= user.email %>">
+        <span class="field__hint">We send the review outcome here.</span>
+      </div>
+      <div class="field">
+        <label class="field__label" for="lot-website">Website (optional)</label>
+        <input class="input" id="lot-website" name="website" type="text" maxlength="300" placeholder="https://">
+      </div>
+    </div>
+
+    <div class="field">
+      <label class="field__label" for="lot-notes">Why the change? (helps it get reviewed faster)</label>
+      <textarea class="textarea" id="lot-notes" name="notes" rows="3" maxlength="400"
+                placeholder="e.g. we moved to a new area, or renamed the lot."></textarea>
+    </div>
+
+    <button class="btn btn--primary btn--sm" type="submit">Send for review</button>
+  </form>
+</section>

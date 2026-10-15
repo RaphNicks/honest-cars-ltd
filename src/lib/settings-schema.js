@@ -66,6 +66,11 @@ const CHANNEL_TEMPLATES = {
   addon_paid: null,
   referral_qualified: null,
   referral_reward_approved: null,
+  // §7.2 — partner onboarding decisions go to the applicant; follow the general
+  // channel (email in production).
+  partner_approved: null,
+  partner_declined: null,
+  partner_lot_updated: null,
 };
 
 const CHANNELS = [
@@ -104,6 +109,9 @@ const TEMPLATE_LABELS = {
   hire_confirmed: 'Hire confirmed',
   hire_completed: 'Hire closed',
   addon_paid: 'Dealer add-on live',
+  partner_approved: 'Partner approved',
+  partner_declined: 'Partner application declined',
+  partner_lot_updated: 'Partner lot updated',
 };
 
 /**

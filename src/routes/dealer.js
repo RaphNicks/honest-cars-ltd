@@ -63,8 +63,16 @@ const PATHS = {
   statements: `${HOME}/billing/statements`,
   addons: `${HOME}/addons`,
   profile: `${HOME}/profile`,
+  lot: `${HOME}/lot`,
   imports: `${HOME}/imports`,
 };
+
+/** The three partner tiers, shown to a partner editing their own lot. */
+const TIER_OPTIONS = [
+  { value: 'pilot', label: 'Pilot' },
+  { value: 'standard', label: 'Standard' },
+  { value: 'premium', label: 'Premium' },
+];
 
 const NAV = [
   { href: PATHS.dashboard, label: 'Dashboard', icon: 'chart' },
@@ -76,6 +84,7 @@ const NAV = [
   { href: PATHS.addons, label: 'Add-ons', icon: 'plus' },
   { href: PATHS.imports, label: 'Import', icon: 'package' },
   { href: PATHS.profile, label: 'Profile', icon: 'store' },
+  { href: PATHS.lot, label: 'My lot', icon: 'cog' },
 ];
 
 /** §7.2 guided shot list — the wizard asks for these in this order. */
@@ -565,6 +574,70 @@ router.post('/leads/:id', requireDealer, auth.sameOriginOnly, async (req, res, n
       new: 'Back in the inbox.',
     };
     return done(res, PATHS.leads, messages[status] || 'Lead updated.');
+  } catch (error) {
+    return next(error);
+  }
+});
+
+// ---------------------------------------------------------------------------
+// My lot — a partner proposes changes to the lot they run (§7.2). The change is
+// not applied directly; it files an "update" application the desk reviews and
+// approves (or declines) in the console's Applications queue. That keeps a
+// partner's own edits and a new-partner application on separate paths, and both
+// land on a human rather than a write to the live lot.
+// ---------------------------------------------------------------------------
+router.get('/lot', requireDealer, async (req, res, next) => {
+  try {
+    const pending =
+      (await dealers.listApplications({ status: 'pending', type: 'update', limit: 25 })).find(
+        (a) => Number(a.dealer_id) === Number(req.lot.id),
+      ) || null;
+    return await page(req, res, {
+      view: 'dealer/lot',
+      active: PATHS.lot,
+      title: 'My lot',
+      description:
+        'Change your lot details. Your change goes to the Honest Cars desk for a quick review before it goes live.',
+      data: { pendingUpdate: pending, tierOptions: TIER_OPTIONS },
+    });
+  } catch (error) {
+    return next(error);
+  }
+});
+
+router.post('/lot', requireDealer, auth.sameOriginOnly, async (req, res, next) => {
+  try {
+    const alreadyPending = (await dealers.listApplications({ status: 'pending', type: 'update', limit: 25 })).some(
+      (a) => Number(a.dealer_id) === Number(req.lot.id),
+    );
+    if (alreadyPending) {
+      return done(
+        res,
+        PATHS.lot,
+        'You already have a change waiting for review. We will apply it — or tell you why not — before you send another.',
+        { error: true },
+      );
+    }
+    const b = req.body;
+    const result = await dealers.createApplication(
+      {
+        userId: req.user.id,
+        type: 'update',
+        dealerId: req.lot.id,
+        lotName: b.lotName,
+        city: b.city,
+        lotArea: b.lotArea,
+        tier: b.tier,
+        contactName: b.contactName,
+        phone: b.phone,
+        email: b.email,
+        website: b.website,
+        notes: b.notes,
+      },
+      { actorId: req.user.id },
+    );
+    if (!result.ok) return done(res, PATHS.lot, result.error, { error: true });
+    return done(res, PATHS.lot, 'Sent. The Honest Cars desk will review the change, apply it, and email you the outcome.');
   } catch (error) {
     return next(error);
   }

@@ -29,6 +29,7 @@ const { router: accountRoutes } = require('./routes/account');
 const { router: adminRoutes } = require('./routes/admin');
 const { router: adminCmsRoutes } = require('./routes/admin-cms');
 const { router: dealerRoutes } = require('./routes/dealer');
+const { router: partnerRoutes } = require('./routes/partners');
 const auth = require('./services/auth');
 const publish = require('./services/publish');
 const og = require('./services/og');
@@ -202,6 +203,7 @@ function createApp() {
   app.use('/blog', blogRoutes);
   app.use('/', shopRoutes);
   app.use('/', financingRoutes); // FR-34 — /financing, before the generic page routes
+  app.use('/', partnerRoutes); // §7.2 — /become-a-partner, before the generic page routes
   app.use('/', pageRoutes);
   app.use('/', publicRoutes);
 

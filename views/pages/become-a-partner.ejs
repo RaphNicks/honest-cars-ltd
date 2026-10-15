@@ -1,0 +1,142 @@
+<%#
+  /become-a-partner — §7.2 self-serve "become a partner".
+
+  A signed-in account (a customer, by definition — staff and existing partners
+  are diverted elsewhere) applies to open a partner lot. A person in the
+  console's Applications queue reviews it and approves (which opens the lot and
+  makes them a dealer) or declines with a reason. The email fields are prefilled
+  from the account but editable.
+
+  Locals: account { name, phone, email }, tierOptions, ok, err
+%>
+<section class="page-hero">
+  <div class="container">
+    <%- include('../partials/breadcrumbs', { crumbs: [{ label: 'Home', href: '/' }, { label: 'Become a partner', href: '/become-a-partner' }] }) %>
+    <p class="eyebrow">Partner with us</p>
+    <h1>List your cars on Honest Cars</h1>
+    <p class="lead">
+      Tell us about your lot below. A person — not a bot — reviews the application, and if it's a
+      fit we open your lot, set your commission and show you how to start listing.
+    </p>
+  </div>
+</section>
+
+<section class="section">
+  <div class="container container--narrow">
+    <% if (ok) { %>
+      <p class="auth-message auth-message--banner mt-2" data-state="ok" role="status"><%= ok %></p>
+    <% } %>
+    <% if (err) { %>
+      <p class="auth-message auth-message--banner mt-2" data-state="error" role="alert"><%= err %></p>
+    <% } %>
+
+    <form class="card card__body service-form" method="post" action="/become-a-partner" novalidate>
+      <h2 class="mb-1">Your lot</h2>
+      <% if (account.name || account.email) { %>
+        <p class="form-hint mb-3">
+          You're applying as <strong><%= account.name || 'this account' %></strong><% if (account.email) { %>
+          · <%= account.email %><% } %>. A partner lot is linked to one account.
+        </p>
+      <% } %>
+
+      <div class="field">
+        <label class="field__label" for="bp-lot-name">Lot name</label>
+        <input class="input" id="bp-lot-name" name="lotName" type="text" maxlength="160" required
+               placeholder="e.g. Woji Auto Park">
+        <span class="field__hint">This is the name buyers and the desk will see.</span>
+      </div>
+
+      <div class="field">
+        <label class="field__label" for="bp-tier">Which fits best?</label>
+        <select class="select" id="bp-tier" name="tier">
+          <% tierOptions.forEach(function (t) { %>
+            <option value="<%= t.value %>"<%= t.value === 'standard' ? ' selected' : '' %>><%= t.label %></option>
+          <% }); %>
+        </select>
+        <span class="field__hint">
+          Pilot is a small curated lot, Standard a regular dealer lot, Premium high-volume. You can
+          move between tiers later — it's not a test.
+        </span>
+      </div>
+
+      <div class="form-grid">
+        <div class="field">
+          <label class="field__label" for="bp-city">City</label>
+          <input class="input" id="bp-city" name="city" type="text" maxlength="80" value="Port Harcourt">
+        </div>
+        <div class="field">
+          <label class="field__label" for="bp-area">Lot area</label>
+          <input class="input" id="bp-area" name="lotArea" type="text" maxlength="80"
+                 placeholder="e.g. GRA, Port Harcourt">
+        </div>
+      </div>
+
+      <div class="form-grid">
+        <div class="field">
+          <label class="field__label" for="bp-contact">Contact name</label>
+          <input class="input" id="bp-contact" name="contactName" type="text" maxlength="120"
+                 autocomplete="name" value="<%= account.name %>">
+        </div>
+        <div class="field">
+          <label class="field__label" for="bp-phone">Phone / WhatsApp</label>
+          <input class="input" id="bp-phone" name="phone" type="tel" inputmode="tel" maxlength="40"
+                 autocomplete="tel" value="<%= account.phone %>">
+        </div>
+      </div>
+
+      <div class="field">
+        <label class="field__label" for="bp-email">Email</label>
+        <input class="input" id="bp-email" name="email" type="email" maxlength="160"
+               autocomplete="email" value="<%= account.email %>">
+        <span class="field__hint">We send the decision here.</span>
+      </div>
+
+      <div class="field">
+        <label class="field__label" for="bp-website">Website (optional)</label>
+        <input class="input" id="bp-website" name="website" type="text" maxlength="300"
+               placeholder="https://">
+      </div>
+
+      <div class="field">
+        <label class="field__label" for="bp-notes">Anything we should know?</label>
+        <textarea class="textarea" id="bp-notes" name="notes" rows="4" maxlength="400"
+                  placeholder="Roughly how many cars, where the lot is, how you'd like to work with us."></textarea>
+      </div>
+
+      <button class="btn btn--primary btn--lg btn--block" type="submit">Send application</button>
+      <p class="field__hint mb-0">
+        Nothing here lists a car or charges you. It opens a review — we reply with a yes, or a no
+        with the reason.
+      </p>
+    </form>
+  </div>
+</section>
+
+<section class="section section--surface">
+  <div class="container">
+    <div class="section-head"><h2>What happens next</h2></div>
+    <div class="steps">
+      <div class="step">
+        <span class="step__num" aria-hidden="true">1</span>
+        <div>
+          <strong>You apply</strong>
+          <p>The lot details above, sent to the Honest Cars desk. You can correct anything with a reply.</p>
+        </div>
+      </div>
+      <div class="step">
+        <span class="step__num" aria-hidden="true">2</span>
+        <div>
+          <strong>A person reviews it</strong>
+          <p>We check the fit — area, stock, and how you'll keep the cars honest. We reply either way.</p>
+        </div>
+      </div>
+      <div class="step">
+        <span class="step__num" aria-hidden="true">3</span>
+        <div>
+          <strong>You're a partner</strong>
+          <p>Your lot is opened, your commission set, and the portal shows you how to add your first car.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>

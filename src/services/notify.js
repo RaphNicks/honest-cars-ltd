@@ -89,6 +89,15 @@ const TEMPLATES = {
     `Your financing enquiry ${reference}: ${status}${note ? ` (${note})` : ''} If anything there is unclear, reply here and a human will answer.`,
   hire_completed: ({ reference, amount, deposit }) =>
     `Hire ${reference} is closed. Your invoice is in your account at honestcarsltd.com/account${amount ? ` — ${amount} was paid on it` : ''}.${deposit ? ` The deposit of ${deposit} is released back to you; it can take up to 5 working days.` : ''}`,
+  // §7.2 — partner onboarding. These go to the person who applied, and the
+  // wording is the point: an approval says exactly what is now open and where,
+  // a decline says plainly that it was a human decision and — when given — why.
+  partner_approved: ({ lot, tierLabel, commission, portal }) =>
+    `Welcome to Honest Cars — ${lot} is now a partner lot, linked to this account. Open your partner portal at ${portal} to start listing cars. Your tier is ${tierLabel}${commission ? `, at ${commission}% commission on the cars you sell through us` : ''}. Nothing to do but list.`,
+  partner_declined: ({ lot, reason }) =>
+    `Thanks for applying to partner with Honest Cars${lot ? ` as ${lot}` : ''}. After review we're not able to take it on this time${reason ? ` — ${reason}` : ''}. If your situation changes, reply here and a human will take another look.`,
+  partner_lot_updated: ({ lot }) =>
+    `Your partner lot ${lot ? `“${lot}”` : ''} has been updated as you proposed. If anything looks off, reply here and a human will fix it right away.`,
 };
 
 function render(template, values = {}) {

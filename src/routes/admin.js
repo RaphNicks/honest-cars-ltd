@@ -76,6 +76,7 @@ const PATHS = {
   alerts: `${HOME}/alerts`,
   subscriptions: `${HOME}/subscriptions`,
   dealers: `${HOME}/dealers`,
+  applications: `${HOME}/dealers/applications`,
   hire: `${HOME}/hire`,
   intel: `${HOME}/intel`,
   reports: `${HOME}/reports`,
@@ -105,6 +106,7 @@ const NAV = [
   { href: PATHS.alerts, label: 'Alerts', icon: 'bell', capability: 'intel.manage' },
   { href: PATHS.subscriptions, label: 'Subscriptions', icon: 'repeat', capability: 'payments.view' },
   { href: PATHS.dealers, label: 'Dealers', icon: 'store', capability: 'dealers.view' },
+  { href: PATHS.applications, label: 'Applications', icon: 'inbox', capability: 'dealers.view' },
   { href: PATHS.hire, label: 'Hire', icon: 'car', capability: 'hire.view' },
   { href: PATHS.intel, label: 'Price intel', icon: 'gauge', capability: 'pricing.view' },
   { href: PATHS.reports, label: 'Reports', icon: 'fileCheck', capability: 'reports.view' },
@@ -185,24 +187,39 @@ function checklistFrom(body, grade) {
  * small COUNT query, run only for roles that can act on at least one section.
  * Never throws: a count failure means "no badge", never a broken page.
  */
+// Attaches waiting-work counts to the nav items that have them: the Actions
+// queue (posts, listings and payments still on a human) and the partner
+// Applications queue (applications awaiting review).
 async function withActionsCount(user, nav) {
   const can = (cap) => roles.can(user.role, cap);
-  if (!can('cms.manage') && !can('listings.moderate') && !can('payments.approve')) return nav;
-  let total = 0;
-  try {
-    const row = await db.queryOne(
-      `SELECT
-         (SELECT COUNT(*) FROM blog_posts WHERE status = 'in_review') AS posts,
-         (SELECT COUNT(*) FROM vehicle_listings WHERE status = 'in_review') AS listings,
-         (SELECT COUNT(*) FROM payments WHERE status = 'pending') AS payments`,
-    );
-    if (can('cms.manage')) total += Number(row.posts) || 0;
-    if (can('listings.moderate')) total += Number(row.listings) || 0;
-    if (can('payments.approve')) total += Number(row.payments) || 0;
-  } catch {
-    return nav;
+  let result = nav;
+  if (can('cms.manage') || can('listings.moderate') || can('payments.approve')) {
+    let total = 0;
+    try {
+      const row = await db.queryOne(
+        `SELECT
+           (SELECT COUNT(*) FROM blog_posts WHERE status = 'in_review') AS posts,
+           (SELECT COUNT(*) FROM vehicle_listings WHERE status = 'in_review') AS listings,
+           (SELECT COUNT(*) FROM payments WHERE status = 'pending') AS payments`,
+      );
+      if (can('cms.manage')) total += Number(row.posts) || 0;
+      if (can('listings.moderate')) total += Number(row.listings) || 0;
+      if (can('payments.approve')) total += Number(row.payments) || 0;
+    } catch {
+      total = 0;
+    }
+    result = result.map((item) => (item.href === PATHS.actions ? { ...item, count: total } : item));
   }
-  return nav.map((item) => (item.href === PATHS.actions ? { ...item, count: total } : item));
+  if (can('dealers.view')) {
+    let pending = 0;
+    try {
+      pending = await db.dealers.pendingApplicationCount();
+    } catch {
+      pending = 0;
+    }
+    result = result.map((item) => (item.href === PATHS.applications ? { ...item, count: pending } : item));
+  }
+  return result;
 }
 
 async function page(req, res, { view, active, title, description, data = {}, status = 200 }) {
@@ -1600,6 +1617,179 @@ router.get('/dealers', auth.requireStaff('dealers.view'), async (req, res, next)
     return next(error);
   }
 });
+
+// ---------------------------------------------------------------------------
+// Partner applications — the "become a partner" queue (§7.2).
+//
+// A partner applies from the site (a brand-new lot) or from the portal (changes
+// to the lot they already run); a human reviews it here and approves or
+// declines. Approving a "new" application opens the lot, links it to the
+// applicant and makes them a dealer; approving an "update" applies the changes.
+// Registered before /dealers/:id so the literal path wins over the id catch-all.
+// ---------------------------------------------------------------------------
+
+const PARTNER_TIER_LABELS = { pilot: 'Pilot', standard: 'Standard', premium: 'Premium' };
+
+router.get('/dealers/applications', auth.requireStaff('dealers.view'), async (req, res, next) => {
+  try {
+    const applications = await db.dealers.listApplications({ limit: 100 });
+    return await page(req, res, {
+      view: 'admin/applications',
+      active: PATHS.applications,
+      title: 'Partner applications',
+      description: 'Accounts applying to become a partner, and the changes partners have proposed to their lot. You approve or decline each one.',
+      data: { applications, tierLabels: PARTNER_TIER_LABELS, defaultCommission: db.dealers.DEFAULT_COMMISSION_BY_TIER },
+    });
+  } catch (error) {
+    return next(error);
+  }
+});
+
+router.post(
+  '/dealers/applications/:id/approve',
+  auth.requireStaff('dealers.manage'),
+  auth.sameOriginOnly,
+  async (req, res, next) => {
+    try {
+      const id = Number.parseInt(req.params.id, 10);
+      if (!Number.isFinite(id) || id < 1) return next();
+      const application = await db.dealers.applicationById(id);
+      if (!application) return next();
+      if (application.status !== 'pending') {
+        return done(res, PATHS.applications, 'That application has already been handled.', { error: true });
+      }
+      const actorId = req.user.id;
+
+      // The commission the approver settles on. Blank falls back to the tier's
+      // default rate — the number the approver sees and can change.
+      const rawCommission = req.body.commissionPct;
+      const commissionPct =
+        rawCommission === '' || rawCommission === undefined || rawCommission === null
+          ? null
+          : Number.isFinite(Number(rawCommission))
+            ? Number(rawCommission)
+            : null;
+      const settledCommission =
+        commissionPct !== null ? commissionPct : db.dealers.DEFAULT_COMMISSION_BY_TIER[application.tier] ?? null;
+
+      let message;
+      let email = null;
+      if (application.type === 'new') {
+        // One account runs one lot: they must not already be linked elsewhere.
+        const existing = await db.dealers.forUser(application.user_id);
+        if (existing) {
+          return done(res, PATHS.applications, `This account already runs ${existing.name} — change that lot instead.`, { error: true });
+        }
+        const created = await db.dealers.createLot(
+          {
+            name: application.lotName,
+            lotArea: application.lotArea,
+            city: application.city,
+            tier: application.tier,
+            verified: true,
+            userId: application.user_id,
+            commissionPct: settledCommission,
+          },
+          { actorId },
+        );
+        if (!created.ok) return done(res, PATHS.applications, created.error, { error: true });
+        const roleResult = await admin.setRole(application.user_id, 'dealer', { actorId });
+        if (!roleResult.ok) {
+          return done(
+            res,
+            PATHS.applications,
+            `The lot “${created.slug}” was created, but setting the account’s role failed: ${roleResult.error}`,
+            { error: true },
+          );
+        }
+        message = `Approved — ${application.lotName} is a partner lot now, and ${application.account_name || 'the applicant'} is a dealer.`;
+        email = {
+          template: 'partner_approved',
+          values: {
+            lot: application.lotName,
+            tierLabel: PARTNER_TIER_LABELS[application.tier] || application.tier,
+            commission: settledCommission,
+            portal: `${config.siteUrl}/dealer`,
+          },
+          subject: `Welcome to Honest Cars — ${application.lotName}`,
+        };
+      } else {
+        const result = await db.dealers.updateLot(
+          application.dealer_id,
+          {
+            name: application.lotName,
+            city: application.city,
+            lotArea: application.lotArea,
+            tier: application.tier,
+            ...(commissionPct !== null ? { commissionPct } : {}),
+          },
+          { actorId },
+        );
+        if (!result.ok) return done(res, PATHS.applications, result.error, { error: true });
+        message = `Approved — ${result.lot.name} was updated the way the partner asked.`;
+        email = { template: 'partner_lot_updated', values: { lot: result.lot.name }, subject: 'Your Honest Cars lot is updated' };
+      }
+
+      // Record the decision first, then tell the applicant — a delivery hiccup
+      // must never leave the queue thinking it still needs a review.
+      await db.dealers.markApplication(application.id, 'approved', { actorId, commissionPct: settledCommission });
+      try {
+        await notify.send({
+          template: email.template,
+          values: email.values,
+          subject: email.subject,
+          recipient: application.account_email || application.email,
+          entity: 'dealer_application',
+          entityId: application.id,
+          createdBy: actorId,
+          mustDeliver: true,
+        });
+      } catch {
+        // The decision is already recorded; the notification log shows it undelivered.
+      }
+      return done(res, PATHS.applications, message);
+    } catch (error) {
+      return next(error);
+    }
+  },
+);
+
+router.post(
+  '/dealers/applications/:id/decline',
+  auth.requireStaff('dealers.manage'),
+  auth.sameOriginOnly,
+  async (req, res, next) => {
+    try {
+      const id = Number.parseInt(req.params.id, 10);
+      if (!Number.isFinite(id) || id < 1) return next();
+      const application = await db.dealers.applicationById(id);
+      if (!application) return next();
+      if (application.status !== 'pending') {
+        return done(res, PATHS.applications, 'That application has already been handled.', { error: true });
+      }
+      const reason = String(req.body.reason || '').trim() || null;
+      await db.dealers.markApplication(application.id, 'declined', { actorId: req.user.id, declineReason: reason });
+      const lotName = application.type === 'new' ? application.lotName : application.current_lot_name || application.lotName;
+      try {
+        await notify.send({
+          template: 'partner_declined',
+          values: { lot: lotName, reason },
+          recipient: application.account_email || application.email,
+          entity: 'dealer_application',
+          entityId: application.id,
+          createdBy: req.user.id,
+          subject: 'Your Honest Cars partner application',
+          mustDeliver: true,
+        });
+      } catch {
+        // The decision is already recorded; the notification log shows it undelivered.
+      }
+      return done(res, PATHS.applications, `Declined${reason ? ` (reason recorded: ${reason})` : ''} — the applicant has been told.`);
+    } catch (error) {
+      return next(error);
+    }
+  },
+);
 
 // A leaked key is an emergency, so the desk can cut one off without waiting for
 // the dealer to sign in.

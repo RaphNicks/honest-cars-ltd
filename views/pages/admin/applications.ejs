@@ -1,0 +1,151 @@
+<%#
+  /admin/dealers/applications — §7.2 the "become a partner" queue.
+
+  Two kinds of application arrive here:
+    · new    — a signed-in account applying to open a partner lot
+    · update — an existing partner proposing changes to their own lot
+  Approving a "new" one opens the lot, links it to the account and makes them a
+  dealer (you set the commission); approving an "update" writes the changes.
+  Either way the applicant is told.
+
+  Locals: applications, tierLabels, defaultCommission
+%>
+<%
+  var when = function (iso) {
+    if (!iso) return '';
+    var d = new Date(iso);
+    return (
+      d.toLocaleDateString('en-NG', { day: 'numeric', month: 'short', year: 'numeric' }) +
+      ' ' +
+      d.toLocaleTimeString('en-NG', { hour: '2-digit', minute: '2-digit' })
+    );
+  };
+  var pendingNew = applications.filter(function (a) { return a.status === 'pending' && a.type === 'new'; });
+  var pendingUpdate = applications.filter(function (a) { return a.status === 'pending' && a.type === 'update'; });
+  var handled = applications.filter(function (a) { return a.status !== 'pending'; });
+%>
+
+<div class="admin-grid admin-grid--3">
+  <div class="kpi kpi--sm">
+    <span class="kpi__label">New partner requests</span>
+    <strong class="kpi__value tabular"><%= pendingNew.length %></strong>
+    <span class="kpi__foot">accounts applying to open a lot</span>
+  </div>
+  <div class="kpi kpi--sm">
+    <span class="kpi__label">Lot changes</span>
+    <strong class="kpi__value tabular"><%= pendingUpdate.length %></strong>
+    <span class="kpi__foot">proposed by partners, awaiting your yes</span>
+  </div>
+  <div class="kpi kpi--sm">
+    <span class="kpi__label">Handled</span>
+    <strong class="kpi__value tabular"><%= handled.length %></strong>
+    <span class="kpi__foot">approved and declined</span>
+  </div>
+</div>
+
+<% if (!applications.length) { %>
+  <section class="panel mt-3">
+    <div class="panel__head"><h2 class="panel__title">Nothing here yet</h2></div>
+    <p class="empty-line">
+      When someone applies to become a partner, or a partner proposes a change to their own
+      lot, it lands here for you to approve or decline. Approving a new partner opens their lot
+      and makes them a dealer; declining tells them plainly, with your reason if you give one.
+    </p>
+  </section>
+<% } %>
+
+<% applications.forEach(function (a) { %>
+  <%
+    var isPending = a.status === 'pending';
+    var isNew = a.type === 'new';
+    var statusText = isPending
+      ? (isNew ? 'New partner — awaiting review' : 'Lot change — awaiting review')
+      : (a.status === 'approved' ? 'Approved' : 'Declined');
+    var statusTone = !isPending ? (a.status === 'approved' ? 'ok' : 'closed') : 'attention';
+  %>
+  <section class="panel mt-3">
+    <div class="panel__head">
+      <h2 class="panel__title">
+        <%= a.lot_name %>
+        <% if (a.type === 'update' && a.current_lot_name && a.current_lot_name !== a.lot_name) { %>
+          <span class="listing-row__meta">was “<%= a.current_lot_name %>”</span>
+        <% } %>
+      </h2>
+      <span class="badge badge--<%= statusTone %>"><%= statusText %></span>
+    </div>
+
+    <div class="admin-grid admin-grid--2">
+      <div>
+        <p class="muted mb-1"><%= isNew ? 'Proposed lot' : 'Proposed changes' %></p>
+        <p class="mb-1">
+          <strong>Tier</strong> <%= tierLabels[a.tier] || a.tier %>
+          · <strong>City</strong> <%= a.city %>
+          · <strong>Lot area</strong> <%= a.lot_area %>
+        </p>
+        <% if (!isNew && a.commission_pct !== null) { %>
+          <p class="mb-1"><strong>Commission</strong> <%= a.commission_pct %>% (unchanged unless you set it)</p>
+        <% } else if (isPending) { %>
+          <p class="mb-1 muted"><strong>Commission</strong> you set it below, or leave it at the <%= tierLabels[a.tier] || a.tier %> default.</p>
+        <% } %>
+      </div>
+      <div>
+        <p class="muted mb-1">Contact &amp; applicant</p>
+        <p class="mb-1">
+          <% if (a.contact_name) { %><strong>Contact</strong> <%= a.contact_name %> · <% } %>
+          <strong>Phone</strong> <%= a.phone || '—' %>
+          · <strong>Email</strong> <%= a.email || '—' %>
+        </p>
+        <% if (a.website) { %><p class="mb-1"><strong>Website</strong> <%= a.website %></p><% } %>
+        <p class="mb-0 muted">
+          Applicant: <%= a.account_name || 'this account' %>
+          <span class="listing-row__meta tabular"><%= [a.account_phone, a.account_email].filter(Boolean).join(' · ') %></span>
+        </p>
+        <% if (a.notes) { %><p class="muted mt-2 mb-0"><strong>Note</strong> <%= a.notes %></p><% } %>
+      </div>
+    </div>
+
+    <% if (isPending) { %>
+      <div class="admin-grid admin-grid--2 mt-3">
+        <form method="post" action="/admin/dealers/applications/<%= a.id %>/approve">
+          <% if (isNew) { %>
+            <div class="field">
+              <label class="field__label" for="comm-<%= a.id %>">Commission %</label>
+              <input
+                class="input"
+                id="comm-<%= a.id %>"
+                name="commissionPct"
+                type="number"
+                step="0.5"
+                min="0"
+                max="100"
+                value="<%= defaultCommission[a.tier] || '' %>"
+                aria-label="Commission percentage"
+              >
+              <span class="field__hint">Leaving it blank uses the <%= tierLabels[a.tier] || a.tier %> default.</span>
+            </div>
+          <% } %>
+          <button class="btn btn--primary btn--sm" type="submit"><%= isNew ? 'Approve &amp; open lot' : 'Approve changes' %></button>
+        </form>
+        <form method="post" action="/admin/dealers/applications/<%= a.id %>/decline">
+          <div class="field">
+            <label class="field__label" for="reason-<%= a.id %>">Reason (sent to them, optional)</label>
+            <input
+              class="input"
+              id="reason-<%= a.id %>"
+              name="reason"
+              type="text"
+              maxlength="400"
+              placeholder="e.g. we are not taking on more Pilot lots in this area right now"
+            >
+          </div>
+          <button class="btn btn--secondary btn--sm" type="submit">Decline</button>
+        </form>
+      </div>
+    <% } else { %>
+      <p class="muted mt-3 mb-0">
+        <%= a.status === 'approved' ? 'Approved' : 'Declined' %><% if (a.reviewed_at) { %> on <%= when(a.reviewed_at) %><% } %>
+        <% if (a.status === 'declined' && a.decline_reason) { %> — “<%= a.decline_reason %>”<% } %>
+      </p>
+    <% } %>
+  </section>
+<% }); %>
