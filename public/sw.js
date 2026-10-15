@@ -36,7 +36,7 @@
 
 /* eslint-env serviceworker */
 
-const VERSION = 'hc-v14'; // v14: two-family type restored — Libre Caslon Condensed for display, IBM Plex Sans for body (shell font assets); v13: the brand family is now Libre Caslon Condensed (shell font assets replaced); v12: partial (206) media chunks are never cached and cache writes can't break delivery — the hero video used to play only on a hard refresh; v11: code (js/css) now waits for the network — a slow connection must never resurrect the previous release's modules; v6: pwa.js now asks a waiting worker to take over, so a new shell is never left waiting on 'close every tab'
+const VERSION = 'hc-v15'; // v15: page navigations wait for the network instead of timing out to the /offline page after 6s — a first-time page load was falsely showing "You are offline" while the visitor was online; v14: two-family type restored — Libre Caslon Condensed for display, IBM Plex Sans for body (shell font assets); v13: the brand family is now Libre Caslon Condensed (shell font assets replaced); v12: partial (206) media chunks are never cached and cache writes can't break delivery — the hero video used to play only on a hard refresh; v11: code (js/css) now waits for the network — a slow connection must never resurrect the previous release's modules; v6: pwa.js now asks a waiting worker to take over, so a new shell is never left waiting on 'close every tab'
 const SHELL = `${VERSION}-shell`;
 const PAGES = `${VERSION}-pages`;
 const RUNTIME = `${VERSION}-runtime`; // shell assets discovered later (other font weights)
@@ -230,8 +230,18 @@ self.addEventListener('fetch', (event) => {
   if (bypass(url)) return; // let the network answer for private areas
 
   if (request.mode === 'navigate') {
+    // A page you have not opened yet has no cached copy, so the only fallback
+    // is the /offline page — which is a lie when you are online. Therefore a
+    // first-time load must WAIT for the network (ceilingMs: 0), never time out
+    // onto the offline page after 6 seconds. When you are genuinely offline the
+    // fetch fails fast, so the offline page still appears correctly.
     event.respondWith(
-      networkFirst(request, { cacheName: PAGES, cap: PAGE_CAP, fallbackUrl: '/offline' }).catch(
+      networkFirst(request, {
+        cacheName: PAGES,
+        cap: PAGE_CAP,
+        fallbackUrl: '/offline',
+        ceilingMs: 0,
+      }).catch(
         async () =>
           (await caches.match('/offline')) ||
           new Response(
