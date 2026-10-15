@@ -186,6 +186,27 @@
         </form>
       </li>
     </ol>
+
+    <div class="panel mt-2 setup-livecheck">
+      <h3 class="panel__title">Before you submit — a one-second check</h3>
+      <p class="mb-1">
+        Right now, this server computes <span class="setup-secret tabular" data-live-code><%= setup.currentCode %></span>
+        for this key
+        <span class="cms-hint">
+          (server time <%= (setup.serverTime || '').replace('T', ' ').slice(0, 19) %> UTC —
+          it changes every 30 seconds, so reload the page for a fresh one).
+        </span>
+      </p>
+      <p class="cms-hint mb-0">
+        Glance at your app:
+        <ul class="setup-livecheck__list">
+          <li>It shows the <strong>same six digits</strong> — type them in and submit. It will verify.</li>
+          <li>It shows <strong>different digits</strong> — your app is holding a different key. Delete the old
+            Honest Cars entry and enter this exact key again.</li>
+        </ul>
+      </p>
+    </div>
+
     <p class="cms-hint mb-0">
       If the code is rejected, check your phone's clock is set to update automatically — TOTP is a shared clock,
       and a phone a minute out produces codes that are a minute wrong.

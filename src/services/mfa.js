@@ -107,6 +107,13 @@ async function currentSetup(user) {
     formatted: totp.formatSecret(secret),
     account: user.phone,
     uri: totp.otpauthUrl({ secret, account: user.phone, issuer: ISSUER }),
+    // Live reference so a person comparing their app to this server can do it in
+    // one look: the code this key produces right now, and this server's own clock.
+    // A mismatch between the two tells you exactly which side is wrong — a key in
+    // the app that is not this key, or a server clock that has drifted — instead
+    // of "incorrect code" with nothing to go on.
+    currentCode: totp.code(secret),
+    serverTime: new Date().toISOString(),
   };
 }
 
@@ -125,7 +132,7 @@ async function confirmEnrolment(user, token) {
 
   const step = totp.verify(secret.secret, token);
   if (step === null) {
-    return { ok: false, error: 'That code did not match. Check your phone’s clock is set automatically, then try the next one.' };
+    return { ok: false, error: 'That code did not match. Look at the “this server sees” line below: if your app shows the same six digits there, type them in and submit; if it shows different ones, your app is holding a different key — delete the old entry and add this exact key again.' };
   }
   const confirmed = await db.mfa.confirmEnrolment(user.id, step);
   if (!confirmed.ok) return { ok: false, error: 'That setup was already confirmed. Reload the page.' };

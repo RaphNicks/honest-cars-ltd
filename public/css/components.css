@@ -1948,6 +1948,17 @@ body[data-scroll-locked='true'] { overflow: hidden; }
   word-spacing: 0.3em;
 }
 
+/* The enrolment "compare your app to this server" check. It is the first thing
+   a confused person should look at, so it gets a distinct accent and a little
+   separation from the steps above it. */
+.setup-livecheck {
+  border-left: 4px solid var(--colour-accent, #0B5FBF);
+  background: var(--colour-surface-sunken, #F7FAFC);
+  padding: var(--space-3) var(--space-4);
+}
+.setup-livecheck .setup-secret { font-size: var(--text-24); }
+.setup-livecheck__list { margin: var(--space-1) 0 0; padding-left: var(--space-5); }
+
 /* ==========================================================================
    Premium rounding pass (owner 2026-10-12, revisited): soft, deliberate
    radii on the touchable surfaces; structure — header, footer, rails,
