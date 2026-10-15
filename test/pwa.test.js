@@ -147,11 +147,21 @@ test('the precache list covers the whole shell and every entry ships', () => {
     );
   }
 
-  // The two files the layout preloads, and no others: the rest arrive
-  // through the runtime cache rather than costing every install ~50 kB.
-  assert.ok(unique.has('/fonts/ibm-plex-sans-latin-400-normal.woff2'));
-  assert.ok(unique.has('/fonts/barlow-condensed-latin-700-normal.woff2'));
-  assert.equal(urls.filter((url) => url.startsWith('/fonts/')).length, 2);
+  // Exactly the fonts the layout preloads, and no others: the rest arrive
+  // through the runtime cache rather than costing every install up front.
+  // Read from the layout so the brand family can change without this going
+  // stale (Libre Caslon Condensed since 2026-10-15 — one variable face).
+  const layout = fs.readFileSync(path.join(ROOT, 'views', 'layouts', 'base.ejs'), 'utf8');
+  const preloads = [...layout.matchAll(/href="(\/fonts\/[^"]+)"/g)].map((match) => match[1]);
+  assert.ok(preloads.length > 0, 'the layout must preload its font(s)');
+  for (const url of preloads) {
+    assert.ok(unique.has(url), `${url} is preloaded by the layout but not precached`);
+  }
+  assert.equal(
+    urls.filter((url) => url.startsWith('/fonts/')).length,
+    preloads.length,
+    'the precache holds exactly the fonts the layout preloads',
+  );
 });
 
 test('the worker never caches a private area, and never caches a private response', () => {

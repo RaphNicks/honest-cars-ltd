@@ -36,7 +36,7 @@
 
 /* eslint-env serviceworker */
 
-const VERSION = 'hc-v12'; // v12: partial (206) media chunks are never cached and cache writes can't break delivery — the hero video used to play only on a hard refresh; v11: code (js/css) now waits for the network — a slow connection must never resurrect the previous release's modules; v6: pwa.js now asks a waiting worker to take over, so a new shell is never left waiting on 'close every tab'
+const VERSION = 'hc-v13'; // v13: the brand family is now Libre Caslon Condensed (shell font assets replaced); v12: partial (206) media chunks are never cached and cache writes can't break delivery — the hero video used to play only on a hard refresh; v11: code (js/css) now waits for the network — a slow connection must never resurrect the previous release's modules; v6: pwa.js now asks a waiting worker to take over, so a new shell is never left waiting on 'close every tab'
 const SHELL = `${VERSION}-shell`;
 const PAGES = `${VERSION}-pages`;
 const RUNTIME = `${VERSION}-runtime`; // shell assets discovered later (other font weights)
@@ -60,8 +60,7 @@ const SHELL_URLS = [
   // data up front (§13.2); the other weights land in the runtime asset cache
   // the first time a page that uses them is opened, and are then available
   // offline too.
-  '/fonts/ibm-plex-sans-latin-400-normal.woff2',
-  '/fonts/barlow-condensed-latin-700-normal.woff2',
+  '/fonts/libre-caslon-condensed-latin-wght-normal.woff2',
   // `/js/admin.js` and `/js/dealer.js` are deliberately absent: /admin and
   // /dealer are bypassed by this worker, so precaching them would only cost
   // every other visitor bytes — their pages fill the runtime cache when used.
