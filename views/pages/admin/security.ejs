@@ -193,10 +193,32 @@
         Right now, this server computes <span class="setup-secret tabular" data-live-code><%= setup.currentCode %></span>
         for this key
         <span class="cms-hint">
-          (server time <%= (setup.serverTime || '').replace('T', ' ').slice(0, 19) %> UTC —
-          it changes every 30 seconds, so reload the page for a fresh one).
+          (server time <span data-server-time><%= (setup.serverTime || '').replace('T', ' ').slice(0, 19) %></span> UTC ·
+          your device's clock <span data-device-time>…</span> UTC ·
+          <span data-clock-diff>…</span> — the code changes every 30 seconds, so reload the page for a fresh one).
         </span>
       </p>
+      <script>
+        (function () {
+          function p(n) { return String(n).padStart(2, '0'); }
+          function iso(d) {
+            return d.getUTCFullYear() + '-' + p(d.getUTCMonth() + 1) + '-' + p(d.getUTCDate()) +
+              ' ' + p(d.getUTCHours()) + ':' + p(d.getUTCMinutes()) + ':' + p(d.getUTCSeconds());
+          }
+          var dev = document.querySelector('[data-device-time]');
+          if (!dev) return;
+          dev.textContent = iso(new Date());
+          var srv = document.querySelector('[data-server-time]');
+          var diff = document.querySelector('[data-clock-diff]');
+          if (srv && diff) {
+            var serverMs = new Date(srv.textContent.replace(' ', 'T') + 'Z').getTime();
+            var secs = Math.round((Date.now() - serverMs) / 1000);
+            diff.textContent = Math.abs(secs) <= 3
+              ? 'clocks match'
+              : 'server clock is ~' + Math.abs(secs) + 's ' + (secs > 0 ? 'behind' : 'ahead of') + ' your device';
+          }
+        })();
+      </script>
       <p class="cms-hint mb-0">
         Glance at your app:
         <ul class="setup-livecheck__list">
