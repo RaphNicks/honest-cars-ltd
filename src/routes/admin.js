@@ -1660,8 +1660,17 @@ router.post(
       }
       const actorId = req.user.id;
 
-      // The commission the approver settles on. Blank falls back to the tier's
-      // default rate — the number the approver sees and can change.
+      // The approver confirms the lot and may correct any of it — a blank field
+      // keeps the applicant's proposed value. The application row is stored
+      // snake_case (lot_name / lot_area); reading it camelCase here was what
+      // blanked the name out and made createLot fail with "A lot needs a name."
+      const proposedName = String(req.body.lotName || '').trim() || application.lot_name;
+      const proposedCity = String(req.body.city || '').trim() || application.city;
+      const proposedArea = String(req.body.lotArea || '').trim() || application.lot_area || proposedName;
+      const proposedTier = db.dealers.TIERS.includes(req.body.tier) ? req.body.tier : application.tier;
+
+      // The commission the approver settles on. Blank falls back to the (possibly
+      // re-tiered) lot's default rate — the number the approver sees and can change.
       const rawCommission = req.body.commissionPct;
       const commissionPct =
         rawCommission === '' || rawCommission === undefined || rawCommission === null
@@ -1670,7 +1679,7 @@ router.post(
             ? Number(rawCommission)
             : null;
       const settledCommission =
-        commissionPct !== null ? commissionPct : db.dealers.DEFAULT_COMMISSION_BY_TIER[application.tier] ?? null;
+        commissionPct !== null ? commissionPct : db.dealers.DEFAULT_COMMISSION_BY_TIER[proposedTier] ?? null;
 
       let message;
       let email = null;
@@ -1682,10 +1691,10 @@ router.post(
         }
         const created = await db.dealers.createLot(
           {
-            name: application.lotName,
-            lotArea: application.lotArea,
-            city: application.city,
-            tier: application.tier,
+            name: proposedName,
+            lotArea: proposedArea,
+            city: proposedCity,
+            tier: proposedTier,
             verified: true,
             userId: application.user_id,
             commissionPct: settledCommission,
@@ -1702,25 +1711,25 @@ router.post(
             { error: true },
           );
         }
-        message = `Approved — ${application.lotName} is a partner lot now, and ${application.account_name || 'the applicant'} is a dealer.`;
+        message = `Approved — ${proposedName} is a partner lot now, and ${application.account_name || 'the applicant'} is a dealer.`;
         email = {
           template: 'partner_approved',
           values: {
-            lot: application.lotName,
-            tierLabel: PARTNER_TIER_LABELS[application.tier] || application.tier,
+            lot: proposedName,
+            tierLabel: PARTNER_TIER_LABELS[proposedTier] || proposedTier,
             commission: settledCommission,
             portal: `${config.siteUrl}/dealer`,
           },
-          subject: `Welcome to Honest Cars — ${application.lotName}`,
+          subject: `Welcome to Honest Cars — ${proposedName}`,
         };
       } else {
         const result = await db.dealers.updateLot(
           application.dealer_id,
           {
-            name: application.lotName,
-            city: application.city,
-            lotArea: application.lotArea,
-            tier: application.tier,
+            name: proposedName,
+            city: proposedCity,
+            lotArea: proposedArea,
+            tier: proposedTier,
             ...(commissionPct !== null ? { commissionPct } : {}),
           },
           { actorId },
@@ -1769,7 +1778,10 @@ router.post(
       }
       const reason = String(req.body.reason || '').trim() || null;
       await db.dealers.markApplication(application.id, 'declined', { actorId: req.user.id, declineReason: reason });
-      const lotName = application.type === 'new' ? application.lotName : application.current_lot_name || application.lotName;
+      const lotName =
+        application.type === 'new'
+          ? application.lot_name
+          : application.current_lot_name || application.lot_name;
       try {
         await notify.send({
           template: 'partner_declined',

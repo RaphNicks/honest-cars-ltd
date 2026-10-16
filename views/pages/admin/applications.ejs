@@ -107,24 +107,38 @@
     <% if (isPending) { %>
       <div class="admin-grid admin-grid--2 mt-3">
         <form method="post" action="/admin/dealers/applications/<%= a.id %>/approve">
+          <div class="field mb-1">
+            <label class="field__label" for="lotname-<%= a.id %>">Lot name</label>
+            <input class="input" id="lotname-<%= a.id %>" name="lotName" type="text" maxlength="120"
+                   value="<%= a.lot_name %>" aria-label="Lot name">
+          </div>
+          <div class="field mb-1">
+            <label class="field__label" for="lotcity-<%= a.id %>">City</label>
+            <input class="input" id="lotcity-<%= a.id %>" name="city" type="text" maxlength="80"
+                   value="<%= a.city %>" aria-label="Lot city">
+          </div>
+          <div class="field mb-1">
+            <label class="field__label" for="lotarea-<%= a.id %>">Lot area</label>
+            <input class="input" id="lotarea-<%= a.id %>" name="lotArea" type="text" maxlength="120"
+                   value="<%= a.lot_area %>" aria-label="Lot area">
+          </div>
+          <div class="field mb-1">
+            <label class="field__label" for="lottier-<%= a.id %>">Tier</label>
+            <select class="input" id="lottier-<%= a.id %>" name="tier" aria-label="Partner tier">
+              <% Object.keys(tierLabels).forEach(function (t) { %>
+                <option value="<%= t %>"<%= a.tier === t ? ' selected' : '' %>><%= tierLabels[t] %></option>
+              <% }); %>
+            </select>
+          </div>
           <% if (isNew) { %>
-            <div class="field">
+            <div class="field mb-1">
               <label class="field__label" for="comm-<%= a.id %>">Commission %</label>
-              <input
-                class="input"
-                id="comm-<%= a.id %>"
-                name="commissionPct"
-                type="number"
-                step="0.5"
-                min="0"
-                max="100"
-                value="<%= defaultCommission[a.tier] || '' %>"
-                aria-label="Commission percentage"
-              >
+              <input class="input" id="comm-<%= a.id %>" name="commissionPct" type="number" step="0.5" min="0" max="100"
+                     value="<%= defaultCommission[a.tier] || '' %>" aria-label="Commission percentage">
               <span class="field__hint">Leaving it blank uses the <%= tierLabels[a.tier] || a.tier %> default.</span>
             </div>
           <% } %>
-          <button class="btn btn--primary btn--sm" type="submit"><%= isNew ? 'Approve &amp; open lot' : 'Approve changes' %></button>
+          <button class="btn btn--primary btn--sm" type="submit"><%= isNew ? 'Approve & open lot' : 'Approve changes' %></button>
         </form>
         <form method="post" action="/admin/dealers/applications/<%= a.id %>/decline">
           <div class="field">
