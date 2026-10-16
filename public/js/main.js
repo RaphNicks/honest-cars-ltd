@@ -113,6 +113,12 @@ function boot() {
     initRecentlyViewed(listingId);
   }
 
+  // Public per-dealer storefront (§037) — count a lot's mini-site visit. The
+  // beacon sends the page path, which already carries the lot slug, so no
+  // payload is needed here.
+  const dealerView = document.querySelector('[data-dealer-view]');
+  if (dealerView) track('dealer_page_view');
+
   const article = document.querySelector('[data-article]');
   if (article) observeReadDepth(article);
 

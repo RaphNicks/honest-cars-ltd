@@ -16,6 +16,32 @@
 .page-hero .lead { font-size: var(--text-20); color: var(--color-text-muted); max-width: 62ch; }
 .page-hero__meta { display: flex; flex-wrap: wrap; gap: var(--space-1) var(--space-2); align-items: center; color: var(--color-text-muted); font-size: var(--text-14); }
 
+/* §037 — public per-dealer storefront (GET /dealers/:slug). Flag-gated in the
+   route; the hero + the two compact strips are the only new styles. */
+.dealer-hero__top { display: flex; flex-wrap: wrap; gap: var(--space-3); align-items: center; justify-content: space-between; }
+.dealer-hero__brand { display: flex; gap: var(--space-2); align-items: center; }
+.dealer-hero__logo { width: 72px; height: 72px; border-radius: var(--radius); object-fit: cover; border: var(--border); background: #fff; flex: none; }
+.dealer-hero__logo--placeholder { display: grid; place-items: center; color: var(--honest-navy); }
+.dealer-hero__id h1 { font-size: var(--text-32); line-height: 1.05; }
+.dealer-hero__tagline { color: var(--color-text-muted); margin-top: var(--space-05); }
+.dealer-hero__meta { display: flex; align-items: center; gap: var(--space-05); color: var(--color-text-muted); font-size: var(--text-14); margin-top: var(--space-05); }
+.dealer-hero__meta svg { color: var(--honest-green); flex: none; }
+.dealer-hero__badges { display: flex; flex-wrap: wrap; gap: var(--space-1); align-items: center; }
+.dealer-hero__tier { font-size: var(--text-12); font-weight: var(--weight-medium); letter-spacing: 0.04em; text-transform: uppercase; color: var(--honest-navy); }
+.dealer-hero__count { font-size: var(--text-14); color: var(--color-text-muted); }
+.dealer-hero__trust { margin-top: var(--space-3); max-width: 70ch; color: var(--color-text-muted); }
+
+.dealer-strip__row { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(220px, 260px); gap: var(--space-2); overflow-x: auto; padding-bottom: var(--space-1); scroll-snap-type: x proximity; }
+.dealer-strip-card { position: relative; display: block; border: var(--border); border-radius: var(--radius); overflow: hidden; background: #fff; scroll-snap-align: start; }
+.dealer-strip-card__media { aspect-ratio: 3 / 2; overflow: hidden; background: var(--green-08); }
+.dealer-strip-card__media img, .dealer-strip-card__media .placeholder-media { width: 100%; height: 100%; object-fit: cover; }
+.dealer-strip-card__body { padding: var(--space-2); }
+.dealer-strip-card__title { font-size: var(--text-16); margin-bottom: var(--space-05); }
+.dealer-strip-card__price { font-weight: var(--weight-medium); color: var(--honest-navy); }
+.dealer-strip-card__badge { position: absolute; top: var(--space-1); left: var(--space-1); background: var(--honest-green); color: #fff; font-size: var(--text-12); font-weight: var(--weight-medium); padding: 2px 10px; border-radius: var(--radius-pill); }
+.dealer-strip-card--sold .dealer-strip-card__badge { background: var(--honest-navy); }
+.dealer-strip-card--sold .dealer-strip-card__media { filter: grayscale(0.35) brightness(0.97); }
+
 .cta-band {
   display: grid;
   gap: var(--space-3);

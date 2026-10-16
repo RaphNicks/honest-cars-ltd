@@ -36,6 +36,9 @@ const EVENTS = {
   commerce: ['view_item', 'add_to_cart', 'begin_checkout', 'purchase', 'subscription_renewed'],
   dealerB2b: ['dealer_application_submitted', 'dealer_login_active', 'services_enquiry_submitted'],
   brand: ['article_read_75', 'blog_post_shared', 'deal_alert_signup', 'review_link_clicked'],
+  // Public per-dealer storefront — fired when a lot's mini-site loads. The page
+  // path already carries the lot slug, so no payload key is needed.
+  dealers: ['dealer_page_view'],
   /**
    * Auth & account telemetry — an extension BEYOND §15.1, which has no auth
    * category. Recorded server-side only (never accepted from the browser) so

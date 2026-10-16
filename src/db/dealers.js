@@ -96,6 +96,17 @@ async function updateBranding(id, { logo = null, tagline = null } = {}) {
   return byId(id);
 }
 
+/** Lots eligible for the sitemap: a live storefront needs live stock to point at. */
+async function storefrontsForSitemap() {
+  return query(
+    `SELECT d.slug, d.updated_at AS lastmod
+       FROM dealers d
+      WHERE EXISTS (SELECT 1 FROM vehicle_listings l
+                      WHERE l.dealer_id = d.id AND l.status = 'live')
+      ORDER BY d.name ASC`,
+  );
+}
+
 /** A compact card for the storefront's secondary strips (no full media join). */
 function compactListing(row) {
   return {
@@ -953,6 +964,7 @@ module.exports = {
   updateBranding,
   storefrontDeals,
   storefrontRecentlySold,
+  storefrontsForSitemap,
   dashboard,
   list,
   fleetTotals,

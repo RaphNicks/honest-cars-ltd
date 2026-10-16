@@ -140,6 +140,22 @@ async function buildSitemap(db, { siteUrl = config.siteUrl } = {}) {
     );
   }
 
+  // §037 — per-dealer storefronts. Only when the feature is live, and only for
+  // lots that have live stock (an empty lot page is a thin page — Google says so).
+  if (config.features.dealerStorefront) {
+    const storefronts = await db.dealers.storefrontsForSitemap().catch(() => []);
+    for (const lot of storefronts) {
+      entries.push(
+        urlEntry({
+          loc: `${siteUrl}/dealers/${lot.slug}`,
+          lastmod: lot.lastmod,
+          changefreq: 'daily',
+          priority: '0.7',
+        }),
+      );
+    }
+  }
+
   // Listings. A sold car keeps its live URL for the first few days (§6.2), so
   // the sitemap must point there — advertising /cars/sold/{slug} while the
   // archive page does not exist yet would send crawlers to a 404. Only inside

@@ -29,6 +29,7 @@ const { router: accountRoutes } = require('./routes/account');
 const { router: adminRoutes } = require('./routes/admin');
 const { router: adminCmsRoutes } = require('./routes/admin-cms');
 const { router: dealerRoutes } = require('./routes/dealer');
+const { router: dealerPublicRoutes } = require('./routes/dealers');
 const { router: partnerRoutes } = require('./routes/partners');
 const auth = require('./services/auth');
 const publish = require('./services/publish');
@@ -197,6 +198,7 @@ function createApp() {
   // §7.2 dealer portal. Mounted before the marketing pages so /dealer is the
   // portal, not the phase-2 stub it used to be.
   app.use('/dealer', dealerRoutes);
+  app.use('/dealers', dealerPublicRoutes); // §037 public per-dealer storefront (flag-gated)
   app.use('/api', apiRoutes);
   app.use('/services', serviceRoutes);
   app.use('/', flowRoutes);

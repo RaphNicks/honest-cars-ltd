@@ -1,0 +1,95 @@
+<%#
+  /dealers/:slug — one partner lot's public storefront (§037).
+
+  Built but flag-gated in src/routes/dealers.js (config.features.dealerStorefront,
+  default off). Discovery is by shared link only, so there are no in-site links.
+
+  Layout: hero (logo, name, tagline, lot, city, tier, verified, live count)
+  → "Deals" strip (live cars priced below the market band) → the lot's stock
+  (the standard browse partial: search, filter rail, sort, pagination) →
+  "Recently sold" strip → a contact band. The grid reuses partials/browse so a
+  lot's cars filter, sort and paginate exactly like /cars.
+%>
+<section class="page-hero dealer-hero" data-dealer-view data-dealer-slug="<%= dealer.slug %>">
+  <div class="container">
+    <div class="dealer-hero__top">
+      <div class="dealer-hero__brand">
+        <% if (dealer.logo) { %>
+          <img class="dealer-hero__logo" src="<%= dealer.logo %>" alt="<%= helpers.esc(dealer.name) %> logo"
+               width="72" height="72" loading="eager" decoding="async">
+        <% } else { %>
+          <div class="dealer-hero__logo dealer-hero__logo--placeholder" aria-hidden="true"><%- helpers.icon('car', { size: 26 }) %></div>
+        <% } %>
+        <div class="dealer-hero__id">
+          <p class="eyebrow mb-0">Partner lot</p>
+          <h1><%= helpers.esc(dealer.name) %></h1>
+          <% if (dealer.tagline) { %><p class="dealer-hero__tagline mb-0"><%= helpers.esc(dealer.tagline) %></p><% } %>
+          <p class="dealer-hero__meta mb-0"><%- helpers.icon('mapPin', { size: 14 }) %> <%= helpers.esc(dealer.lotArea) %>, <%= helpers.esc(dealer.city) %></p>
+        </div>
+      </div>
+      <div class="dealer-hero__badges">
+        <span class="dealer-hero__tier"><%= helpers.esc(dealer.tierLabel) %></span>
+        <% if (dealer.verified) { %><span class="status-pill status-pill--confirmed"><%- helpers.icon('checkCircle', { size: 14 }) %> Verified by HonestCars</span><% } %>
+        <span class="dealer-hero__count"><strong><%= result.total %></strong>&nbsp;in stock</span>
+      </div>
+    </div>
+    <p class="dealer-hero__trust">
+      Prices are what the lot is asking — and we show where each car sits against the current
+      market band, plus the mileage and documents status, before you travel.
+    </p>
+  </div>
+</section>
+
+<% if (deals.length) { %>
+<section class="section dealer-strip">
+  <div class="container">
+    <div class="section-head">
+      <h2>Deals this week</h2>
+      <p class="section-head__note mb-0">Live cars this lot has priced below the current market band.</p>
+    </div>
+    <div class="dealer-strip__row">
+      <% deals.forEach(function (car) { %><%- include('../partials/dealer-strip-card', { car: car, helpers: helpers, badge: 'Below market' }) %><% }); %>
+    </div>
+  </div>
+</section>
+<% } %>
+
+<section class="section dealer-stock">
+  <div class="container">
+    <%- include('../partials/browse', {
+          result: result, facets: facets, filters: filters, models: models,
+          basePath: basePath, queryString: queryString, activePills: activePills,
+          nearMatches: nearMatches, hiddenQuery: hiddenQuery, locationLabel: locationLabel
+        }) %>
+  </div>
+</section>
+
+<% if (sold.length) { %>
+<section class="section dealer-strip dealer-strip--surface">
+  <div class="container">
+    <div class="section-head">
+      <h2>Recently sold</h2>
+      <p class="section-head__note mb-0">Real cars this lot has moved, and how quickly they went.</p>
+    </div>
+    <div class="dealer-strip__row">
+      <% sold.forEach(function (car) { %>
+        <%- include('../partials/dealer-strip-card', { car: car, helpers: helpers, badge: car.soldInDays ? 'Sold in ' + car.soldInDays + (car.soldInDays === 1 ? ' day' : ' days') : 'Sold', sold: true }) %>
+      <% }); %>
+    </div>
+  </div>
+</section>
+<% } %>
+
+<section class="section">
+  <div class="container">
+    <div class="surface-panel">
+      <div class="row row--between">
+        <div>
+          <h2 class="mb-0">Buying from <%= helpers.esc(dealer.name) %></h2>
+          <p class="mb-0 note-inline">Interest is handled through HonestCars — we keep the channels and the money safe, so the dealer never handles your payment.</p>
+        </div>
+        <a class="btn btn--primary" href="/contact">Contact HonestCars</a>
+      </div>
+    </div>
+  </div>
+</section>

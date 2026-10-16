@@ -137,8 +137,12 @@ function isRawFilterCombo(view = {}) {
   return FILTER_PARAMS.some((key) => view[key] !== undefined && view[key] !== '');
 }
 
-/** Human labels for the active-filter pills. */
-function activeFilterPills(view = {}, helpers) {
+/**
+ * Human labels for the active-filter pills. `basePath` (default `/cars`) is
+ * where the "remove this filter" links land — the dealer storefront passes its
+ * own path so removing a filter stays on the lot's page.
+ */
+function activeFilterPills(view = {}, helpers, basePath = '/cars') {
   const pills = [];
   const add = (key, label, value) => pills.push({ key, label, value, remove: { ...view, [key]: undefined } });
 
@@ -163,7 +167,7 @@ function activeFilterPills(view = {}, helpers) {
 
   return pills.map((pill) => ({
     ...pill,
-    href: `/cars${buildQueryString(pill.remove)}`,
+    href: `${basePath}${buildQueryString(pill.remove)}`,
   }));
 }
 
