@@ -79,8 +79,28 @@ function wireConfirm() {
   });
 }
 
+/** On small screens the console nav folds into a tap-to-open menu. */
+function wireNavToggle() {
+  const toggle = document.querySelector('[data-admin-nav-toggle]');
+  const bar = toggle ? toggle.closest('.admin-bar') : null;
+  if (!toggle || !bar) return;
+
+  const setOpen = (open) => {
+    bar.classList.toggle('is-open', open);
+    toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+  };
+  toggle.addEventListener('click', () => setOpen(!bar.classList.contains('is-open')));
+
+  // Choosing a section closes the menu. (A full page load resets it anyway;
+  // this keeps the touch state tidy before navigation.)
+  bar.querySelectorAll('.admin-bar__nav a').forEach((link) => {
+    link.addEventListener('click', () => setOpen(false));
+  });
+}
+
 wireAutoSubmit();
 wireTemplates();
 wireSummary();
 wirePrint();
 wireConfirm();
+wireNavToggle();

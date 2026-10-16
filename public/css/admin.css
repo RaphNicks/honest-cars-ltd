@@ -75,6 +75,9 @@ body.admin {
 
 .admin-bar__name { font-size: var(--text-16); }
 
+/* Mobile-only: the desktop sidebar never needs a menu button. */
+.admin-bar__toggle { display: none; }
+
 .admin-bar__nav {
   display: flex;
   flex-wrap: wrap;
@@ -1252,11 +1255,46 @@ a.hire-cal__ref:hover { text-decoration: underline; }
     flex-direction: row;
     flex-wrap: wrap;
     align-items: center;
+    justify-content: space-between;
     gap: var(--space-1) var(--space-2);
     padding: var(--space-1) var(--space-2);
   }
-  .admin-bar__nav { flex-direction: row; flex-wrap: wrap; flex: 1 1 auto; }
-  .admin-bar__me { margin-top: 0; flex-direction: row; align-items: center; }
+  .admin-bar__brand { flex: 1 1 auto; }
+  .admin-bar__toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px;
+    min-height: 40px;
+    border: 1px solid rgba(255, 255, 255, 0.28);
+    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.06);
+    color: var(--white);
+    font-size: var(--text-14);
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .admin-bar__toggle:active { background: rgba(255, 255, 255, 0.14); }
+
+  /* The section links + people block collapse into a tap-to-open menu, so the
+     page (not the navigation) owns the screen. */
+  .admin-bar__nav,
+  .admin-bar__me { display: none; }
+  .admin-bar.is-open .admin-bar__nav,
+  .admin-bar.is-open .admin-bar__me {
+    display: flex;
+    flex-basis: 100%;
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .admin-bar.is-open .admin-bar__nav { gap: 2px; }
+  .admin-bar.is-open .admin-bar__nav .admin-bar__link { width: 100%; }
+  .admin-bar.is-open .admin-bar__me {
+    margin-top: var(--space-1);
+    padding-top: var(--space-2);
+    border-top: 1px solid rgba(255, 255, 255, 0.16);
+    gap: var(--space-1);
+  }
 }
 
 /* Premium rounding pass (owner 2026-10-12): the console stays sharp and
