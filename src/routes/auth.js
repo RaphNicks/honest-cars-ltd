@@ -115,7 +115,9 @@ router.post('/email/verify', auth.sameOriginOnly, emailVerifyLimiter, async (req
     if (!result.ok) return sendJson(res, { ok: false, error: result.error, code: result.code }, { status: result.status });
 
     auth.setSessionCookie(res, result.token, { expiresAt: result.expiresAt });
-    const defaultRedirect = signin.defaultRedirect(audience);
+    // A partner signing in through the normal door lands in their portal, not
+    // the customer dashboard. The role decides; a safe `next` still wins.
+    const defaultRedirect = signin.defaultRedirect(result.user && result.user.role ? result.user.role : audience);
     return sendJson(res, {
       ok: true,
       // The greeting half of the contract: who the browser is now signed in
@@ -154,7 +156,7 @@ router.get('/google', googleLimiter, (req, res) => {
     return res.redirect(302, '/login?auth_error=google_link_session');
   }
   if (intent !== 'link' && req.user && signin.audienceMatches(req.user, audience)) {
-    return res.redirect(302, auth.safeNextPath(req.query.next) || signin.defaultRedirect(audience));
+    return res.redirect(302, auth.safeNextPath(req.query.next) || signin.defaultRedirect(req.user.role));
   }
 
   const result = signin.beginGoogleAuth({
@@ -211,13 +213,14 @@ router.get('/google/callback', googleLimiter, async (req, res, next) => {
       return res.redirect(302, `${context.linkUserId ? '/account' : errorPath}?auth_error=${encodeURIComponent(result.code.toLowerCase())}`);
     }
     auth.setSessionCookie(res, result.token, { expiresAt: result.expiresAt });
+    const defaultRedirect = signin.defaultRedirect(result.user && result.user.role ? result.user.role : audience);
     if (result.mfaPending) {
-      return res.redirect(302, `/login/mfa?next=${encodeURIComponent(auth.safeNextPath(context.next) || signin.defaultRedirect(audience))}`);
+      return res.redirect(302, `/login/mfa?next=${encodeURIComponent(auth.safeNextPath(context.next) || defaultRedirect)}`);
     }
     if (context.saveListingId) {
       await db.users.addSavedCar(result.user.id, context.saveListingId, null).catch(() => {});
     }
-    return res.redirect(302, auth.safeNextPath(context.next) || signin.defaultRedirect(audience));
+    return res.redirect(302, auth.safeNextPath(context.next) || defaultRedirect);
   } catch (error) {
     const code = String(error.code || 'google_sign_in_failed').toLowerCase().replace(/[^a-z0-9_-]/g, '').slice(0, 60);
     const safeCode = encodeURIComponent(code || 'google_sign_in_failed');

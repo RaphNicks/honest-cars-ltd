@@ -46,7 +46,10 @@ function audienceMatches(user, audience) {
   const scope = normaliseAudience(audience);
   if (scope === 'staff') return roles.isStaff(user.role);
   if (scope === 'dealer') return user.role === 'dealer';
-  return user.role === 'customer';
+  // The customer door is open to customers and to partners: a partner is a
+  // person too and signs in here, landing in their portal (not the customer
+  // dashboard). Staff stays a closed surface — it cannot be opened from here.
+  return user.role === 'customer' || user.role === 'dealer';
 }
 
 /** Where a finished sign-in lands. Accepts an audience or the account's role. */
