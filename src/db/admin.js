@@ -1019,6 +1019,34 @@ async function customerCount() {
   return ints(row);
 }
 
+/** Every account — staff, dealers and customers — for the super admin's role
+    desk. An optional `q` filters by name, phone or sign-in email. */
+async function allAccounts({ q = null } = {}) {
+  const where = [];
+  const params = [];
+  if (q) {
+    where.push('(u.name LIKE ? OR u.phone LIKE ? OR u.email LIKE ?)');
+    params.push(`%${q}%`, `%${q}%`, `%${q}%`);
+  }
+  const rows = await query(
+    `SELECT u.id, u.name, u.phone, u.email, u.role, u.status, u.last_seen_at
+       FROM \`users\` u
+      ${where.length ? `WHERE ${where.join(' AND ')}` : ''}
+      ORDER BY FIELD(u.role,'admin','ops','inspector','finance','marketing','dealer','customer'), u.name
+      LIMIT 300`,
+    params,
+  );
+  return rows.map((row) => ({
+    id: row.id,
+    name: row.name || 'Unnamed',
+    maskedPhone: phones.mask(row.phone),
+    signInEmail: row.email || null,
+    role: row.role,
+    status: row.status,
+    lastSeenAt: row.last_seen_at,
+  }));
+}
+
 module.exports = {
   STALE_DAYS,
   REFRESH_GRACE_DAYS,
@@ -1061,6 +1089,7 @@ module.exports = {
   saveInspectionReport,
   inspectorJobs,
   staffList,
+  allAccounts,
   setRole,
   setSignInEmail,
   setWatchlist,

@@ -31,9 +31,13 @@
       </a>
 
       <button class="admin-bar__toggle" type="button" aria-expanded="false" aria-controls="admin-nav" data-admin-nav-toggle>
-        <%- helpers.icon('menu', { size: 20 }) %><span class="admin-bar__toggle-label">Menu</span>
+        <span class="admin-bar__toggle-ic admin-bar__toggle-ic--menu"><%- helpers.icon('menu', { size: 20 }) %></span>
+        <span class="admin-bar__toggle-ic admin-bar__toggle-ic--close"><%- helpers.icon('close', { size: 20 }) %></span>
+        <span class="admin-bar__toggle-txt admin-bar__toggle-txt--menu">Menu</span>
+        <span class="admin-bar__toggle-txt admin-bar__toggle-txt--close">Close</span>
       </button>
 
+      <div class="admin-bar__menu">
       <nav class="admin-bar__nav" id="admin-nav" aria-label="Console sections">
         <% admin.nav.forEach(function (item) { %>
           <a class="admin-bar__link<%= admin.active === item.href ? ' is-current' : '' %>"
@@ -53,6 +57,7 @@
         <form method="post" action="/api/auth/logout" class="inline">
           <button class="btn btn--ghost btn--sm" type="submit">Sign out</button>
         </form>
+      </div>
       </div>
     </div>
   </aside>

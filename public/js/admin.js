@@ -79,7 +79,8 @@ function wireConfirm() {
   });
 }
 
-/** On small screens the console nav folds into a tap-to-open menu. */
+/** On small screens the console nav is a full-screen overlay: open it and the
+    page hides behind, with a Close button left on the fixed top bar. */
 function wireNavToggle() {
   const toggle = document.querySelector('[data-admin-nav-toggle]');
   const bar = toggle ? toggle.closest('.admin-bar') : null;
@@ -87,13 +88,14 @@ function wireNavToggle() {
 
   const setOpen = (open) => {
     bar.classList.toggle('is-open', open);
+    document.body.classList.toggle('admin-menu-open', open);
     toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
   };
   toggle.addEventListener('click', () => setOpen(!bar.classList.contains('is-open')));
 
-  // Choosing a section closes the menu. (A full page load resets it anyway;
-  // this keeps the touch state tidy before navigation.)
-  bar.querySelectorAll('.admin-bar__nav a').forEach((link) => {
+  // Picking a page (or the Site link) closes the overlay. A full page load
+  // resets it anyway; this keeps the touch state tidy before navigation.
+  bar.querySelectorAll('.admin-bar__menu a').forEach((link) => {
     link.addEventListener('click', () => setOpen(false));
   });
 }

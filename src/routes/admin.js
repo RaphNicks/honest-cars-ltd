@@ -1280,22 +1280,26 @@ router.get('/jobs/:id/report.pdf', auth.requireAnyStaff(['bookings.own_jobs', 'b
 // ---------------------------------------------------------------------------
 router.get('/staff', auth.requireStaff('users.manage'), async (req, res, next) => {
   try {
-    const [staff, customers, dealerAccounts, unclaimedLots] = await Promise.all([
+    const q = validate.text(req.query.q, 60) || null;
+    const [staff, customers, dealerAccounts, unclaimedLots, allAccounts] = await Promise.all([
       admin.staffList(),
       admin.customerCount(),
       dealers.dealerAccounts(),
       dealers.unclaimed(50),
+      admin.allAccounts({ q }),
     ]);
     return await page(req, res, {
       view: 'admin/staff',
       active: PATHS.staff,
       title: 'Staff & roles',
-      description: 'Who is staff, what they may do, the dealer onboarding list, and the watchlist.',
+      description: 'Who is staff, what they may do, every account and its role, the dealer onboarding list, and the watchlist.',
       data: {
         staff,
         customers,
         dealerAccounts,
         unclaimedLots,
+        allAccounts,
+        q,
         roleLabels: roles.ROLE_LABELS,
         matrix: roles.MATRIX,
         capabilitiesFor: roles.capabilitiesFor,

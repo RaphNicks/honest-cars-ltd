@@ -104,6 +104,64 @@
 </section>
 
 <section class="panel">
+  <div class="panel__head">
+    <div>
+      <h2 class="panel__title">All accounts</h2>
+      <span class="cms-hint">Every account, including customers, and the role you can set for it</span>
+    </div>
+    <form class="admin-filters" method="get" action="/admin/staff">
+      <label class="visually-hidden" for="allacc-q">Search accounts</label>
+      <input class="input input--compact" id="allacc-q" name="q" type="search" value="<%= q || '' %>" placeholder="Name, phone or email">
+      <button class="btn btn--secondary btn--sm" type="submit">Search</button>
+    </form>
+  </div>
+  <p class="note-inline">
+    Anyone here can be made a staff member — up to and including Super Admin — and dropped back down to a
+    customer. A customer only sees the public site until you give them a role. Setting a role is audited.
+  </p>
+  <% if (!allAccounts.length) { %>
+    <p class="empty-line">No accounts match “<%= q %>”.</p>
+  <% } else { %>
+    <div class="table-scroll">
+      <table class="table table--stack">
+        <caption class="visually-hidden">Every account and the role assigned to it</caption>
+        <thead>
+          <tr>
+            <th scope="col">Account</th>
+            <th scope="col">Role</th>
+            <th scope="col">Set role</th>
+            <th scope="col">Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% allAccounts.forEach(function (account) { %>
+            <tr>
+              <th scope="row">
+                <%= account.name %>
+                <br><span class="muted"><%= account.maskedPhone || 'no phone' %><% if (account.signInEmail) { %> · <%= account.signInEmail %><% } %></span>
+              </th>
+              <td><span class="badge badge--role-<%= account.role %>"><%= roleLabels[account.role] || account.role %></span></td>
+              <td>
+                <form method="post" action="/admin/staff/<%= account.id %>/role" class="inline-form">
+                  <label class="visually-hidden" for="allacc-role-<%= account.id %>">Role</label>
+                  <select class="select select--compact" id="allacc-role-<%= account.id %>" name="role">
+                    <% assignableRoles.forEach(function (role) { %>
+                      <option value="<%= role %>" <%= account.role === role ? 'selected' : '' %>><%= roleLabels[role] || role %></option>
+                    <% }); %>
+                  </select>
+                  <button class="btn btn--secondary btn--sm" type="submit">Apply</button>
+                </form>
+              </td>
+              <td><span class="badge <%= account.status === 'active' ? 'badge--ok' : 'badge--attention' %>"><%= account.status %></span></td>
+            </tr>
+          <% }); %>
+        </tbody>
+      </table>
+    </div>
+  <% } %>
+</section>
+
+<section class="panel">
   <h2 class="panel__title">Dealer accounts &amp; lots</h2>
   <p class="note-inline">
     A dealer login sees exactly one lot — the one linked here. Until a lot is linked, the account

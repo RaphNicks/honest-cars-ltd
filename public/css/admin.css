@@ -1236,6 +1236,8 @@ a.hire-cal__ref:hover { text-decoration: underline; }
   padding: var(--space-3) var(--space-2);
 }
 
+.admin-bar__menu { display: flex; flex-direction: column; flex: 1 1 auto; min-height: 0; }
+
 .admin-bar__nav { flex-direction: column; flex: 0 0 auto; }
 
 .admin-bar__link { justify-content: flex-start; }
@@ -1248,17 +1250,22 @@ a.hire-cal__ref:hover { text-decoration: underline; }
 }
 
 @media (max-width: 768px) {
+  body.admin-menu-open { overflow: hidden; }
   .admin-shell { grid-template-columns: 1fr; min-height: 0; }
-  .admin-bar { position: static; height: auto; overflow: visible; }
+  /* A fixed top bar (brand + Menu/Close) that always stays at the very top, so
+     the Close button is reachable no matter where the page was scrolled. */
+  .admin-bar { position: fixed; top: 0; left: 0; right: 0; z-index: 50; height: auto; overflow: visible; }
   .admin-bar__inner {
     min-height: 0;
     flex-direction: row;
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
     align-items: center;
     justify-content: space-between;
     gap: var(--space-1) var(--space-2);
     padding: var(--space-1) var(--space-2);
   }
+  /* Clear the fixed bar so the page is not hidden under it. */
+  .admin-content { padding-top: 56px; }
   .admin-bar__brand { flex: 1 1 auto; }
   .admin-bar__toggle {
     display: inline-flex;
@@ -1275,22 +1282,41 @@ a.hire-cal__ref:hover { text-decoration: underline; }
     cursor: pointer;
   }
   .admin-bar__toggle:active { background: rgba(255, 255, 255, 0.14); }
+  /* Closed shows "Menu"; open shows "Close" on the same always-visible button. */
+  .admin-bar__toggle-ic--close,
+  .admin-bar__toggle-txt--close { display: none; }
+  .admin-bar.is-open .admin-bar__toggle-ic--menu,
+  .admin-bar.is-open .admin-bar__toggle-txt--menu { display: none; }
+  .admin-bar.is-open .admin-bar__toggle-ic--close,
+  .admin-bar.is-open .admin-bar__toggle-txt--close { display: inline-flex; }
 
-  /* The section links + people block collapse into a tap-to-open menu, so the
-     page (not the navigation) owns the screen. */
-  .admin-bar__nav,
-  .admin-bar__me { display: none; }
-  .admin-bar.is-open .admin-bar__nav,
-  .admin-bar.is-open .admin-bar__me {
+  /* The links + people block is a full-screen overlay that drops down from
+     beneath the top bar and covers the page — only the bar (with Close) shows
+     above it. It stays off-screen until the menu is open. */
+  .admin-bar__menu {
+    position: fixed;
+    top: 56px;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 40;
     display: flex;
-    flex-basis: 100%;
+    flex-direction: column;
+    gap: var(--space-2);
+    background: var(--navy-deep);
+    padding: var(--space-2);
+    overflow-y: auto;
+    transform: translateY(-100%);
+    visibility: hidden;
+    transition: transform 0.16s ease, visibility 0.16s ease;
+  }
+  .admin-bar.is-open .admin-bar__menu { transform: translateY(0); visibility: visible; }
+  .admin-bar__menu .admin-bar__nav { gap: 2px; }
+  .admin-bar__menu .admin-bar__nav .admin-bar__link { width: 100%; }
+  .admin-bar__me {
+    margin-top: auto;
     flex-direction: column;
     align-items: stretch;
-  }
-  .admin-bar.is-open .admin-bar__nav { gap: 2px; }
-  .admin-bar.is-open .admin-bar__nav .admin-bar__link { width: 100%; }
-  .admin-bar.is-open .admin-bar__me {
-    margin-top: var(--space-1);
     padding-top: var(--space-2);
     border-top: 1px solid rgba(255, 255, 255, 0.16);
     gap: var(--space-1);
