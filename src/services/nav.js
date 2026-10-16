@@ -14,6 +14,7 @@ const HEADER_NAV = [
   { label: 'Services', href: '/services', mega: true },
   { label: 'Sell/Swap', href: '/sell-swap' },
   { label: 'Hire', href: '/hire' },
+  { label: 'Become a partner', href: '/become-a-partner' },
   { label: 'Blog', href: '/blog' },
 ];
 
