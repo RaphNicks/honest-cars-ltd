@@ -1803,6 +1803,81 @@ router.post(
   },
 );
 
+// A decision's email can be missed (mail down at the time, or delivered before
+// the send was wired up). Re-send it against what actually happened.
+router.post(
+  '/dealers/applications/:id/resend',
+  auth.requireStaff('dealers.manage'),
+  auth.sameOriginOnly,
+  async (req, res, next) => {
+    try {
+      const id = Number.parseInt(req.params.id, 10);
+      if (!Number.isFinite(id) || id < 1) return next();
+      const application = await db.dealers.applicationById(id);
+      if (!application) return next();
+      if (application.status === 'pending') {
+        return done(res, PATHS.applications, 'Handle it first — approve or decline, then re-send if you need to.', { error: true });
+      }
+      const recipient = application.account_email || application.email;
+      if (!recipient) {
+        return done(res, PATHS.applications, 'There is no email address on this application to re-send to.', { error: true });
+      }
+
+      let template;
+      let values;
+      let subject;
+      if (application.status === 'approved') {
+        // Re-send against the lot as it stands, so a lot that was renamed at
+        // approval reads correctly.
+        const lot =
+          application.type === 'update'
+            ? await db.dealers.byId(application.dealer_id)
+            : await db.dealers.forUser(application.user_id);
+        const lotName = (lot && lot.name) || application.lot_name;
+        if (application.type === 'new') {
+          template = 'partner_approved';
+          values = {
+            lot: lotName,
+            tierLabel: PARTNER_TIER_LABELS[(lot && lot.tier) || application.tier] || application.tier,
+            commission: lot && lot.commissionPct != null ? lot.commissionPct : application.commission_pct,
+            portal: `${config.siteUrl}/dealer`,
+          };
+          subject = `Welcome to Honest Cars — ${lotName}`;
+        } else {
+          template = 'partner_lot_updated';
+          values = { lot: lotName };
+          subject = 'Your Honest Cars lot is updated';
+        }
+      } else {
+        const lotName =
+          application.type === 'new'
+            ? application.lot_name
+            : application.current_lot_name || application.lot_name;
+        template = 'partner_declined';
+        values = { lot: lotName, reason: application.decline_reason };
+        subject = 'Your Honest Cars partner application';
+      }
+
+      const result = await notify.send({
+        template,
+        values,
+        subject,
+        recipient,
+        entity: 'dealer_application',
+        entityId: application.id,
+        createdBy: req.user.id,
+        mustDeliver: true,
+      });
+      if (!result.ok) {
+        return done(res, PATHS.applications, `Could not re-send: ${result.error}`, { error: true });
+      }
+      return done(res, PATHS.applications, `Re-sent to ${recipient} — it should reach their inbox shortly (check spam if it does not).`);
+    } catch (error) {
+      return next(error);
+    }
+  },
+);
+
 // A leaked key is an emergency, so the desk can cut one off without waiting for
 // the dealer to sign in.
 router.post('/dealers/:id/keys/:keyId/revoke', auth.requireStaff('dealers.manage'), auth.sameOriginOnly, async (req, res, next) => {
