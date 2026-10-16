@@ -637,6 +637,16 @@ async function savedCars(userId) {
     .filter(Boolean);
 }
 
+// Keep the listing's denormalized save counter in step with saved_cars — the
+// stock pages read the column, not the saved_cars table (mirrors the views
+// sync in /api/events and the backfill in migration 036).
+async function refreshSavesCount(listingId) {
+  await query(
+    'UPDATE vehicle_listings SET saves = (SELECT COUNT(*) FROM saved_cars WHERE listing_id = ?) WHERE id = ?',
+    [listingId, listingId],
+  );
+}
+
 async function addSavedCar(userId, listingId, note = null) {
   // FR-25: record the price the saver is looking at. The alert sweep measures
   // every future drop from here, so saving a car is never itself an alert.
@@ -648,11 +658,13 @@ async function addSavedCar(userId, listingId, note = null) {
        last_price_kobo = COALESCE(last_price_kobo, VALUES(last_price_kobo))`,
     [userId, listingId, note ? String(note).slice(0, 200) : null, listingId],
   );
+  await refreshSavesCount(listingId);
   return savedCarIds(userId);
 }
 
 async function removeSavedCar(userId, listingId) {
   await query('DELETE FROM saved_cars WHERE user_id = ? AND listing_id = ?', [userId, listingId]);
+  await refreshSavesCount(listingId);
   return savedCarIds(userId);
 }
 

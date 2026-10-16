@@ -83,6 +83,13 @@ router.post('/events', rateLimit({ windowMs: 60_000, max: 60 }), async (req, res
           sessionId: body.session || null,
         });
         stored += 1;
+        // Keep the denormalized view counter in step with the raw event, so the
+        // stock pages (which read the column, not the event log) stay truthful.
+        // Fire-and-forget: a metric bump must never hold the beacon response.
+        if (name === 'listing_view') {
+          const listingId = Number(event.payload && event.payload.listing_id);
+          if (Number.isFinite(listingId) && listingId > 0) db.listings.recordView(listingId);
+        }
       }
     }
 
