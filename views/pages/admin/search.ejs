@@ -1,0 +1,36 @@
+<%#
+  /admin/search — find a car across every lot (read-only).
+  A match shows its status, price, stock number and which dealer/lot it belongs
+  to, and links to the live listing when one is public.
+  Locals: rows, q, matched
+%>
+<% if (!q) { %>
+  <p class="empty-line">Use the search above — make, model or stock number — to find a car across every lot.</p>
+<% } else if (!rows.length) { %>
+  <p class="empty-line">No car matches “<%= q %>” at any lot.</p>
+<% } else { %>
+  <p class="muted"><%= matched %> match<%= matched === 1 ? '' : 'es' %> for “<%= q %>” across every lot.</p>
+  <div class="stack">
+    <% rows.forEach(function (row) { %>
+      <section class="panel search-row">
+        <div class="panel__head">
+          <div>
+            <h2 class="search-row__title"><%= row.year %> <%= row.make %> <%= row.model %><% if (row.trim) { %> <%= row.trim %><% } %></h2>
+            <p class="muted mb-0">
+              <span class="badge badge--<%= row.status %>"><%= row.status.replace(/_/g, ' ') %></span>
+              &nbsp;·&nbsp; <strong><%= helpers.formatNaira(row.priceKobo) %></strong>
+              &nbsp;·&nbsp; Stock <%= row.stockNo %>
+              &nbsp;·&nbsp; <%= row.dealer || 'No lot' %>
+              &nbsp;·&nbsp; <%= row.area %>
+            </p>
+          </div>
+          <% if (['live', 'reserved', 'sold'].includes(row.status)) { %>
+            <div class="admin-actions__group">
+              <a class="btn btn--secondary btn--sm" href="<%= row.url %>" target="_blank" rel="noopener">View listing</a>
+            </div>
+          <% } %>
+        </div>
+      </section>
+    <% }); %>
+  </div>
+<% } %>

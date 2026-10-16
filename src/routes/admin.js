@@ -335,6 +335,25 @@ router.get('/actions', auth.requireStaff('reports.view'), async (req, res, next)
 // ---------------------------------------------------------------------------
 // Listings moderation (§7.3)
 // ---------------------------------------------------------------------------
+// Cross-lot car search — find a car by make, model or stock no across every
+// dealer. Read-only; results reuse the moderation row shape, which carries the
+// dealer name, so the desk can see which lot a match belongs to.
+router.get('/search', auth.requireAnyStaff(['listings.moderate', 'reports.view']), async (req, res, next) => {
+  try {
+    const q = validate.text(req.query.q, 60) || null;
+    const list = await admin.moderationList({ status: null, q, limit: 100 });
+    return await page(req, res, {
+      view: 'admin/search',
+      active: null,
+      title: 'Car search',
+      description: 'Find a car across every lot — by make, model or stock number.',
+      data: { rows: list.rows, q, matched: list.rows.length },
+    });
+  } catch (error) {
+    return next(error);
+  }
+});
+
 router.get('/listings', auth.requireStaff('listings.moderate'), async (req, res, next) => {
   try {
     const status = validate.oneOf(req.query.status, [...admin.LISTING_STATUSES, 'all'], 'in_review');
