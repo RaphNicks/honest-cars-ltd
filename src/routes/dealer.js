@@ -65,6 +65,7 @@ const PATHS = {
   profile: `${HOME}/profile`,
   lot: `${HOME}/lot`,
   imports: `${HOME}/imports`,
+  storefront: `${HOME}/storefront`,
 };
 
 /** The three partner tiers, shown to a partner editing their own lot. */
@@ -199,7 +200,11 @@ async function page(req, res, { view, active, title, description, data = {}, sta
     },
     data: {
       admin: {
-        nav: NAV,
+        // The storefront entry only exists while the feature is on (§037) —
+        // off, the page 404s in the route and there is nothing to navigate to.
+        nav: config.features.dealerStorefront
+          ? [...NAV, { href: PATHS.storefront, label: 'Storefront', icon: 'home' }]
+          : NAV,
         active,
         user: req.user,
         dealer: true,
@@ -646,6 +651,45 @@ router.post('/lot', requireDealer, auth.sameOriginOnly, async (req, res, next) =
 // ---------------------------------------------------------------------------
 // Profile & agreement (§7.2)
 // ---------------------------------------------------------------------------
+// ---------------------------------------------------------------------------
+// Public storefront (§037) — the lot's own mini-site: its link, logo, tagline.
+// Flag-gated end to end: when config.features.dealerStorefront is off, the nav
+// entry is hidden and both routes redirect to the dashboard (nothing surfaces).
+// The logo is uploaded to the shared /api/media/upload endpoint client-side
+// (like the listing photos); only the returned URL is posted here.
+// ---------------------------------------------------------------------------
+router.get('/storefront', requireDealer, async (req, res, next) => {
+  try {
+    if (!config.features.dealerStorefront) return res.redirect(302, PATHS.dashboard);
+    return await page(req, res, {
+      view: 'dealer/storefront',
+      active: PATHS.storefront,
+      title: 'Storefront',
+      description: 'Your public lot page — the link you share, and the logo and tagline on it.',
+      data: {
+        storefrontPath: `/dealers/${req.lot.slug}`,
+        storefrontUrl: `${config.siteUrl}/dealers/${req.lot.slug}`,
+        logo: req.lot.logo || '',
+        tagline: req.lot.tagline || '',
+      },
+    });
+  } catch (error) {
+    return next(error);
+  }
+});
+
+router.post('/storefront', requireDealer, auth.sameOriginOnly, async (req, res, next) => {
+  try {
+    if (!config.features.dealerStorefront) return res.redirect(302, PATHS.dashboard);
+    const logo = String((req.body && req.body.logo) || '').trim().slice(0, 400);
+    const tagline = String((req.body && req.body.tagline) || '').trim().slice(0, 160);
+    await dealers.updateBranding(req.lot.id, { logo: logo || null, tagline: tagline || null });
+    return done(res, PATHS.storefront, 'Storefront updated.');
+  } catch (error) {
+    return next(error);
+  }
+});
+
 router.get('/profile', requireDealer, async (req, res, next) => {
   try {
     return await page(req, res, {

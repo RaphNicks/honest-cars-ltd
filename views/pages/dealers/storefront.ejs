@@ -15,20 +15,20 @@
     <div class="dealer-hero__top">
       <div class="dealer-hero__brand">
         <% if (dealer.logo) { %>
-          <img class="dealer-hero__logo" src="<%= dealer.logo %>" alt="<%= helpers.esc(dealer.name) %> logo"
+          <img class="dealer-hero__logo" src="<%= dealer.logo %>" alt="<%= dealer.name %> logo"
                width="72" height="72" loading="eager" decoding="async">
         <% } else { %>
           <div class="dealer-hero__logo dealer-hero__logo--placeholder" aria-hidden="true"><%- helpers.icon('car', { size: 26 }) %></div>
         <% } %>
         <div class="dealer-hero__id">
           <p class="eyebrow mb-0">Partner lot</p>
-          <h1><%= helpers.esc(dealer.name) %></h1>
-          <% if (dealer.tagline) { %><p class="dealer-hero__tagline mb-0"><%= helpers.esc(dealer.tagline) %></p><% } %>
-          <p class="dealer-hero__meta mb-0"><%- helpers.icon('mapPin', { size: 14 }) %> <%= helpers.esc(dealer.lotArea) %>, <%= helpers.esc(dealer.city) %></p>
+          <h1><%= dealer.name %></h1>
+          <% if (dealer.tagline) { %><p class="dealer-hero__tagline mb-0"><%= dealer.tagline %></p><% } %>
+          <p class="dealer-hero__meta mb-0"><%- helpers.icon('mapPin', { size: 14 }) %> <%= dealer.lotArea %>, <%= dealer.city %></p>
         </div>
       </div>
       <div class="dealer-hero__badges">
-        <span class="dealer-hero__tier"><%= helpers.esc(dealer.tierLabel) %></span>
+        <span class="dealer-hero__tier"><%= dealer.tierLabel %></span>
         <% if (dealer.verified) { %><span class="status-pill status-pill--confirmed"><%- helpers.icon('checkCircle', { size: 14 }) %> Verified by HonestCars</span><% } %>
         <span class="dealer-hero__count"><strong><%= result.total %></strong>&nbsp;in stock</span>
       </div>
@@ -85,7 +85,7 @@
     <div class="surface-panel">
       <div class="row row--between">
         <div>
-          <h2 class="mb-0">Buying from <%= helpers.esc(dealer.name) %></h2>
+          <h2 class="mb-0">Buying from <%= dealer.name %></h2>
           <p class="mb-0 note-inline">Interest is handled through HonestCars — we keep the channels and the money safe, so the dealer never handles your payment.</p>
         </div>
         <a class="btn btn--primary" href="/contact">Contact HonestCars</a>

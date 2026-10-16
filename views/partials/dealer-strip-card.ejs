@@ -8,15 +8,15 @@
   <div class="dealer-strip-card__media media-blur"
        <% var blur = car.image ? helpers.blurFor(car.image) : null; %><% if (blur) { %>style="background-image:url('<%= blur %>')"<% } %>>
     <% if (car.image) { %>
-      <img src="<%= helpers.photoSrc(car.image) %>" alt="<%= helpers.esc(car.title) %>"
+      <img src="<%= helpers.photoSrc(car.image) %>" alt="<%= car.title %>"
            width="600" height="400" loading="lazy" decoding="async">
     <% } else { %>
       <div class="placeholder-media" aria-hidden="true"></div>
     <% } %>
   </div>
   <div class="dealer-strip-card__body">
-    <h3 class="dealer-strip-card__title"><%= helpers.esc(car.title) %></h3>
+    <h3 class="dealer-strip-card__title"><%= car.title %></h3>
     <p class="dealer-strip-card__price mb-0"><%= helpers.formatNaira(car.priceKobo) %></p>
   </div>
-  <span class="dealer-strip-card__badge"><%= helpers.esc(badge) %></span>
+  <span class="dealer-strip-card__badge"><%= badge %></span>
 </a>

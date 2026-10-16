@@ -1,0 +1,109 @@
+<%#
+  /dealer/storefront — the lot's public mini-site and its branding (§037).
+  Flag-gated in the route (config.features.dealerStorefront): when off, the nav
+  entry is hidden and the route redirects to the dashboard.
+
+  The dealer sets a logo (uploaded through the shared /api/media/upload endpoint,
+  like the listing photos) and a short tagline, then shares the lot's public URL.
+  The public page lives at /dealers/:slug and is indexable while the feature is
+  on. Locals: lot, storefrontPath, storefrontUrl, logo, tagline (+ ok, error).
+%>
+<section class="panel">
+  <div class="panel__head">
+    <h2 class="panel__title">Your storefront</h2>
+    <span class="cms-hint">A public page for your lot</span>
+  </div>
+  <p class="muted">
+    This is your lot's public mini-site — a page showing your cars that buyers can open and share.
+    Set a logo and a short tagline below, then share the link with your customers.
+  </p>
+
+  <div class="field mt-2">
+    <label class="field__label">Storefront link</label>
+    <div class="row" style="gap: var(--space-1); align-items: center;">
+      <input class="input" type="text" readonly value="<%= storefrontUrl %>" aria-label="Your storefront link">
+      <button class="btn btn--secondary" type="button" data-copy-link data-copy="<%= storefrontUrl %>" data-copy-label="Copy">Copy</button>
+      <a class="btn btn--ghost" href="<%= storefrontPath %>" target="_blank" rel="noopener">View live page</a>
+    </div>
+    <span class="field__hint">The link buyers use to reach your lot. It is live and indexable while this feature is on.</span>
+  </div>
+</section>
+
+<section class="panel mt-3">
+  <div class="panel__head">
+    <h2 class="panel__title">Branding</h2>
+  </div>
+
+  <form method="post" action="/dealer/storefront" class="mt-2">
+    <div class="field">
+      <label class="field__label" for="storefront-logo">Logo</label>
+      <div data-logo-upload>
+        <img id="storefront-logo-thumb" src="<%= logo %>" alt="Your logo preview"
+             style="max-height:72px; max-width:160px; object-fit:contain; border-radius:12px; border: var(--border); background:#fff;"
+             <%= logo ? '' : 'hidden' %>>
+        <div class="mt-1">
+          <input type="file" id="storefront-logo" name="logo-file" accept="image/jpeg,image/png,image/webp" data-logo-input>
+        </div>
+        <input type="hidden" name="logo" value="<%= logo %>" data-logo-url>
+        <p class="field__hint" data-logo-status>JPEG, PNG or WebP, up to 8&nbsp;MB. A square logo looks best.</p>
+      </div>
+    </div>
+
+    <div class="field">
+      <label class="field__label" for="storefront-tagline">Tagline</label>
+      <input class="input" id="storefront-tagline" name="tagline" type="text" maxlength="160"
+             value="<%= tagline %>" placeholder="e.g. Verified family cars, all papered">
+      <span class="field__hint">A short line under your lot name on your storefront. Up to 160 characters.</span>
+    </div>
+
+    <div class="mt-1">
+      <button class="btn btn--primary" type="submit">Save storefront</button>
+    </div>
+  </form>
+</section>
+
+<script>
+  // Portal storefront: upload the logo through the shared media endpoint (the
+  // file travels as-is, the served URL is what the form keeps) and copy the
+  // public link to the clipboard.
+  (function () {
+    var box = document.querySelector('[data-logo-upload]');
+    if (box) {
+      var fileInput = box.querySelector('[data-logo-input]');
+      var urlInput = box.querySelector('[data-logo-url]');
+      var thumb = box.querySelector('#storefront-logo-thumb');
+      var status = box.querySelector('[data-logo-status]');
+      fileInput.addEventListener('change', async function () {
+        var file = fileInput.files && fileInput.files[0];
+        if (!file) return;
+        if (status) status.textContent = 'Uploading…';
+        try {
+          var res = await fetch('/api/media/upload', { method: 'POST', headers: { 'Content-Type': file.type }, body: file });
+          var data = await res.json().catch(function () { return {}; });
+          if (!res.ok || !data.ok) throw new Error((data && data.error) || 'Upload failed — try another image.');
+          urlInput.value = data.url;
+          if (thumb) { thumb.src = data.url; thumb.hidden = false; }
+          if (status) status.textContent = file.name + ' — uploaded.';
+        } catch (err) {
+          if (status) status.textContent = (err && err.message) ? err.message : 'Upload failed — try another image.';
+        } finally {
+          fileInput.value = '';
+        }
+      });
+    }
+
+    document.querySelectorAll('[data-copy-link]').forEach(function (btn) {
+      btn.addEventListener('click', async function () {
+        var text = btn.getAttribute('data-copy');
+        var label = btn.getAttribute('data-copy-label') || 'Copy';
+        try {
+          await navigator.clipboard.writeText(text);
+          btn.textContent = 'Copied';
+          setTimeout(function () { btn.textContent = label; }, 1500);
+        } catch (e) {
+          window.prompt('Copy your storefront link:', text);
+        }
+      });
+    });
+  })();
+</script>
