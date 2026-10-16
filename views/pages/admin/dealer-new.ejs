@@ -1,0 +1,46 @@
+<%#
+  /admin/dealers/new — open a dealership + lot under Honest Cars management.
+  No owner is attached yet; the dealer is handed the keys from the lot's page.
+  Locals: tiers
+%>
+<p class="mb-2"><a href="/admin/dealers">← All dealers</a></p>
+
+<section class="panel">
+  <div class="panel__head">
+    <h2 class="panel__title">New dealership</h2>
+    <span class="cms-hint">Opens as a verified lot under Honest Cars management — add cars under it, then hand it over to the dealer.</span>
+  </div>
+  <form method="post" action="/admin/dealers/new" class="stack">
+    <div class="field">
+      <label class="field__label" for="d-name">Dealership name *</label>
+      <input class="input" id="d-name" name="name" type="text" maxlength="160" required placeholder="e.g. Woji Auto Park">
+    </div>
+    <div class="admin-grid admin-grid--2">
+      <div class="field">
+        <label class="field__label" for="d-area">Lot area</label>
+        <input class="input" id="d-area" name="lot_area" type="text" maxlength="80" placeholder="e.g. Aba Road, PH">
+      </div>
+      <div class="field">
+        <label class="field__label" for="d-city">City</label>
+        <input class="input" id="d-city" name="city" type="text" maxlength="80" value="Port Harcourt">
+      </div>
+    </div>
+    <div class="admin-grid admin-grid--2">
+      <div class="field">
+        <label class="field__label" for="d-tier">Tier</label>
+        <select class="select" id="d-tier" name="tier">
+          <% tiers.forEach(function (pair) { %><option value="<%= pair[0] %>" <%= pair[0] === 'standard' ? 'selected' : '' %>><%= pair[1] %></option><% }); %>
+        </select>
+      </div>
+      <div class="field">
+        <label class="field__label" for="d-commission">Commission %</label>
+        <input class="input" id="d-commission" name="commission_pct" type="number" step="0.01" min="0" max="100" placeholder="e.g. 3.5">
+      </div>
+    </div>
+    <p class="muted">It opens <strong>verified</strong> and without an owner, so you can upload cars under it right away. You hand it over to the dealer from its page when they are ready.</p>
+    <div class="btn-row">
+      <a class="btn btn--secondary" href="/admin/dealers">Cancel</a>
+      <button class="btn btn--primary" type="submit">Open the dealership</button>
+    </div>
+  </form>
+</section>

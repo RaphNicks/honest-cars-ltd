@@ -52,6 +52,7 @@ const locals = require('../lib/locals');
 const privacyService = require('../services/privacy');
 const mfaService = require('../services/mfa');
 const csv = require('../lib/csv');
+const phoneLib = require('../lib/phone');
 const { sendPage, CACHE } = require('../lib/respond');
 
 const router = express.Router();
@@ -1630,8 +1631,56 @@ router.get('/dealers', auth.requireStaff('dealers.view'), async (req, res, next)
       active: PATHS.dealers,
       title: 'Dealers',
       description: 'Every partner lot: stock, commission, statement history and the add-ons they have paid for.',
-      data: { lots, totals, purchases, statementService },
+      data: { lots, totals, purchases, statementService, canManage: roles.can(req.user.role, 'dealers.manage') },
     });
+  } catch (error) {
+    return next(error);
+  }
+});
+
+// Honest Cars opens the dealership + lot itself (no self-serve application):
+// a real partner whose cars we upload on their behalf before they come online.
+// It starts owner-less ("under Honest Cars management"); the dealer is handed
+// the keys later from the lot's page (see POST /dealers/:id/handover).
+router.get('/dealers/new', auth.requireStaff('dealers.manage'), async (req, res, next) => {
+  try {
+    return await page(req, res, {
+      view: 'admin/dealer-new',
+      active: PATHS.dealers,
+      title: 'Add a dealer',
+      description: 'Open a new dealership and lot. It starts under Honest Cars management until you hand it over to the dealer from its page.',
+      data: { tiers: Object.entries(PARTNER_TIER_LABELS) },
+    });
+  } catch (error) {
+    return next(error);
+  }
+});
+
+router.post('/dealers/new', auth.requireStaff('dealers.manage'), auth.sameOriginOnly, async (req, res, next) => {
+  try {
+    const name = String(req.body.name || '').trim();
+    if (!name) return done(res, PATHS.dealers, 'Give the dealership a name.', { error: true });
+    const result = await db.dealers.createLot(
+      {
+        name,
+        lotArea: String(req.body.lot_area || '').trim(),
+        city: String(req.body.city || '').trim(),
+        tier: validate.oneOf(req.body.tier, ['pilot', 'standard', 'premium'], 'standard'),
+        verified: true,
+        commissionPct: req.body.commission_pct ? Number(req.body.commission_pct) : null,
+        userId: null,
+      },
+      { actorId: req.user.id },
+    );
+    if (!result.ok) return done(res, PATHS.dealers, result.error, { error: true });
+    await admin.recordAudit({
+      actorId: req.user.id,
+      action: 'dealer.created',
+      entity: 'dealer',
+      entityId: result.id,
+      detail: { lot: name, tier: result.tier, note: 'Opened under Honest Cars management (no owner yet).' },
+    });
+    return done(res, `/admin/dealers/${result.id}`, `${name} is open and under Honest Cars management — add cars under it, or hand it over to the dealer from its page.`);
   } catch (error) {
     return next(error);
   }
@@ -1920,7 +1969,8 @@ router.get('/dealers/:id', auth.requireStaff('dealers.view'), async (req, res, n
     const lot = await db.dealers.byId(id);
     if (!lot) return next();
 
-    const [ledger, months, purchases, dashboard, listings, keys] = await Promise.all([
+    const [owner, ledger, months, purchases, dashboard, listings, keys] = await Promise.all([
+      lot.userId ? db.users.findById(lot.userId) : Promise.resolve(null),
       db.dealers.statements(id, { limit: 200 }),
       statementService.months(id),
       db.addons.purchasesFor(id, { limit: 100 }),
@@ -1933,8 +1983,71 @@ router.get('/dealers/:id', auth.requireStaff('dealers.view'), async (req, res, n
       active: PATHS.dealers,
       title: lot.name,
       description: `Commission ledger, monthly statements and add-on purchases for ${lot.name}.`,
-      data: { lot, ledger, months, purchases, counts: dashboard.counts, commission: dashboard.commission, listings, keys, canManage: roles.can(req.user.role, 'dealers.manage') },
+      data: { lot, owner, ledger, months, purchases, counts: dashboard.counts, commission: dashboard.commission, listings, keys, canManage: roles.can(req.user.role, 'dealers.manage') },
     });
+  } catch (error) {
+    return next(error);
+  }
+});
+
+// Hand a dealership + lot over to the real dealer: create-or-find their login
+// by phone, make it a dealer, link it to the lot, and (if an email was given)
+// send them the portal welcome. The desk keeps the moderation/price/grade
+// controls; this only opens the dealer's own portal to their lot.
+router.post('/dealers/:id/handover', auth.requireStaff('dealers.manage'), auth.sameOriginOnly, async (req, res, next) => {
+  try {
+    const id = Number.parseInt(req.params.id, 10);
+    if (!Number.isFinite(id) || id < 1) return next();
+    const lot = await db.dealers.byId(id);
+    if (!lot) return next();
+
+    const name = String(req.body.name || '').trim();
+    const phoneRaw = String(req.body.phone || '').trim();
+    const emailRaw = String(req.body.email || '').trim();
+    if (!name) return done(res, `/admin/dealers/${id}`, 'Give the dealer a name before handing the lot over.', { error: true });
+    const phone = phoneLib.normalise(phoneRaw);
+    if (!phone) return done(res, `/admin/dealers/${id}`, 'That does not look like a Nigerian mobile number — check the phone.', { error: true });
+    const email = emailRaw ? db.users.normaliseEmail(emailRaw) : null;
+    if (emailRaw && !email) return done(res, `/admin/dealers/${id}`, 'That email does not look right — leave it blank if you have none.', { error: true });
+
+    const account = await db.users.upsertByPhone({ phone, name });
+    if (['ops', 'inspector', 'marketing', 'finance', 'admin'].includes(account.role)) {
+      return done(res, `/admin/dealers/${id}`, `That number is a staff account (${roles.ROLE_LABELS[account.role]}). Pick the dealer's own number.`, { error: true });
+    }
+    if (account.role !== 'dealer') {
+      const roleResult = await admin.setRole(account.id, 'dealer', { actorId: req.user.id });
+      if (!roleResult.ok) return done(res, `/admin/dealers/${id}`, `Could not hand over: ${roleResult.error}`, { error: true });
+    }
+    const linked = await db.dealers.linkUser(id, account.id);
+    if (!linked.ok) return done(res, `/admin/dealers/${id}`, linked.error, { error: true });
+
+    await admin.recordAudit({
+      actorId: req.user.id,
+      action: 'dealer.handover',
+      entity: 'dealer',
+      entityId: id,
+      detail: { lot: lot.name, accountId: account.id, name, phone },
+    });
+
+    let inviteLine = 'No email on file — tell them to sign in at the dealer portal with their number.';
+    if (email) {
+      try {
+        await notify.send({
+          template: 'partner_approved',
+          values: { lot: lot.name, tierLabel: PARTNER_TIER_LABELS[lot.tier] || lot.tier, commission: lot.commissionPct, portal: `${config.siteUrl}/dealer` },
+          subject: `Welcome to Honest Cars — ${lot.name}`,
+          recipient: email,
+          entity: 'dealer',
+          entityId: id,
+          createdBy: req.user.id,
+          mustDeliver: true,
+        });
+        inviteLine = `A welcome note with the portal link is on its way to ${email}.`;
+      } catch {
+        inviteLine = 'The handover is done, but the invite email could not be sent — tell them to sign in.';
+      }
+    }
+    return done(res, `/admin/dealers/${id}`, `${name} now runs ${lot.name} — the portal is open to them. ${inviteLine}`);
   } catch (error) {
     return next(error);
   }

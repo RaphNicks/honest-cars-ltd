@@ -29,6 +29,43 @@
 
 <p class="mb-2"><a href="/admin/dealers">← All dealers</a></p>
 
+<%# Handover — hand this dealership + lot to the real dealer. Only the partner
+    desk (admin/ops) sees it. If a login already runs it, say so; otherwise
+    create-or-link one by phone and invite them to the portal. %>
+<% if (canManage) { %>
+<section class="panel mt-3">
+  <div class="panel__head">
+    <h2 class="panel__title">Dealer access</h2>
+    <span class="cms-hint"><%= owner ? 'This lot is run through its own dealer login.' : 'Still under Honest Cars management — hand it over when the dealer is ready.' %></span>
+  </div>
+  <% if (owner) { %>
+    <p class="mb-1"><strong><%= lot.name %></strong> is run by <strong><%= owner.name || 'that account' %></strong><% if (owner.phone) { %> · <span class="tabular"><%= owner.phone %></span><% } %>.</p>
+    <p class="muted mb-0">Their portal shows this lot and its cars. To move it to a different person, <a href="/admin/staff">unlink the account in Staff &amp; roles</a>, then hand it over again.</p>
+  <% } else { %>
+    <form method="post" action="/admin/dealers/<%= lot.id %>/handover" class="stack">
+      <div class="admin-grid admin-grid--2">
+        <div class="field">
+          <label class="field__label" for="h-name">Dealer name *</label>
+          <input class="input" id="h-name" name="name" type="text" maxlength="120" required placeholder="Who runs this lot?">
+        </div>
+        <div class="field">
+          <label class="field__label" for="h-phone">Mobile number *</label>
+          <input class="input" id="h-phone" name="phone" type="tel" required placeholder="+2348031234567">
+        </div>
+      </div>
+      <div class="field">
+        <label class="field__label" for="h-email">Email, for the invite (optional)</label>
+        <input class="input" id="h-email" name="email" type="email" placeholder="name@dealership.com">
+      </div>
+      <p class="muted">This opens their dealer login, makes them a dealer and links them to this lot — every car already filed under it is now in their portal. They sign in with the number above (an OTP proves it is theirs).</p>
+      <div class="btn-row">
+        <button class="btn btn--primary" type="submit">Hand over to dealer</button>
+      </div>
+    </form>
+  <% } %>
+</section>
+<% } %>
+
 <div class="admin-grid admin-grid--4">
   <div class="kpi kpi--sm">
     <span class="kpi__label">Commission balance</span>

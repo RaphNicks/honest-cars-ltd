@@ -46,8 +46,13 @@
 
 <section class="panel mt-3">
   <div class="panel__head">
-    <h2 class="panel__title">Lots</h2>
-    <span class="cms-hint">Premium first, then by live stock</span>
+    <div>
+      <h2 class="panel__title">Lots</h2>
+      <span class="cms-hint">Premium first, then by live stock</span>
+    </div>
+    <% if (canManage) { %>
+      <a class="btn btn--primary btn--sm" href="/admin/dealers/new"><%- helpers.icon('plus', { size: 16 }) %> Add a dealer</a>
+    <% } %>
   </div>
 
   <% if (!lots.length) { %>
