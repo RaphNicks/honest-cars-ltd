@@ -71,4 +71,36 @@ async function sendAuthCode({ to, code, ttlMinutes, purpose = 'sign_in' }) {
   return { channel: 'email', delivered: true };
 }
 
-module.exports = { emailConfigured, maskEmail, escapeHtml, sendAuthCode };
+/**
+ * Deliver a plain-text notification (a partner decision, a status update, …)
+ * through the same SMTP as the sign-in codes. Unlike sendAuthCode there is no
+ * dev seam: a notification that cannot be sent is a delivery failure the caller
+ * records honestly, not a code to print on the server.
+ */
+async function sendEmail({ to, subject, text }) {
+  const transport = emailTransport();
+  if (!transport) {
+    return { ok: false, error: 'Email is not configured (SMTP_URL + SMTP_FROM).' };
+  }
+  const message = String(text || '');
+  const html =
+    `<!doctype html><html lang="en"><body style="margin:0;background:#f5f4f1;color:#20211f;font-family:Arial,sans-serif">` +
+    `<div style="max-width:520px;margin:0 auto;padding:32px 16px"><div style="background:#fff;border-radius:12px;padding:32px">` +
+    `<p style="margin:0 0 20px;color:#6c6d68;font-size:13px;letter-spacing:.08em;text-transform:uppercase">Honest Cars</p>` +
+    `<p style="margin:0;font-size:15px;line-height:1.65;white-space:pre-line">${escapeHtml(message)}</p>` +
+    `</div></div></body></html>`;
+  try {
+    await transport.sendMail({
+      from: config.mail.from,
+      to,
+      subject: String(subject || 'A message from Honest Cars'),
+      text: message,
+      html,
+    });
+    return { ok: true, providerRef: 'smtp' };
+  } catch (error) {
+    return { ok: false, error: `Email delivery failed: ${error.code || error.message || 'unknown'}` };
+  }
+}
+
+module.exports = { emailConfigured, maskEmail, escapeHtml, sendAuthCode, sendEmail };

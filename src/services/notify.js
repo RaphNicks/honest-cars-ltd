@@ -18,6 +18,7 @@
 
 const config = require('../config');
 const db = require('../db');
+const email = require('./email');
 
 /**
  * Templates. `{name}`, `{amount}`, `{reference}`, `{when}`… are substituted.
@@ -116,10 +117,19 @@ function formatNaira(kobo) {
   return `₦${naira.toLocaleString('en-NG', { maximumFractionDigits: 2 })}`;
 }
 
+// Partner onboarding notices always carry the applicant's account email, so
+// they default to being delivered by email rather than just logged to the
+// console. The desk can still move any of them to WhatsApp/SMS/console.
+const EMAIL_DEFAULT_TEMPLATES = new Set(['partner_approved', 'partner_declined', 'partner_lot_updated']);
+
 /** Which channel a template should take. */
 function channelFor(template, recipient) {
-  const preferred = config.notifications.channels[template] || config.notifications.defaultChannel;
-  if (preferred === 'email' && !recipient) return 'console';
+  const explicit = config.notifications.channels[template];
+  if (explicit) return explicit;
+  const hasEmail = recipient && String(recipient).includes('@');
+  if (EMAIL_DEFAULT_TEMPLATES.has(template) && hasEmail) return 'email';
+  const preferred = config.notifications.defaultChannel;
+  if (preferred === 'email' && !hasEmail) return 'console';
   return preferred;
 }
 
@@ -138,8 +148,11 @@ const providers = {
   async sms() {
     return { ok: false, error: 'SMS provider is not configured (NOTIFY_SMS_KEY).' };
   },
-  async email() {
-    return { ok: false, error: 'Email provider is not configured (NOTIFY_EMAIL_KEY).' };
+  async email({ body, subject, recipient }) {
+    if (!recipient || !String(recipient).includes('@')) {
+      return { ok: false, error: 'No email address to send to.' };
+    }
+    return email.sendEmail({ to: recipient, subject, text: body });
   },
 };
 
