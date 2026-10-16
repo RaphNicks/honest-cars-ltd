@@ -273,6 +273,10 @@ const config = {
     // Static pages are written to disk by `npm run build:static`; the server
     // serves them when present and falls back to request-time rendering.
     serveStaticPages: bool(process.env.SERVE_STATIC_PAGES, true),
+    // Per-dealer public storefront (GET /dealers/:slug). Built end to end but
+    // inert until the owner flips it on: off means the public pages 404 and the
+    // portal "Storefront" page is hidden, so nothing surfaces today.
+    dealerStorefront: bool(process.env.DEALER_STOREFRONT, false),
     staticDir: process.env.STATIC_DIR || 'dist',
     // Absolute — res.sendFile() requires it, and the build script and the
     // server must agree on the same directory regardless of cwd. Relative

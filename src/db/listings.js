@@ -82,6 +82,22 @@ function buildWhere(filters = {}, { alias = 'l', liveScoped = true } = {}) {
     );
   }
 
+  // Scope to a single lot — the public dealer storefront reuses the whole
+  // browse query and passes the lot id here. A non-numeric value is dropped,
+  // never queried.
+  if (filters.dealer_id) {
+    const dealerId = Math.trunc(Number(filters.dealer_id));
+    if (Number.isFinite(dealerId) && dealerId > 0) {
+      clauses.push('l.dealer_id = ?');
+      params.push(dealerId);
+    }
+  }
+  // Exclude sold cars from the live grid (the storefront keeps them in a
+  // separate "recently sold" strip so they are not counted twice).
+  if (filters.exclude_sold === true) {
+    clauses.push("l.status <> 'sold'");
+  }
+
   const numeric = {
     price_min_kobo: 'l.asking_price_kobo >= ?',
     price_max_kobo: 'l.asking_price_kobo <= ?',

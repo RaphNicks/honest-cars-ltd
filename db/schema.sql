@@ -93,6 +93,8 @@ CREATE TABLE IF NOT EXISTS dealers (
   agreement_ref     VARCHAR(80)      NULL,                  -- reference on the signed agreement
   agreement_url     VARCHAR(300)     NULL,                  -- digital copy, if ops has one
   commission_pct    DECIMAL(4,2)     NULL,                  -- the rate on the agreement
+  logo              VARCHAR(400)     NULL,                  -- storefront logo (037)
+  tagline           VARCHAR(160)     NULL,                  -- storefront tagline (037)
   created_at        TIMESTAMP        NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at        TIMESTAMP        NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (id),

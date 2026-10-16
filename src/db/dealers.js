@@ -70,10 +70,81 @@ function shapeDealer(row) {
     agreementRef: row.agreement_ref || null,
     agreementUrl: row.agreement_url || null,
     commissionPct: row.commission_pct === null ? null : Number(row.commission_pct),
+    logo: row.logo || null,
+    tagline: row.tagline || null,
     listingsTotal: row.listings_total === undefined ? undefined : Number(row.listings_total),
     // §7.2 “tier badge”
     tierLabel: { pilot: 'Pilot partner', standard: 'Standard partner', premium: 'Premium partner' }[row.tier] || row.tier,
   };
+}
+
+// ---------------------------------------------------------------------------
+// Public storefront (GET /dealers/:slug) — gated by config.features.dealerStorefront
+// ---------------------------------------------------------------------------
+
+/** The public identity of one lot, looked up by its unique slug. */
+async function bySlug(slug) {
+  const row = await queryOne('SELECT * FROM dealers WHERE slug = ? LIMIT 1', [String(slug || '').slice(0, 160)]);
+  return row ? shapeDealer(row) : null;
+}
+
+/** Save the lot's storefront branding (logo URL + tagline). Both optional. */
+async function updateBranding(id, { logo = null, tagline = null } = {}) {
+  const logoUrl = logo ? String(logo).trim().slice(0, 400) : null;
+  const tag = tagline ? String(tagline).trim().slice(0, 160) : null;
+  await query('UPDATE dealers SET logo = ?, tagline = ? WHERE id = ?', [logoUrl, tag, id]);
+  return byId(id);
+}
+
+/** A compact card for the storefront's secondary strips (no full media join). */
+function compactListing(row) {
+  return {
+    id: row.id,
+    stockNo: row.stock_no,
+    title: [row.year, row.make, row.model, row.trim].filter(Boolean).join(' '),
+    priceKobo: Number(row.asking_price_kobo),
+    slug: row.seo_slug,
+    url: `/cars/${row.seo_slug}`,
+    pricePosition: row.price_position,
+    image: row.image_url || null,
+    soldInDays:
+      row.published_at && row.sold_at
+        ? Math.max(1, Math.round((new Date(row.sold_at) - new Date(row.published_at)) / 86_400_000))
+        : null,
+  };
+}
+
+/** The lot's live cars priced below the market band — the storefront "Deals" strip. */
+async function storefrontDeals(id, limit = 6) {
+  const rows = await query(
+    `SELECT l.id, l.stock_no, l.seo_slug, l.year, l.make, l.model, l.trim,
+            l.asking_price_kobo, l.price_position, l.sold_at, l.published_at,
+            (SELECT m.url FROM listing_media m WHERE m.listing_id = l.id AND m.type = 'image'
+               ORDER BY m.position LIMIT 1) AS image_url
+       FROM vehicle_listings l
+      WHERE l.dealer_id = ? AND l.status = 'live' AND l.price_position = 'below'
+        AND (l.expires_at IS NULL OR l.expires_at > UTC_TIMESTAMP())
+      ORDER BY l.published_at DESC
+      LIMIT ?`,
+    [id, Math.min(12, Math.max(1, Number(limit) || 6))],
+  );
+  return rows.map(compactListing);
+}
+
+/** The lot's recently sold cars — the storefront's social-proof strip. */
+async function storefrontRecentlySold(id, limit = 6) {
+  const rows = await query(
+    `SELECT l.id, l.stock_no, l.seo_slug, l.year, l.make, l.model, l.trim,
+            l.asking_price_kobo, l.price_position, l.sold_at, l.published_at,
+            (SELECT m.url FROM listing_media m WHERE m.listing_id = l.id AND m.type = 'image'
+               ORDER BY m.position LIMIT 1) AS image_url
+       FROM vehicle_listings l
+      WHERE l.dealer_id = ? AND l.status = 'sold' AND l.sold_at IS NOT NULL
+      ORDER BY l.sold_at DESC
+      LIMIT ?`,
+    [id, Math.min(12, Math.max(1, Number(limit) || 6))],
+  );
+  return rows.map(compactListing);
 }
 
 // ---------------------------------------------------------------------------
@@ -878,6 +949,10 @@ module.exports = {
   shapeDealerListing,
   forUser,
   byId,
+  bySlug,
+  updateBranding,
+  storefrontDeals,
+  storefrontRecentlySold,
   dashboard,
   list,
   fleetTotals,
