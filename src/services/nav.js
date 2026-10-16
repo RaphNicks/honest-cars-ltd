@@ -14,7 +14,6 @@ const HEADER_NAV = [
   { label: 'Services', href: '/services', mega: true },
   { label: 'Sell/Swap', href: '/sell-swap' },
   { label: 'Hire', href: '/hire' },
-  { label: 'Become a partner', href: '/become-a-partner' },
   { label: 'Blog', href: '/blog' },
 ];
 
@@ -47,7 +46,7 @@ const FOOTER_COMPANY = [
   { label: 'About', href: '/about' },
   { label: 'Verification', href: '/verification' },
   { label: 'How It Works', href: '/how-it-works' },
-  { label: 'Partner With Us', href: '/partner' },
+  { label: 'Become a partner', href: '/become-a-partner' },
   { label: 'Blog', href: '/blog' },
   { label: 'FAQ', href: '/faq' },
   { label: 'Contact', href: '/contact' },
