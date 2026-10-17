@@ -63,6 +63,29 @@ function safeEqual(a, b) {
 }
 
 // ---------------------------------------------------------------------------
+// Password hashing (first factor for staff + dealer accounts, migration 038).
+// scrypt with a per-password random salt; the stored form is
+// `scrypt$<salt-hex>$<hash-hex>`. A slow KDF, not a fast HMAC, because this is
+// a secret a person types -- the usual online guessing target.
+// ---------------------------------------------------------------------------
+const SCRYPT_KEYLEN = 64;
+
+function hashPassword(password) {
+  const salt = crypto.randomBytes(16).toString('hex');
+  const derived = crypto.scryptSync(String(password), salt, SCRYPT_KEYLEN);
+  return `scrypt$${salt}$${derived.toString('hex')}`;
+}
+
+function verifyPassword(password, stored) {
+  if (!stored) return false;
+  const parts = String(stored).split('$');
+  if (parts.length !== 3 || parts[0] !== 'scrypt') return false;
+  const [, salt, hash] = parts;
+  const derived = crypto.scryptSync(String(password), salt, SCRYPT_KEYLEN);
+  return safeEqual(derived.toString('hex'), hash);
+}
+
+// ---------------------------------------------------------------------------
 // Session cookie
 // ---------------------------------------------------------------------------
 function cookieOptions({ maxAgeMs } = {}) {
@@ -141,6 +164,15 @@ function isMfaPending(req) {
   return Boolean(req.user && req.session && req.session.mfaPending);
 }
 
+/**
+ * §12.2 / 038 — a session that has proven its email but not yet set a password.
+ * Like an MFA-pending session it carries a user and no authority: the one door
+ * is the endpoint that stores the password.
+ */
+function isPasswordPending(req) {
+  return Boolean(req.user && req.session && req.session.passwordPending);
+}
+
 /** Send a half-signed-in session to the challenge, remembering where they were going. */
 function mfaChallenge(req, res) {
   const wantsJson = req.path.startsWith('/api/') || (req.get('accept') || '').includes('application/json');
@@ -152,6 +184,25 @@ function mfaChallenge(req, res) {
   // for a shared cache to keep.
   res.set('Cache-Control', 'private, no-store, no-cache, must-revalidate');
   return res.redirect(302, `/login/mfa?next=${target}`);
+}
+
+/**
+ * §12.2 / 038 — send a password-pending session to the sign-in surface for its
+ * role, where the "set your password" step lives. The session is remembered, so
+ * that surface opens straight on the password step rather than the email code.
+ */
+function passwordChallenge(req, res) {
+  const role = (req.user && req.user.role) || 'customer';
+  const next_ = encodeURIComponent(req.originalUrl || '');
+  let loginPath;
+  if (role === 'dealer') loginPath = '/dealer/login';
+  else if (roles.isStaff(role)) loginPath = config.admin.enforceHost ? '/login' : '/admin/login';
+  else loginPath = '/login';
+  const wantsJson = req.path.startsWith('/api/') || (req.get('accept') || '').includes('application/json');
+  if (wantsJson) {
+    return res.status(401).json({ ok: false, error: 'Set a password to finish signing in.' });
+  }
+  return res.redirect(302, `${loginPath}${next_ ? `?next=${next_}` : ''}`);
 }
 
 /**
@@ -197,6 +248,7 @@ function mfaGate(req, res, next) {
     '/login',
     '/login/mfa',
     '/api/auth/mfa',
+    '/api/auth/password/set',
     '/api/auth/logout',
     '/api/auth/email/otp',
     '/api/auth/email/verify',
@@ -209,6 +261,7 @@ function mfaGate(req, res, next) {
   }
 
   if (isMfaPending(req)) return mfaChallenge(req, res);
+  if (isPasswordPending(req)) return passwordChallenge(req, res);
 
   if (mfa.mustEnrol(req.user) && !mfaEnrolmentOpen(path) && !path.startsWith('/api/account/')) {
     const wantsJson = path.startsWith('/api/') || (req.get('accept') || '').includes('application/json');
@@ -228,6 +281,7 @@ function mfaGate(req, res, next) {
 /** Gate a page behind a login. HTML redirects to /login?next=…, APIs get 401. */
 function requireUser(req, res, next) {
   if (isMfaPending(req)) return mfaChallenge(req, res);
+  if (isPasswordPending(req)) return passwordChallenge(req, res);
   if (req.user) return next();
   const wantsJson = req.path.startsWith('/api/') || (req.get('accept') || '').includes('application/json');
   if (wantsJson) return res.status(401).json({ ok: false, error: 'Sign in to continue.' });
@@ -270,6 +324,7 @@ function requireStaff(options = {}) {
       return res.redirect(302, `${loginPath}?next=${target}`);
     }
     if (isMfaPending(req)) return mfaChallenge(req, res);
+    if (isPasswordPending(req)) return passwordChallenge(req, res);
     if (mfa.mustEnrol(req.user) && !mfaEnrolmentOpen(fullPath(req))) {
       return res.redirect(302, `/admin/security?err=${encodeURIComponent('Set up two-step sign-in first — this role can move money or grant roles.')}`);
     }
@@ -349,6 +404,8 @@ module.exports = {
   hashEmailCode,
   signAuthState,
   hashToken,
+  hashPassword,
+  verifyPassword,
   generateCode,
   newSessionToken,
   safeEqual,
@@ -357,6 +414,8 @@ module.exports = {
   mfaEnrolmentOpen,
   mfaChallenge,
   isMfaPending,
+  isPasswordPending,
+  passwordChallenge,
   requireUser,
   sameOriginOnly,
   setSessionCookie,

@@ -207,6 +207,26 @@ async function makeAccount({ role = 'customer', name = 'Test Fixture', email = n
   return { id: userId, email: address, role, name, phone: phone || null };
 }
 
+/**
+ * §12.2 / 038 — finish the self-set password step if a staff or dealer sign-in
+ * stopped there (a fixture account has no password, so its first email sign-in
+ * is always password-pending). A customer sign-in never stops here, so the call
+ * is a no-op for the customer door. Returns the /password/set body (or the
+ * verify body when there was nothing to set).
+ */
+async function completePassword(client, verifyResponse, { baseUrl = null, password = 'Test-Pass-1234' } = {}) {
+  const body = verifyResponse.json || {};
+  if (!body.password || !body.password.required) return body;
+  const headers = baseUrl ? { Origin: baseUrl } : {};
+  const set = await client.request('/api/auth/password/set', {
+    method: 'POST',
+    body: { password, confirm: password },
+    headers,
+  });
+  if (set.status !== 200) throw new Error(`set-password step failed (${set.status}): ${set.text}`);
+  return set.json;
+}
+
 module.exports = {
   ROOT,
   dbAvailable,
@@ -216,6 +236,7 @@ module.exports = {
   sweepOrphanAudit,
   enrolMfa,
   completeMfa,
+  completePassword,
   nextEmail,
   makeAccount,
 };

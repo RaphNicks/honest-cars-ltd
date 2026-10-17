@@ -245,6 +245,61 @@ maybe('staff and dealer sign-in is closed to provisioned accounts and cannot cre
   assert.equal(dealerVerify.json.redirect, '/dealer/dashboard');
 });
 
+maybe('staff sign-in adds a password first factor, self-set on first login', async () => {
+  const db = require('../src/db');
+  const config = require('../src/config');
+  // The general suite runs with the flag off (historical no-password fixtures);
+  // this test turns it on, exercises the on path, then restores it.
+  const flagBefore = config.auth.passwordForStaffDealers;
+  config.auth.passwordForStaffDealers = true;
+  try {
+    // An ops account (no authenticator) sets its password on first sign-in.
+    const ops = await makeAccount({ role: 'ops', name: 'Password Staff' });
+    createdEmails.add(ops.email);
+    const client = newClient();
+    const otp = await client.request('/api/auth/email/otp', { method: 'POST', body: { email: ops.email, audience: 'staff' } });
+    assert.equal(otp.status, 200, otp.text);
+    const verify = await client.request('/api/auth/email/verify', { method: 'POST', body: { email: ops.email, code: otp.json.devCode, audience: 'staff' } });
+    assert.equal(verify.status, 200, verify.text);
+    assert.deepEqual(verify.json.password, { required: true }, 'first login stops at the set-password step');
+
+    // The password-pending session has no authority: the console is off-limits.
+    const protectedPage = await client.request('/admin', { headers: { Accept: 'text/html' } });
+    assert.ok([302, 303, 401, 403].includes(protectedPage.status), 'a password-pending session cannot open the console');
+
+    // Choose the password — the same session continues.
+    const setPw = await client.request('/api/auth/password/set', { method: 'POST', body: { password: 'correct-horse-99', confirm: 'correct-horse-99' } });
+    assert.equal(setPw.status, 200, setPw.text);
+    assert.equal(setPw.json.redirect, '/admin', 'an ops account with no authenticator lands on the console');
+
+    // The password is stored as an scrypt hash, never the plaintext.
+    const stored = await db.users.passwordHashFor(ops.id);
+    assert.ok(stored && stored.startsWith('scrypt$'), 'the password is stored as an scrypt hash');
+
+    // Second sign-in: the password is now the first factor.
+    const fresh = newClient();
+    const noPw = await fresh.request('/api/auth/email/otp', { method: 'POST', body: { email: ops.email, audience: 'staff' } });
+    assert.equal(noPw.status, 401, 'no code is sent without the password');
+    assert.equal(noPw.json.code, 'PASSWORD_REQUIRED');
+    const wrongPw = await fresh.request('/api/auth/email/otp', { method: 'POST', body: { email: ops.email, audience: 'staff', password: 'not-the-password' } });
+    assert.equal(wrongPw.status, 401, 'a wrong password is refused');
+    assert.equal(wrongPw.json.code, 'PASSWORD_WRONG');
+
+    const otp2 = await fresh.request('/api/auth/email/otp', { method: 'POST', body: { email: ops.email, audience: 'staff', password: 'correct-horse-99' } });
+    assert.equal(otp2.status, 200, otp2.text);
+    const verify2 = await fresh.request('/api/auth/email/verify', { method: 'POST', body: { email: ops.email, code: otp2.json.devCode, audience: 'staff' } });
+    assert.equal(verify2.status, 200, verify2.text);
+    assert.equal(verify2.json.redirect, '/admin', 'a password-bearing staff account signs straight through');
+
+    // The customer door cannot be used to skip the password first factor.
+    const onCustomerDoor = await fresh.request('/api/auth/email/otp', { method: 'POST', body: { email: ops.email, audience: 'customer' } });
+    assert.equal(onCustomerDoor.status, 403, 'a staff account cannot sign in through the customer door');
+    assert.equal(onCustomerDoor.json.code, 'WRONG_SURFACE');
+  } finally {
+    config.auth.passwordForStaffDealers = flagBefore;
+  }
+});
+
 maybe('production email sign-in fails closed without a configured mailer', async () => {
   const db = require('../src/db');
   const signin = require('../src/services/signin');

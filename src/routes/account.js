@@ -113,7 +113,7 @@ function loginLocals({ next, reason, ref: referralCode, save, authError } = {}) 
   };
 }
 
-function staffLoginLocals({ next, reason, authError = null } = {}) {
+function staffLoginLocals({ next, reason, authError = null, passwordPending = false } = {}) {
   return {
     view: 'staff-login',
     page: {
@@ -129,6 +129,7 @@ function staffLoginLocals({ next, reason, authError = null } = {}) {
     data: {
       next: auth.safeNextPath(next) || '/admin',
       audience: 'staff',
+      passwordPending: Boolean(passwordPending),
       reason: validate.text(reason, 80) || null,
       authErrorMessage: LOGIN_AUTH_ERRORS[validate.text(authError, 80).toLowerCase()] || '',
       googleReady: config.googleAuth.configured,
@@ -148,14 +149,23 @@ function staffLoginLocals({ next, reason, authError = null } = {}) {
 router.get('/login', async (req, res, next) => {
   try {
     if (isAdminHost(req)) {
-      if (req.user) return res.redirect(302, auth.safeNextPath(req.query.next) || '/admin');
+      const passwordPending = Boolean(req.session && req.session.passwordPending);
+      if (req.user && !passwordPending) return res.redirect(302, auth.safeNextPath(req.query.next) || '/admin');
       return await sendPage(req, res, {
-        ...staffLoginLocals({ next: req.query.next, reason: req.query.reason, authError: req.query.auth_error }),
+        ...staffLoginLocals({ next: req.query.next, reason: req.query.reason, authError: req.query.auth_error, passwordPending }),
         routePath: '/login',
         cache: CACHE.private,
       });
     }
     if (req.user) {
+      // §12.2 / 038 — a staff or dealer session mid password-setup: the customer
+      // door has no set-password step, so send them to the surface that does.
+      if (req.session && req.session.passwordPending) {
+        const to = req.user.role === 'dealer'
+          ? '/dealer/login'
+          : (config.admin.enforceHost ? `${config.admin.url}/login` : '/admin/login');
+        return res.redirect(302, `${to}?next=${encodeURIComponent(auth.safeNextPath(req.query.next) || '')}`);
+      }
       const fallback = roles.isStaff(req.user.role) ? '/admin' : req.user.role === 'dealer' ? '/dealer/dashboard' : DASHBOARD_PATH;
       return res.redirect(302, auth.safeNextPath(req.query.next) || fallback);
     }
@@ -181,9 +191,10 @@ router.get('/admin/login', async (req, res, next) => {
     if (config.admin.enforceHost && isAdminHost(req)) {
       return res.redirect(302, `/login?next=${encodeURIComponent(nextPath)}`);
     }
-    if (req.user && roles.isStaff(req.user.role)) return res.redirect(302, nextPath);
+    const passwordPending = Boolean(req.session && req.session.passwordPending);
+    if (req.user && roles.isStaff(req.user.role) && !passwordPending) return res.redirect(302, nextPath);
     return await sendPage(req, res, {
-      ...staffLoginLocals({ next: nextPath, reason: req.query.reason, authError: req.query.auth_error }),
+      ...staffLoginLocals({ next: nextPath, reason: req.query.reason, authError: req.query.auth_error, passwordPending }),
       routePath: '/admin/login',
       cache: CACHE.private,
     });

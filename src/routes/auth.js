@@ -83,7 +83,10 @@ router.post('/email/otp', auth.sameOriginOnly, emailOtpLimiter, async (req, res,
   try {
     const body = req.body || {};
     const audience = audienceFromRequest(req);
-    const result = await signin.requestEmailCode({ rawEmail: body.email, ip: req.ip, audience });
+    // First factor for staff + dealer: the password, if the account has one.
+    // Customers never send it and it is ignored for them.
+    const password = typeof body.password === 'string' ? body.password : '';
+    const result = await signin.requestEmailCode({ rawEmail: body.email, password, ip: req.ip, audience });
     if (!result.ok) return sendJson(res, { ok: false, error: result.error, code: result.code }, { status: result.status });
     return sendJson(res, {
       ok: true,
@@ -115,6 +118,24 @@ router.post('/email/verify', auth.sameOriginOnly, emailVerifyLimiter, async (req
     if (!result.ok) return sendJson(res, { ok: false, error: result.error, code: result.code }, { status: result.status });
 
     auth.setSessionCookie(res, result.token, { expiresAt: result.expiresAt });
+
+    // §12.2 / 038: the email is proven but this account has no password yet.
+    // The session is password-pending — it may only finish the password, so the
+    // browser is sent to the "set your password" step instead of the dashboard.
+    if (result.passwordPending) {
+      return sendJson(res, {
+        ok: true,
+        user: {
+          name: result.user.name,
+          firstName: result.user.shortName,
+          email: result.user.email,
+          emailVerified: Boolean(result.emailVerified || result.user.emailVerified),
+          hasName: Boolean(result.user.name),
+        },
+        password: { required: true },
+      });
+    }
+
     // A partner signing in through the normal door lands in their portal, not
     // the customer dashboard. The role decides; a safe `next` still wins.
     const defaultRedirect = signin.defaultRedirect(result.user && result.user.role ? result.user.role : audience);
@@ -278,6 +299,53 @@ router.post('/mfa', mfaLimiter, async (req, res, next) => {
       via: result.via,
       redirect: next_ || signin.defaultRedirect(req.user.role),
     });
+  } catch (error) {
+    return next(error);
+  }
+});
+
+// §12.2 / 038 — the self-set password step. A `password_pending` session may
+// only do this: choose the account's password. Once stored, a staff account
+// that already has a confirmed authenticator continues to the TOTP step in the
+// same sign-in; a dealer (or staff without TOTP yet) is finished.
+router.post('/password/set', auth.sameOriginOnly, async (req, res, next) => {
+  try {
+    if (!req.user || !req.session) {
+      return sendJson(res, { ok: false, error: 'Sign in again — this session has ended.' }, { status: 401 });
+    }
+    if (!req.session.passwordPending) {
+      return sendJson(res, { ok: false, error: 'This account does not need to set a password.' }, { status: 409 });
+    }
+
+    const body = req.body || {};
+    const password = typeof body.password === 'string' ? body.password : '';
+    const confirm = typeof body.confirm === 'string' ? body.confirm : '';
+    if (password.length < 8) {
+      return sendJson(res, { ok: false, error: 'Choose a password of at least 8 characters.' }, { status: 422 });
+    }
+    if (password !== confirm) {
+      return sendJson(res, { ok: false, error: 'The two passwords do not match.' }, { status: 422 });
+    }
+
+    await db.users.setPassword(req.user.id, auth.hashPassword(password));
+
+    // Continue the same sign-in: a staff account with a confirmed authenticator
+    // now does its TOTP step; everyone else is done here.
+    const toMfa = roles.isStaff(req.user.role) && mfa.mustChallenge(req.user);
+    await db.users.setSessionPasswordPending(req.session.id, { mfaPending: toMfa });
+
+    await db.analytics
+      .record('password_set', { payload: { role: req.user.role, toMfa }, sourcePath: '/login' })
+      .catch(() => {});
+
+    const redirect = auth.safeNextPath(body.next) || signin.defaultRedirect(req.user.role);
+    if (toMfa) {
+      return sendJson(res, {
+        ok: true,
+        mfa: { required: true, next: `/login/mfa?next=${encodeURIComponent(redirect)}` },
+      });
+    }
+    return sendJson(res, { ok: true, redirect });
   } catch (error) {
     return next(error);
   }

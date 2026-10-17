@@ -25,7 +25,7 @@
       <p class="auth-message auth-message--banner" data-state="error"><%= authErrorMessage %></p>
     <% } %>
 
-    <div class="auth-card" data-auth-card data-next="<%= next %>" data-ref="" data-save="" data-auth-audience="<%= audience %>">
+    <div class="auth-card" data-auth-card data-next="<%= next %>" data-ref="" data-save="" data-auth-audience="<%= audience %>" data-password-pending="<%= passwordPending ? 'true' : 'false' %>">
       <div data-auth-panel="email">
         <form class="auth-form" data-auth-step="email" action="/api/auth/email/otp" method="post" novalidate>
           <h2 class="mb-1">Your dealer account email</h2>
@@ -34,6 +34,11 @@
             <label class="field__label" for="login-email">Email address</label>
             <input class="input" id="login-email" name="email" type="email" inputmode="email" autocomplete="email" maxlength="160" placeholder="you@example.com" required aria-describedby="login-email-hint">
             <p class="field__hint" id="login-email-hint">We will send a one-time code to this address. It expires in <%= otp.ttlMinutes %> minutes.</p>
+          </div>
+          <div class="field">
+            <label class="field__label" for="login-password">Password</label>
+            <input class="input" id="login-password" name="password" type="password" autocomplete="current-password" placeholder="Your account password" aria-describedby="login-password-hint">
+            <p class="field__hint" id="login-password-hint">Leave blank if this is your first sign-in — you'll set a password right after the email code.</p>
           </div>
           <input type="hidden" name="audience" value="<%= audience %>">
           <input type="hidden" name="next" value="<%= next %>">
@@ -70,6 +75,24 @@
             <button class="btn btn--primary" type="submit">Sign in</button>
             <button class="btn btn--ghost" type="button" data-auth-restart>Use a different email</button>
             <button class="btn btn--secondary" type="button" data-auth-resend>Send a new code</button>
+          </div>
+          <p class="auth-message" data-auth-message role="status" aria-live="polite"></p>
+        </form>
+
+        <form class="auth-form hidden" data-auth-step="set-password" action="/api/auth/password/set" method="post" novalidate hidden>
+          <h2 class="mb-1">Set your password</h2>
+          <p class="note-inline">This is your first sign-in to this account. Choose a password — from now on you sign in with your password and an email code.</p>
+          <input type="hidden" name="next" value="<%= next %>">
+          <div class="field">
+            <label class="field__label" for="set-password">New password</label>
+            <input class="input" id="set-password" name="password" type="password" autocomplete="new-password" minlength="8" placeholder="At least 8 characters" required>
+          </div>
+          <div class="field">
+            <label class="field__label" for="set-password-confirm">Confirm password</label>
+            <input class="input" id="set-password-confirm" name="confirm" type="password" autocomplete="new-password" placeholder="Enter it again" required>
+          </div>
+          <div class="btn-row">
+            <button class="btn btn--primary" type="submit">Set password</button>
           </div>
           <p class="auth-message" data-auth-message role="status" aria-live="polite"></p>
         </form>

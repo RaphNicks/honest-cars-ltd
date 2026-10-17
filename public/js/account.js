@@ -56,6 +56,12 @@ export function initLogin(root = document) {
   const nameInput = card.querySelector('#login-name');
   const emailCodeInput = card.querySelector('#login-email-code');
   const emailLabel = card.querySelector('[data-auth-email]');
+  // §12.2 / 038 — first factor for staff + dealer. Absent on the customer
+  // door, so every reference below guards against null.
+  const passwordInput = card.querySelector('#login-password');
+  const setPasswordStep = card.querySelector('[data-auth-step="set-password"]');
+  const setPasswordInput = setPasswordStep ? setPasswordStep.querySelector('#set-password') : null;
+  const setPasswordConfirmInput = setPasswordStep ? setPasswordStep.querySelector('#set-password-confirm') : null;
 
   const next = card.dataset.next || '';
   const referral = card.dataset.ref || '';
@@ -73,13 +79,22 @@ export function initLogin(root = document) {
   const showEmailStep = ({ focus = true } = {}) => {
     setVisible(emailStep, true);
     setVisible(emailCodeStep, false);
+    setVisible(setPasswordStep, false);
     if (focus && emailInput) emailInput.focus();
   };
 
   const showCodeStep = () => {
     setVisible(emailStep, false);
     setVisible(emailCodeStep, true);
+    setVisible(setPasswordStep, false);
     if (emailCodeInput) emailCodeInput.focus();
+  };
+
+  const showSetPasswordStep = () => {
+    setVisible(emailStep, false);
+    setVisible(emailCodeStep, false);
+    setVisible(setPasswordStep, true);
+    if (setPasswordInput) setPasswordInput.focus();
   };
 
   const finishLogin = async (result, message) => {
@@ -113,7 +128,11 @@ export function initLogin(root = document) {
       ? emailCodeStep.querySelector('[data-auth-resend]')
       : emailStep.querySelector('button[type="submit"]');
     if (button) button.disabled = true;
-    const result = await postJson('/api/auth/email/otp', { email: typedEmail, audience });
+    const result = await postJson('/api/auth/email/otp', {
+      email: typedEmail,
+      password: passwordInput ? passwordInput.value : '',
+      audience,
+    });
     if (button) button.disabled = false;
     if (!result.ok) return setMessage(currentMessage, result.error || 'We could not send a code just now.', 'error');
 
@@ -153,6 +172,15 @@ export function initLogin(root = document) {
     if (button) button.disabled = false;
     if (!result.ok) return setMessage(message, result.error || 'That code did not work.', 'error');
 
+    // §12.2 / 038 — first sign-in for a staff or dealer account: the email is
+    // proven, now choose the password that protects this account from here on.
+    if (result.password && result.password.required) {
+      showSetPasswordStep();
+      const pwMessage = setPasswordStep ? setPasswordStep.querySelector('[data-auth-message]') : null;
+      if (pwMessage) setMessage(pwMessage, 'Almost there — choose a password for this account.', 'ok');
+      return undefined;
+    }
+
     if (result.mfa && result.mfa.required) {
       setMessage(message, 'One more step \u2014 enter your authenticator code.', 'ok');
       if (pendingSave) {
@@ -165,8 +193,36 @@ export function initLogin(root = document) {
     return undefined;
   };
 
+  const submitSetPassword = async (event) => {
+    if (event) event.preventDefault();
+    const message = setPasswordStep ? setPasswordStep.querySelector('[data-auth-message]') : null;
+    if (message) setMessage(message, '');
+    const password = String(setPasswordInput ? setPasswordInput.value : '');
+    const confirm = String(setPasswordConfirmInput ? setPasswordConfirmInput.value : '');
+    if (password.length < 8) return setMessage(message, 'Choose a password of at least 8 characters.', 'error');
+    if (password !== confirm) return setMessage(message, 'The two passwords do not match.', 'error');
+
+    const button = setPasswordStep ? setPasswordStep.querySelector('button[type="submit"]') : null;
+    if (button) button.disabled = true;
+    const result = await postJson('/api/auth/password/set', { password, confirm, next });
+    if (button) button.disabled = false;
+    if (!result.ok) return setMessage(message, result.error || 'We could not save that password.', 'error');
+
+    if (result.mfa && result.mfa.required) {
+      if (message) setMessage(message, 'One more step \u2014 enter your authenticator code.', 'ok');
+      window.location.assign(result.mfa.next || '/login/mfa');
+      return undefined;
+    }
+    if (message) setMessage(message, 'Signed in. Taking you through\u2026', 'ok');
+    window.location.assign(
+      result.redirect || (audience === 'dealer' ? '/dealer/dashboard' : audience === 'staff' ? '/admin' : '/account'),
+    );
+    return undefined;
+  };
+
   if (emailStep) emailStep.addEventListener('submit', requestEmailCode);
   if (emailCodeStep) emailCodeStep.addEventListener('submit', verifyEmailCode);
+  if (setPasswordStep) setPasswordStep.addEventListener('submit', submitSetPassword);
 
   const restartEmail = emailCodeStep && emailCodeStep.querySelector('[data-auth-restart]');
   if (restartEmail) restartEmail.addEventListener('click', () => showEmailStep());
@@ -181,7 +237,10 @@ export function initLogin(root = document) {
     });
   }
 
-  showEmailStep({ focus: false });
+  // §12.2 / 038 — a session that proved its email but has not set a password yet
+  // opens straight on the "set your password" step instead of the email code.
+  if (card.dataset.passwordPending === 'true' && setPasswordStep) showSetPasswordStep();
+  else showEmailStep({ focus: false });
 }
 
 // ---------------------------------------------------------------------------

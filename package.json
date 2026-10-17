@@ -25,7 +25,7 @@
     "lint:type": "node scripts/lint-type-scale.js",
     "lint:js": "node scripts/lint-js.js",
     "lint": "npm run lint:type && npm run lint:js",
-    "test": "node --test test/*.test.js",
+    "test": "AUTH_PASSWORD_FOR_STAFF_DEALERS=false node --test test/*.test.js",
     "artifacts": "node scripts/build-static.js && node scripts/lint-type-scale.js",
     "check": "npm run lint && npm test",
     "smoke": "node scripts/smoke-roles.mjs",

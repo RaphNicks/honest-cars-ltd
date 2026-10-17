@@ -35,6 +35,7 @@ CREATE TABLE IF NOT EXISTS `users` (
   contact_phone    VARCHAR(40)   NULL,                  -- optional contact number; never an identity key
   name             VARCHAR(120)  NULL,
   email            VARCHAR(160)  NULL,                  -- profile/display value; verified logins live below
+  password_hash    VARCHAR(255)  NULL,                  -- §12.2 first factor for staff/dealer (scrypt, migration 038)
   marketing_opt_in TINYINT(1)    NOT NULL DEFAULT 0,    -- NDPA: explicit, revocable
   status           ENUM('active','blocked','deleted') NOT NULL DEFAULT 'active',
   role             ENUM('customer','dealer','ops','inspector','marketing','finance','admin')
@@ -317,6 +318,7 @@ CREATE TABLE IF NOT EXISTS `sessions` (
   revoked_at DATETIME      NULL,
   mfa_pending  TINYINT(1)      NOT NULL DEFAULT 0,  -- passed the first factor only (§12.2)
   mfa_attempts SMALLINT UNSIGNED NOT NULL DEFAULT 0, -- brute-force ceiling on a 6-digit code
+  password_pending TINYINT(1)  NOT NULL DEFAULT 0,  -- email proven, password not yet chosen (§12.2, 038)
   created_at TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (id),
   UNIQUE KEY uq_session_token (token_hash),

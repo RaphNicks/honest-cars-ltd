@@ -519,11 +519,36 @@ async function countRecentEmailCodes(email, purpose = 'sign_in', userId = null, 
 // ---------------------------------------------------------------------------
 // Sessions
 // ---------------------------------------------------------------------------
-async function createSession({ userId, tokenHash, expiresAt, ip, userAgent, mfaPending = false }) {
+async function createSession({ userId, tokenHash, expiresAt, ip, userAgent, mfaPending = false, passwordPending = false }) {
   await query(
-    'INSERT INTO sessions (user_id, token_hash, expires_at, ip, user_agent, mfa_pending) VALUES (?, ?, ?, ?, ?, ?)',
-    [userId, tokenHash, expiresAt, ip || null, userAgent ? String(userAgent).slice(0, 200) : null, mfaPending ? 1 : 0],
+    'INSERT INTO sessions (user_id, token_hash, expires_at, ip, user_agent, mfa_pending, password_pending) VALUES (?, ?, ?, ?, ?, ?, ?)',
+    [userId, tokenHash, expiresAt, ip || null, userAgent ? String(userAgent).slice(0, 200) : null, mfaPending ? 1 : 0, passwordPending ? 1 : 0],
   );
+}
+
+/** The scrypt hash for an account, or null. Only the sign-in path reads this. */
+async function passwordHashFor(userId) {
+  const row = await queryOne('SELECT password_hash FROM users WHERE id = ? LIMIT 1', [userId]);
+  return row && row.password_hash ? row.password_hash : null;
+}
+
+async function setPassword(userId, passwordHash) {
+  await query('UPDATE users SET password_hash = ? WHERE id = ?', [passwordHash, userId]);
+  return { ok: true };
+}
+
+/**
+ * Finish the self-set password step on a `password_pending` session. The
+ * session keeps its user; we clear the pending flag and (for a staff account
+ * that already has a confirmed authenticator) immediately continue to MFA, so
+ * the sign-in flow is password -> email code -> password -> TOTP in one go.
+ */
+async function setSessionPasswordPending(sessionId, { mfaPending = false } = {}) {
+  await query(
+    'UPDATE sessions SET password_pending = 0, mfa_pending = ? WHERE id = ?',
+    [mfaPending ? 1 : 0, sessionId],
+  );
+  return { ok: true };
 }
 
 /**
@@ -551,7 +576,7 @@ async function recordMfaFailure(sessionId) {
 /** Returns the session + its user, or null when missing/expired/revoked. */
 async function findSession(tokenHash) {
   const row = await queryOne(
-    `SELECT s.id AS session_id, s.expires_at, s.revoked_at, s.mfa_pending, s.mfa_attempts,
+    `SELECT s.id AS session_id, s.expires_at, s.revoked_at, s.mfa_pending, s.mfa_attempts, s.password_pending,
             u.*, ei.verified_at AS email_verified_at,
             EXISTS (SELECT 1 FROM user_email_identities gi WHERE gi.user_id = u.id AND gi.google_subject IS NOT NULL) AS google_linked
        FROM sessions s
@@ -569,6 +594,9 @@ async function findSession(tokenHash) {
     // user and no authority — every gate reads this before anything else.
     mfaPending: Boolean(row.mfa_pending),
     mfaAttempts: Number(row.mfa_attempts) || 0,
+    // §12.2 / 038: the email is proven but the password is not yet set — the
+    // account may only call /password/set, nothing else.
+    passwordPending: Boolean(row.password_pending),
     user: shapeUser(row),
   };
 }
@@ -934,6 +962,9 @@ module.exports = {
   countRecentEmailCodes,
   createSession,
   findSession,
+  passwordHashFor,
+  setPassword,
+  setSessionPasswordPending,
   revokeSession,
   revokeSessionById,
   clearSessionMfa,

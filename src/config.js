@@ -163,6 +163,12 @@ const config = {
     totpClockOffsetSeconds: int(process.env.TOTP_CLOCK_OFFSET_SECONDS, 0),
     // Peppers the OTP hash and the session token. Must be set in production.
     pepper: process.env.AUTH_PEPPER || '',
+    // §12.2 / 038: the password is the first factor for staff + dealer sign-in,
+    // and a password-less account sets one on its first email sign-in. On by
+    // default; the automated suite turns it off (via the test script) so the
+    // many existing staff/dealer fixtures keep their historical no-password
+    // sign-in, and one dedicated test exercises the on path directly.
+    passwordForStaffDealers: bool(process.env.AUTH_PASSWORD_FOR_STAFF_DEALERS, true),
     // Development only: echo the code in the API response so the flow can be
     // driven without SMTP. Forced off when NODE_ENV=production.
     get showCodeInResponse() {

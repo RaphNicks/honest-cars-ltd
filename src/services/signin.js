@@ -86,7 +86,7 @@ const UNAVAILABLE = 'We could not send a sign-in code to that email. Please cont
 const UNAVAILABLE_GOOGLE = 'We could not sign you in with Google here. Please contact Honest Cars for help.';
 const WRONG_SURFACE = 'That sign-in option is not available for this account. Please contact Honest Cars for help.';
 
-async function requestEmailCode({ rawEmail, purpose = 'sign_in', userId = null, ip = null, audience = 'customer' }) {
+async function requestEmailCode({ rawEmail, purpose = 'sign_in', userId = null, ip = null, audience = 'customer', password = null }) {
   const address = normaliseEmail(rawEmail);
   if (!address) return resultError('INVALID_EMAIL', 422, 'Enter a valid email address.');
   if (!EMAIL_PURPOSES.includes(purpose)) return resultError('INVALID_PURPOSE', 422, 'Choose a valid email verification action.');
@@ -114,6 +114,26 @@ async function requestEmailCode({ rawEmail, purpose = 'sign_in', userId = null, 
     const existing = await db.users.findByVerifiedEmail(address);
     if (!existing || existing.status !== 'active' || !audienceMatches(existing, scope)) {
       return resultError('SIGN_IN_UNAVAILABLE', 404, UNAVAILABLE);
+    }
+    // The password is the first factor once it exists: verify it before a code
+    // is sent. An account that has not chosen one yet (first sign-in) skips this
+    // and sets a password right after the email code is confirmed.
+    if (config.auth.passwordForStaffDealers) {
+      const storedHash = await db.users.passwordHashFor(existing.id);
+      if (storedHash) {
+        if (!password) return resultError('PASSWORD_REQUIRED', 401, 'Enter your password to get a sign-in code.');
+        if (!auth.verifyPassword(password, storedHash)) return resultError('PASSWORD_WRONG', 401, 'That password is not right for this account.');
+      }
+    }
+  } else if (purpose === 'sign_in' && scope === 'customer' && config.auth.passwordForStaffDealers) {
+    // The customer door collects no password, so a staff or dealer account
+    // belongs on its own sign-in surface, where the password is the first
+    // factor. Honouring it here would let that account skip the password by
+    // signing in through the "customer" door, so it is turned away.
+    const existing = await db.users.findByVerifiedEmail(address);
+    if (existing && existing.status === 'active' && (roles.isStaff(existing.role) || existing.role === 'dealer')) {
+      const door = existing.role === 'dealer' ? 'the dealer sign-in' : 'the staff sign-in';
+      return resultError('WRONG_SURFACE', 403, `That account signs in through ${door}.`);
     }
   }
 
@@ -187,7 +207,15 @@ async function createSession(user, { audience = 'customer', ip = null, userAgent
     return resultError('ACCOUNT_NOT_ACTIVE', 403, 'That account cannot sign in right now. Contact Honest Cars for help.');
   }
 
-  const mfaPending = mfa.mustChallenge(currentUser);
+  // §12.2 / 038: a staff or dealer account that has not chosen a password yet
+  // gets a password-pending session — the email is proven, the password is not
+  // set. (A staff account that already has a confirmed authenticator will move
+  // straight to TOTP once the password is set; not yet.)
+  const isStaffOrDealer = roles.isStaff(currentUser.role) || currentUser.role === 'dealer';
+  const hasPassword = isStaffOrDealer ? Boolean(await db.users.passwordHashFor(currentUser.id)) : false;
+  const needsPassword = config.auth.passwordForStaffDealers && isStaffOrDealer && !hasPassword;
+  const mfaPending = needsPassword ? false : mfa.mustChallenge(currentUser);
+  const passwordPending = needsPassword;
   const token = auth.newSessionToken();
   const expiresAt = new Date(Date.now() + config.auth.sessionDays * 86_400_000);
   await db.users.createSession({
@@ -197,13 +225,14 @@ async function createSession(user, { audience = 'customer', ip = null, userAgent
     ip,
     userAgent,
     mfaPending,
+    passwordPending,
   });
   db.users.pruneSessions().catch(() => {});
   await db.analytics
     .record('customer_sign_in_succeeded', { payload: { method: source, audience: scope }, sourcePath: '/login' })
     .catch(() => {});
 
-  return { ok: true, user: currentUser, token, expiresAt, mfaPending };
+  return { ok: true, user: currentUser, token, expiresAt, mfaPending, passwordPending };
 }
 
 async function verifyEmailCode({

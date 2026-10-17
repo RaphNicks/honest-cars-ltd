@@ -231,10 +231,17 @@ function dealerLoginNext(value) {
 // ---------------------------------------------------------------------------
 router.get('/login', async (req, res, next) => {
   try {
-    if (req.user) {
+    const passwordPending = Boolean(req.session && req.session.passwordPending);
+    if (req.user && !passwordPending) {
       if (req.user.role === 'dealer') return res.redirect(302, dealerLoginNext(req.query.next));
       if (roles.isStaff(req.user.role)) return res.redirect(302, '/admin');
       return res.redirect(302, '/dealer');
+    }
+    // §12.2 / 038 — a staff session mid password-setup on the dealer door:
+    // send it to the staff surface that has the set-password step. A dealer
+    // session mid setup falls through and opens on that step.
+    if (req.user && passwordPending && roles.isStaff(req.user.role)) {
+      return res.redirect(302, `${config.admin.enforceHost ? '/login' : '/admin/login'}?next=${encodeURIComponent(dealerLoginNext(req.query.next))}`);
     }
     return await sendPage(req, res, {
       routePath: `${HOME}/login`,
@@ -252,6 +259,7 @@ router.get('/login', async (req, res, next) => {
       data: {
         next: dealerLoginNext(req.query.next),
         audience: 'dealer',
+        passwordPending: passwordPending,
         reason: req.sessionEnded ? 'expired' : null,
         authErrorMessage: '',
         googleReady: config.googleAuth.configured,
